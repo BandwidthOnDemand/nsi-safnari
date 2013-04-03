@@ -1,0 +1,8 @@
+.cache
+.history
+.target/
+target/
+logs/
+bin/
+project/project/
+project/target/
