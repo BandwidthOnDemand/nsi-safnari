@@ -12,6 +12,8 @@ object ApplicationBuild extends Build {
   )
 
   val main = play.Project(appName, appVersion, appDependencies).settings(
+    scalaVersion := "2.10.1",
+    scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
     resolvers ++= Seq(
         "SURFnet BoD Snapshots" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-snapshots",
         "SURFnet BoD Releases" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-releases"
