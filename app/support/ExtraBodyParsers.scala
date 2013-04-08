@@ -44,6 +44,7 @@ object ExtraBodyParsers {
     tolerantSoap(maxLength),
     _ => Results.BadRequest("Expecting " + SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
+  import scala.language.reflectiveCalls
   def tolerantSoap(maxLength: Int): BodyParser[SOAPMessage] = BodyParser("SOAP, maxLength=" + maxLength) { request =>
     Traversable.takeUpTo[Array[Byte]](maxLength).apply(Iteratee.consume[Array[Byte]]().mapDone { bytes =>
       Try {
