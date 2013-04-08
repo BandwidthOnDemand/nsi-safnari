@@ -16,7 +16,7 @@ import play.api.http.ContentTypes
 object ConnectionProvider extends Controller {
 
   private val WsdlResourcePath = "wsdl/2.0"
-  private val WsdlFilenamePattern = "[a-z0-9_-]+\\.(wsdl|xsd)"
+  private val WsdlFilenamePattern = "[a-z0-9_-]+(\\.[a-z0-9_-]+)*\\.(wsdl|xsd)"
   private val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
   require(BaseWsdlFilename matches WsdlFilenamePattern, "base WSDL filename does not match WSDL filename pattern")
 
