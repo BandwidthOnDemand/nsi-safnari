@@ -65,12 +65,12 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed {
       val result = Enumerator.fromFile(new File("test/reserve.xml")) |>>> nsiRequestMessage.apply(FakeSoapRequest())
 
       Await.result(result, Duration.Inf) match {
-        case Right(message: NsiRequestMessage.Reserve) => true
+        case Right(_: NsiRequestMessage.Reserve) => true
         case x => failure(s"unexpected response $x")
       }
     }
 
-    "give BadRequest when the request is invalid" in {
+    "give NSI Reserve for a request with extra xml" in {
       val result = Enumerator.fromFile(new File("test/reserve_additional_xml.xml")) |>>> nsiRequestMessage.apply(FakeSoapRequest())
 
       Await.result(result, Duration.Inf) match {
@@ -78,6 +78,16 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed {
         case x => failure(s"unexpected response $x")
       }
     }
+
+    "give BadRequest when the nsi headers are missing" in {
+      val result = Enumerator.fromFile(new File("test/reserve_without_headers.xml")) |>>> nsiRequestMessage.apply(FakeSoapRequest())
+
+      Await.result(result, Duration.Inf) match {
+        case Left(SimpleResult(h, _)) => h.status must_== 400
+        case x => failure(s"unexpected response $x")
+      }
+    }.pendingUntilFixed
+
   }
 
   object FakeSoapRequest {
