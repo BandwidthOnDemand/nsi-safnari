@@ -14,14 +14,11 @@ import models.NsiResponseMessage
 
 object ConnectionProvider extends Controller {
 
-  def request = NsiEndPoint { nsiRequest =>
-
-    nsiRequest match {
-      case r: NsiRequestMessage.Reserve =>
-        NsiResponseMessage.GenericAck(r.correlationId)
-      case _ =>
-        NsiResponseMessage.GenericFail()
-    }
+  def request = NsiEndPoint {
+    case r: NsiRequestMessage.Reserve =>
+      NsiResponseMessage.GenericAck(r.correlationId)
+    case _ =>
+      NsiResponseMessage.GenericFail()
   }
 
 }

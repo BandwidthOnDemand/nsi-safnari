@@ -1,36 +1,23 @@
 package support
 
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import scala.Array.canBuildFrom
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import javax.xml.bind.{JAXBContext, Unmarshaller}
+import javax.xml.soap._
 import scala.collection.JavaConverters.asScalaIteratorConverter
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
-import org.ogf.schemas.nsi._2013._04.connection.types.ReserveType
-import javax.xml.bind.JAXBContext
-import javax.xml.soap.MessageFactory
-import javax.xml.soap.MimeHeaders
-import javax.xml.soap.SOAPConstants
-import javax.xml.soap.SOAPFactory
-import javax.xml.soap.SOAPMessage
-import models.NsiRequestMessage
-import models.NsiResponseMessage
-import play.api.http.ContentTypeOf
-import play.api.http.Writeable
-import play.api.libs.iteratee.Done
+import scala.util.{Failure, Success, Try}
+import play.api.http.{ContentTypeOf, Writeable}
+import play.api.libs.iteratee._
 import play.api.libs.iteratee.Input.Empty
-import play.api.libs.iteratee.Iteratee
-import play.api.libs.iteratee.Traversable
 import play.api.mvc._
 import play.api.mvc.BodyParsers.parse.when
-import javax.xml.bind.Unmarshaller
+import org.ogf.schemas.nsi._2013._04.connection.types.ReserveType
 import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
-import javax.xml.soap.SOAPElement
+import models.{NsiRequestMessage, NsiResponseMessage}
 
 object ExtraBodyParsers {
 
   implicit val nsiMessageContentType: ContentTypeOf[NsiResponseMessage] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+
   implicit val nsiMessageWriteable: Writeable[NsiResponseMessage] = Writeable { message =>
     val soap = MessageFactory.newInstance().createMessage()
 
@@ -45,10 +32,6 @@ object ExtraBodyParsers {
 
     out.toByteArray
   }
-
-  implicit val unmarshaller = JAXBContext.newInstance(
-    classOf[ReserveType],
-    classOf[CommonHeaderType]).createUnmarshaller()
 
   def NsiEndPoint(action: NsiRequestMessage => NsiResponseMessage): Action[NsiRequestMessage] = Action(nsiRequestMessage) { request =>
     Results.Ok(action(request.body))
@@ -78,7 +61,11 @@ object ExtraBodyParsers {
       }
   }
 
-  def nsiRequestMessage(implicit unmarshaller: Unmarshaller): BodyParser[NsiRequestMessage] = soap.map { soapMessage =>
+  def nsiRequestMessage(): BodyParser[NsiRequestMessage] = soap.map { soapMessage =>
+    val unmarshaller = JAXBContext.newInstance(
+      classOf[ReserveType],
+      classOf[CommonHeaderType]).createUnmarshaller()
+
     val header = unmarshaller.unmarshal(firstElement(soapMessage.getSOAPHeader()), classOf[CommonHeaderType]).getValue
     val body = unmarshaller.unmarshal(firstElement(soapMessage.getSOAPBody()), classOf[ReserveType]).getValue
 
