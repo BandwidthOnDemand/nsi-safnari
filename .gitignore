@@ -1,6 +1,9 @@
 .cache
+.classpath
 .history
+.project
 .target/
+.settings/
 target/
 logs/
 bin/
