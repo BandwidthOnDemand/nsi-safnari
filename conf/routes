@@ -5,6 +5,8 @@
 # Home page
 GET     /                           controllers.Application.index
 POST    /nsi/v2/connectionProvider  controllers.ConnectionProvider.request
+GET     /nsi/v2/connectionProvider  controllers.ConnectionProvider.wsdl(wsdl: String)
+GET     /nsi/v2/:wsdlOrXsd          controllers.ConnectionProvider.wsdlOrXsd(wsdlOrXsd: String)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
