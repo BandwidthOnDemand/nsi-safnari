@@ -4,8 +4,9 @@
 .project
 .target/
 .settings/
-target/
-logs/
-bin/
-project/project/
-project/target/
+/dist/
+/target/
+/logs/
+/bin/
+/project/project/
+/project/target/
