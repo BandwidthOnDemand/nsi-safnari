@@ -1,0 +1,34 @@
+<soapenv:Envelope xmlns:type="http://schemas.ogf.org/nsi/2013/04/connection/types"
+   xmlns:head="http://schemas.ogf.org/nsi/2013/04/framework/headers"
+   xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+   <soapenv:Header />
+   <soapenv:Body>
+      <type:reserve>
+         <globalReservationId />
+         <description>My first reservation</description>
+         <criteria version="">
+            <schedule>
+               <startTime>2013-04-03T12:15:29.731+02:00</startTime>
+               <endTime>2013-04-03T12:25:29.798+02:00</endTime>
+            </schedule>
+            <bandwidth>100</bandwidth>
+            <serviceAttributes>
+            </serviceAttributes>
+            <path>
+               <directionality>Bidirectional</directionality>
+               <symmetric></symmetric>
+               <sourceSTP>
+                  <networkId></networkId>
+                  <localId></localId>
+                  <labels></labels>
+               </sourceSTP>
+               <destSTP>
+                  <networkId></networkId>
+                  <localId></localId>
+                  <labels></labels>
+               </destSTP>
+            </path>
+         </criteria>
+      </type:reserve>
+   </soapenv:Body>
+</soapenv:Envelope>

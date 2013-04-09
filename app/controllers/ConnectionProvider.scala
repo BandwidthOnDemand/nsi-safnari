@@ -51,6 +51,8 @@ object ConnectionProvider extends Controller {
   def request = NsiEndPoint {
     case r: NsiRequestMessage.Reserve =>
       NsiResponseMessage.GenericAck(r.correlationId)
+    case q: NsiRequestMessage.QuerySummary =>
+      NsiResponseMessage.GenericAck(q.correlationId)
     case _ =>
       NsiResponseMessage.GenericFail()
   }

@@ -10,7 +10,7 @@ import play.api.libs.iteratee._
 import play.api.libs.iteratee.Input.Empty
 import play.api.mvc._
 import play.api.mvc.BodyParsers.parse.when
-import org.ogf.schemas.nsi._2013._04.connection.types.ReserveType
+import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
 import models.{NsiRequestMessage, NsiResponseMessage}
 
@@ -65,12 +65,24 @@ object ExtraBodyParsers {
   def nsiRequestMessage(): BodyParser[NsiRequestMessage] = soap.map { soapMessage =>
     val unmarshaller = JAXBContext.newInstance(
       classOf[ReserveType],
-      classOf[CommonHeaderType]).createUnmarshaller()
+      classOf[CommonHeaderType],
+      classOf[QueryType]).createUnmarshaller()
+
+    //soapMessage.writeTo(Console.out)
 
     val header = unmarshaller.unmarshal(firstElement(soapMessage.getSOAPHeader()), classOf[CommonHeaderType]).getValue
-    val body = unmarshaller.unmarshal(firstElement(soapMessage.getSOAPBody()), classOf[ReserveType]).getValue
 
-    NsiRequestMessage.Reserve(header.getCorrelationId())
+    val bodyNode = firstElement(soapMessage.getSOAPBody())
+
+    bodyNode.getLocalName match {
+      case "reserve" =>
+        unmarshaller.unmarshal(bodyNode, classOf[ReserveType]).getValue
+        NsiRequestMessage.Reserve(header.getCorrelationId())
+      case "querySummary" =>
+        unmarshaller.unmarshal(bodyNode, classOf[QueryType])
+        NsiRequestMessage.QuerySummary(header.getCorrelationId())
+    }
+
   }
 
   private def firstElement(elem: SOAPElement) =
