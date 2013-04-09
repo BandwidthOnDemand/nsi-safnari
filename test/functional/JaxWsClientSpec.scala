@@ -58,7 +58,10 @@ class JaxWsClientSpec extends Specification {
     private def createNsiHeader() = {
         val factory = new HeadersObjectFactory()
         val header = factory.createCommonHeaderType()
-        header.setCorrelationId("123-abc")
+        header.setCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
+        header.setProtocolVersion("0")
+        header.setRequesterNSA("")
+        header.setProviderNSA("")
         factory.createNsiHeader(header)
     }
 
