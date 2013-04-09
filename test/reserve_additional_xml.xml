@@ -4,7 +4,7 @@
    <soapenv:Header>
       <head:nsiHeader>
          <protocolVersion>2.0</protocolVersion>
-         <correlationId>1234567890</correlationId>
+         <correlationId>urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def</correlationId>
          <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
          <providerNSA>nl.surfnet</providerNSA>
          <replyTo>http://localhost:9000</replyTo>

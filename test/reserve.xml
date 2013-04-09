@@ -4,7 +4,7 @@
    <soapenv:Header>
       <head:nsiHeader>
          <protocolVersion>2.0</protocolVersion>
-         <correlationId>1234567890</correlationId>
+         <correlationId>urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def</correlationId>
          <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
          <providerNSA>nl.surfnet</providerNSA>
          <replyTo>http://localhost:9000</replyTo>
@@ -12,9 +12,8 @@
    </soapenv:Header>
    <soapenv:Body>
       <type:reserve>
-         <globalReservationId />
          <description>My first reservation</description>
-         <criteria version="">
+         <criteria version="1">
             <schedule>
                <startTime>2013-04-03T12:15:29.731+02:00</startTime>
                <endTime>2013-04-03T12:25:29.798+02:00</endTime>
@@ -24,7 +23,7 @@
             </serviceAttributes>
             <path>
                <directionality>Bidirectional</directionality>
-               <symmetric></symmetric>
+               <symmetric>true</symmetric>
                <sourceSTP>
                   <networkId></networkId>
                   <localId></localId>

@@ -1,7 +1,22 @@
 <soapenv:Envelope xmlns:type="http://schemas.ogf.org/nsi/2013/04/connection/types"
    xmlns:head="http://schemas.ogf.org/nsi/2013/04/framework/headers"
    xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
-   <soapenv:Header />
+   <soapenv:Header>
+      <head:nsiHeader>
+         <protocolVersion>2.0</protocolVersion>
+         <correlationId>urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def</correlationId>
+         <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
+         <providerNSA>nl.surfnet</providerNSA>
+         <replyTo>http://localhost:9000</replyTo>
+      </head:nsiHeader>
+      <head:nsiHeader>
+         <protocolVersion>2.0</protocolVersion>
+         <correlationId>urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def</correlationId>
+         <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
+         <providerNSA>nl.surfnet</providerNSA>
+         <replyTo>http://localhost:9000</replyTo>
+      </head:nsiHeader>
+   </soapenv:Header>
    <soapenv:Body>
       <type:reserve>
          <description>My first reservation</description>

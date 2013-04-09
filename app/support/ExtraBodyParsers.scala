@@ -1,18 +1,24 @@
 package support
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
-import javax.xml.bind.{JAXBContext, Unmarshaller}
+import java.io.{ ByteArrayInputStream, ByteArrayOutputStream }
+import javax.xml.bind.{ JAXBContext, Unmarshaller }
 import javax.xml.soap._
 import scala.collection.JavaConverters.asScalaIteratorConverter
-import scala.util.{Failure, Success, Try}
-import play.api.http.{ContentTypeOf, Writeable}
+import scala.util.{ Failure, Success, Try }
+import play.api.http.{ ContentTypeOf, Writeable }
 import play.api.libs.iteratee._
 import play.api.libs.iteratee.Input.Empty
 import play.api.mvc._
 import play.api.mvc.BodyParsers.parse.when
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
-import models.{NsiRequestMessage, NsiResponseMessage}
+import models.{ NsiRequestMessage, NsiResponseMessage }
+import scala.util.control.NonFatal
+import javax.xml.validation.SchemaFactory
+import javax.xml.XMLConstants
+import javax.xml.transform.stream.StreamSource
+import javax.xml.transform.Source
+import scala.reflect.ClassTag
 
 object ExtraBodyParsers {
 
@@ -57,37 +63,73 @@ object ExtraBodyParsers {
         case Left(b) => Done(Left(b), Empty)
         case Right(it) => it.flatMap {
           case Failure(exception) => Done(Left(Results.BadRequest), Empty)
-          case Success(xml) => Done(Right(xml), Empty)
+          case Success(xml)       => Done(Right(xml), Empty)
         }
       }
   }
 
-  def nsiRequestMessage(): BodyParser[NsiRequestMessage] = soap.map { soapMessage =>
-    val unmarshaller = JAXBContext.newInstance(
-      classOf[ReserveType],
-      classOf[CommonHeaderType],
-      classOf[QueryType]).createUnmarshaller()
+  private val NsiFrameworkHeaderNamespace = "http://schemas.ogf.org/nsi/2013/04/framework/headers"
+  private val NsiConnectionTypesNamespace = "http://schemas.ogf.org/nsi/2013/04/connection/types"
 
-    //soapMessage.writeTo(Console.out)
-
-    val header = unmarshaller.unmarshal(firstElement(soapMessage.getSOAPHeader()), classOf[CommonHeaderType]).getValue
-
-    val bodyNode = firstElement(soapMessage.getSOAPBody())
-
-    bodyNode.getLocalName match {
-      case "reserve" =>
-        unmarshaller.unmarshal(bodyNode, classOf[ReserveType]).getValue
-        NsiRequestMessage.Reserve(header.getCorrelationId())
-      case "querySummary" =>
-        unmarshaller.unmarshal(bodyNode, classOf[QueryType])
-        NsiRequestMessage.QuerySummary(header.getCorrelationId())
-    }
-
+  trait NsiRequestMessageFactory {
+    type JaxbMessage
+    def klass: Class[JaxbMessage]
+    def apply(headers: CommonHeaderType, body: JaxbMessage): NsiRequestMessage
+  }
+  def NsiRequestMessageFactory[M](f: (CommonHeaderType, M) => NsiRequestMessage)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory {
+    override type JaxbMessage = M
+    override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]
+    override def apply(headers: CommonHeaderType, body: M): NsiRequestMessage = f(headers, body)
   }
 
-  private def firstElement(elem: SOAPElement) =
+  private val schema = {
+    val schemas = Array("wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
+    val sources = schemas.map(Thread.currentThread().getContextClassLoader().getResource).map(schema => new StreamSource(schema.toExternalForm()): Source)
+    val factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+    factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+    factory.newSchema(sources)
+  }
+
+  def nsiRequestMessage(): BodyParser[NsiRequestMessage] = soap.flatMap { soapMessage =>
+    BodyParser { requestHeader =>
+      val unmarshaller = JAXBContext.newInstance(
+        classOf[ReserveType],
+        classOf[CommonHeaderType],
+        classOf[QueryType]).createUnmarshaller()
+      unmarshaller.setSchema(schema)
+
+      val parsedMessage = for {
+        headerNode <- onlyChildElementWithNamespace(NsiFrameworkHeaderNamespace, soapMessage.getSOAPHeader()).right
+        bodyNode <- onlyChildElementWithNamespace(NsiConnectionTypesNamespace, soapMessage.getSOAPBody()).right
+        messageFactory <- bodyNameToClass(bodyNode).right
+        header <- tryEither(unmarshaller.unmarshal(headerNode, classOf[CommonHeaderType]).getValue).right
+        body <- tryEither(unmarshaller.unmarshal(bodyNode, messageFactory.klass).getValue).right
+      } yield {
+        messageFactory(header, body)
+      }
+
+      Done(parsedMessage.left.map(Results.BadRequest(_)))
+    }
+  }
+
+  private def tryEither[A](f: => A): Either[String, A] = try Right(f) catch {
+    case NonFatal(e) => Left(e.toString)
+  }
+
+  private val MessageFactories = Map(
+    "reserve" -> NsiRequestMessageFactory[ReserveType]((headers, _) => NsiRequestMessage.Reserve(headers.getCorrelationId())),
+    "querySummary" -> NsiRequestMessageFactory[QueryType]((headers, _) => NsiRequestMessage.QuerySummary(headers.getCorrelationId())))
+
+  private def bodyNameToClass(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory] =
+    MessageFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
+
+  private def onlyChildElementWithNamespace(namespaceUri: String, elem: SOAPElement) =
     elem.getChildElements().asScala.collect {
-      case e: org.w3c.dom.Element => e
-    }.toSeq.head
+      case e: org.w3c.dom.Element if e.getNamespaceURI() == namespaceUri => e
+    }.toList match {
+      case Nil      => Left("missing NSI element, expected one")
+      case e :: Nil => Right(e)
+      case _        => Left("multiple NSI elements, expected one")
+    }
 
 }
