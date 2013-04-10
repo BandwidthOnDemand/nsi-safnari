@@ -12,6 +12,6 @@ object ConnectionRequester extends Controller with SoapWebService {
     routes.ConnectionRequester.request().absoluteURL()
 
   def request = Action(soap) { message =>
-    Ok
+    NotImplemented
   }
 }

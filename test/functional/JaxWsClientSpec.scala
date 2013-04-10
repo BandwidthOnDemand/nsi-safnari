@@ -21,6 +21,7 @@ import org.ogf.schemas.nsi._2013._04.framework.headers.{ObjectFactory => Headers
 import javax.xml.bind.JAXBContext
 import javax.xml.parsers.DocumentBuilderFactory
 import org.ogf.schemas.nsi._2013._04.connection.requester.ConnectionServiceRequester
+import com.sun.xml.internal.ws.client.ClientTransportException
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
 class JaxWsClientSpec extends Specification {
@@ -42,7 +43,8 @@ class JaxWsClientSpec extends Specification {
     "be able to talk to the connection requester endpoint" in new WithServer {
       val service = new ConnectionServiceRequester(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceRequester"))
 
-      service.getConnectionServiceRequesterPort().reserveCommitConfirmed("", "123-abc")
+      service.getConnectionServiceRequesterPort()
+        .reserveCommitConfirmed("", "123-abc") must throwA[ClientTransportException](message = "The server sent HTTP status code 501: Not Implemented")
     }
   }
 
