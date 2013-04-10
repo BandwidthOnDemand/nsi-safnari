@@ -4,7 +4,7 @@ import play.api.mvc._
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.headers._
 import support.ExtraBodyParsers._
-import models.NsiRequestMessage
+import models.NsiProviderOperation
 import models.NsiResponseMessage
 
 object ConnectionProvider extends Controller with SoapWebService {
@@ -15,9 +15,9 @@ object ConnectionProvider extends Controller with SoapWebService {
     routes.ConnectionProvider.request().absoluteURL()
 
   def request = NsiEndPoint {
-    case r: NsiRequestMessage.Reserve =>
+    case r: NsiProviderOperation.Reserve =>
       NsiResponseMessage.GenericAck(r.correlationId)
-    case q: NsiRequestMessage.QuerySummary =>
+    case q: NsiProviderOperation.QuerySummary =>
       NsiResponseMessage.GenericAck(q.correlationId)
     case _ =>
       NsiResponseMessage.GenericFail()

@@ -13,7 +13,7 @@ import play.api.test.Helpers._
 import play.api.libs.iteratee._
 import javax.xml.soap._
 import java.io.File
-import models.NsiRequestMessage
+import models.NsiProviderOperation
 import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions
 
@@ -55,7 +55,7 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
     "give NSI Reserve for a valid reserve request" in {
       val result = await(Enumerator.fromFile(new File("test/reserve.xml")) |>>> nsiRequestMessage.apply(FakeSoapRequest()))
 
-      result must beRight.like { case x => x must beAnInstanceOf[NsiRequestMessage.Reserve] }
+      result must beRight.like { case x => x must beAnInstanceOf[NsiProviderOperation.Reserve] }
     }
 
     "give Badrequest when NSI Reserve contains extra xml" in {
