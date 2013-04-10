@@ -28,7 +28,7 @@ class JaxWsClientSpec extends Specification {
   "A JAX WS client" should {
 
     "be able to talk to the connection provider endpoint" in new WithServer {
-      val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi/v2/connectionProvider"))
+      val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))
 
       service.setHandlerResolver(new HandlerResolver() {
         override def getHandlerChain(portInfo: PortInfo) = {
@@ -40,7 +40,7 @@ class JaxWsClientSpec extends Specification {
     }
 
     "be able to talk to the connection requester endpoint" in new WithServer {
-      val service = new ConnectionServiceRequester(new URL(s"http://localhost:$port/nsi/v2/connectionRequester"))
+      val service = new ConnectionServiceRequester(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceRequester"))
 
       service.getConnectionServiceRequesterPort().reserveCommitConfirmed("", "123-abc")
     }
