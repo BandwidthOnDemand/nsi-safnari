@@ -43,24 +43,4 @@ object NsiResponseMessage {
   }
 
   case class GenericFail() extends NsiResponseMessage
-
-  case class ReserveConfirmed() extends NsiResponseMessage
-  case class ReserveFailed() extends NsiResponseMessage
-  case class ReserveCommitConfirmed() extends NsiResponseMessage
-  case class ReserveCommitFailed() extends NsiResponseMessage
-  case class ReserveAbortConfirmed() extends NsiResponseMessage
-  case class ReserveTimeout() extends NsiResponseMessage
-
-  case class ProvisionConfirmed() extends NsiResponseMessage
-  case class ReleaseConfirmed() extends NsiResponseMessage
-  case class TermianteConfirmed() extends NsiResponseMessage
-
-  case class QuerySummaryConfirmed() extends NsiResponseMessage
-  case class QuerySummaryFailed() extends NsiResponseMessage
-  case class QueryRecursiveConfirmed() extends NsiResponseMessage
-  case class QueryRecursiveFailed() extends NsiResponseMessage
-
-  case class ErrorEvent() extends NsiResponseMessage
-  case class DataPlaneStateChanged() extends NsiResponseMessage
-  case class MesasgeDeliveryTimeout() extends NsiResponseMessage
 }
