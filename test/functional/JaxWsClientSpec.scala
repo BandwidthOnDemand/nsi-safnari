@@ -26,6 +26,7 @@ import com.sun.xml.internal.ws.client.ClientTransportException
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
 class JaxWsClientSpec extends Specification {
 
+
   "A JAX WS client" should {
 
     "be able to talk to the connection provider endpoint" in new WithServer {

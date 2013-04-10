@@ -4,24 +4,17 @@ import org.w3c.dom.Document
 import javax.xml.bind.JAXBContext
 import javax.xml.parsers.DocumentBuilderFactory
 import org.ogf.schemas.nsi._2013._04.connection._interface.GenericAcknowledgmentType
-import org.ogf.schemas.nsi._2013._04.connection._interface.{ObjectFactory => InterfaceObjectFactory}
+import org.ogf.schemas.nsi._2013._04.connection._interface.{ ObjectFactory => InterfaceObjectFactory }
+import org.ogf.schemas.nsi._2013._04.connection.types.{ ObjectFactory => TypesObjectFactory }
 import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
-import org.ogf.schemas.nsi._2013._04.framework.headers.{ObjectFactory => HeadersObjectFactory}
+import org.ogf.schemas.nsi._2013._04.framework.headers.{ ObjectFactory => HeadersObjectFactory }
 
-sealed trait NsiResponseMessage {
-  def bodyDocument: Document = ???
-  def headerDocument: Document = ???
-}
+sealed trait NsiResponseMessage extends NsiMessage
 
 object NsiResponseMessage {
+  import NsiMessage._
 
-  lazy val marshaller = JAXBContext.newInstance(
-    classOf[GenericAcknowledgmentType],
-    classOf[CommonHeaderType]).createMarshaller
-
-  case class GenericAck(correlationId: String) extends NsiResponseMessage {
-    lazy val db = DocumentBuilderFactory.newInstance().newDocumentBuilder()
-
+  case class GenericAck(headers: NsiHeaders) extends NsiResponseMessage {
     override def bodyDocument = {
       val factory = new InterfaceObjectFactory()
       val ack = factory.createGenericAcknowledgmentType()
@@ -30,17 +23,21 @@ object NsiResponseMessage {
       marshaller.marshal(factory.createAcknowledgment(ack), doc)
       doc
     }
+  }
 
-    override def headerDocument = {
-      val factory = new HeadersObjectFactory()
-      val header = factory.createCommonHeaderType()
-      header.setCorrelationId(correlationId)
+  case class ReserveResponse(headers: NsiHeaders, connectionId: String) extends NsiResponseMessage {
+    override def bodyDocument = {
+      val factory = new TypesObjectFactory()
+      val response = factory.createReserveResponseType()
+      response.setConnectionId(connectionId)
 
       val doc = db.newDocument()
-      marshaller.marshal(factory.createNsiHeader(header), doc)
+      marshaller.marshal(factory.createReserveResponse(response), doc)
       doc
     }
   }
 
-  case class GenericFail() extends NsiResponseMessage
+  case class ServiceException(headers: NsiHeaders) extends NsiResponseMessage {
+    override def bodyDocument: Document = ???
+  }
 }

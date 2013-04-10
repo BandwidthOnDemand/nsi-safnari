@@ -19,12 +19,15 @@ import javax.xml.XMLConstants
 import javax.xml.transform.stream.StreamSource
 import javax.xml.transform.Source
 import scala.reflect.ClassTag
+import models.NsiHeaders
+import models.NsiRequesterOperation
+import models.NsiMessage
 
 object ExtraBodyParsers {
 
-  implicit val nsiMessageContentType: ContentTypeOf[NsiResponseMessage] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+  implicit val NsiMessageContentType: ContentTypeOf[NsiMessage] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
-  implicit val nsiMessageWriteable: Writeable[NsiResponseMessage] = Writeable { message =>
+  implicit val NsiMessageWriteable: Writeable[NsiMessage] = Writeable { message =>
     val soap = MessageFactory.newInstance().createMessage()
 
     val header = SOAPFactory.newInstance().createElement(message.headerDocument.getDocumentElement())
@@ -74,12 +77,12 @@ object ExtraBodyParsers {
   trait NsiRequestMessageFactory {
     type JaxbMessage
     def klass: Class[JaxbMessage]
-    def apply(headers: CommonHeaderType, body: JaxbMessage): NsiProviderOperation
+    def apply(headers: NsiHeaders, body: JaxbMessage): NsiProviderOperation
   }
-  def NsiRequestMessageFactory[M](f: (CommonHeaderType, M) => NsiProviderOperation)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory {
+  def NsiRequestMessageFactory[M](f: (NsiHeaders, M) => NsiProviderOperation)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory {
     override type JaxbMessage = M
     override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]
-    override def apply(headers: CommonHeaderType, body: M): NsiProviderOperation = f(headers, body)
+    override def apply(headers: NsiHeaders, body: M): NsiProviderOperation = f(headers, body)
   }
 
   private val schema = {
@@ -105,7 +108,7 @@ object ExtraBodyParsers {
         header <- tryEither(unmarshaller.unmarshal(headerNode, classOf[CommonHeaderType]).getValue).right
         body <- tryEither(unmarshaller.unmarshal(bodyNode, messageFactory.klass).getValue).right
       } yield {
-        messageFactory(header, body)
+        messageFactory(NsiHeaders(header.getCorrelationId(), Option(header.getReplyTo())), body)
       }
 
       Done(parsedMessage.left.map(Results.BadRequest(_)))
@@ -117,8 +120,8 @@ object ExtraBodyParsers {
   }
 
   private val MessageFactories = Map(
-    "reserve" -> NsiRequestMessageFactory[ReserveType]((headers, _) => NsiProviderOperation.Reserve(headers.getCorrelationId())),
-    "querySummary" -> NsiRequestMessageFactory[QueryType]((headers, _) => NsiProviderOperation.QuerySummary(headers.getCorrelationId())))
+    "reserve" -> NsiRequestMessageFactory[ReserveType]((headers, _) => NsiProviderOperation.Reserve(headers)),
+    "querySummary" -> NsiRequestMessageFactory[QueryType]((headers, _) => NsiProviderOperation.QuerySummary(headers)))
 
   private def bodyNameToClass(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory] =
     MessageFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
