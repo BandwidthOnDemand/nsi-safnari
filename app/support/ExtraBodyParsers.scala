@@ -127,9 +127,9 @@ object ExtraBodyParsers {
     elem.getChildElements().asScala.collect {
       case e: org.w3c.dom.Element if e.getNamespaceURI() == namespaceUri => e
     }.toList match {
-      case Nil      => Left("missing NSI element, expected one")
+      case Nil      => Left(s"missing NSI element in '${elem.getLocalName}', expected one")
       case e :: Nil => Right(e)
-      case _        => Left("multiple NSI elements, expected one")
+      case _        => Left(s"multiple NSI elements in '${elem.getLocalName}', expected one")
     }
 
 }

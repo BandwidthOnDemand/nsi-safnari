@@ -74,7 +74,7 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
       result must beLeft.like {
         case result =>
           status(result) must beEqualTo(400)
-          contentAsString(result) must beEqualTo("missing NSI element, expected one")
+          contentAsString(result) must beEqualTo("missing NSI element in 'Header', expected one")
       }
     }
 
@@ -84,7 +84,7 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
       result must beLeft.like {
         case result =>
           status(result) must beEqualTo(400)
-          contentAsString(result) must beEqualTo("multiple NSI elements, expected one")
+          contentAsString(result) must beEqualTo("multiple NSI elements in 'Header', expected one")
       }
     }
 
