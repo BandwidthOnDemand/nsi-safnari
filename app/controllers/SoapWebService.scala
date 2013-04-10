@@ -12,11 +12,9 @@ trait SoapWebService {
 
   def serviceUrl(implicit request: RequestHeader): String
 
-  def wsdl(ignore: String) =
-    SoapWebService.serveWsdl(BaseWsdlFilename) { implicit request =>
-      replaceSoapAddress(_)
-    }
-
+  def wsdl(ignore: String) = SoapWebService.serveWsdl(BaseWsdlFilename) { implicit request =>
+    replaceSoapAddress
+  }
 
   private def replaceSoapAddress(wsdl: String)(implicit request: RequestHeader) = {
     wsdl.replaceAll(
@@ -31,7 +29,7 @@ object SoapWebService {
   private val WsdlResourcePath = "wsdl/2.0"
   private val WsdlFilenamePattern = "[a-z0-9_-]+(\\.[a-z0-9_-]+)*\\.(wsdl|xsd)"
 
-  def wsdlOrXsd(name: String) = serveWsdl(name) { _ => identity }
+  def wsdlOrXsd(name: String) = serveWsdl(name){ _ => identity }
 
   private def serveWsdl(file: String)(transform: RequestHeader => String => String) = Action { implicit request =>
     readClasspathWsdl(file).map(transform(request)).map { body =>

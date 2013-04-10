@@ -9,8 +9,8 @@ import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
 import org.ogf.schemas.nsi._2013._04.framework.headers.{ObjectFactory => HeadersObjectFactory}
 
 sealed trait NsiResponseMessage {
-  def bodyDocument: Document
-  def headerDocument: Document
+  def bodyDocument: Document = ???
+  def headerDocument: Document = ???
 }
 
 object NsiResponseMessage {
@@ -22,7 +22,7 @@ object NsiResponseMessage {
   case class GenericAck(correlationId: String) extends NsiResponseMessage {
     lazy val db = DocumentBuilderFactory.newInstance().newDocumentBuilder()
 
-    def bodyDocument = {
+    override def bodyDocument = {
       val factory = new InterfaceObjectFactory()
       val ack = factory.createGenericAcknowledgmentType()
 
@@ -31,7 +31,7 @@ object NsiResponseMessage {
       doc
     }
 
-    def headerDocument = {
+    override def headerDocument = {
       val factory = new HeadersObjectFactory()
       val header = factory.createCommonHeaderType()
       header.setCorrelationId(correlationId)
@@ -42,9 +42,25 @@ object NsiResponseMessage {
     }
   }
 
-  case class GenericFail() extends NsiResponseMessage {
-    def bodyDocument = ???
+  case class GenericFail() extends NsiResponseMessage
 
-    def headerDocument = ???
-  }
+  case class ReserveConfirmed() extends NsiResponseMessage
+  case class ReserveFailed() extends NsiResponseMessage
+  case class ReserveCommitConfirmed() extends NsiResponseMessage
+  case class ReserveCommitFailed() extends NsiResponseMessage
+  case class ReserveAbortConfirmed() extends NsiResponseMessage
+  case class ReserveTimeout() extends NsiResponseMessage
+
+  case class ProvisionConfirmed() extends NsiResponseMessage
+  case class ReleaseConfirmed() extends NsiResponseMessage
+  case class TermianteConfirmed() extends NsiResponseMessage
+
+  case class QuerySummaryConfirmed() extends NsiResponseMessage
+  case class QuerySummaryFailed() extends NsiResponseMessage
+  case class QueryRecursiveConfirmed() extends NsiResponseMessage
+  case class QueryRecursiveFailed() extends NsiResponseMessage
+
+  case class ErrorEvent() extends NsiResponseMessage
+  case class DataPlaneStateChanged() extends NsiResponseMessage
+  case class MesasgeDeliveryTimeout() extends NsiResponseMessage
 }
