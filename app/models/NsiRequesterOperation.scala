@@ -46,7 +46,35 @@ object NsiRequesterOperation {
   case class ReleaseConfirmed() extends NsiRequesterOperation
   case class TerminateConfirmed() extends NsiRequesterOperation
 
-  case class QuerySummaryConfirmed() extends NsiRequesterOperation
+  case class QuerySummaryConfirmed(override val headers: NsiHeaders, connectionIds: Seq[String]) extends NsiRequesterOperation {
+    override def bodyDocument = {
+      val factory = new ObjectFactory()
+      val q = factory.createQuerySummaryConfirmedType()
+      connectionIds.map { id =>
+        q.withReservation(factory.createQuerySummaryResultType()
+          .withConnectionId(id)
+          .withRequesterNSA("urn:ogf:network:nsa:surfnet-nsi-requester")
+          .withConnectionStates(factory.createConnectionStatesType()
+            .withDataPlaneStatus(factory.createDataPlaneStatusType()
+              .withActive(false)
+              .withVersion(0)
+              .withVersionConsistent(true))
+            .withLifecycleState(factory.createLifecycleStateType().withState(LifecycleStateEnumType.TERMINATED))
+            .withProvisionState(factory.createProvisionStateType().withState(ProvisionStateEnumType.RELEASED))
+            .withReservationState(factory.createReservationStateType().withState(ReservationStateEnumType.RESERVE_FAILED)))
+          .withCriteria(factory.createReservationConfirmCriteriaType()
+            .withBandwidth(100)
+            .withSchedule(factory.createScheduleType())
+            .withServiceAttributes(new FTypesObjectFactory().createTypeValuePairListType())
+            .withPath(factory.createPathType()
+              .withDirectionality(DirectionalityType.BIDIRECTIONAL)
+              .withSourceSTP(factory.createStpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("22"))
+              .withDestSTP(factory.createStpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("33")))
+            .withVersion(0)))
+      }
+      marshal(factory.createQuerySummaryConfirmed(q))
+    }
+  }
   case class QuerySummaryFailed() extends NsiRequesterOperation
   case class QueryRecursiveConfirmed() extends NsiRequesterOperation
   case class QueryRecursiveFailed() extends NsiRequesterOperation

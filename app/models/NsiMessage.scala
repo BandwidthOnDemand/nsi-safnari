@@ -20,7 +20,7 @@ case class NsiHeaders(correlationId: UUID, replyTo: Option[URI]) {
     val header = factory.createCommonHeaderType()
     header.setCorrelationId(f"urn:uuid:${correlationId}")
     header.setReplyTo(replyTo.map(_.toASCIIString()).orNull)
-    header.setProtocolVersion("1")
+    header.setProtocolVersion("2.0")
     header.setProviderNSA("ProviderNSA")
     header.setRequesterNSA("RequesterNSA")
 

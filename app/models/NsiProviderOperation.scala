@@ -18,7 +18,7 @@ object NsiProviderOperation {
   case class Release(headers: NsiHeaders) extends NsiProviderOperation
   case class Terminate(headers: NsiHeaders) extends NsiProviderOperation
 
-  case class QuerySummary(headers: NsiHeaders) extends NsiProviderOperation
+  case class QuerySummary(headers: NsiHeaders, connectionIds: Seq[String]) extends NsiProviderOperation
   case class QuerySummarySync(headers: NsiHeaders) extends NsiProviderOperation
   case class QueryRecursive(headers: NsiHeaders) extends NsiProviderOperation
 }

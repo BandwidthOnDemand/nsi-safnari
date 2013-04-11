@@ -25,6 +25,7 @@ import models.NsiMessage
 import java.util.UUID
 import java.net.URI
 import play.api.Logger
+import scala.collection.JavaConverters._
 
 object ExtraBodyParsers {
   private val logger = Logger("ExtraBodyParsers")
@@ -119,7 +120,7 @@ object ExtraBodyParsers {
 
   private val MessageFactories = Map(
     "reserve" -> NsiRequestMessageFactory[ReserveType]((headers, _) => NsiProviderOperation.Reserve(headers)),
-    "querySummary" -> NsiRequestMessageFactory[QueryType]((headers, _) => NsiProviderOperation.QuerySummary(headers)))
+    "querySummary" -> NsiRequestMessageFactory[QueryType]((headers, body) => NsiProviderOperation.QuerySummary(headers, body.getConnectionId().asScala)))
 
   private def bodyNameToClass(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory] =
     MessageFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")

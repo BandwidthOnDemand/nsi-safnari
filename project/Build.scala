@@ -8,7 +8,8 @@ object ApplicationBuild extends Build {
   val appVersion      = "1.0-SNAPSHOT"
 
   val appDependencies = Seq(
-    "nl.surfnet.bod" % "bod-nsi" % "0.2.0-SNAPSHOT"
+    "nl.surfnet.bod" % "bod-nsi" % "0.2.0-SNAPSHOT",
+    "org.scala-stm" %% "scala-stm" % "0.7"
   )
 
   val main = play.Project(appName, appVersion, appDependencies).settings(
