@@ -22,6 +22,8 @@ import scala.reflect.ClassTag
 import models.NsiHeaders
 import models.NsiRequesterOperation
 import models.NsiMessage
+import java.util.UUID
+import java.net.URI
 
 object ExtraBodyParsers {
 
@@ -36,10 +38,7 @@ object ExtraBodyParsers {
     soap.getSOAPHeader().addChildElement(header)
     soap.saveChanges()
 
-    val out = new ByteArrayOutputStream
-    soap.writeTo(out)
-
-    out.toByteArray
+    new ByteArrayOutputStream().tap(soap.writeTo).toByteArray
   }
 
   def NsiEndPoint(action: NsiProviderOperation => NsiResponseMessage): Action[NsiProviderOperation] = Action(nsiRequestMessage) { request =>
@@ -85,21 +84,9 @@ object ExtraBodyParsers {
     override def apply(headers: NsiHeaders, body: M): NsiProviderOperation = f(headers, body)
   }
 
-  private val schema = {
-    val schemas = Array("wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
-    val sources = schemas.map(Thread.currentThread().getContextClassLoader().getResource).map(schema => new StreamSource(schema.toExternalForm()): Source)
-    val factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
-    factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-    factory.newSchema(sources)
-  }
-
   def nsiRequestMessage(): BodyParser[NsiProviderOperation] = soap.flatMap { soapMessage =>
     BodyParser { requestHeader =>
-      val unmarshaller = JAXBContext.newInstance(
-        classOf[ReserveType],
-        classOf[CommonHeaderType],
-        classOf[QueryType]).createUnmarshaller()
-      unmarshaller.setSchema(schema)
+      val unmarshaller = NsiMessage.unmarshaller
 
       val parsedMessage = for {
         headerNode <- onlyChildElementWithNamespace(NsiFrameworkHeaderNamespace, soapMessage.getSOAPHeader()).right
@@ -107,8 +94,10 @@ object ExtraBodyParsers {
         messageFactory <- bodyNameToClass(bodyNode).right
         header <- tryEither(unmarshaller.unmarshal(headerNode, classOf[CommonHeaderType]).getValue).right
         body <- tryEither(unmarshaller.unmarshal(bodyNode, messageFactory.klass).getValue).right
+        correlationId <- tryEither(UUID.fromString(header.getCorrelationId().drop(9))).right
+        replyTo <- tryEither(Option(header.getReplyTo()).map(URI.create)).right
       } yield {
-        messageFactory(NsiHeaders(header.getCorrelationId(), Option(header.getReplyTo())), body)
+        messageFactory(NsiHeaders(correlationId, replyTo), body)
       }
 
       Done(parsedMessage.left.map(Results.BadRequest(_)))

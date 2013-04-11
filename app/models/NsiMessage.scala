@@ -1,10 +1,18 @@
 package models
 
-import org.w3c.dom.Document
-import org.ogf.schemas.nsi._2013._04.framework.headers.ObjectFactory
-import javax.xml.parsers.DocumentBuilderFactory
+import java.net.URI
+import java.util.UUID
+import javax.xml.XMLConstants
 import javax.xml.bind.JAXBContext
-import org.ogf.schemas.nsi._2013._04._
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.Source
+import javax.xml.transform.stream.StreamSource
+import javax.xml.validation.SchemaFactory
+import org.ogf.schemas.nsi._2013._04.framework.headers.ObjectFactory
+import org.w3c.dom.Document
+import support._
+
+case class NsiHeaders(correlationId: UUID, replyTo: Option[URI])
 
 trait NsiMessage {
   def headers: NsiHeaders
@@ -16,20 +24,29 @@ trait NsiMessage {
   def headerDocument = {
     val factory = new ObjectFactory()
     val header = factory.createCommonHeaderType()
-    header.setCorrelationId(headers.correlationId)
-    header.setReplyTo(headers.replyTo.orNull)
+    header.setCorrelationId(f"urn:uuid:${headers.correlationId}")
+    header.setReplyTo(headers.replyTo.map(_.toASCIIString()).orNull)
     header.setProtocolVersion("1")
     header.setProviderNSA("ProviderNSA")
     header.setRequesterNSA("RequesterNSA")
 
-    val doc = NsiMessage.db.newDocument()
-    NsiMessage.marshaller.marshal(factory.createNsiHeader(header), doc)
-    doc
+    NsiMessage.marshal(factory.createNsiHeader(header))
   }
 }
 object NsiMessage {
+  private def newDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
 
-  def db = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+  private val schema = {
+    val schemas = Array("wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
+    val sources = schemas.map(Thread.currentThread().getContextClassLoader().getResource).map(schema => new StreamSource(schema.toExternalForm()): Source)
+    val factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+    factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+    factory.newSchema(sources)
+  }
+  private val context = JAXBContext.newInstance("org.ogf.schemas.nsi._2013._04.framework.types:org.ogf.schemas.nsi._2013._04.connection.types:org.ogf.schemas.nsi._2013._04.connection._interface:org.ogf.schemas.nsi._2013._04.framework.headers")
 
-  def marshaller = JAXBContext.newInstance("org.ogf.schemas.nsi._2013._04.framework.types:org.ogf.schemas.nsi._2013._04.connection.types:org.ogf.schemas.nsi._2013._04.connection._interface:org.ogf.schemas.nsi._2013._04.framework.headers").createMarshaller
+  def marshaller = context.createMarshaller().tap(_.setSchema(schema))
+  def unmarshaller = context.createUnmarshaller().tap(_.setSchema(schema))
+
+  def marshal(jaxbElement: AnyRef): Document = newDocument.tap(marshaller.marshal(jaxbElement, _))
 }

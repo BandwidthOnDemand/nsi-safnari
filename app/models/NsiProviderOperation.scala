@@ -1,13 +1,12 @@
 package models
 
 import java.net.URI
-
-case class NsiHeaders(correlationId: String, replyTo: Option[String])
+import java.util.UUID
 
 sealed trait NsiProviderOperation {
   def headers: NsiHeaders
-  def replyTo: Option[String] = headers.replyTo
-  def correlationId: String = headers.correlationId
+  def replyTo: Option[URI] = headers.replyTo
+  def correlationId: UUID = headers.correlationId
 }
 
 object NsiProviderOperation {

@@ -28,7 +28,7 @@ object ConnectionProvider extends Controller with SoapWebService {
 //        Future {
           blocking {
 //            Thread.sleep(3000)
-            WS.url(replyTo).post(ReserveFailed(r.headers.copy(replyTo = None)))
+            WS.url(replyTo.toASCIIString()).post(ReserveFailed(r.headers.copy(replyTo = None)))
 //          }
         }
       }

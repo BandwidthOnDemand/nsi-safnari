@@ -18,9 +18,7 @@ object NsiRequesterOperation {
       val genericFailed = factory.createGenericFailedType();
       val response = factory.createReserveFailed(genericFailed)
 
-      val doc = db.newDocument()
-      marshaller.marshal(response, doc)
-      doc
+      marshal(response)
     }
   }
   case class ReserveCommitConfirmed() extends NsiRequesterOperation

@@ -18,10 +18,7 @@ object NsiResponseMessage {
     override def bodyDocument = {
       val factory = new InterfaceObjectFactory()
       val ack = factory.createGenericAcknowledgmentType()
-
-      val doc = db.newDocument()
-      marshaller.marshal(factory.createAcknowledgment(ack), doc)
-      doc
+      marshal(factory.createAcknowledgment(ack))
     }
   }
 
@@ -31,9 +28,7 @@ object NsiResponseMessage {
       val response = factory.createReserveResponseType()
       response.setConnectionId(connectionId)
 
-      val doc = db.newDocument()
-      marshaller.marshal(factory.createReserveResponse(response), doc)
-      doc
+      marshal(factory.createReserveResponse(response))
     }
   }
 
