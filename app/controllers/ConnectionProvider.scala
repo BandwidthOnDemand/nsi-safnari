@@ -23,16 +23,16 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private[controllers] def handleMessage(message: NsiProviderOperation): NsiResponseMessage = message match {
     case r: NsiProviderOperation.Reserve =>
+      val connectionId = UUID.randomUUID.toString()
       r.replyTo.foreach { replyTo =>
-        println(s"Replying to $replyTo")
-//        Future {
+        Future {
           blocking {
-//            Thread.sleep(3000)
-            WS.url(replyTo.toASCIIString()).post(ReserveFailed(r.headers.copy(replyTo = None)))
-//          }
+            Thread.sleep(3000)
+            WS.url(replyTo.toASCIIString()).post(ReserveFailed(r.headers.copy(replyTo = None), connectionId))
+          }
         }
       }
-      NsiResponseMessage.ReserveResponse(r.headers, UUID.randomUUID.toString())
+      NsiResponseMessage.ReserveResponse(r.headers, connectionId)
     case q: NsiProviderOperation.QuerySummary =>
       NsiResponseMessage.GenericAck(q.headers)
     case m =>

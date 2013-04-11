@@ -1,7 +1,10 @@
 package models
 
 import org.ogf.schemas.nsi._2013._04.connection.types.ObjectFactory
+import org.ogf.schemas.nsi._2013._04.framework.types.{ ObjectFactory => FTypesObjectFactory }
 import org.w3c.dom.Document
+import support._
+import org.ogf.schemas.nsi._2013._04.connection.types._
 
 sealed trait NsiRequesterOperation extends NsiMessage {
   override def headers: NsiHeaders = ???
@@ -12,13 +15,26 @@ object NsiRequesterOperation {
   import NsiMessage._
 
   case class ReserveConfirmed() extends NsiRequesterOperation
-  case class ReserveFailed(override val headers: NsiHeaders) extends NsiRequesterOperation {
+  case class ReserveFailed(override val headers: NsiHeaders, connectionId: String) extends NsiRequesterOperation {
     override def bodyDocument = {
       val factory = new ObjectFactory()
-      val genericFailed = factory.createGenericFailedType();
-      val response = factory.createReserveFailed(genericFailed)
 
-      marshal(response)
+      val genericFailed = factory.createGenericFailedType()
+        .withConnectionId(connectionId)
+        .withConnectionStates(factory.createConnectionStatesType()
+          .withDataPlaneStatus(factory.createDataPlaneStatusType()
+            .withActive(false)
+            .withVersion(0)
+            .withVersionConsistent(true))
+          .withLifecycleState(factory.createLifecycleStateType().withState(LifecycleStateEnumType.TERMINATED))
+          .withProvisionState(factory.createProvisionStateType().withState(ProvisionStateEnumType.RELEASED))
+          .withReservationState(factory.createReservationStateType().withState(ReservationStateEnumType.RESERVE_FAILED)))
+        .withServiceException(new FTypesObjectFactory().createServiceExceptionType()
+          .withErrorId("0600")
+          .withNsaId("urn:ogf:surfnet.nl")
+          .withText("Creating reservation is not supported yet"))
+
+      marshal(factory.createReserveFailed(genericFailed))
     }
   }
   case class ReserveCommitConfirmed() extends NsiRequesterOperation
