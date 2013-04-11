@@ -24,21 +24,30 @@ import models.NsiRequesterOperation
 import models.NsiMessage
 import java.util.UUID
 import java.net.URI
+import play.api.Logger
 
 object ExtraBodyParsers {
+  private val logger = Logger("ExtraBodyParsers")
 
   implicit val NsiMessageContentType: ContentTypeOf[NsiMessage] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
   implicit val NsiMessageWriteable: Writeable[NsiMessage] = Writeable { message =>
-    val soap = MessageFactory.newInstance().createMessage()
+    try {
+      val soap = MessageFactory.newInstance().createMessage()
 
-    val header = SOAPFactory.newInstance().createElement(message.headerDocument.getDocumentElement())
+      val header = SOAPFactory.newInstance().createElement(message.headerDocument.getDocumentElement())
 
-    soap.getSOAPBody().addDocument(message.bodyDocument)
-    soap.getSOAPHeader().addChildElement(header)
-    soap.saveChanges()
+      soap.getSOAPBody().addDocument(message.bodyDocument)
+      soap.getSOAPHeader().addChildElement(header)
+      soap.saveChanges()
 
-    new ByteArrayOutputStream().tap(soap.writeTo).toByteArray
+      new ByteArrayOutputStream().tap(soap.writeTo).toByteArray
+    } catch {
+      case NonFatal(e) =>
+        // Exceptions from writeable are swallowed by Play, so log these here.
+        logger.error(f"error writing SOAP message: $e", e)
+        throw e
+    }
   }
 
   def NsiEndPoint(action: NsiProviderOperation => NsiResponseMessage): Action[NsiProviderOperation] = Action(nsiRequestMessage) { request =>

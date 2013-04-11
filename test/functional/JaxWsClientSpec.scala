@@ -22,6 +22,9 @@ import javax.xml.bind.JAXBContext
 import javax.xml.parsers.DocumentBuilderFactory
 import org.ogf.schemas.nsi._2013._04.connection.requester.ConnectionServiceRequester
 import com.sun.xml.internal.ws.client.ClientTransportException
+import models.NsiMessage
+import models.NsiHeaders
+import java.util.UUID
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
 class JaxWsClientSpec extends Specification {
@@ -53,13 +56,9 @@ class JaxWsClientSpec extends Specification {
 
     def handleMessage(messageContext: SOAPMessageContext): Boolean = {
       if (isOutboundMessage(messageContext)) {
-
-        val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
-        JAXBContext.newInstance(classOf[CommonHeaderType]).createMarshaller().marshal(createNsiHeader(), doc)
-
+        val headers = NsiHeaders(UUID.randomUUID, None).asDocument
         val soapHeader = messageContext.getMessage().getSOAPPart().getEnvelope().addHeader()
-
-        soapHeader.addChildElement(SOAPFactory.newInstance().createElement(doc.getDocumentElement()))
+        soapHeader.addChildElement(SOAPFactory.newInstance().createElement(headers.getDocumentElement()))
       }
 
       true

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Extracted from ogf_nsi_connection_interface_v2_0_.wsdl to allow Java schema validation.  -->
+<xsd:schema targetNamespace="http://schemas.ogf.org/nsi/2013/04/connection/interface"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://schemas.ogf.org/nsi/2013/04/connection/interface" xmlns:ftypes="http://schemas.ogf.org/nsi/2013/04/framework/types" elementFormDefault="qualified">
+
+  <!-- Import the common NSI framework types. -->
+  <xsd:import namespace="http://schemas.ogf.org/nsi/2013/04/framework/types"
+    schemaLocation="ogf_nsi_framework_types_v2_0.xsd" />
+
+  <!-- Import common NSI framework header types. -->
+  <xsd:import namespace="http://schemas.ogf.org/nsi/2013/04/framework/headers"
+    schemaLocation="ogf_nsi_framework_headers_v2_0.xsd" />
+
+  <!-- Import common NSI Connection Services types from protocol schema. -->
+  <xsd:import namespace="http://schemas.ogf.org/nsi/2013/04/connection/types"
+    schemaLocation="ogf_nsi_connection_types_v2_0.xsd" />
+
+  <!-- ********** Acknowledgment message element ********** -->
+  <xsd:element name="acknowledgment" type="tns:GenericAcknowledgmentType" />
+
+  <!-- ********** Fault message element ********** -->
+  <xsd:element name="serviceException" type="ftypes:ServiceExceptionType" />
+
+  <!-- ********** Acknowledgment type definition ********** -->
+  <xsd:complexType name="GenericAcknowledgmentType">
+    <xsd:annotation>
+      <xsd:documentation xml:lang="en">
+        Common WSDL output message for acknowledgment of an NSI CS
+        request (input) message.
+
+        Elements:
+        We have moved the correlationId to the header so this is
+        now an empty response.
+
+        Notes on acknowledgment:
+        Depending on NSA implementation and thread timing an
+        acknowledgment to a request operation may be returned
+        after the confirm/fail for the request has been returned
+        to the Requesting NSA.
+
+        For protocol robustness, Requesting NSA should be
+        able to accept confirm/fail before acknowledgment.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence />
+  </xsd:complexType>
+</xsd:schema>
