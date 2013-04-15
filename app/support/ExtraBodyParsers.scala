@@ -114,9 +114,7 @@ object ExtraBodyParsers {
     }
   }
 
-  private def tryEither[A](f: => A): Either[String, A] = try Right(f) catch {
-    case NonFatal(e) => Left(e.toString)
-  }
+  private def tryEither[A](f: => A): Either[String, A] = Try(f).toEither.left.map(_.toString)
 
   private val MessageFactories = Map(
     "reserve" -> NsiRequestMessageFactory[ReserveType]((headers, _) => NsiProviderOperation.Reserve(headers)),
@@ -133,5 +131,4 @@ object ExtraBodyParsers {
       case e :: Nil => Right(e)
       case _        => Left(s"multiple NSI elements in '${elem.getLocalName}', expected one")
     }
-
 }

@@ -40,19 +40,27 @@ trait NsiMessage {
 object NsiMessage {
   private def newDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
 
-  private val schema = {
-    val schemas = Array("wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd", "ogf_nsi_connection_interface_types_v2_0.xsd")
-    val sources = schemas.map(Thread.currentThread().getContextClassLoader().getResource).map(schema => new StreamSource(schema.toExternalForm()): Source)
+  private val SchemaLocations = Seq("wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd", "ogf_nsi_connection_interface_types_v2_0.xsd")
+  private val SchemaPackages = Seq("org.ogf.schemas.nsi._2013._04.framework.headers", "org.ogf.schemas.nsi._2013._04.connection.types", "org.ogf.schemas.nsi._2013._04.connection._interface")
+
+  private val nsiSchema = {
+    val schemaSources = SchemaLocations.map(location => new StreamSource(classpathResourceUri(location).toASCIIString()))
+
     val factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
     factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-    factory.newSchema(sources)
+    factory.newSchema(schemaSources.toArray[Source])
   }
-  private val context = JAXBContext.newInstance("org.ogf.schemas.nsi._2013._04.framework.types:org.ogf.schemas.nsi._2013._04.connection.types:org.ogf.schemas.nsi._2013._04.connection._interface:org.ogf.schemas.nsi._2013._04.framework.headers")
+  private val jaxbContext = JAXBContext.newInstance(SchemaPackages.mkString(":"))
 
-  def marshaller = context.createMarshaller().tap(_.setSchema(schema))
-  def unmarshaller = context.createUnmarshaller().tap(_.setSchema(schema)).tap(_.setEventHandler(new ValidationEventHandler {
-    def handleEvent(event: ValidationEvent) = event.getMessage().contains("cvc-complex-type.2.3") && event.getMessage().contains("cannot have character [children], because the type's content type is element-only")
-  }))
+  def marshaller = jaxbContext.createMarshaller().tap(_.setSchema(nsiSchema))
+  def unmarshaller = jaxbContext.createUnmarshaller().tap(_.setSchema(nsiSchema))
 
-  def marshal(jaxbElement: AnyRef): Document = newDocument.tap(marshaller.marshal(jaxbElement, _))
+  /* To allow whitespace in between elements set the following event handler on the unmarshaller:
+
+     new ValidationEventHandler {
+       def handleEvent(event: ValidationEvent) = event.getMessage().contains("cvc-complex-type.2.3") && event.getMessage().contains("cannot have character [children], because the type's content type is element-only")
+     }
+   */
+
+  def marshal(jaxbElement: AnyRef): Document = newDocument.tap(document => marshaller.marshal(jaxbElement, document))
 }
