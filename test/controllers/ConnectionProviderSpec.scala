@@ -6,8 +6,7 @@ import java.util.UUID
 import scala.concurrent.Promise
 import nl.surfnet.nsi._
 import nl.surfnet.nsi.NsiProviderOperation._
-import nl.surfnet.nsi.NsiRequesterOperation._
-import nl.surfnet.nsi.NsiAcknowledgement._
+import nl.surfnet.nsi.NsiResponseMessage._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends org.specs2.mutable.Specification {
@@ -15,7 +14,7 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
   val CorrelationId = UUID.randomUUID
 
   "Reserve operation" should {
-    "fail when path computation fails" in {
+    "return the connection id" in {
       var requesterOperation: Response = null
       val response = ConnectionProvider.handleRequest(Reserve(NsiHeaders(CorrelationId, None))) { requesterOperation = _ }
 
@@ -26,11 +25,10 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
           connectionId must not(beEmpty)
       }
 
-//      ConnectionProvider.handleResponse(PathComputationFailed(ConnectionProvider.continuations.single.head._1))
+      ConnectionProvider.handleResponse(PathComputationFailed(ConnectionProvider.continuations.single.head._1))
 
       // Send fake failed route response
 
-      requesterOperation must beAnInstanceOf[ReserveFailed]
       requesterOperation.correlationId must beEqualTo(CorrelationId)
     }
   }
