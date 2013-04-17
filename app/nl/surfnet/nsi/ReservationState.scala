@@ -11,3 +11,6 @@ case object InitialReservationState extends ReservationState {
 case object FailedReservationState extends ReservationState {
   def jaxb = ReservationStateEnumType.RESERVE_FAILED
 }
+case object ReservedReservationState extends ReservationState {
+  def jaxb = ReservationStateEnumType.RESERVED
+}

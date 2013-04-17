@@ -8,56 +8,82 @@ import java.net.URI
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionSpec extends org.specs2.mutable.Specification {
+  isolated
 
   val Headers = NsiHeaders(UUID.randomUUID, Some(URI.create("http://example.com/")))
   val ConnectionId = "ConnectionId"
   val CorrelationId = newCorrelationId
   val InitialMessages = Seq(Inbound(Reserve(Headers)), Outbound(ReserveResponse(Headers.copy(replyTo = None), ConnectionId)))
-  val InitialConnection = given(InitialMessages: _*)
 
-  def given(messages: Message*): Connection = messages.foldLeft(NewConnection(ConnectionId): Connection) { _.handle(_)._1 }
-  def when(connection: Connection, message: Message): Seq[Message] = connection.handle(message)._2
+  var connection: Connection = NewConnection(ConnectionId)
+  var messages: Seq[Message] = Nil
+
+  def given(messages: Message*): Unit = {
+    connection = messages.foldLeft(connection) { _.handle(_)._1 }
+  }
+  def when(message: Message): Unit = {
+    val (c, m) = connection.handle(message)
+    connection = c
+    messages = m
+  }
 
   "A connection" should {
     "send a reserve response when reserve is requested" in {
-      val connection = given()
+      when(Inbound(Reserve(Headers)))
 
-      val Seq(response: ReserveResponse) = when(connection, Inbound(Reserve(Headers)))
-
-      response.headers must beEqualTo(Headers.copy(replyTo = None))
+      messages.head.asInstanceOf[ReserveResponse].headers must beEqualTo(Headers.copy(replyTo = None))
     }
 
     "send a path computation request when reserve is received" in {
-      val connection = given(Inbound(Reserve(Headers)))
+      given(Inbound(Reserve(Headers)))
 
-      val outbound = when(connection, Outbound(ReserveResponse(Headers, ConnectionId)))
+      when(Outbound(ReserveResponse(Headers, ConnectionId)))
 
-      outbound must haveOneElementLike { case request: PathComputationRequest => ok }
+      messages must haveOneElementLike { case request: PathComputationRequest => ok }
     }
 
     "fail the connection when path computation fails" in {
-      val connection = given(InitialMessages :+ Outbound(PathComputationRequest(CorrelationId)): _*)
+      given(InitialMessages :+ Outbound(PathComputationRequest(CorrelationId)): _*)
 
-      val outbound = when(connection, Inbound(PathComputationFailed(CorrelationId)))
+      when(Inbound(PathComputationFailed(CorrelationId)))
 
-      outbound must contain(ReserveFailed(Headers.copy(replyTo = None), ConnectionId))
+      messages must contain(ReserveFailed(Headers.copy(replyTo = None), ConnectionId))
     }
 
     "mark the reservation state failed" in {
-      val connection = given(InitialMessages :+ Outbound(ReserveFailed(Headers.copy(replyTo = None), ConnectionId)): _*)
+      given(InitialMessages :+ Outbound(ReserveFailed(Headers.copy(replyTo = None), ConnectionId)): _*)
 
       connection.reservationState must beEqualTo(FailedReservationState)
     }
 
     "confirm the reservation with a single path segment" in {
-      val connection = given(InitialMessages ++ Seq(
-        Inbound(PathComputationConfirmed(CorrelationId)),
+      given(InitialMessages ++ Seq(
+        Inbound(PathComputationConfirmed(CorrelationId, Seq("A"))),
         Outbound(Reserve(Headers)),
         Inbound(ReserveResponse(Headers, "SegmentConnectionId"))): _*)
 
-      val outbound = when(connection, Inbound(ReserveConfirmed()))
+      when(Inbound(ReserveConfirmed()))
 
-      outbound must contain(ReserveConfirmed())
+      messages must contain(ReserveConfirmed())
+    }
+
+    "reserve two segments and be reserved" in {
+      given(InitialMessages ++ Seq(
+          Inbound(PathComputationConfirmed(CorrelationId, Seq("A", "B"))),
+          Outbound(Reserve(Headers)),
+          Outbound(Reserve(Headers)),
+          Inbound(ReserveResponse(Headers, "ConnectionIdA")),
+          Inbound(ReserveResponse(Headers, "ConnectionIdB"))): _*)
+
+      when(Inbound(ReserveConfirmed()))
+      messages must beEmpty
+
+      when(Inbound(ReserveConfirmed()))
+      messages must contain(ReserveConfirmed())
+
+      when(Outbound(ReserveConfirmed()))
+
+      connection.reservationState must beEqualTo(ReservedReservationState)
     }
   }
 }
