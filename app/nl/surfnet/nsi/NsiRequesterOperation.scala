@@ -16,7 +16,7 @@ sealed trait NsiRequesterOperation extends NsiMessage {
 object NsiRequesterOperation {
   import NsiMessage._
 
-  case class ReserveConfirmed() extends NsiRequesterOperation
+  case class ReserveConfirmed(override val headers: NsiHeaders) extends NsiRequesterOperation
   case class ReserveFailed(override val headers: NsiHeaders, connectionId: String) extends NsiRequesterOperation with Response {
     override def bodyDocument = {
       val factory = new ObjectFactory()

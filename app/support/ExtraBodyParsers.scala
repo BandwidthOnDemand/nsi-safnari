@@ -48,7 +48,7 @@ object ExtraBodyParsers {
     }
   }
 
-  def NsiEndPoint(action: NsiProviderOperation => NsiResponseMessage): Action[NsiProviderOperation] = Action(nsiRequestMessage) { request =>
+  def NsiEndPoint(action: NsiProviderOperation => NsiAcknowledgement): Action[NsiProviderOperation] = Action(nsiRequestMessage) { request =>
     Results.Ok(action(request.body))
   }
 

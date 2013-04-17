@@ -12,7 +12,7 @@ import play.api.libs.ws.WS
 import nl.surfnet.nsi._
 import nl.surfnet.nsi.NsiRequesterOperation._
 import nl.surfnet.nsi.NsiProviderOperation._
-import nl.surfnet.nsi.NsiResponseMessage._
+import nl.surfnet.nsi.NsiAcknowledgement._
 import scala.concurrent.stm._
 import java.net.URI
 
@@ -42,25 +42,24 @@ object ConnectionProvider extends Controller with SoapWebService {
       handleQuery(query)(replyToClient(query.replyTo))
   }
 
-  private def handleQuery(message: NsiProviderOperation)(replyTo: Response => Unit): NsiResponseMessage = message match {
+  private def handleQuery(message: NsiProviderOperation)(replyTo: Response => Unit): NsiAcknowledgement = message match {
     case q: NsiProviderOperation.QuerySummary =>
       val connections = state.single.snapshot
       val connectionStates = q.connectionIds.map(id => connections.get(id).map(connection => id -> connection.reservationState)).flatten
       replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.headers.copy(replyTo = None), connectionStates))
-      NsiResponseMessage.GenericAck(q.headers)
+      NsiAcknowledgement.GenericAck(q.headers)
   }
 
   private[controllers] def handleResponse(message: Response): Unit = atomic { implicit transaction =>
-
     for {
       f <- continuations.get(message.correlationId)
     } {
+      println(f"Handling response $message with correlation id ${message.correlationId}")
       f(message)
-
     }
   }
 
-  private[controllers] def handleRequest(message: NsiProviderOperation with Request)(replyTo: Response => Unit): NsiResponseMessage = atomic { implicit transaction =>
+  private[controllers] def handleRequest(message: NsiProviderOperation with Request)(replyTo: Response => Unit): NsiAcknowledgement = atomic { implicit transaction =>
     continuations(message.correlationId) = replyTo
 
     val connection = message.optionalConnectionId match {
@@ -68,22 +67,29 @@ object ConnectionProvider extends Controller with SoapWebService {
       case Some(connectionId) => state.getOrElse(connectionId, throw new IllegalStateException("unknown connection id"))
     }
 
-    val (connection2, Seq(ack: NsiResponseMessage)) = connection.handle(Inbound(message))
+    val (connection2, ack, asyncOutboundMessages1) = connection.handleInbound(message)
+//    state(connection2.id) = connection2
+//    handleAsyncOutboundMessages(connection.id, Seq(ack))
 
-    val (updatedConnection, asyncOutboundMessages) = connection2.handle(Outbound(ack))
+    val (updatedConnection, asyncOutboundMessages) = connection2.handleAck(ack)
     state(updatedConnection.id) = updatedConnection
     handleAsyncOutboundMessages(updatedConnection.id, asyncOutboundMessages)
 
-    ack
+    ack.asInstanceOf[NsiAcknowledgement]
   }
 
   def handleAsyncOutboundMessages(connectionId: ConnectionId, messages: Seq[Message]): Unit = atomic { implicit txn =>
     messages.collect {
       case request: Request =>
-        continuations(request.correlationId) = response => {
-          val (updatedConnection, asyncOutboundMessages) = state(connectionId).handle(Inbound(response))
+        println(f"Adding request $request to continuations table with correlation id ${request.correlationId}")
+        continuations(request.correlationId) = response => atomic { implicit txn =>
+          val (updatedConnection, ack, asyncOutboundMessages) = state(connectionId).handleInbound(response)
           state(connectionId) = updatedConnection
           handleAsyncOutboundMessages(connectionId, asyncOutboundMessages)
+        }
+        request match {
+          case PathComputationRequest(correlationId) => handleResponse(PathComputationFailed(correlationId))
+          case _ =>
         }
       case response: Response =>
         handleResponse(response)
