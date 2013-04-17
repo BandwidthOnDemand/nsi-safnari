@@ -12,20 +12,17 @@ import play.api.mvc._
 import play.api.mvc.BodyParsers.parse.when
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
-import models.{ NsiProviderOperation, NsiResponseMessage }
 import scala.util.control.NonFatal
 import javax.xml.validation.SchemaFactory
 import javax.xml.XMLConstants
 import javax.xml.transform.stream.StreamSource
 import javax.xml.transform.Source
-import scala.reflect.ClassTag
-import models.NsiHeaders
-import models.NsiRequesterOperation
-import models.NsiMessage
 import java.util.UUID
 import java.net.URI
 import play.api.Logger
 import scala.collection.JavaConverters._
+import nl.surfnet.nsi._
+import scala.reflect.ClassTag
 
 object ExtraBodyParsers {
   private val logger = Logger("ExtraBodyParsers")

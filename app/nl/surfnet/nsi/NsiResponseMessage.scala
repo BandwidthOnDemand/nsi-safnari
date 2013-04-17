@@ -1,15 +1,14 @@
-package models
+package nl.surfnet.nsi
 
 import org.w3c.dom.Document
-import javax.xml.bind.JAXBContext
-import javax.xml.parsers.DocumentBuilderFactory
-import org.ogf.schemas.nsi._2013._04.connection._interface.GenericAcknowledgmentType
 import org.ogf.schemas.nsi._2013._04.connection._interface.{ ObjectFactory => InterfaceObjectFactory }
 import org.ogf.schemas.nsi._2013._04.connection.types.{ ObjectFactory => TypesObjectFactory }
-import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
-import org.ogf.schemas.nsi._2013._04.framework.headers.{ ObjectFactory => HeadersObjectFactory }
+import org.ogf.schemas.nsi._2013._04.connection._interface.{ObjectFactory => InterfaceObjectFactory}
+import org.ogf.schemas.nsi._2013._04.connection.types.{ObjectFactory => TypesObjectFactory}
 
-sealed trait NsiResponseMessage extends NsiMessage
+sealed trait NsiResponseMessage extends NsiMessage {
+  override def optionalConnectionId: Option[ConnectionId] = None
+}
 
 object NsiResponseMessage {
   import NsiMessage._
@@ -23,6 +22,7 @@ object NsiResponseMessage {
   }
 
   case class ReserveResponse(headers: NsiHeaders, connectionId: String) extends NsiResponseMessage {
+    override def optionalConnectionId = Some(connectionId)
     override def bodyDocument = {
       val factory = new TypesObjectFactory()
       val response = factory.createReserveResponseType()

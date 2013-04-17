@@ -1,16 +1,17 @@
-package models
+package nl.surfnet.nsi
 
 import java.net.URI
 import java.util.UUID
 
-sealed trait NsiProviderOperation {
-  def headers: NsiHeaders
-  def replyTo: Option[URI] = headers.replyTo
-  def correlationId: UUID = headers.correlationId
+sealed trait NsiProviderOperation extends NsiMessage {
+  override def optionalConnectionId: Option[ConnectionId] = ???
+  override def bodyDocument = ???
 }
 
 object NsiProviderOperation {
-  case class Reserve(headers: NsiHeaders) extends NsiProviderOperation
+  case class Reserve(headers: NsiHeaders) extends NsiProviderOperation with Request {
+    override def optionalConnectionId: Option[ConnectionId] = None
+  }
   case class ReserveCommit(headers: NsiHeaders) extends NsiProviderOperation
   case class ReserveAbort(headers: NsiHeaders) extends NsiProviderOperation
 

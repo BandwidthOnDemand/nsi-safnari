@@ -1,0 +1,17 @@
+<soapenv:Envelope 
+xmlns:type="http://schemas.ogf.org/nsi/2013/04/connection/types" xmlns:head="http://schemas.ogf.org/nsi/2013/04/framework/headers" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+    <soapenv:Header>
+        <head:nsiHeader>
+            <protocolVersion>2.0</protocolVersion>
+            <correlationId>urn:uuid:35ff4b05-40d3-487a-b8f2-ae76a0c527ad</correlationId>
+            <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
+            <providerNSA>urn:ogf:network:nsa:surfnet.nl</providerNSA>
+            <replyTo>http://localhost:9090/reply</replyTo>
+        </head:nsiHeader>
+    </soapenv:Header>
+    <soapenv:Body>
+        <type:querySummary>
+            <connectionId>123-abc</connectionId>
+        </type:querySummary>
+    </soapenv:Body>
+</soapenv:Envelope>

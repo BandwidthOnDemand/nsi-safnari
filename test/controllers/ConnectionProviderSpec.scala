@@ -1,10 +1,12 @@
 package controllers
 
 import play.api.test._
-import models.NsiProviderOperation._
-import models.NsiResponseMessage._
-import models.NsiHeaders
+import play.api.test.Helpers._
 import java.util.UUID
+import scala.concurrent.Promise
+import nl.surfnet.nsi._
+import nl.surfnet.nsi.NsiProviderOperation._
+import nl.surfnet.nsi.NsiResponseMessage._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends org.specs2.mutable.Specification {
@@ -13,7 +15,8 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
 
   "Reserve operation" should {
     "return the connection id" in {
-      val response = ConnectionProvider.handleMessage(Reserve(NsiHeaders(CorrelationId, None)))
+      var requesterOperation: Response = null
+      val response = ConnectionProvider.handleRequest(Reserve(NsiHeaders(CorrelationId, None))) { requesterOperation = _ }
 
       response must beAnInstanceOf[ReserveResponse]
       response must beLike {
@@ -21,6 +24,12 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
           headers must beEqualTo(NsiHeaders(CorrelationId, None))
           connectionId must not(beEmpty)
       }
+
+      ConnectionProvider.handleResponse(PathComputationFailed(ConnectionProvider.continuations.single.head._1))
+
+      // Send fake failed route response
+
+      requesterOperation.correlationId must beEqualTo(CorrelationId)
     }
   }
 }

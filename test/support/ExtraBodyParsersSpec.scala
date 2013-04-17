@@ -13,7 +13,7 @@ import play.api.test.Helpers._
 import play.api.libs.iteratee._
 import javax.xml.soap._
 import java.io.File
-import models.NsiProviderOperation
+import nl.surfnet.nsi.NsiProviderOperation
 import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions
 

@@ -1,21 +1,23 @@
-package models
+package nl.surfnet.nsi
 
 import org.ogf.schemas.nsi._2013._04.connection.types.ObjectFactory
 import org.ogf.schemas.nsi._2013._04.framework.types.{ ObjectFactory => FTypesObjectFactory }
 import org.w3c.dom.Document
 import support._
+import org.ogf.schemas.nsi._2013._04.framework.types.{ObjectFactory => FTypesObjectFactory}
 import org.ogf.schemas.nsi._2013._04.connection.types._
 
 sealed trait NsiRequesterOperation extends NsiMessage {
   override def headers: NsiHeaders = ???
   override def bodyDocument: Document = ???
+  override def optionalConnectionId: Option[ConnectionId] = ???
 }
 
 object NsiRequesterOperation {
   import NsiMessage._
 
   case class ReserveConfirmed() extends NsiRequesterOperation
-  case class ReserveFailed(override val headers: NsiHeaders, connectionId: String) extends NsiRequesterOperation {
+  case class ReserveFailed(override val headers: NsiHeaders, connectionId: String) extends NsiRequesterOperation with Response {
     override def bodyDocument = {
       val factory = new ObjectFactory()
 
@@ -46,11 +48,11 @@ object NsiRequesterOperation {
   case class ReleaseConfirmed() extends NsiRequesterOperation
   case class TerminateConfirmed() extends NsiRequesterOperation
 
-  case class QuerySummaryConfirmed(override val headers: NsiHeaders, connectionIds: Seq[String]) extends NsiRequesterOperation {
+  case class QuerySummaryConfirmed(override val headers: NsiHeaders, connectionIds: Seq[(String, ReservationState)]) extends NsiRequesterOperation with Response {
     override def bodyDocument = {
       val factory = new ObjectFactory()
       val q = factory.createQuerySummaryConfirmedType()
-      connectionIds.map { id =>
+      connectionIds.map { case (id, reservationState) =>
         q.withReservation(factory.createQuerySummaryResultType()
           .withConnectionId(id)
           .withRequesterNSA("urn:ogf:network:nsa:surfnet-nsi-requester")
@@ -61,7 +63,7 @@ object NsiRequesterOperation {
               .withVersionConsistent(true))
             .withLifecycleState(factory.createLifecycleStateType().withState(LifecycleStateEnumType.TERMINATED))
             .withProvisionState(factory.createProvisionStateType().withState(ProvisionStateEnumType.RELEASED))
-            .withReservationState(factory.createReservationStateType().withState(ReservationStateEnumType.RESERVE_FAILED)))
+            .withReservationState(factory.createReservationStateType().withState(reservationState.jaxb)))
           .withCriteria(factory.createReservationConfirmCriteriaType()
             .withBandwidth(100)
             .withSchedule(factory.createScheduleType())

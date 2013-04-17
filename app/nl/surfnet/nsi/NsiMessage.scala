@@ -1,4 +1,4 @@
-package models
+package nl.surfnet.nsi
 
 import java.net.URI
 import java.util.UUID
@@ -11,8 +11,13 @@ import javax.xml.validation.SchemaFactory
 import org.ogf.schemas.nsi._2013._04.framework.headers.ObjectFactory
 import org.w3c.dom.Document
 import support._
-import javax.xml.bind.ValidationEventHandler
-import javax.xml.bind.ValidationEvent
+
+trait Request {
+  def correlationId: CorrelationId
+}
+trait Response {
+  def correlationId: CorrelationId
+}
 
 case class NsiHeaders(correlationId: UUID, replyTo: Option[URI]) {
   def asDocument: Document = {
@@ -32,6 +37,7 @@ trait NsiMessage {
   def headers: NsiHeaders
   def correlationId = headers.correlationId
   def replyTo = headers.replyTo
+  def optionalConnectionId: Option[ConnectionId]
 
   def bodyDocument: Document
 

@@ -22,8 +22,8 @@ import javax.xml.bind.JAXBContext
 import javax.xml.parsers.DocumentBuilderFactory
 import org.ogf.schemas.nsi._2013._04.connection.requester.ConnectionServiceRequester
 import com.sun.xml.internal.ws.client.ClientTransportException
-import models.NsiMessage
-import models.NsiHeaders
+import nl.surfnet.nsi.NsiMessage
+import nl.surfnet.nsi.NsiHeaders
 import java.util.UUID
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
