@@ -2,7 +2,6 @@ package support
 
 import org.specs2.mutable.Specification
 import org.specs2.execute.PendingUntilFixed
-import org.junit.runner.RunWith
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ Future, Await }
@@ -17,7 +16,7 @@ import nl.surfnet.nsi.NsiProviderOperation
 import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions
 
-@RunWith(classOf[org.specs2.runner.JUnitRunner])
+@org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoTimeConversions {
 
   import ExtraBodyParsers._

@@ -3,7 +3,6 @@ package nl.surfnet.nsi
 import org.ogf.schemas.nsi._2013._04.connection.types.ObjectFactory
 import org.ogf.schemas.nsi._2013._04.framework.types.{ ObjectFactory => FTypesObjectFactory }
 import org.w3c.dom.Document
-import support._
 import org.ogf.schemas.nsi._2013._04.framework.types.{ObjectFactory => FTypesObjectFactory}
 import org.ogf.schemas.nsi._2013._04.connection.types._
 
