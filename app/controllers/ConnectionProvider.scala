@@ -15,10 +15,18 @@ import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiResponseMessage._
 import scala.concurrent.stm._
 import java.net.URI
+import akka.actor.ActorRef
+import akka.actor.ActorSystem
+import akka.actor.Props
+import akka.actor.Actor
+import akka.pattern.ask
+import akka.util.Timeout
+import scala.concurrent.duration._
 
 object ConnectionProvider extends Controller with SoapWebService {
-
-  private val state = TMap.empty[ConnectionId, Connection]
+  implicit val actorSystem = ActorSystem("NSI")
+  implicit val timeout = Timeout(2.seconds)
+  private val state = TMap.empty[ConnectionId, ActorRef]
   private[controllers] val continuations = TMap.empty[CorrelationId, Response => Unit]
 
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
@@ -39,15 +47,16 @@ object ConnectionProvider extends Controller with SoapWebService {
     case request: Request =>
       handleRequest(request)(replyToClient(request.replyTo))
     case query: NsiProviderOperation =>
-      handleQuery(query)(replyToClient(query.replyTo))
+      Future.successful(handleQuery(query)(replyToClient(query.replyTo)))
   }
 
   private def handleQuery(message: NsiProviderOperation)(replyTo: Response => Unit): NsiResponseMessage = message match {
     case q: NsiProviderOperation.QuerySummary =>
-      val connections = state.single.snapshot
-      val connectionStates = q.connectionIds.map(id => connections.get(id).map(connection => id -> connection.reservationState)).flatten
-      replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.headers.copy(replyTo = None), connectionStates))
-      NsiResponseMessage.GenericAck(q.headers)
+      ???
+//      val connections = state.single.snapshot
+//      val connectionStates = q.connectionIds.map(id => connections.get(id).map(connection => id -> FailedReservationState /*connection.reservationState*/)).flatten
+//      replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.headers.copy(replyTo = None), connectionStates))
+//      NsiResponseMessage.GenericAck(q.headers)
   }
 
   private[controllers] def handleResponse(message: Response): Unit = atomic { implicit transaction =>
@@ -60,49 +69,32 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
   }
 
-  private[controllers] def handleRequest(message: NsiProviderOperation with Request)(replyTo: Response => Unit): NsiResponseMessage = atomic { implicit transaction =>
-    continuations(message.correlationId) = replyTo
-
-    val connection = message.optionalConnectionId match {
-      case None               => NewConnection(newConnectionId)
-      case Some(connectionId) => state.getOrElse(connectionId, throw new IllegalStateException("unknown connection id"))
-    }
-
-    val (connection2, Seq(ack: NsiResponseMessage)) = connection.handle(Inbound(message))
-
-    val (updatedConnection, asyncOutboundMessages) = connection2.handle(Outbound(ack))
-    state(updatedConnection.id) = updatedConnection
-    handleAsyncOutboundMessages(updatedConnection.id, asyncOutboundMessages)
-
-    ack
-  }
-
-  def handleAsyncOutboundMessages(connectionId: ConnectionId, messages: Seq[Message]): Unit = atomic { implicit txn =>
-    messages.collect {
+  private val outboundActor = actorSystem.actorOf(Props(new Actor {
+    def receive = {
+      case pce: PathComputationRequest =>
+        sender ! Inbound(PathComputationFailed(pce.correlationId))
       case request: Request =>
-        continuations(request.correlationId) = response => {
-          val (updatedConnection, asyncOutboundMessages) = state(connectionId).handle(Inbound(response))
-          state(connectionId) = updatedConnection
-          handleAsyncOutboundMessages(connectionId, asyncOutboundMessages)
-        }
+        val connection = sender
+        continuations.single.put(request.correlationId, response => {
+          connection ! Inbound(response)
+        })
       case response: Response =>
         handleResponse(response)
     }
-  }
+  }))
 
-  //
-  //    message match {
-  //      case r: NsiProviderOperation.Reserve =>
-  //        val connectionId = UUID.randomUUID.toString()
-  //        state.single.transform(_ + (connectionId -> InitialReservationState))
-  //        replyTo(ReserveFailed(r.headers.copy(replyTo = None), connectionId))
-  //        NsiResponseMessage.ReserveResponse(r.headers, connectionId)
-  //      case q: NsiProviderOperation.QuerySummary =>
-  //        val connectionStates = state.single.getWith(state => q.connectionIds.map(id => state.get(id).map(id -> _))).flatten
-  //        replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.headers.copy(replyTo = None), connectionStates))
-  //        NsiResponseMessage.GenericAck(q.headers)
-  //      case m =>
-  //        NsiResponseMessage.ServiceException(m.headers)
-  //    }
-  //  }
+  private[controllers] def handleRequest(message: NsiProviderOperation with Request)(replyTo: Response => Unit): Future[NsiResponseMessage] = atomic { implicit transaction =>
+    continuations(message.correlationId) = replyTo
+
+    val connection = message.optionalConnectionId match {
+      case None               =>
+        val id = newConnectionId
+        val c = actorSystem.actorOf(Props(new ConnectionActor(id, outboundActor)))
+        state(id) = c
+        c
+      case Some(connectionId) => state.getOrElse(connectionId, throw new IllegalStateException("unknown connection id"))
+    }
+
+    connection ? Inbound(message) map (_.asInstanceOf[NsiResponseMessage])
+  }
 }

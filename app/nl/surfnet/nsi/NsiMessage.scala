@@ -19,6 +19,8 @@ trait Response {
 }
 
 case class NsiHeaders(correlationId: UUID, replyTo: Option[URI]) {
+  def asReply: NsiHeaders = copy(replyTo = None)
+
   def asDocument: Document = {
     val factory = new ObjectFactory()
     val header = factory.createCommonHeaderType()

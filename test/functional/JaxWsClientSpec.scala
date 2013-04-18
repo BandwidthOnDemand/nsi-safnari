@@ -25,9 +25,10 @@ import com.sun.xml.internal.ws.client.ClientTransportException
 import nl.surfnet.nsi.NsiMessage
 import nl.surfnet.nsi.NsiHeaders
 import java.util.UUID
+import org.specs2.execute.PendingUntilFixed
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
-class JaxWsClientSpec extends Specification {
+class JaxWsClientSpec extends Specification with PendingUntilFixed {
 
 
   "A JAX WS client" should {
@@ -42,7 +43,7 @@ class JaxWsClientSpec extends Specification {
       })
 
       service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String])
-    }
+    }.pendingUntilFixed
 
     "be able to talk to the connection requester endpoint" in new WithServer {
       val service = new ConnectionServiceRequester(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceRequester"))

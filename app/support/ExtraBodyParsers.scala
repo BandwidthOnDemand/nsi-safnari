@@ -23,8 +23,12 @@ import play.api.Logger
 import scala.collection.JavaConverters._
 import nl.surfnet.nsi._
 import scala.reflect.ClassTag
+import scala.concurrent.Future
+import play.api.mvc.AsyncResult
+import scala.concurrent.ExecutionContext
 
 object ExtraBodyParsers {
+  import ExecutionContext.Implicits.global
   private val logger = Logger("ExtraBodyParsers")
 
   implicit val NsiMessageContentType: ContentTypeOf[NsiMessage] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
@@ -48,8 +52,8 @@ object ExtraBodyParsers {
     }
   }
 
-  def NsiEndPoint(action: NsiProviderOperation => NsiResponseMessage): Action[NsiProviderOperation] = Action(nsiRequestMessage) { request =>
-    Results.Ok(action(request.body))
+  def NsiEndPoint(action: NsiProviderOperation => Future[NsiResponseMessage]): Action[NsiProviderOperation] = Action(nsiRequestMessage) { request =>
+    AsyncResult { action(request.body).map(Results.Ok(_)) }
   }
 
   def soap: BodyParser[SOAPMessage] = soap(BodyParsers.parse.DEFAULT_MAX_TEXT_LENGTH)

@@ -10,7 +10,8 @@ object ApplicationBuild extends Build {
   val appDependencies = Seq(
     "nl.surfnet.bod" % "bod-nsi" % "0.2.0-SNAPSHOT",
     "org.scala-stm" %% "scala-stm" % "0.7",
-    "org.scalacheck" %% "scalacheck" % "1.10.1" % "test"
+    "org.scalacheck" %% "scalacheck" % "1.10.1" % "test",
+    "com.typesafe.akka" %% "akka-testkit" % "2.1.0" % "test"
   )
 
   val main = play.Project(appName, appVersion, appDependencies).settings(

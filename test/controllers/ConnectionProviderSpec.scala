@@ -7,6 +7,9 @@ import scala.concurrent.Promise
 import nl.surfnet.nsi._
 import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiResponseMessage._
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
+import org.specs2.matcher.BeNull
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends org.specs2.mutable.Specification {
@@ -16,7 +19,7 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
   "Reserve operation" should {
     "return the connection id" in {
       var requesterOperation: Response = null
-      val response = ConnectionProvider.handleRequest(Reserve(NsiHeaders(CorrelationId, None))) { requesterOperation = _ }
+      val response = Await.result(ConnectionProvider.handleRequest(Reserve(NsiHeaders(CorrelationId, None))) { requesterOperation = _ }, Duration.Inf)
 
       response must beAnInstanceOf[ReserveResponse]
       response must beLike {
@@ -29,6 +32,7 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
 
       // Send fake failed route response
 
+      requesterOperation must not(beNull)
       requesterOperation.correlationId must beEqualTo(CorrelationId)
     }
   }
