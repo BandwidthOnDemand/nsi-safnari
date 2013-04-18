@@ -7,13 +7,8 @@ import akka.actor._
 import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiRequesterOperation._
 
-
 case class Inbound(message: Message)
 case class Outbound(message: Message)
-
-case class PathComputationRequest(correlationId: CorrelationId) extends Request
-case class PathComputationFailed(correlationId: CorrelationId) extends Response
-case class PathComputationConfirmed(correlationId: CorrelationId, segments: Seq[String]) extends Response
 
 class ConnectionActor(id: ConnectionId, outbound: ActorRef) extends Actor with FSM[ReservationState, Connection] {
 
@@ -25,8 +20,13 @@ class ConnectionActor(id: ConnectionId, outbound: ActorRef) extends Actor with F
   }
 
   when(CheckingReservationState) {
-    case Event(Inbound(message: PathComputationConfirmed), data: ExistingConnection) => stay using data.copy(outstandingReserveCount = message.segments.size)
-    case Event(Inbound(message: PathComputationFailed), _) => goto(FailedReservationState) replying 200
+    case Event(Inbound(message: PathComputationConfirmed), data: ExistingConnection) =>
+      (1 to message.segments.size).foreach { seg =>
+        outbound ! Reserve(NsiHeaders(newCorrelationId, None))
+      }
+      stay using data.copy(outstandingReserveCount = message.segments.size) replying 200
+    case Event(Inbound(message: PathComputationFailed), _) =>
+      goto(FailedReservationState) replying 200
 
     case Event(Inbound(message: ReserveConfirmed), data: ExistingConnection) =>
       val newData = data.copy(outstandingReserveCount = data.outstandingReserveCount - 1)
@@ -46,7 +46,7 @@ class ConnectionActor(id: ConnectionId, outbound: ActorRef) extends Actor with F
   onTransition {
     case InitialReservationState -> CheckingReservationState => outbound ! PathComputationRequest(newCorrelationId)
     case CheckingReservationState -> FailedReservationState => outbound ! ReserveFailed(nextStateData.asInstanceOf[ExistingConnection].headers.asReply, id)
-    case CheckingReservationState -> ReservedReservationState => outbound ! ReserveConfirmed(nextStateData.asInstanceOf[ExistingConnection].headers.asReply)
+    case CheckingReservationState -> ReservedReservationState => outbound ! ReserveConfirmed(nextStateData.asInstanceOf[ExistingConnection].headers.asReply, id)
   }
 }
 

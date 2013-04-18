@@ -17,8 +17,9 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
   val CorrelationId = UUID.randomUUID
 
   "Reserve operation" should {
+
     "return the connection id" in {
-      var requesterOperation: Response = null
+      var requesterOperation: NsiRequesterOperation = null
       val response = Await.result(ConnectionProvider.handleRequest(Reserve(NsiHeaders(CorrelationId, None))) { requesterOperation = _ }, Duration.Inf)
 
       response must beAnInstanceOf[ReserveResponse]
@@ -28,7 +29,7 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
           connectionId must not(beEmpty)
       }
 
-      ConnectionProvider.handleResponse(PathComputationFailed(ConnectionProvider.continuations.single.head._1))
+      //ConnectionProvider.handleResponse(PathComputationFailed(ConnectionProvider.continuations.single.head._1))
 
       // Send fake failed route response
 

@@ -52,8 +52,16 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       messages must haveOneElementLike { case request: PathComputationRequest => ok }
     }
 
+    "send reserve requests to when path computation confirmed is received" in {
+      given(InitialMessages: _*)
+
+      when(Inbound(PathComputationConfirmed(CorrelationId, Seq("A", "B"))))
+
+      messages must haveSize(2)
+    }
+
     "fail the connection when path computation fails" in {
-      given(InitialMessages: _*) // :+ Outbound(PathComputationRequest(CorrelationId)): _*)
+      given(InitialMessages: _*)
 
       when(Inbound(PathComputationFailed(CorrelationId)))
 
@@ -66,9 +74,9 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
         Inbound(PathComputationConfirmed(CorrelationId, Seq("A"))),
         Inbound(ReserveResponse(Headers, "SegmentConnectionId"))): _*)
 
-      when(Inbound(ReserveConfirmed(Headers)))
+      when(Inbound(ReserveConfirmed(Headers, "connectionId")))
 
-      messages must contain(ReserveConfirmed(Headers.asReply))
+      messages must contain(ReserveConfirmed(Headers.asReply, ConnectionId))
     }
 
     "reserve two segments and be reserved" in {
@@ -77,11 +85,11 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
           Inbound(ReserveResponse(Headers, "ConnectionIdA")),
           Inbound(ReserveResponse(Headers, "ConnectionIdB"))): _*)
 
-      when(Inbound(ReserveConfirmed(Headers)))
+      when(Inbound(ReserveConfirmed(Headers, "ConnectionIdA")))
       messages must beEmpty
 
-      when(Inbound(ReserveConfirmed(Headers)))
-      messages must contain(ReserveConfirmed(Headers.asReply))
+      when(Inbound(ReserveConfirmed(Headers, "ConnectionIdB")))
+      messages must contain(ReserveConfirmed(Headers.asReply, ConnectionId))
 
       connection.stateName must beEqualTo(ReservedReservationState)
     }
@@ -103,7 +111,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
         Inbound(ReserveResponse(Headers, "SegmentConnectionId")),
         Inbound(ReserveFailed(Headers, ConnectionId))): _*)
 
-     when(Inbound(ReserveConfirmed(Headers)))
+     when(Inbound(ReserveConfirmed(Headers, "connectionIdA")))
 
      messages must contain(ReserveFailed(Headers.asReply, ConnectionId))
      connection.stateName must beEqualTo(FailedReservationState)

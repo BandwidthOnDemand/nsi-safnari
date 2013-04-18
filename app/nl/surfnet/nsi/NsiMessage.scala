@@ -11,13 +11,6 @@ import javax.xml.validation.SchemaFactory
 import org.ogf.schemas.nsi._2013._04.framework.headers.ObjectFactory
 import org.w3c.dom.Document
 
-trait Request {
-  def correlationId: CorrelationId
-}
-trait Response {
-  def correlationId: CorrelationId
-}
-
 case class NsiHeaders(correlationId: UUID, replyTo: Option[URI]) {
   def asReply: NsiHeaders = copy(replyTo = None)
 
