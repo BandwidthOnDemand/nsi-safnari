@@ -10,7 +10,6 @@ import javax.xml.transform.stream.StreamSource
 import javax.xml.validation.SchemaFactory
 import org.ogf.schemas.nsi._2013._04.framework.headers.ObjectFactory
 import org.w3c.dom.Document
-import support._
 
 trait Request {
   def correlationId: CorrelationId
