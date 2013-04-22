@@ -43,7 +43,7 @@ class JaxWsClientSpec extends Specification with PendingUntilFixed {
       })
 
       service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String])
-    }.pendingUntilFixed
+    }
 
     "be able to talk to the connection requester endpoint" in new WithServer {
       val service = new ConnectionServiceRequester(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceRequester"))

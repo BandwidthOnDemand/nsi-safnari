@@ -55,7 +55,17 @@ object NsiRequesterOperation {
       marshal(factory.createReserveFailed(genericFailed))
     }
   }
-  case class ReserveCommitConfirmed() extends NsiRequesterOperation
+
+  case class ReserveCommitConfirmed(override val headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation {
+    override def bodyDocument = {
+      val factory = new ObjectFactory()
+
+      val confirmed = factory.createGenericConfirmedType().withConnectionId(connectionId)
+
+      marshal(factory.createReserveCommitConfirmed(confirmed))
+    }
+  }
+
   case class ReserveCommitFailed() extends NsiRequesterOperation
   case class ReserveAbortConfirmed() extends NsiRequesterOperation
   case class ReserveTimeout() extends NsiRequesterOperation

@@ -77,9 +77,11 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       when(Inbound(ReserveConfirmed(Headers, "connectionId")))
 
       messages must contain(ReserveConfirmed(Headers.asReply, ConnectionId))
+
+      connection.stateName must beEqualTo(HeldReservationState)
     }
 
-    "reserve two segments and be reserved" in {
+    "be in reservation held state when both segments are confirmed" in {
       given(InitialMessages ++ Seq(
           Inbound(PathComputationConfirmed(CorrelationId, Seq("A", "B"))),
           Inbound(ReserveResponse(Headers, "ConnectionIdA")),
@@ -91,7 +93,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       when(Inbound(ReserveConfirmed(Headers, "ConnectionIdB")))
       messages must contain(ReserveConfirmed(Headers.asReply, ConnectionId))
 
-      connection.stateName must beEqualTo(ReservedReservationState)
+      connection.stateName must beEqualTo(HeldReservationState)
     }
 
     "fail the reservation with a single path segment" in {
@@ -116,6 +118,43 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
      messages must contain(ReserveFailed(Headers.asReply, ConnectionId))
      connection.stateName must beEqualTo(FailedReservationState)
     }.pendingUntilFixed
+
+    "be in committing state when reserve commit is received" in {
+      given(InitialMessages ++ Seq(
+        Inbound(PathComputationConfirmed(CorrelationId, Seq("A"))),
+        Inbound(ReserveResponse(Headers, "SegmentConnectionId")),
+        Inbound(ReserveConfirmed(Headers, ConnectionId))): _*)
+
+      when(Inbound(ReserveCommit(Headers, "SegmentConnectionId")))
+
+      messages must haveOneElementLike { case request: ReserveCommit => ok }
+      connection.stateName must beEqualTo(CommittingReservationState)
+    }
+
+    "be in reserved state when reserve commit confirmed is received" in {
+      given(InitialMessages ++ Seq(
+        Inbound(PathComputationConfirmed(CorrelationId, Seq("A"))),
+        Inbound(ReserveResponse(Headers, "SegmentConnectionId")),
+        Inbound(ReserveConfirmed(Headers, ConnectionId)),
+        Inbound(ReserveCommit(Headers, ConnectionId))): _*)
+
+      when(Inbound(ReserveCommitConfirmed(Headers, "SegmentConnectionId")))
+
+      messages must contain(ReserveCommitConfirmed(Headers.asReply, ConnectionId))
+      connection.stateName must beEqualTo(ReservedReservationState)
+    }
+
+    "be in aborting state when reserve abort is received" in {
+      given(InitialMessages ++ Seq(
+        Inbound(PathComputationConfirmed(CorrelationId, Seq("A"))),
+        Inbound(ReserveResponse(Headers, "SegmentConnectionId")),
+        Inbound(ReserveConfirmed(Headers, ConnectionId))): _*)
+
+      when(Inbound(ReserveAbort(Headers, "SegmentConnectionId")))
+
+      messages must haveOneElementLike { case request: ReserveAbort => ok }
+      connection.stateName must beEqualTo(AbortingReservationState)
+    }
 
   }
 }

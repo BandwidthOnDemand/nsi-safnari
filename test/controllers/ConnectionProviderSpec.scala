@@ -6,6 +6,7 @@ import java.util.UUID
 import scala.concurrent.Promise
 import nl.surfnet.nsi._
 import nl.surfnet.nsi.NsiProviderOperation._
+import nl.surfnet.nsi.NsiRequesterOperation._
 import nl.surfnet.nsi.NsiResponseMessage._
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
@@ -18,7 +19,7 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
 
   "Reserve operation" should {
 
-    "return the connection id" in {
+    "return the connection id and confirm the reservation" in new WithApplication {
       var requesterOperation: NsiRequesterOperation = null
       val response = Await.result(ConnectionProvider.handleRequest(Reserve(NsiHeaders(CorrelationId, None))) { requesterOperation = _ }, Duration.Inf)
 
@@ -29,11 +30,7 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
           connectionId must not(beEmpty)
       }
 
-      //ConnectionProvider.handleResponse(PathComputationFailed(ConnectionProvider.continuations.single.head._1))
-
-      // Send fake failed route response
-
-      requesterOperation must not(beNull)
+      requesterOperation must beAnInstanceOf[ReserveConfirmed]
       requesterOperation.correlationId must beEqualTo(CorrelationId)
     }
   }

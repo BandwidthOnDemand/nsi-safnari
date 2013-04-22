@@ -17,3 +17,15 @@ case object ReservedReservationState extends ReservationState {
 case object CheckingReservationState extends ReservationState {
   def jaxb = ReservationStateEnumType.RESERVE_CHECKING
 }
+case object HeldReservationState extends ReservationState {
+  def jaxb = ReservationStateEnumType.RESERVE_HELD
+}
+case object CommittingReservationState extends ReservationState {
+  def jaxb = ReservationStateEnumType.RESERVE_COMMITTING
+}
+case object AbortingReservationState extends ReservationState {
+  def jaxb = ReservationStateEnumType.RESERVE_ABORTING
+}
+case object TimeoutReservationState extends ReservationState {
+  def jaxb = ReservationStateEnumType.RESERVE_TIMEOUT
+}

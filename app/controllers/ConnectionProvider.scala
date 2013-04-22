@@ -60,30 +60,6 @@ object ConnectionProvider extends Controller with SoapWebService {
     case q => ???
   }
 
-  private[controllers] def handleResponse(message: NsiRequesterOperation): Unit = atomic { implicit transaction =>
-    for {
-      f <- continuations.get(message.correlationId)
-    } {
-      f(message)
-    }
-  }
-
-  private val outboundActor = Akka.system.actorOf(Props(new Actor {
-    def receive = {
-      case pce: PathComputationRequest =>
-        sender ! Inbound(PathComputationConfirmed(pce.correlationId, Seq("1")))
-      case reserve: Reserve =>
-        sender ! Inbound(ReserveConfirmed(reserve.headers.asReply, newConnectionId))
-      case request: NsiProviderOperation =>
-        val connection = sender
-        continuations.single.put(request.correlationId, response => {
-          connection ! Inbound(response)
-        })
-      case response: NsiRequesterOperation =>
-        handleResponse(response)
-    }
-  }))
-
   private[controllers] def handleRequest(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiResponseMessage] = atomic { implicit transaction =>
     continuations(message.correlationId) = replyTo
 
@@ -99,4 +75,24 @@ object ConnectionProvider extends Controller with SoapWebService {
 
     connection ? Inbound(message) map (_.asInstanceOf[NsiResponseMessage])
   }
+
+  private val outboundActor = Akka.system.actorOf(Props(new Actor {
+    def receive = {
+      case pce: PathComputationRequest =>
+        sender ! Inbound(PathComputationConfirmed(pce.correlationId, Seq("1")))
+      case reserve: Reserve =>
+        sender ! Inbound(ReserveConfirmed(reserve.headers.asReply, newConnectionId))
+      case commit: ReserveCommit =>
+        sender ! Inbound(ReserveCommitConfirmed(commit.headers.asReply, commit.connectionId))
+      case response: NsiRequesterOperation =>
+        handleResponse(response)
+    }
+  }))
+
+  private[controllers] def handleResponse(message: NsiRequesterOperation): Unit = atomic { implicit transaction =>
+    continuations.get(message.correlationId) foreach { f =>
+      f(message)
+    }
+  }
+
 }

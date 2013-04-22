@@ -119,6 +119,8 @@ object ExtraBodyParsers {
 
   private val MessageFactories = Map(
     "reserve" -> NsiRequestMessageFactory[ReserveType]((headers, _) => NsiProviderOperation.Reserve(headers)),
+    "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType]((headers, body) => NsiProviderOperation.ReserveCommit(headers, body.getConnectionId())),
+    "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType]((headers, body) => NsiProviderOperation.ReserveAbort(headers, body.getConnectionId())),
     "querySummary" -> NsiRequestMessageFactory[QueryType]((headers, body) => NsiProviderOperation.QuerySummary(headers, body.getConnectionId().asScala)))
 
   private def bodyNameToClass(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory] =
