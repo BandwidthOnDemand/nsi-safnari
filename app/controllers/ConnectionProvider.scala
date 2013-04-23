@@ -21,6 +21,7 @@ import nl.surfnet.nsi._
 import nl.surfnet.nsi.NsiRequesterOperation._
 import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiResponseMessage._
+import play.api.libs.json.Json
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -76,18 +77,53 @@ object ConnectionProvider extends Controller with SoapWebService {
     connection ? Inbound(message) map (_.asInstanceOf[NsiResponseMessage])
   }
 
-  private val outboundActor = Akka.system.actorOf(Props(new Actor {
+  private val outboundActor = {
+    val nsiRequester = Akka.system.actorOf(Props[DummyNsiRequesterActor])
+    val pceRequester = Akka.system.actorOf(Props[DummyPceRequesterActor])
+//    val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
+//    val pceRequester = Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint)))
+    Akka.system.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester)))
+  }
+
+  class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef) extends Actor {
     def receive = {
-      case pce: PathComputationRequest =>
-        sender ! Inbound(PathComputationConfirmed(pce.correlationId, Seq("1")))
+      case pceRequest: PathComputationRequest => pceRequester forward pceRequest
+      case nsiRequest: NsiProviderOperation   => nsiRequester forward nsiRequest
+      case response: NsiRequesterOperation    => handleResponse(response)
+    }
+  }
+
+  class DummyNsiRequesterActor extends Actor {
+    def receive = {
       case reserve: Reserve =>
         sender ! Inbound(ReserveConfirmed(reserve.headers.asReply, newConnectionId))
       case commit: ReserveCommit =>
         sender ! Inbound(ReserveCommitConfirmed(commit.headers.asReply, commit.connectionId))
-      case response: NsiRequesterOperation =>
-        handleResponse(response)
     }
-  }))
+  }
+
+  class PceRequesterActor(endPoint: String) extends Actor {
+    def receive = {
+      case pce: PathComputationRequest =>
+        WS.url(endPoint).post(Json.obj(
+          "source-stp" -> Json.obj("domain-id" -> "", "local-id" -> ""),
+          "destination-stp" -> Json.obj("domain-id" -> "", "local-id" -> ""),
+          "start-time" -> "",
+          "end-time" -> "",
+          "bandwidth" -> "",
+          "reply-to" -> "http://localhost:9090/pce/reply",
+          "correation-id" -> pce.correlationId.toString,
+          "algorithm" -> "chain"
+        ))
+    }
+  }
+
+  class DummyPceRequesterActor extends Actor {
+    def receive = {
+      case pce: PathComputationRequest =>
+        sender ! Inbound(PathComputationConfirmed(pce.correlationId, Seq("1")))
+    }
+  }
 
   private[controllers] def handleResponse(message: NsiRequesterOperation): Unit = atomic { implicit transaction =>
     continuations.get(message.correlationId) foreach { f =>
