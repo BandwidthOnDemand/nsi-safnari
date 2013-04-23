@@ -123,8 +123,6 @@ object ExtraBodyParsers {
     }
   }
 
-  private def tryEither[A](f: => A): Either[String, A] = Try(f).toEither.left.map(_.toString)
-
   private val MessageFactories = Map(
     "reserve" -> NsiRequestMessageFactory[ReserveType]((correlationId, _) => NsiProviderOperation.Reserve(correlationId)),
     "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType]((correlationId, body) => NsiProviderOperation.ReserveCommit(correlationId, body.getConnectionId())),

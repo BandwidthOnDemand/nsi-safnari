@@ -34,4 +34,6 @@ package object nsi {
       case Success(a) => Right(a)
     }
   }
+
+  def tryEither[A](f: => A): Either[String, A] = Try(f).toEither.left.map(_.toString)
 }
