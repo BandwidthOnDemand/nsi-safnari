@@ -40,8 +40,8 @@ trait NsiMessage {
 object NsiMessage {
   private def newDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
 
-  private val SchemaLocations = Seq("wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd", "ogf_nsi_connection_interface_types_v2_0.xsd")
-  private val SchemaPackages = Seq("org.ogf.schemas.nsi._2013._04.framework.headers", "org.ogf.schemas.nsi._2013._04.connection.types", "org.ogf.schemas.nsi._2013._04.connection._interface")
+  private val SchemaLocations = Seq("wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
+  private val SchemaPackages = Seq("org.ogf.schemas.nsi._2013._04.framework.headers", "org.ogf.schemas.nsi._2013._04.connection.types")
 
   private val nsiSchema = {
     val schemaSources = SchemaLocations.map(location => new StreamSource(classpathResourceUri(location).toASCIIString()))
@@ -56,7 +56,6 @@ object NsiMessage {
   def unmarshaller = jaxbContext.createUnmarshaller().tap(_.setSchema(nsiSchema))
 
   /* To allow whitespace in between elements set the following event handler on the unmarshaller:
-
      new ValidationEventHandler {
        def handleEvent(event: ValidationEvent) = event.getMessage().contains("cvc-complex-type.2.3") && event.getMessage().contains("cannot have character [children], because the type's content type is element-only")
      }

@@ -89,6 +89,7 @@ object ExtraBodyParsers {
     def klass: Class[JaxbMessage]
     def apply(headers: NsiHeaders, body: JaxbMessage): NsiProviderOperation
   }
+
   def NsiRequestMessageFactory[M](f: (NsiHeaders, M) => NsiProviderOperation)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory {
     override type JaxbMessage = M
     override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]

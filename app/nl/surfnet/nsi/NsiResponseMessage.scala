@@ -1,10 +1,7 @@
 package nl.surfnet.nsi
 
 import org.w3c.dom.Document
-import org.ogf.schemas.nsi._2013._04.connection._interface.{ ObjectFactory => InterfaceObjectFactory }
 import org.ogf.schemas.nsi._2013._04.connection.types.{ ObjectFactory => TypesObjectFactory }
-import org.ogf.schemas.nsi._2013._04.connection._interface.{ObjectFactory => InterfaceObjectFactory}
-import org.ogf.schemas.nsi._2013._04.connection.types.{ObjectFactory => TypesObjectFactory}
 
 sealed trait NsiResponseMessage extends NsiMessage {
   override def optionalConnectionId: Option[ConnectionId] = None
@@ -13,9 +10,10 @@ sealed trait NsiResponseMessage extends NsiMessage {
 object NsiResponseMessage {
   import NsiMessage._
 
+  val factory = new TypesObjectFactory()
+
   case class GenericAck(headers: NsiHeaders) extends NsiResponseMessage {
     override def bodyDocument = {
-      val factory = new InterfaceObjectFactory()
       val ack = factory.createGenericAcknowledgmentType()
       marshal(factory.createAcknowledgment(ack))
     }
@@ -23,8 +21,8 @@ object NsiResponseMessage {
 
   case class ReserveResponse(headers: NsiHeaders, connectionId: String) extends NsiResponseMessage {
     override def optionalConnectionId = Some(connectionId)
+
     override def bodyDocument = {
-      val factory = new TypesObjectFactory()
       val response = factory.createReserveResponseType()
       response.setConnectionId(connectionId)
 

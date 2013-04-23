@@ -8,7 +8,7 @@ object ApplicationBuild extends Build {
   val appVersion      = "1.0-SNAPSHOT"
 
   val appDependencies = Seq(
-    "nl.surfnet.bod" % "bod-nsi" % "0.2.0-SNAPSHOT",
+    "nl.surfnet.bod" % "bod-nsi" % "0.2.0-SNAPSHOT" changing(),
     "org.scala-stm" %% "scala-stm" % "0.7",
     "org.scalacheck" %% "scalacheck" % "1.10.1" % "test",
     "com.typesafe.akka" %% "akka-testkit" % "2.1.0" % "test"
@@ -18,6 +18,7 @@ object ApplicationBuild extends Build {
     scalaVersion := "2.10.1",
     scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
     resolvers ++= Seq(
+        "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository",
         "SURFnet BoD Snapshots" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-snapshots",
         "SURFnet BoD Releases" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-releases"
     ),
