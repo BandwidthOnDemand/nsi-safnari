@@ -31,9 +31,9 @@ object ExtraBodyParsers {
   import ExecutionContext.Implicits.global
   private val logger = Logger("ExtraBodyParsers")
 
-  implicit val NsiMessageContentType: ContentTypeOf[NsiMessage] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+  implicit def NsiMessageContentType[T <: NsiMessage]: ContentTypeOf[NsiEnvelope[T]] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
-  implicit val NsiMessageWriteable: Writeable[NsiMessage] = Writeable { message =>
+  implicit def NsiMessageWriteable[T <: NsiMessage]: Writeable[NsiEnvelope[T]] = Writeable { message =>
     try {
       val soap = MessageFactory.newInstance().createMessage()
 
@@ -52,8 +52,8 @@ object ExtraBodyParsers {
     }
   }
 
-  def NsiEndPoint(action: NsiProviderOperation => Future[NsiResponseMessage]): Action[NsiProviderOperation] = Action(nsiRequestMessage) { request =>
-    AsyncResult { action(request.body).map(Results.Ok(_)) }
+  def NsiEndPoint(action: NsiEnvelope[NsiProviderOperation] => Future[NsiResponseMessage]): Action[NsiEnvelope[NsiProviderOperation]] = Action(nsiRequestMessage) { request =>
+    AsyncResult { action(request.body).map(response => Results.Ok(NsiEnvelope(request.body.headers.asReply, response))) }
   }
 
   def soap: BodyParser[SOAPMessage] = soap(BodyParsers.parse.DEFAULT_MAX_TEXT_LENGTH)
@@ -87,16 +87,16 @@ object ExtraBodyParsers {
   trait NsiRequestMessageFactory {
     type JaxbMessage
     def klass: Class[JaxbMessage]
-    def apply(headers: NsiHeaders, body: JaxbMessage): NsiProviderOperation
+    def apply(headers: NsiHeaders, body: JaxbMessage): NsiEnvelope[NsiProviderOperation]
   }
 
-  def NsiRequestMessageFactory[M](f: (NsiHeaders, M) => NsiProviderOperation)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory {
+  def NsiRequestMessageFactory[M](f: (CorrelationId, M) => NsiProviderOperation)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory {
     override type JaxbMessage = M
     override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]
-    override def apply(headers: NsiHeaders, body: M): NsiProviderOperation = f(headers, body)
+    override def apply(headers: NsiHeaders, body: M): NsiEnvelope[NsiProviderOperation] = NsiEnvelope(headers, f(headers.correlationId, body))
   }
 
-  def nsiRequestMessage(): BodyParser[NsiProviderOperation] = soap.flatMap { soapMessage =>
+  def nsiRequestMessage(): BodyParser[NsiEnvelope[NsiProviderOperation]] = soap.flatMap { soapMessage =>
     BodyParser { requestHeader =>
       val unmarshaller = NsiMessage.unmarshaller
 
@@ -119,10 +119,10 @@ object ExtraBodyParsers {
   private def tryEither[A](f: => A): Either[String, A] = Try(f).toEither.left.map(_.toString)
 
   private val MessageFactories = Map(
-    "reserve" -> NsiRequestMessageFactory[ReserveType]((headers, _) => NsiProviderOperation.Reserve(headers)),
-    "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType]((headers, body) => NsiProviderOperation.ReserveCommit(headers, body.getConnectionId())),
-    "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType]((headers, body) => NsiProviderOperation.ReserveAbort(headers, body.getConnectionId())),
-    "querySummary" -> NsiRequestMessageFactory[QueryType]((headers, body) => NsiProviderOperation.QuerySummary(headers, body.getConnectionId().asScala)))
+    "reserve" -> NsiRequestMessageFactory[ReserveType]((correlationId, _) => NsiProviderOperation.Reserve(correlationId)),
+    "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType]((correlationId, body) => NsiProviderOperation.ReserveCommit(correlationId, body.getConnectionId())),
+    "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType]((correlationId, body) => NsiProviderOperation.ReserveAbort(correlationId, body.getConnectionId())),
+    "querySummary" -> NsiRequestMessageFactory[QueryType]((correlationId, body) => NsiProviderOperation.QuerySummary(correlationId, body.getConnectionId().asScala)))
 
   private def bodyNameToClass(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory] =
     MessageFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")

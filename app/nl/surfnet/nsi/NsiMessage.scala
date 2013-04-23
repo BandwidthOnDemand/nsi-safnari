@@ -11,6 +11,12 @@ import javax.xml.validation.SchemaFactory
 import org.ogf.schemas.nsi._2013._04.framework.headers.ObjectFactory
 import org.w3c.dom.Document
 
+case class NsiEnvelope[T <: NsiMessage](headers: NsiHeaders, body: T) {
+  def replyTo = headers.replyTo
+  def headerDocument = headers.asDocument
+  def bodyDocument = body.asDocument
+}
+
 case class NsiHeaders(correlationId: UUID, replyTo: Option[URI]) {
   def asReply: NsiHeaders = copy(replyTo = None)
 
@@ -28,14 +34,10 @@ case class NsiHeaders(correlationId: UUID, replyTo: Option[URI]) {
 }
 
 trait NsiMessage {
-  def headers: NsiHeaders
-  def correlationId = headers.correlationId
-  def replyTo = headers.replyTo
+  def correlationId: CorrelationId
   def optionalConnectionId: Option[ConnectionId]
 
-  def bodyDocument: Document
-
-  def headerDocument = headers.asDocument
+  def asDocument: Document
 }
 object NsiMessage {
   private def newDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()

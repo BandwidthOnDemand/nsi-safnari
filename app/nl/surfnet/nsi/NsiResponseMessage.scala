@@ -12,17 +12,16 @@ object NsiResponseMessage {
 
   val factory = new TypesObjectFactory()
 
-  case class GenericAck(headers: NsiHeaders) extends NsiResponseMessage {
-    override def bodyDocument = {
+  case class GenericAck(correlationId: CorrelationId) extends NsiResponseMessage {
+    override def asDocument = {
       val ack = factory.createGenericAcknowledgmentType()
       marshal(factory.createAcknowledgment(ack))
     }
   }
 
-  case class ReserveResponse(headers: NsiHeaders, connectionId: String) extends NsiResponseMessage {
+  case class ReserveResponse(correlationId: CorrelationId, connectionId: String) extends NsiResponseMessage {
     override def optionalConnectionId = Some(connectionId)
-
-    override def bodyDocument = {
+    override def asDocument = {
       val response = factory.createReserveResponseType()
       response.setConnectionId(connectionId)
 
@@ -30,7 +29,7 @@ object NsiResponseMessage {
     }
   }
 
-  case class ServiceException(headers: NsiHeaders) extends NsiResponseMessage {
-    override def bodyDocument: Document = ???
+  case class ServiceException(correlationId: CorrelationId) extends NsiResponseMessage {
+    override def asDocument: Document = ???
   }
 }

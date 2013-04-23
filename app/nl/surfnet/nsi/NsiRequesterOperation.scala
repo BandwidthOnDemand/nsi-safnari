@@ -7,16 +7,15 @@ import org.ogf.schemas.nsi._2013._04.framework.types.{ ObjectFactory => FTypesOb
 import org.ogf.schemas.nsi._2013._04.connection.types._
 
 sealed trait NsiRequesterOperation extends NsiMessage {
-  override def headers: NsiHeaders = ???
-  override def bodyDocument: Document = ???
+  override def asDocument: Document = ???
   override def optionalConnectionId: Option[ConnectionId] = ???
 }
 
 object NsiRequesterOperation {
   import NsiMessage._
 
-  case class ReserveConfirmed(override val headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation {
-    override def bodyDocument = {
+  case class ReserveConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation {
+    override def asDocument = {
       val factory = new ObjectFactory()
 
       val confirmed = factory.createReserveConfirmedType()
@@ -33,8 +32,8 @@ object NsiRequesterOperation {
     }
   }
 
-  case class ReserveFailed(override val headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation {
-    override def bodyDocument = {
+  case class ReserveFailed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation {
+    override def asDocument = {
       val factory = new ObjectFactory()
 
       val genericFailed = factory.createGenericFailedType()
@@ -56,8 +55,8 @@ object NsiRequesterOperation {
     }
   }
 
-  case class ReserveCommitConfirmed(override val headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation {
-    override def bodyDocument = {
+  case class ReserveCommitConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation {
+    override def asDocument = {
       val factory = new ObjectFactory()
 
       val confirmed = factory.createGenericConfirmedType().withConnectionId(connectionId)
@@ -66,16 +65,16 @@ object NsiRequesterOperation {
     }
   }
 
-  case class ReserveCommitFailed() extends NsiRequesterOperation
-  case class ReserveAbortConfirmed() extends NsiRequesterOperation
-  case class ReserveTimeout() extends NsiRequesterOperation
+  case class ReserveCommitFailed(correlationId: CorrelationId) extends NsiRequesterOperation
+  case class ReserveAbortConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
+  case class ReserveTimeout(correlationId: CorrelationId) extends NsiRequesterOperation
 
-  case class ProvisionConfirmed() extends NsiRequesterOperation
-  case class ReleaseConfirmed() extends NsiRequesterOperation
-  case class TerminateConfirmed() extends NsiRequesterOperation
+  case class ProvisionConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
+  case class ReleaseConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
+  case class TerminateConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
 
-  case class QuerySummaryConfirmed(override val headers: NsiHeaders, connectionIds: Seq[(String, ReservationState)]) extends NsiRequesterOperation {
-    override def bodyDocument = {
+  case class QuerySummaryConfirmed(correlationId: CorrelationId, connectionIds: Seq[(String, ReservationState)]) extends NsiRequesterOperation {
+    override def asDocument = {
       val factory = new ObjectFactory()
       val q = factory.createQuerySummaryConfirmedType()
       connectionIds.map {
@@ -104,11 +103,11 @@ object NsiRequesterOperation {
       marshal(factory.createQuerySummaryConfirmed(q))
     }
   }
-  case class QuerySummaryFailed() extends NsiRequesterOperation
-  case class QueryRecursiveConfirmed() extends NsiRequesterOperation
-  case class QueryRecursiveFailed() extends NsiRequesterOperation
+  case class QuerySummaryFailed(correlationId: CorrelationId) extends NsiRequesterOperation
+  case class QueryRecursiveConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
+  case class QueryRecursiveFailed(correlationId: CorrelationId) extends NsiRequesterOperation
 
-  case class ErrorEvent() extends NsiRequesterOperation
-  case class DataPlaneStateChanged() extends NsiRequesterOperation
-  case class MessageDeliveryTimeout() extends NsiRequesterOperation
+  case class ErrorEvent(correlationId: CorrelationId) extends NsiRequesterOperation
+  case class DataPlaneStateChanged(correlationId: CorrelationId) extends NsiRequesterOperation
+  case class MessageDeliveryTimeout(correlationId: CorrelationId) extends NsiRequesterOperation
 }

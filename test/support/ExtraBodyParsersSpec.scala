@@ -15,6 +15,7 @@ import java.io.File
 import nl.surfnet.nsi.NsiProviderOperation
 import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions
+import nl.surfnet.nsi.NsiEnvelope
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoTimeConversions {
@@ -54,7 +55,7 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
     "give NSI Reserve for a valid reserve request" in {
       val result = await(Enumerator.fromFile(new File("test/reserve.xml")) |>>> nsiRequestMessage.apply(FakeSoapRequest()))
 
-      result must beRight.like { case x => x must beAnInstanceOf[NsiProviderOperation.Reserve] }
+      result must beRight.like { case NsiEnvelope(_, _: NsiProviderOperation.Reserve) => ok }
     }
 
     "give Badrequest when NSI Reserve contains extra xml" in {

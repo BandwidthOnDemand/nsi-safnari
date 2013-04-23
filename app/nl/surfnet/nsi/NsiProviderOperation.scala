@@ -2,29 +2,30 @@ package nl.surfnet.nsi
 
 import java.net.URI
 import java.util.UUID
+import org.w3c.dom.Document
 
 sealed trait NsiProviderOperation extends NsiMessage {
   override def optionalConnectionId: Option[ConnectionId] = ???
-  override def bodyDocument = ???
+  override def asDocument: Document = ???
 }
 
 sealed trait NsiQuery extends NsiProviderOperation
 
 object NsiProviderOperation {
-  case class Reserve(headers: NsiHeaders) extends NsiProviderOperation {
+  case class Reserve(correlationId: CorrelationId) extends NsiProviderOperation {
     override def optionalConnectionId: Option[ConnectionId] = None
   }
-  case class ReserveCommit(headers: NsiHeaders, connectionId: ConnectionId) extends NsiProviderOperation {
+  case class ReserveCommit(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation {
     override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
   }
-  case class ReserveAbort(headers: NsiHeaders, connectionId: ConnectionId) extends NsiProviderOperation {
+  case class ReserveAbort(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation {
     override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
   }
-  case class Provision(headers: NsiHeaders) extends NsiProviderOperation
-  case class Release(headers: NsiHeaders) extends NsiProviderOperation
-  case class Terminate(headers: NsiHeaders) extends NsiProviderOperation
+  case class Provision(correlationId: CorrelationId) extends NsiProviderOperation
+  case class Release(correlationId: CorrelationId) extends NsiProviderOperation
+  case class Terminate(correlationId: CorrelationId) extends NsiProviderOperation
 
-  case class QuerySummary(headers: NsiHeaders, connectionIds: Seq[ConnectionId]) extends NsiQuery
-  case class QuerySummarySync(headers: NsiHeaders) extends NsiQuery
-  case class QueryRecursive(headers: NsiHeaders) extends NsiQuery
+  case class QuerySummary(correlationId: CorrelationId, connectionIds: Seq[ConnectionId]) extends NsiQuery
+  case class QuerySummarySync(correlationId: CorrelationId) extends NsiQuery
+  case class QueryRecursive(correlationId: CorrelationId) extends NsiQuery
 }

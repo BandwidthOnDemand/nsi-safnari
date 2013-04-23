@@ -38,16 +38,16 @@ object ConnectionProvider extends Controller with SoapWebService {
     replyTo.foreach { replyTo =>
       Future {
         blocking { Thread.sleep(3000) }
-        WS.url(replyTo.toASCIIString()).post(response.asInstanceOf[NsiMessage])
+        WS.url(replyTo.toASCIIString()).post(response.asInstanceOf[NsiEnvelope[NsiMessage]])
       }
     }
   }
 
   def request = NsiEndPoint {
-    case query: NsiQuery =>
-      Future.successful(handleQuery(query)(replyToClient(query.replyTo)))
-    case request: NsiProviderOperation =>
-      handleRequest(request)(replyToClient(request.replyTo))
+    case NsiEnvelope(headers, query: NsiQuery) =>
+      Future.successful(handleQuery(query)(replyToClient(headers.replyTo)))
+    case NsiEnvelope(headers, request: NsiProviderOperation) =>
+      handleRequest(request)(replyToClient(headers.replyTo))
   }
 
   private def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
@@ -57,7 +57,7 @@ object ConnectionProvider extends Controller with SoapWebService {
 //        connections.get(id).map(_ ? 'queryState)
 //      }
     // replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.headers.copy(replyTo = None), connectionStates))
-    NsiResponseMessage.GenericAck(q.headers)
+    NsiResponseMessage.GenericAck(q.correlationId)
     case q => ???
   }
 
@@ -96,9 +96,9 @@ object ConnectionProvider extends Controller with SoapWebService {
   class DummyNsiRequesterActor extends Actor {
     def receive = {
       case reserve: Reserve =>
-        sender ! Inbound(ReserveConfirmed(reserve.headers.asReply, newConnectionId))
+        sender ! Inbound(ReserveConfirmed(reserve.correlationId, newConnectionId))
       case commit: ReserveCommit =>
-        sender ! Inbound(ReserveCommitConfirmed(commit.headers.asReply, commit.connectionId))
+        sender ! Inbound(ReserveCommitConfirmed(commit.correlationId, commit.connectionId))
     }
   }
 
