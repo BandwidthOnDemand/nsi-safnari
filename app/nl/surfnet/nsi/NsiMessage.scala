@@ -17,7 +17,7 @@ case class NsiEnvelope[T <: NsiMessage](headers: NsiHeaders, body: T) {
   def bodyDocument = body.asDocument
 }
 
-case class NsiHeaders(correlationId: UUID, replyTo: Option[URI]) {
+case class NsiHeaders(correlationId: CorrelationId, requesterNSA: String, providerNSA: String, replyTo: Option[URI], protocolVersion: URI = URI.create("urn:nsi:2.0:FIXME")) {
   def asReply: NsiHeaders = copy(replyTo = None)
 
   def asDocument: Document = {
@@ -25,9 +25,9 @@ case class NsiHeaders(correlationId: UUID, replyTo: Option[URI]) {
     val header = factory.createCommonHeaderType()
     header.setCorrelationId(f"urn:uuid:${correlationId}")
     header.setReplyTo(replyTo.map(_.toASCIIString()).orNull)
-    header.setProtocolVersion("2.0")
-    header.setProviderNSA("ProviderNSA")
-    header.setRequesterNSA("RequesterNSA")
+    header.setProtocolVersion(protocolVersion.toASCIIString())
+    header.setProviderNSA(providerNSA)
+    header.setRequesterNSA(requesterNSA)
 
     NsiMessage.marshal(factory.createNsiHeader(header))
   }

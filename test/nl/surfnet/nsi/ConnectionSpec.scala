@@ -22,7 +22,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
 
   isolated
 
-  val Headers = NsiHeaders(UUID.randomUUID, Some(URI.create("http://example.com/")))
+  val Headers = NsiHeaders(UUID.randomUUID, "RequesterNSA", "ProviderNSA", Some(URI.create("http://example.com/")))
   val ConnectionId = "ConnectionId"
   val CorrelationId = newCorrelationId
   val InitialMessages = Seq(Inbound(Reserve(CorrelationId)))

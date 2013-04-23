@@ -57,7 +57,7 @@ class JaxWsClientSpec extends Specification with PendingUntilFixed {
 
     def handleMessage(messageContext: SOAPMessageContext): Boolean = {
       if (isOutboundMessage(messageContext)) {
-        val headers = NsiHeaders(UUID.randomUUID, None).asDocument
+        val headers = NsiHeaders(UUID.randomUUID, "RequesterNSA", "ProviderNSA", None).asDocument
         val soapHeader = messageContext.getMessage().getSOAPPart().getEnvelope().addHeader()
         soapHeader.addChildElement(SOAPFactory.newInstance().createElement(headers.getDocumentElement()))
       }

@@ -102,14 +102,21 @@ object ExtraBodyParsers {
 
       val parsedMessage = for {
         headerNode <- onlyChildElementWithNamespace(NsiFrameworkHeaderNamespace, soapMessage.getSOAPHeader()).right
-        bodyNode <- onlyChildElementWithNamespace(NsiConnectionTypesNamespace, soapMessage.getSOAPBody()).right
-        messageFactory <- bodyNameToClass(bodyNode).right
         header <- tryEither(unmarshaller.unmarshal(headerNode, classOf[CommonHeaderType]).getValue).right
-        body <- tryEither(unmarshaller.unmarshal(bodyNode, messageFactory.klass).getValue).right
+        protocolVersion <- tryEither(URI.create(header.getProtocolVersion())).right
         correlationId <- tryEither(UUID.fromString(header.getCorrelationId().drop(9))).right
         replyTo <- tryEither(Option(header.getReplyTo()).map(URI.create)).right
+        bodyNode <- onlyChildElementWithNamespace(NsiConnectionTypesNamespace, soapMessage.getSOAPBody()).right
+        messageFactory <- bodyNameToClass(bodyNode).right
+        body <- tryEither(unmarshaller.unmarshal(bodyNode, messageFactory.klass).getValue).right
       } yield {
-        messageFactory(NsiHeaders(correlationId, replyTo), body)
+        val headers = NsiHeaders(
+          correlationId = correlationId,
+          requesterNSA = header.getRequesterNSA(),
+          providerNSA = header.getProviderNSA(),
+          replyTo = replyTo,
+          protocolVersion = protocolVersion)
+        messageFactory(headers, body)
       }
 
       Done(parsedMessage.left.map(Results.BadRequest(_)))
