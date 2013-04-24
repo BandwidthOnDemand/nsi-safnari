@@ -19,7 +19,7 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
 
   "Reserve operation" should {
     "return the connection id and confirm the reservation" in new WithApplication {
-      var requesterOperation: NsiRequesterOperation = null
+      @volatile var requesterOperation: NsiRequesterOperation = null
       val response = Await.result(ConnectionProvider.handleRequest(Reserve(CorrelationId, new ReserveType)) { requesterOperation = _ }, Duration.Inf)
 
       response must beAnInstanceOf[ReserveResponse]
