@@ -124,7 +124,7 @@ object ExtraBodyParsers {
   }
 
   private val MessageFactories = Map(
-    "reserve" -> NsiRequestMessageFactory[ReserveType]((correlationId, _) => NsiProviderOperation.Reserve(correlationId)),
+    "reserve" -> NsiRequestMessageFactory[ReserveType](NsiProviderOperation.Reserve),
     "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType]((correlationId, body) => NsiProviderOperation.ReserveCommit(correlationId, body.getConnectionId())),
     "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType]((correlationId, body) => NsiProviderOperation.ReserveAbort(correlationId, body.getConnectionId())),
     "querySummary" -> NsiRequestMessageFactory[QueryType]((correlationId, body) => NsiProviderOperation.QuerySummary(correlationId, body.getConnectionId().asScala)))

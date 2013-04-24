@@ -3,6 +3,7 @@ package nl.surfnet.nsi
 import java.net.URI
 import java.util.UUID
 import org.w3c.dom.Document
+import org.ogf.schemas.nsi._2013._04.connection.types.ReserveType
 
 sealed trait NsiProviderOperation extends NsiMessage {
   override def optionalConnectionId: Option[ConnectionId] = ???
@@ -12,8 +13,8 @@ sealed trait NsiProviderOperation extends NsiMessage {
 sealed trait NsiQuery extends NsiProviderOperation
 
 object NsiProviderOperation {
-  case class Reserve(correlationId: CorrelationId) extends NsiProviderOperation {
-    override def optionalConnectionId: Option[ConnectionId] = None
+  case class Reserve(correlationId: CorrelationId, body: ReserveType) extends NsiProviderOperation {
+    override def optionalConnectionId: Option[ConnectionId] = Option(body.getConnectionId())
   }
   case class ReserveCommit(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation {
     override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)

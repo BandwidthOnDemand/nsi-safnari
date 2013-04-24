@@ -67,7 +67,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     val connection = message.optionalConnectionId match {
       case None =>
         val id = newConnectionId
-        val c = Akka.system.actorOf(Props(new ConnectionActor(id, outboundActor)))
+        val c = Akka.system.actorOf(Props(new ConnectionActor(id, Uuid.randomUuidGenerator(), outboundActor)))
         state(id) = c
         c
       case Some(connectionId) =>
@@ -121,7 +121,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   class DummyPceRequesterActor extends Actor {
     def receive = {
       case pce: PathComputationRequest =>
-        sender ! Inbound(PathComputationConfirmed(pce.correlationId, Seq("1")))
+        sender ! Inbound(PathComputationConfirmed(pce.correlationId, Seq(pce.criteria)))
     }
   }
 

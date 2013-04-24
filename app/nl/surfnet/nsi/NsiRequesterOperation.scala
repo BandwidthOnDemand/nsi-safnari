@@ -65,8 +65,8 @@ object NsiRequesterOperation {
     }
   }
 
-  case class ReserveCommitFailed(correlationId: CorrelationId) extends NsiRequesterOperation
-  case class ReserveAbortConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
+  case class ReserveCommitFailed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
+  case class ReserveAbortConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
   case class ReserveTimeout(correlationId: CorrelationId) extends NsiRequesterOperation
 
   case class ProvisionConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
