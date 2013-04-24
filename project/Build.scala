@@ -18,7 +18,6 @@ object ApplicationBuild extends Build {
     scalaVersion := "2.10.1",
     scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
     resolvers ++= Seq(
-        "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository",
         "SURFnet BoD Snapshots" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-snapshots",
         "SURFnet BoD Releases" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-releases"
     ),
