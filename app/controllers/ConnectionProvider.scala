@@ -26,8 +26,8 @@ import play.api.libs.json.Json
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
 
-  private val state = TMap.empty[ConnectionId, ActorRef]
-  private[controllers] val continuations = TMap.empty[CorrelationId, NsiRequesterOperation => Unit]
+  private val connections = TMap.empty[ConnectionId, ActorRef]
+  private val continuations = TMap.empty[CorrelationId, NsiRequesterOperation => Unit]
 
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
@@ -52,26 +52,29 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
     case q: NsiProviderOperation.QuerySummary =>
-//      val connections = state.single.snapshot
-//      val connectionStates = q.connectionIds.map { id =>
-//        connections.get(id).map(_ ? 'queryState)
-//      }
-    // replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.headers.copy(replyTo = None), connectionStates))
-    NsiResponseMessage.GenericAck(q.correlationId)
+      //      val connections = state.single.snapshot
+      //      val connectionStates = q.connectionIds.map { id =>
+      //        connections.get(id).map(_ ? 'queryState)
+      //      }
+      // replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.headers.copy(replyTo = None), connectionStates))
+      NsiResponseMessage.GenericAck(q.correlationId)
     case q => ???
   }
 
-  private[controllers] def handleRequest(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiResponseMessage] = atomic { implicit transaction =>
-    continuations(message.correlationId) = replyTo
+  private[controllers] def handleRequest(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiResponseMessage] = {
+    lazy val id = newConnectionId
+    lazy val newConnectionActor = Akka.system.actorOf(Props(new ConnectionActor(id, Uuid.randomUuidGenerator(), outboundActor)))
 
-    val connection = message.optionalConnectionId match {
-      case None =>
-        val id = newConnectionId
-        val c = Akka.system.actorOf(Props(new ConnectionActor(id, Uuid.randomUuidGenerator(), outboundActor)))
-        state(id) = c
-        c
-      case Some(connectionId) =>
-        state.getOrElse(connectionId, throw new IllegalStateException("Unknown connection id"))
+    val connection = atomic { implicit transaction =>
+      continuations(message.correlationId) = replyTo
+
+      message.optionalConnectionId match {
+        case None =>
+          connections(id) = newConnectionActor
+          newConnectionActor
+        case Some(connectionId) =>
+          connections.getOrElse(connectionId, throw new IllegalStateException("Unknown connection id"))
+      }
     }
 
     connection ? Inbound(message) map (_.asInstanceOf[NsiResponseMessage])
@@ -80,8 +83,8 @@ object ConnectionProvider extends Controller with SoapWebService {
   private def outboundActor = {
     val nsiRequester = Akka.system.actorOf(Props[DummyNsiRequesterActor])
     val pceRequester = Akka.system.actorOf(Props[DummyPceRequesterActor])
-//    val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
-//    val pceRequester = Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint)))
+    //    val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
+    //    val pceRequester = Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint)))
     Akka.system.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester)))
   }
 
@@ -113,8 +116,7 @@ object ConnectionProvider extends Controller with SoapWebService {
           "bandwidth" -> "",
           "reply-to" -> "http://localhost:9090/pce/reply",
           "correation-id" -> pce.correlationId.toString,
-          "algorithm" -> "chain"
-        ))
+          "algorithm" -> "chain"))
     }
   }
 
