@@ -8,6 +8,8 @@ import akka.actor._
 import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiRequesterOperation._
 import org.ogf.schemas.nsi._2013._04.connection.types.ReservationRequestCriteriaType
+import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteriaType
+import com.twitter.bijection.Injection
 
 case class Inbound(message: Message)
 case class Outbound(message: Message)
@@ -18,16 +20,22 @@ class ConnectionActor(id: ConnectionId, newCorrelationId: () => CorrelationId, o
 
   when(InitialReservationState) {
     case Event(Inbound(message: Reserve), _) =>
-      goto(CheckingReservationState) using ExistingConnection(id, message.correlationId, message.body.getCriteria()) replying ReserveResponse(message.correlationId, id)
+      val criteria = Injection.invert(message.body.getCriteria())
+      goto(CheckingReservationState) using ExistingConnection(
+        id = id,
+        reserveCorrelationId = message.correlationId,
+        globalReservationId = Option(message.body.getGlobalReservationId()),
+        description = Option(message.body.getDescription()),
+        criteria = criteria.getOrElse(sys.error("Bad initial reservation criteria"))) replying ReserveResponse(message.correlationId, id)
   }
 
   when(CheckingReservationState) {
     case Event(Inbound(message: PathComputationConfirmed), data: ExistingConnection) =>
       val segments = message.segments.map { seg =>
-        val reserveType = new ObjectFactory().createReserveType()
-        // FIXME global connection id, description, ???
-        reserveType.setCriteria(seg)
-        newCorrelationId() -> reserveType
+        newCorrelationId() -> new ObjectFactory().createReserveType().
+          withGlobalReservationId(data.globalReservationId.orNull).
+          withDescription(data.description.orNull).
+          withCriteria(Injection.apply(seg))
       }
       segments.foreach { case (correlationId, reserveType) => outbound ! Reserve(correlationId, reserveType) }
 
@@ -97,8 +105,10 @@ case class NewConnection(id: ConnectionId) extends Connection
 case class ExistingConnection(
   id: ConnectionId,
   reserveCorrelationId: CorrelationId,
-  criteria: ReservationRequestCriteriaType,
-  segments: Seq[ReservationRequestCriteriaType] = Seq.empty,
+  globalReservationId: Option[String],
+  description: Option[String],
+  criteria: ReservationConfirmCriteriaType,
+  segments: Seq[ReservationConfirmCriteriaType] = Seq.empty,
   awaitingConnectionId: Set[CorrelationId] = Set.empty,
   downstreamConnections: Map[ConnectionId, ReservationState] = Map.empty) extends Connection {
 

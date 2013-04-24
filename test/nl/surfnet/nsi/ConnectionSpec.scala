@@ -12,11 +12,10 @@ import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiRequesterOperation._
 import nl.surfnet.nsi.NsiResponseMessage._
 import scala.concurrent.Await
-import org.specs2.execute.PendingUntilFixed
-import org.specs2.execute.PendingUntilFixed
-import org.ogf.schemas.nsi._2013._04.connection.types.ReserveType
-import org.ogf.schemas.nsi._2013._04.connection.types.ReservationRequestCriteriaType
+import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.specs2.mutable.After
+import org.specs2.execute.PendingUntilFixed
+import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConversions with PendingUntilFixed {
@@ -30,13 +29,14 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       system.awaitTermination
     }
 
-    val A = new ReservationRequestCriteriaType
-    val B = new ReservationRequestCriteriaType
+    val InitialReserveType = new ReserveType().withCriteria(new ReservationRequestCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType()))
+    val A = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType()).withVersion(0)
+    val B = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType()).withVersion(0)
 
     val Headers = NsiHeaders(UUID.randomUUID, "RequesterNSA", "ProviderNSA", Some(URI.create("http://example.com/")))
     val ConnectionId = "ConnectionId"
     val CorrelationId = newCorrelationId
-    val InitialMessages = Seq(Inbound(Reserve(CorrelationId, new ReserveType)))
+    val InitialMessages = Seq(Inbound(Reserve(CorrelationId, InitialReserveType)))
 
     var messages: Seq[Message] = Nil
 
@@ -54,13 +54,13 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
 
   "A connection" should {
     "send a reserve response when reserve is requested" in new fixture {
-      val ack = when(Inbound(Reserve(CorrelationId, new ReserveType)))
+      val ack = when(Inbound(Reserve(CorrelationId, InitialReserveType)))
 
       ack.asInstanceOf[ReserveResponse].correlationId must beEqualTo(CorrelationId)
     }
 
     "send a path computation request when reserve is received" in new fixture {
-      when(Inbound(Reserve(CorrelationId, new ReserveType)))
+      when(Inbound(Reserve(CorrelationId, InitialReserveType)))
 
       messages must haveOneElementLike { case request: PathComputationRequest => ok }
     }

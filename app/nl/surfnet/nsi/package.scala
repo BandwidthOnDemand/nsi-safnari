@@ -4,6 +4,9 @@ import java.net.URI
 import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
+import org.ogf.schemas.nsi._2013._04.connection.types.ReservationRequestCriteriaType
+import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteriaType
+import com.twitter.bijection.AbstractInjection
 
 package object nsi {
   type Message = Any
@@ -36,4 +39,29 @@ package object nsi {
   }
 
   def tryEither[A](f: => A): Either[String, A] = Try(f).toEither.left.map(_.toString)
+
+  implicit val ReservationCriteriaInjection = new AbstractInjection[ReservationConfirmCriteriaType, ReservationRequestCriteriaType] {
+    override def apply(a: ReservationConfirmCriteriaType) =
+      new ReservationRequestCriteriaType().
+        withSchedule(a.getSchedule()).
+        withBandwidth(a.getBandwidth()).
+        withServiceAttributes(a.getServiceAttributes()).
+        withPath(a.getPath()).
+        withVersion(a.getVersion())
+
+    override def invert(b: ReservationRequestCriteriaType) =
+      for {
+        schedule <- Option(b.getSchedule())
+        bandwidth <- Option(b.getBandwidth())
+        serviceAttributes <- Option(b.getServiceAttributes())
+        path <- Option(b.getPath())
+      } yield {
+        new ReservationConfirmCriteriaType().
+          withSchedule(schedule).
+          withBandwidth(bandwidth).
+          withServiceAttributes(serviceAttributes).
+          withPath(path).
+          withVersion(if (b.getVersion() == null) 0 else b.getVersion())
+      }
+  }
 }
