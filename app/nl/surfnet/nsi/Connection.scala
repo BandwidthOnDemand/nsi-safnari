@@ -1,15 +1,11 @@
 package nl.surfnet.nsi
 
-import nl.surfnet.nsi.NsiResponseMessage._
-import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType
-import org.ogf.schemas.nsi._2013._04.connection.types.ObjectFactory
-import akka.actor.FSM
 import akka.actor._
+import com.twitter.bijection.Injection
 import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiRequesterOperation._
-import org.ogf.schemas.nsi._2013._04.connection.types.ReservationRequestCriteriaType
-import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteriaType
-import com.twitter.bijection.Injection
+import nl.surfnet.nsi.NsiResponseMessage._
+import org.ogf.schemas.nsi._2013._04.connection.types._
 
 case class Inbound(message: Message)
 case class Outbound(message: Message)
@@ -32,7 +28,7 @@ class ConnectionActor(id: ConnectionId, newCorrelationId: () => CorrelationId, o
   when(CheckingReservationState) {
     case Event(Inbound(message: PathComputationConfirmed), data: ExistingConnection) =>
       val segments = message.segments.map { seg =>
-        newCorrelationId() -> new ObjectFactory().createReserveType().
+        newCorrelationId() -> new ReserveType().
           withGlobalReservationId(data.globalReservationId.orNull).
           withDescription(data.description.orNull).
           withCriteria(Injection.apply(seg))
@@ -76,6 +72,23 @@ class ConnectionActor(id: ConnectionId, newCorrelationId: () => CorrelationId, o
 
   when(FailedReservationState)(FSM.NullFunction)
   when(ReservedReservationState)(FSM.NullFunction)
+
+  whenUnhandled {
+    case Event('query, data: ExistingConnection) =>
+      stay replying (new QuerySummaryResultType().
+        withGlobalReservationId(data.globalReservationId.orNull).
+        withDescription(data.description.orNull).
+        withConnectionId(data.id).
+        withCriteria(data.criteria).
+        withRequesterNSA("TODO" /*TODO*/).
+        withConnectionStates(
+          new ConnectionStatesType().
+            withReservationState(new ReservationStateType().withVersion(data.criteria.getVersion()).withState(stateName.jaxb)).
+            withProvisionState(new ProvisionStateType().withVersion(data.criteria.getVersion()).withState(ProvisionStateEnumType.UNKNOWN /*TODO*/)).
+            withLifecycleState(new LifecycleStateType().withVersion(data.criteria.getVersion()).withState(LifecycleStateEnumType.INITIAL /*TODO*/)).
+            withDataPlaneStatus(new DataPlaneStatusType().withVersion(data.criteria.getVersion()).withActive(false /*TODO*/))).
+        withChildren(null /*TODO*/ ))
+  }
 
   onTransition {
     case InitialReservationState -> CheckingReservationState => outbound ! PathComputationRequest(newCorrelationId(), nextStateData.asInstanceOf[ExistingConnection].criteria)

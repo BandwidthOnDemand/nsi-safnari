@@ -5,6 +5,7 @@ import org.ogf.schemas.nsi._2013._04.framework.types.{ ObjectFactory => FTypesOb
 import org.w3c.dom.Document
 import org.ogf.schemas.nsi._2013._04.framework.types.{ ObjectFactory => FTypesObjectFactory }
 import org.ogf.schemas.nsi._2013._04.connection.types._
+import scala.collection.JavaConverters._
 
 sealed trait NsiRequesterOperation extends NsiMessage {
   override def asDocument: Document = ???
@@ -73,33 +74,10 @@ object NsiRequesterOperation {
   case class ReleaseConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
   case class TerminateConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
 
-  case class QuerySummaryConfirmed(correlationId: CorrelationId, connectionIds: Seq[(String, ReservationState)]) extends NsiRequesterOperation {
+  case class QuerySummaryConfirmed(correlationId: CorrelationId, reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation {
     override def asDocument = {
       val factory = new ObjectFactory()
-      val q = factory.createQuerySummaryConfirmedType()
-      connectionIds.map {
-        case (id, reservationState) =>
-          q.withReservation(factory.createQuerySummaryResultType()
-            .withConnectionId(id)
-            .withRequesterNSA("urn:ogf:network:nsa:surfnet-nsi-requester")
-            .withConnectionStates(factory.createConnectionStatesType()
-              .withDataPlaneStatus(factory.createDataPlaneStatusType()
-                .withActive(false)
-                .withVersion(0)
-                .withVersionConsistent(true))
-              .withLifecycleState(factory.createLifecycleStateType().withState(LifecycleStateEnumType.TERMINATED))
-              .withProvisionState(factory.createProvisionStateType().withState(ProvisionStateEnumType.RELEASED))
-              .withReservationState(factory.createReservationStateType().withState(reservationState.jaxb)))
-            .withCriteria(factory.createReservationConfirmCriteriaType()
-              .withBandwidth(100)
-              .withSchedule(factory.createScheduleType())
-              .withServiceAttributes(new FTypesObjectFactory().createTypeValuePairListType())
-              .withPath(factory.createPathType()
-                .withDirectionality(DirectionalityType.BIDIRECTIONAL)
-                .withSourceSTP(factory.createStpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("22"))
-                .withDestSTP(factory.createStpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("33")))
-              .withVersion(0)))
-      }
+      val q = new QuerySummaryConfirmedType().withReservation(reservations.asJava)
       marshal(factory.createQuerySummaryConfirmed(q))
     }
   }

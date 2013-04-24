@@ -50,13 +50,15 @@ object ConnectionProvider extends Controller with SoapWebService {
       handleRequest(request)(replyToClient(headers.replyTo))
   }
 
-  private def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
+  private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
     case q: NsiProviderOperation.QuerySummary =>
-      //      val connections = state.single.snapshot
-      //      val connectionStates = q.connectionIds.map { id =>
-      //        connections.get(id).map(_ ? 'queryState)
-      //      }
-      // replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.headers.copy(replyTo = None), connectionStates))
+      val cs = connections.single.snapshot
+      val connectionStates = Future.sequence(q.connectionIds.flatMap { id =>
+        cs.get(id).map(_ ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
+      })
+      connectionStates.onSuccess { case reservations =>
+        replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.correlationId, reservations))
+      }
       NsiResponseMessage.GenericAck(q.correlationId)
     case q => ???
   }

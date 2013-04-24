@@ -162,5 +162,15 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       connection.stateName must beEqualTo(AbortingReservationState)
     }
 
+    "provide information about connections" in new fixture {
+      given(InitialMessages: _*)
+
+      val response = when('query)
+
+      response must beLike {
+        case result: QuerySummaryResultType =>
+          result.getConnectionId() must beEqualTo(ConnectionId)
+      }
+    }
   }
 }

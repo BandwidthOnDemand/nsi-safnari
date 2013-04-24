@@ -32,7 +32,16 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
       }
 
       await(requesterOperation.future) must beLike {
-        case op: ReserveConfirmed => op.correlationId must beEqualTo(CorrelationId)
+        case op: ReserveConfirmed =>
+          op.correlationId must beEqualTo(CorrelationId)
+
+          val queryResult = Promise[NsiRequesterOperation]
+          ConnectionProvider.handleQuery(QuerySummary(newCorrelationId, Seq(op.connectionId))) { queryResult.success(_) }
+
+          await(queryResult.future) must beLike {
+            case QuerySummaryConfirmed(_, Seq(reservation: QuerySummaryResultType)) =>
+              reservation.getConnectionId() must beEqualTo(op.connectionId)
+          }
       }
     }
   }
