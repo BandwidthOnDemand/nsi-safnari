@@ -25,10 +25,9 @@ import nl.surfnet.nsi._
 import scala.reflect.ClassTag
 import scala.concurrent.Future
 import play.api.mvc.AsyncResult
-import scala.concurrent.ExecutionContext
+import play.api.libs.concurrent.Execution.Implicits._
 
 object ExtraBodyParsers {
-  import ExecutionContext.Implicits.global
   private val logger = Logger("ExtraBodyParsers")
 
   implicit def NsiMessageContentType[T <: NsiMessage]: ContentTypeOf[NsiEnvelope[T]] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
