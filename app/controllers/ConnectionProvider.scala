@@ -77,7 +77,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     connection ? Inbound(message) map (_.asInstanceOf[NsiResponseMessage])
   }
 
-  private val outboundActor = {
+  private def outboundActor = {
     val nsiRequester = Akka.system.actorOf(Props[DummyNsiRequesterActor])
     val pceRequester = Akka.system.actorOf(Props[DummyPceRequesterActor])
 //    val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
