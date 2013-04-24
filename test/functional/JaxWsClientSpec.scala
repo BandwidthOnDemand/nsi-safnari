@@ -26,60 +26,37 @@ import nl.surfnet.nsi.NsiMessage
 import nl.surfnet.nsi.NsiHeaders
 import java.util.UUID
 import org.specs2.execute.PendingUntilFixed
+import javax.xml.ws.Holder
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
 class JaxWsClientSpec extends Specification with PendingUntilFixed {
 
-
   "A JAX WS client" should {
+
+    val NsiHeader = new Holder(new CommonHeaderType()
+      .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
+      .withProtocolVersion("2")
+      .withRequesterNSA("urn:ogf:network:surfnet")
+      .withProviderNSA("urn:ogf:network:safnari"))
 
     "be able to talk to the connection provider endpoint" in new WithServer {
       val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))
 
-      service.setHandlerResolver(new HandlerResolver() {
-        override def getHandlerChain(portInfo: PortInfo) = {
-          List[Handler[_ <: MessageContext]](new NsiHeaderHandler).asJava
-        }
-      })
-
-      service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String])
+      service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String], NsiHeader)
     }
 
     "be able to talk to the connection requester endpoint" in new WithServer {
       val service = new ConnectionServiceRequester(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceRequester"))
 
+      val header = new Holder(new CommonHeaderType()
+        .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
+        .withProtocolVersion("2")
+        .withRequesterNSA("urn:ogf:network:surfnet")
+        .withProviderNSA("urn:ogf:network:safnari"))
+
       service.getConnectionServiceRequesterPort()
-        .reserveCommitConfirmed("", "123-abc") must throwA[ClientTransportException](message = "The server sent HTTP status code 501: Not Implemented")
+        .reserveCommitConfirmed("", "123-abc", NsiHeader) must throwA[ClientTransportException](message = "The server sent HTTP status code 501: Not Implemented")
     }
   }
 
-  class NsiHeaderHandler extends SOAPHandler[SOAPMessageContext] {
-
-    def handleMessage(messageContext: SOAPMessageContext): Boolean = {
-      if (isOutboundMessage(messageContext)) {
-        val headers = NsiHeaders(UUID.randomUUID, "RequesterNSA", "ProviderNSA", None).asDocument
-        val soapHeader = messageContext.getMessage().getSOAPPart().getEnvelope().addHeader()
-        soapHeader.addChildElement(SOAPFactory.newInstance().createElement(headers.getDocumentElement()))
-      }
-
-      true
-    }
-
-    private def createNsiHeader() = {
-        val factory = new HeadersObjectFactory()
-        val header = factory.createCommonHeaderType()
-        header.setCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
-        header.setProtocolVersion("0")
-        header.setRequesterNSA("")
-        header.setProviderNSA("")
-        factory.createNsiHeader(header)
-    }
-
-    private def isOutboundMessage(messageContext: MessageContext): Boolean =
-      messageContext.get(MessageContext.MESSAGE_OUTBOUND_PROPERTY).asInstanceOf[Boolean];
-
-    def close(x$1: javax.xml.ws.handler.MessageContext): Unit = ()
-    def handleFault(x$1: javax.xml.ws.handler.soap.SOAPMessageContext): Boolean = true
-    def getHeaders(): java.util.Set[javax.xml.namespace.QName] = Collections.emptySet[javax.xml.namespace.QName]
-  }
 }
