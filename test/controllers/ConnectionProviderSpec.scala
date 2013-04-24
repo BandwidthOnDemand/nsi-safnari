@@ -19,8 +19,8 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
 
   "Reserve operation" should {
     "return the connection id and confirm the reservation" in new WithApplication {
-      @volatile var requesterOperation: NsiRequesterOperation = null
-      val response = Await.result(ConnectionProvider.handleRequest(Reserve(CorrelationId, new ReserveType)) { requesterOperation = _ }, Duration.Inf)
+      val requesterOperation: Promise[NsiRequesterOperation] = Promise()
+      val response = await(ConnectionProvider.handleRequest(Reserve(CorrelationId, new ReserveType)) { requesterOperation.success(_) })
 
       response must beAnInstanceOf[ReserveResponse]
       response must beLike {
@@ -29,8 +29,9 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
           connectionId must not(beEmpty)
       }
 
-      requesterOperation must beAnInstanceOf[ReserveConfirmed]
-      requesterOperation.correlationId must beEqualTo(CorrelationId)
+      await(requesterOperation.future) must beLike {
+        case op: ReserveConfirmed => op.correlationId must beEqualTo(CorrelationId)
+      }
     }
   }
 }
