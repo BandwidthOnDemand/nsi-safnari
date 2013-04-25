@@ -15,19 +15,11 @@ sealed trait NsiRequesterOperation extends NsiMessage {
 object NsiRequesterOperation {
   import NsiMessage._
 
-  case class ReserveConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation {
+  case class ReserveConfirmed(correlationId: CorrelationId, connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiRequesterOperation {
     override def asDocument = {
       val factory = new ObjectFactory()
 
-      val confirmed = factory.createReserveConfirmedType()
-        .withConnectionId(connectionId).withCriteria(factory.createReservationConfirmCriteriaType().withBandwidth(100)
-          .withSchedule(factory.createScheduleType())
-          .withServiceAttributes(new FTypesObjectFactory().createTypeValuePairListType())
-          .withPath(factory.createPathType()
-            .withDirectionality(DirectionalityType.BIDIRECTIONAL)
-            .withSourceSTP(factory.createStpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("22"))
-            .withDestSTP(factory.createStpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("33")))
-          .withVersion(0))
+      val confirmed = factory.createReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria)
 
       marshal(factory.createReserveConfirmed(confirmed))
     }

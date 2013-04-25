@@ -1,7 +1,7 @@
 package nl.surfnet.nsi
 
 import org.ogf.schemas.nsi._2013._04.connection.types.{ ReservationConfirmCriteriaType, StpType }
-import java.net.URL
+import java.net.URI
 
 sealed trait PceMessage
 
@@ -14,4 +14,4 @@ case object NoAuthentication extends ProviderAuthentication
 case class BasicAuthentication(username: String, password: String) extends ProviderAuthentication
 case class OAuthAuthentictaion(token: String) extends ProviderAuthentication
 
-case class ComputedSegment(sourceStp: StpType, destinationStp: StpType, providerNsa: String, providerUrl: URL, authorization: ProviderAuthentication)
+case class ComputedSegment(sourceStp: StpType, destinationStp: StpType, providerNsa: String, providerUrl: URI, authentication: ProviderAuthentication)

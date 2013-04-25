@@ -6,9 +6,10 @@ import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiRequesterOperation._
 import nl.surfnet.nsi.NsiResponseMessage._
 import org.ogf.schemas.nsi._2013._04.connection.types._
+import java.net.URI
 
 case class Inbound(message: Message)
-case class Outbound(message: Message)
+case class Outbound(message: NsiProviderOperation, providerNsa: String, providerUrl: URI, authentication: ProviderAuthentication)
 
 class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: () => CorrelationId, outbound: ActorRef) extends Actor with FSM[ReservationState, Connection] {
 
@@ -27,21 +28,26 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
 
   when(CheckingReservationState) {
     case Event(Inbound(message: PathComputationConfirmed), data: ExistingConnection) =>
-      val segments = message.segments.map { seg =>
-        val criteria = new ReservationRequestCriteriaType().
-          withBandwidth(data.criteria.getBandwidth()).
-          withPath(new PathType().withSourceSTP(seg.sourceStp).withDestSTP(seg.destinationStp)).
-          withSchedule(data.criteria.getSchedule()).
-          withServiceAttributes(data.criteria.getServiceAttributes()).
-          withVersion(data.criteria.getVersion())
-        newCorrelationId() -> new ReserveType().
-          withGlobalReservationId(data.globalReservationId.orNull).
-          withDescription(data.description.orNull).
-          withCriteria(criteria)
-      }
-      segments.foreach { case (correlationId, reserveType) => outbound ! Reserve(correlationId, reserveType) }
+      val segments = message.segments.map(newCorrelationId() -> _)
 
-      val newData = data.copy(awaitingConnectionId = segments.map(_._1).toSet, segments = message.segments)
+      segments.foreach {
+        case (correlationId, segment) =>
+          val criteria = new ReservationRequestCriteriaType().
+            withBandwidth(data.criteria.getBandwidth()).
+            withPath(new PathType().withSourceSTP(segment.sourceStp).withDestSTP(segment.destinationStp)).
+            withSchedule(data.criteria.getSchedule()).
+            withServiceAttributes(data.criteria.getServiceAttributes()).
+            withVersion(data.criteria.getVersion())
+
+          val reserveType = new ReserveType().
+              withGlobalReservationId(data.globalReservationId.orNull).
+              withDescription(data.description.orNull).
+              withCriteria(criteria)
+
+          outbound ! Outbound(Reserve(correlationId, reserveType), segment.providerNsa, segment.providerUrl, segment.authentication)
+      }
+
+      val newData = data.copy(segments = segments.toMap)
       goto(newData.aggregatedReservationState) using newData replying 200
     case Event(Inbound(message: PathComputationFailed), _) =>
       goto(FailedReservationState) replying 200
@@ -99,16 +105,22 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
   onTransition {
     case InitialReservationState -> CheckingReservationState => outbound ! PathComputationRequest(newCorrelationId(), nextStateData.asInstanceOf[ExistingConnection].criteria)
     case CheckingReservationState -> FailedReservationState  => outbound ! ReserveFailed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id)
-    case CheckingReservationState -> HeldReservationState    => outbound ! ReserveConfirmed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id)
+    case CheckingReservationState -> HeldReservationState    =>
+      val data = nextStateData.asInstanceOf[ExistingConnection]
+      outbound ! ReserveConfirmed(data.reserveCorrelationId, id, data.criteria)
     case HeldReservationState -> CommittingReservationState =>
-      nextStateData.asInstanceOf[ExistingConnection].downstreamConnections foreach {
-        case (connectionId, _) =>
-          outbound ! ReserveCommit(newCorrelationId(), connectionId)
+      val data = nextStateData.asInstanceOf[ExistingConnection]
+      data.connections.foreach {
+        case (connectionId, correlationId) =>
+          val seg = data.segments(correlationId)
+          outbound ! Outbound(ReserveCommit(newCorrelationId(), connectionId), seg.providerNsa, seg.providerUrl, seg.authentication)
       }
     case HeldReservationState -> AbortingReservationState =>
-      nextStateData.asInstanceOf[ExistingConnection].downstreamConnections foreach {
-        case (connectionId, _) =>
-          outbound ! ReserveAbort(newCorrelationId(), connectionId)
+      val data = nextStateData.asInstanceOf[ExistingConnection]
+      data.connections.foreach {
+        case (connectionId, correlationId) =>
+          val seg = data.segments(correlationId)
+          outbound ! Outbound(ReserveAbort(newCorrelationId(), connectionId), seg.providerNsa, seg.providerUrl, seg.authentication)
       }
     case CommittingReservationState -> ReservedReservationState => outbound ! ReserveCommitConfirmed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id)
     case ReservedReservationState -> CheckingReservationState   => ???
@@ -127,9 +139,11 @@ case class ExistingConnection(
   globalReservationId: Option[String],
   description: Option[String],
   criteria: ReservationConfirmCriteriaType,
-  segments: Seq[ComputedSegment] = Seq.empty,
-  awaitingConnectionId: Set[CorrelationId] = Set.empty,
+  segments: Map[CorrelationId, ComputedSegment] = Map.empty,
+  connections: Map[ConnectionId, CorrelationId] = Map.empty,
   downstreamConnections: Map[ConnectionId, ReservationState] = Map.empty) extends Connection {
+
+  def awaitingConnectionId = segments.keySet -- connections.values
 
   def aggregatedReservationState: ReservationState =
     if (awaitingConnectionId.isEmpty && downstreamConnections.isEmpty) CheckingReservationState
@@ -145,7 +159,7 @@ case class ExistingConnection(
     require(awaitingConnectionId.contains(correlationId), s"bad correlationId: $correlationId, awaiting $awaitingConnectionId")
     require(!downstreamConnections.contains(connectionId), s"duplicate connectionId: $connectionId, already have $downstreamConnections")
     copy(
-      awaitingConnectionId = awaitingConnectionId - correlationId,
+      connections = connections + (connectionId -> correlationId),
       downstreamConnections = downstreamConnections + (connectionId -> reservationState))
   }
 }

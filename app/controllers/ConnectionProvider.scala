@@ -26,6 +26,7 @@ import nl.surfnet.nsi.NsiResponseMessage._
 import scala.util.Failure
 import scala.util.Success
 import java.net.URL
+import com.twitter.bijection.Injection
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -102,7 +103,8 @@ object ConnectionProvider extends Controller with SoapWebService {
     val (nsiRequester, pceRequester) = {
       if (current.mode == Mode.Prod) {
         val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
-        (Akka.system.actorOf(Props[NsiRequesterActor]), Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint))))
+        val requesterNsa = current.configuration.getString("nsi.requesterNsa").getOrElse(sys.error("nsi.requsterNsa configuration property is not set"))
+        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa))), Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint))))
       } else
         (Akka.system.actorOf(Props[DummyNsiRequesterActor]), Akka.system.actorOf(Props[DummyPceRequesterActor]))
     }
@@ -113,24 +115,31 @@ object ConnectionProvider extends Controller with SoapWebService {
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef) extends Actor {
     def receive = {
       case pceRequest: PathComputationRequest => pceRequester forward pceRequest
-      case nsiRequest: NsiProviderOperation   => nsiRequester forward nsiRequest
+      case nsiRequest: Outbound               => nsiRequester forward nsiRequest
       case response: NsiRequesterOperation    => handleResponse(response)
     }
   }
 
   class DummyNsiRequesterActor extends Actor {
     def receive = {
-      case reserve: Reserve =>
-        sender ! Inbound(ReserveConfirmed(reserve.correlationId, newConnectionId))
-      case commit: ReserveCommit =>
+      case Outbound(reserve: Reserve, _, _, _) =>
+        sender ! Inbound(ReserveConfirmed(reserve.correlationId, newConnectionId, Injection.invert(reserve.body.getCriteria()).get))
+      case Outbound(commit: ReserveCommit, _, _, _) =>
         sender ! Inbound(ReserveCommitConfirmed(commit.correlationId, commit.connectionId))
     }
   }
 
-  class NsiRequesterActor extends Actor {
+  class NsiRequesterActor(requesterNsa: String) extends Actor {
     def receive = {
-      case reserve: Reserve => ???
-      case commit: ReserveCommit => ???
+      case Outbound(reserveType: Reserve, providerNsa, providerUrl, authentication) =>
+        val headers = NsiHeaders(
+          reserveType.correlationId,
+          requesterNsa,
+          providerNsa,
+          Some(new URI("http://localhost:9000/" + routes.ConnectionRequester.request.url)))
+
+        WS.url(providerUrl.toASCIIString()).post(NsiEnvelope(headers, reserveType))
+      case Outbound(commit: ReserveCommit, providerNsa, providerUrl, authentication) => ???
     }
   }
 
@@ -162,7 +171,7 @@ object ConnectionProvider extends Controller with SoapWebService {
               pce.criteria.getPath().getSourceSTP,
               pce.criteria.getPath().getDestSTP(),
               "urn:ogf:network:surnfnet.nl",
-              new URL("http://localhost:9000/nsi-v2/ConnectionServiceProvider"),
+              URI.create("http://localhost:9000/nsi-v2/ConnectionServiceProvider"),
               NoAuthentication))))
     }
   }

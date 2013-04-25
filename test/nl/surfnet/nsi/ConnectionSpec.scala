@@ -30,9 +30,10 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       system.awaitTermination
     }
 
-    val InitialReserveType = new ReserveType().withCriteria(new ReservationRequestCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType()))
-    val A = ComputedSegment(new StpType().withLocalId(""), new StpType().withLocalId(""), "urn:ogf:network:es.net", new URL("http://example.com/provider"), NoAuthentication)
-    val B = ComputedSegment(new StpType().withLocalId(""), new StpType().withLocalId(""), "urn:ogf:network:surfnet.nl", new URL("http://excample.com/provider"), NoAuthentication)
+    val Criteria = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType())
+    val InitialReserveType = new ReserveType().withCriteria(Criteria)
+    val A = ComputedSegment(new StpType().withLocalId(""), new StpType().withLocalId(""), "urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication)
+    val B = ComputedSegment(new StpType().withLocalId(""), new StpType().withLocalId(""), "urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication)
 
     val Headers = NsiHeaders(UUID.randomUUID, "RequesterNSA", "ProviderNSA", Some(URI.create("http://example.com/")))
     val ConnectionId = "ConnectionId"
@@ -87,9 +88,9 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       given(InitialMessages ++ Seq(
         Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A)))): _*)
 
-      when(Inbound(ReserveConfirmed(new UUID(0, 2), "connectionId")))
+      when(Inbound(ReserveConfirmed(new UUID(0, 2), "connectionId", Criteria)))
 
-      messages must contain(ReserveConfirmed(CorrelationId, ConnectionId))
+      messages must contain(ReserveConfirmed(CorrelationId, ConnectionId, Criteria))
 
       connection.stateName must beEqualTo(HeldReservationState)
     }
@@ -98,11 +99,11 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       given(InitialMessages ++ Seq(
         Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A, B)))): _*)
 
-      when(Inbound(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA")))
+      when(Inbound(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA", Criteria)))
       messages must beEmpty
 
-      when(Inbound(ReserveConfirmed(new UUID(0, 3), "ConnectionIdB")))
-      messages must contain(ReserveConfirmed(CorrelationId, ConnectionId))
+      when(Inbound(ReserveConfirmed(new UUID(0, 3), "ConnectionIdB", Criteria)))
+      messages must contain(ReserveConfirmed(CorrelationId, ConnectionId, Criteria))
 
       connection.stateName must beEqualTo(HeldReservationState)
     }
@@ -122,7 +123,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
         Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A, B))),
         Inbound(ReserveFailed(new UUID(0, 2), ConnectionId))): _*)
 
-      when(Inbound(ReserveConfirmed(new UUID(0, 3), "connectionIdB")))
+      when(Inbound(ReserveConfirmed(new UUID(0, 3), "connectionIdB", Criteria)))
 
       messages must contain(ReserveFailed(CorrelationId, ConnectionId))
       connection.stateName must beEqualTo(FailedReservationState)
@@ -131,11 +132,11 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
     "be in committing state when reserve commit is received" in new fixture {
       given(InitialMessages ++ Seq(
         Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A))),
-        Inbound(ReserveConfirmed(new UUID(0, 2), ConnectionId))): _*)
+        Inbound(ReserveConfirmed(new UUID(0, 2), ConnectionId, Criteria))): _*)
 
       when(Inbound(ReserveCommit(newCorrelationId, ConnectionId)))
 
-      messages must haveOneElementLike { case request: ReserveCommit => ok }
+      messages must haveOneElementLike { case Outbound(_: ReserveCommit, _, _, _) => ok }
       connection.stateName must beEqualTo(CommittingReservationState)
     }
 
@@ -143,7 +144,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       val CommitCorrelationId = newCorrelationId
       given(InitialMessages ++ Seq(
         Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A))),
-        Inbound(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA")),
+        Inbound(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA", Criteria)),
         Inbound(ReserveCommit(CommitCorrelationId, ConnectionId))): _*)
 
       when(Inbound(ReserveCommitConfirmed(new UUID(0, 3), "ConnectionIdA")))
@@ -155,11 +156,11 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
     "be in aborting state when reserve abort is received" in new fixture {
       given(InitialMessages ++ Seq(
         Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A))),
-        Inbound(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA"))): _*)
+        Inbound(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA", Criteria))): _*)
 
       when(Inbound(ReserveAbort(CorrelationId, ConnectionId)))
 
-      messages must haveOneElementLike { case request: ReserveAbort => ok }
+      messages must haveOneElementLike { case Outbound(_: ReserveAbort, _, _, _) => ok }
       connection.stateName must beEqualTo(AbortingReservationState)
     }
 
