@@ -7,6 +7,7 @@ import scala.util.Success
 import org.ogf.schemas.nsi._2013._04.connection.types.ReservationRequestCriteriaType
 import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteriaType
 import com.twitter.bijection.AbstractInjection
+import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 
 package object nsi {
   type Message = Any
@@ -53,7 +54,7 @@ package object nsi {
       for {
         schedule <- Option(b.getSchedule())
         bandwidth <- Option(b.getBandwidth())
-        serviceAttributes <- Option(b.getServiceAttributes())
+        serviceAttributes = Option(b.getServiceAttributes()).getOrElse(new TypeValuePairListType())
         path <- Option(b.getPath())
       } yield {
         new ReservationConfirmCriteriaType().

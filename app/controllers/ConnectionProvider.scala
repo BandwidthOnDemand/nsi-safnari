@@ -6,6 +6,7 @@ import scala.concurrent.stm._
 import scala.concurrent.duration._
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
+import play.api._
 import play.api.mvc.{ Request => _, Response => _, _ }
 import play.api.libs.concurrent.Akka
 import play.api.libs.ws.WS
@@ -22,6 +23,8 @@ import nl.surfnet.nsi.NsiRequesterOperation._
 import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiResponseMessage._
 import play.api.libs.json.Json
+import scala.util.Failure
+import scala.util.Success
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -34,20 +37,24 @@ object ConnectionProvider extends Controller with SoapWebService {
   override def serviceUrl(implicit request: RequestHeader): String =
     routes.ConnectionProvider.request().absoluteURL()
 
-  private def replyToClient(replyTo: Option[URI])(response: NsiRequesterOperation): Unit = {
-    replyTo.foreach { replyTo =>
-      Future {
-        blocking { Thread.sleep(3000) }
-        WS.url(replyTo.toASCIIString()).post(response.asInstanceOf[NsiEnvelope[NsiMessage]])
-      }
+  private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit = {
+    requestHeaders.replyTo.foreach { replyTo =>
+      WS.url(replyTo.toASCIIString()).
+        post(NsiEnvelope(requestHeaders.asReply, response)).
+        onComplete {
+          case Failure(error) =>
+            Logger.info(f"replying to $replyTo: $error", error)
+          case Success(response) =>
+            Logger.debug(f"replying to $replyTo: ${response.status} ${response.statusText}")
+        }
     }
   }
 
   def request = NsiEndPoint {
     case NsiEnvelope(headers, query: NsiQuery) =>
-      Future.successful(handleQuery(query)(replyToClient(headers.replyTo)))
+      Future.successful(handleQuery(query)(replyToClient(headers)))
     case NsiEnvelope(headers, request: NsiProviderOperation) =>
-      handleRequest(request)(replyToClient(headers.replyTo))
+      handleRequest(request)(replyToClient(headers))
   }
 
   private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
@@ -56,8 +63,9 @@ object ConnectionProvider extends Controller with SoapWebService {
       val connectionStates = Future.sequence(q.connectionIds.flatMap { id =>
         cs.get(id).map(_ ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
       })
-      connectionStates.onSuccess { case reservations =>
-        replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.correlationId, reservations))
+      connectionStates.onSuccess {
+        case reservations =>
+          replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.correlationId, reservations))
       }
       NsiResponseMessage.GenericAck(q.correlationId)
     case q => ???
