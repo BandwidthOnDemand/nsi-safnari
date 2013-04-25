@@ -16,6 +16,7 @@ import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.specs2.mutable.After
 import org.specs2.execute.PendingUntilFixed
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
+import java.net.URL
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConversions with PendingUntilFixed {
@@ -30,8 +31,8 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
     }
 
     val InitialReserveType = new ReserveType().withCriteria(new ReservationRequestCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType()))
-    val A = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType()).withVersion(0)
-    val B = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType()).withVersion(0)
+    val A = ComputedSegment(new StpType().withLocalId(""), new StpType().withLocalId(""), "urn:ogf:network:es.net", new URL("http://example.com/provider"), NoAuthentication)
+    val B = ComputedSegment(new StpType().withLocalId(""), new StpType().withLocalId(""), "urn:ogf:network:surfnet.nl", new URL("http://excample.com/provider"), NoAuthentication)
 
     val Headers = NsiHeaders(UUID.randomUUID, "RequesterNSA", "ProviderNSA", Some(URI.create("http://example.com/")))
     val ConnectionId = "ConnectionId"

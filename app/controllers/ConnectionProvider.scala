@@ -10,6 +10,7 @@ import play.api._
 import play.api.mvc.{ Request => _, Response => _, _ }
 import play.api.libs.concurrent.Akka
 import play.api.libs.ws.WS
+import play.api.libs.json.{ JsObject, Json }
 import play.api.Play.current
 import akka.actor._
 import akka.pattern.ask
@@ -22,9 +23,9 @@ import nl.surfnet.nsi._
 import nl.surfnet.nsi.NsiRequesterOperation._
 import nl.surfnet.nsi.NsiProviderOperation._
 import nl.surfnet.nsi.NsiResponseMessage._
-import play.api.libs.json.Json
 import scala.util.Failure
 import scala.util.Success
+import java.net.URL
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -91,10 +92,14 @@ object ConnectionProvider extends Controller with SoapWebService {
   }
 
   private def outboundActor = {
-    val nsiRequester = Akka.system.actorOf(Props[DummyNsiRequesterActor])
-    val pceRequester = Akka.system.actorOf(Props[DummyPceRequesterActor])
-    //    val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
-    //    val pceRequester = Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint)))
+    val (nsiRequester, pceRequester) = {
+      if (current.mode == Mode.Prod) {
+        val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
+        (Akka.system.actorOf(Props[NsiRequesterActor]), Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint))))
+      } else
+        (Akka.system.actorOf(Props[DummyNsiRequesterActor]), Akka.system.actorOf(Props[DummyPceRequesterActor]))
+    }
+
     Akka.system.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester)))
   }
 
@@ -115,25 +120,43 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
   }
 
+  class NsiRequesterActor extends Actor {
+    def receive = {
+      case reserve: Reserve => ???
+      case commit: ReserveCommit => ???
+    }
+  }
+
   class PceRequesterActor(endPoint: String) extends Actor {
     def receive = {
-      case pce: PathComputationRequest =>
+      case PathComputationRequest(correlationId, criteria) =>
         WS.url(endPoint).post(Json.obj(
-          "source-stp" -> Json.obj("domain-id" -> "", "local-id" -> ""),
-          "destination-stp" -> Json.obj("domain-id" -> "", "local-id" -> ""),
-          "start-time" -> "",
-          "end-time" -> "",
-          "bandwidth" -> "",
+          "source-stp" -> stpToJson(criteria.getPath().getSourceSTP()),
+          "destination-stp" -> stpToJson(criteria.getPath().getDestSTP()),
+          "start-time" -> criteria.getSchedule().getStartTime().toString(),
+          "end-time" -> criteria.getSchedule().getEndTime().toString(),
+          "bandwidth" -> criteria.getBandwidth(),
           "reply-to" -> "http://localhost:9090/pce/reply",
-          "correation-id" -> pce.correlationId.toString,
+          "correation-id" -> correlationId.toString,
           "algorithm" -> "chain"))
     }
+
+    private def stpToJson(stp: StpType): JsObject =
+      Json.obj("network-id" -> stp.getNetworkId(), "local-id" -> stp.getLocalId())
   }
 
   class DummyPceRequesterActor extends Actor {
     def receive = {
       case pce: PathComputationRequest =>
-        sender ! Inbound(PathComputationConfirmed(pce.correlationId, Seq(pce.criteria)))
+        sender !
+          Inbound(PathComputationConfirmed(
+            pce.correlationId,
+            Seq(ComputedSegment(
+              pce.criteria.getPath().getSourceSTP,
+              pce.criteria.getPath().getDestSTP(),
+              "urn:ogf:network:surnfnet.nl",
+              new URL("http://localhost:9000/nsi-v2/ConnectionServiceProvider"),
+              NoAuthentication))))
     }
   }
 

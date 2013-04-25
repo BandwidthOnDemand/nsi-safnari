@@ -28,10 +28,16 @@ class ConnectionActor(id: ConnectionId, newCorrelationId: () => CorrelationId, o
   when(CheckingReservationState) {
     case Event(Inbound(message: PathComputationConfirmed), data: ExistingConnection) =>
       val segments = message.segments.map { seg =>
+        val criteria = new ReservationRequestCriteriaType().
+          withBandwidth(data.criteria.getBandwidth()).
+          withPath(new PathType().withSourceSTP(seg.sourceStp).withDestSTP(seg.destinationStp)).
+          withSchedule(data.criteria.getSchedule()).
+          withServiceAttributes(data.criteria.getServiceAttributes()).
+          withVersion(data.criteria.getVersion())
         newCorrelationId() -> new ReserveType().
           withGlobalReservationId(data.globalReservationId.orNull).
           withDescription(data.description.orNull).
-          withCriteria(Injection.apply(seg))
+          withCriteria(criteria)
       }
       segments.foreach { case (correlationId, reserveType) => outbound ! Reserve(correlationId, reserveType) }
 
@@ -121,7 +127,7 @@ case class ExistingConnection(
   globalReservationId: Option[String],
   description: Option[String],
   criteria: ReservationConfirmCriteriaType,
-  segments: Seq[ReservationConfirmCriteriaType] = Seq.empty,
+  segments: Seq[ComputedSegment] = Seq.empty,
   awaitingConnectionId: Set[CorrelationId] = Set.empty,
   downstreamConnections: Map[ConnectionId, ReservationState] = Map.empty) extends Connection {
 

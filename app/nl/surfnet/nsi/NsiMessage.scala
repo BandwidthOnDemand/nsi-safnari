@@ -39,6 +39,7 @@ trait NsiMessage {
 
   def asDocument: Document
 }
+
 object NsiMessage {
   private def newDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
 
