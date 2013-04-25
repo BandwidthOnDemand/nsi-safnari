@@ -86,13 +86,13 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
         withDescription(data.description.orNull).
         withConnectionId(data.id).
         withCriteria(data.criteria).
-        withRequesterNSA("TODO" /*TODO*/).
+        withRequesterNSA(requesterNSA).
         withConnectionStates(
           new ConnectionStatesType().
             withReservationState(new ReservationStateType().withVersion(data.criteria.getVersion()).withState(stateName.jaxb)).
             withProvisionState(new ProvisionStateType().withVersion(data.criteria.getVersion()).withState(ProvisionStateEnumType.UNKNOWN /*TODO*/)).
             withLifecycleState(new LifecycleStateType().withVersion(data.criteria.getVersion()).withState(LifecycleStateEnumType.INITIAL /*TODO*/)).
-            withDataPlaneStatus(new DataPlaneStatusType().withVersion(data.criteria.getVersion()).withActive(false /*TODO*/))).
+            withDataPlaneStatus(new DataPlaneStatusType().withVersion(data.criteria.getVersion()).withActive(false /*TODO*/).withVersionConsistent(true))).
         withChildren(null /*TODO*/ ))
   }
 

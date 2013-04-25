@@ -72,7 +72,8 @@ object ConnectionProvider extends Controller with SoapWebService {
   private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
     case q: NsiProviderOperation.QuerySummary =>
       val cs = connections.single.snapshot
-      val connectionStates = Future.sequence(q.connectionIds.flatMap { id =>
+      val connectionIds = if (q.connectionIds.isEmpty) cs.keys.toSeq else q.connectionIds
+      val connectionStates = Future.sequence(connectionIds.flatMap { id =>
         cs.get(id).map(_ ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
       })
       connectionStates.onSuccess {
