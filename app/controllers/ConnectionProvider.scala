@@ -51,12 +51,23 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
   }
 
-  def request = NsiEndPoint {
+  private def findOrCreateConnection(request: NsiEnvelope[NsiProviderOperation]): Either[ConnectionId, ActorRef] = request.body.optionalConnectionId match {
+    case Some(connectionId) =>
+      connections.single.get(connectionId).toRight(connectionId)
+    case None =>
+      // Initial reserve request.
+      val connectionId = newConnectionId
+      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, Uuid.randomUuidGenerator(), outboundActor)))
+      connections.single(connectionId) = connectionActor
+      Right(connectionActor)
+  }
+
+  def request = NsiEndPoint({
     case NsiEnvelope(headers, query: NsiQuery) =>
       Future.successful(handleQuery(query)(replyToClient(headers)))
-    case NsiEnvelope(headers, request: NsiProviderOperation) =>
+    case request @ NsiEnvelope(headers, _: NsiProviderOperation) =>
       handleRequest(request)(replyToClient(headers))
-  }
+  })
 
   private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
     case q: NsiProviderOperation.QuerySummary =>
@@ -72,22 +83,17 @@ object ConnectionProvider extends Controller with SoapWebService {
     case q => ???
   }
 
-  private[controllers] def handleRequest(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiResponseMessage] = {
-    lazy val id = newConnectionId
-    lazy val newConnectionActor = Akka.system.actorOf(Props(new ConnectionActor(id, Uuid.randomUuidGenerator(), outboundActor)))
-
-    val connection = atomic { implicit transaction =>
-      continuations(message.correlationId) = replyTo
-
-      message.optionalConnectionId match {
-        case None =>
-          connections(id) = newConnectionActor
-          newConnectionActor
-        case Some(connectionId) =>
-          connections.getOrElse(connectionId, throw new IllegalStateException("Unknown connection id"))
-      }
+  private[controllers] def handleRequest(request: NsiEnvelope[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiResponseMessage] = {
+    findOrCreateConnection(request) match {
+      case Left(connectionId) =>
+        Future.successful(NsiResponseMessage.ServiceException(request.body.correlationId, f"Unknown connection ${connectionId}"))
+      case Right(connectionActor) =>
+        handleProviderOperation(request.body)(replyTo)(connectionActor)
     }
+  }
 
+  private def handleProviderOperation(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit)(connection: ActorRef): Future[NsiResponseMessage] = {
+    continuations.single(message.correlationId) = replyTo
     connection ? Inbound(message) map (_.asInstanceOf[NsiResponseMessage])
   }
 
@@ -165,5 +171,4 @@ object ConnectionProvider extends Controller with SoapWebService {
       f(message)
     }
   }
-
 }

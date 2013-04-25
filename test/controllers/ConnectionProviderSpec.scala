@@ -16,13 +16,14 @@ import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends org.specs2.mutable.Specification {
 
+  def withEnvelope[T <: NsiMessage](message: T) = NsiEnvelope(NsiHeaders(message.correlationId, "RequesterNSA", "ProviderNSA", None), message)
   val InitialReserveType = new ReserveType().withCriteria(new ReservationRequestCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType()))
   val CorrelationId = newCorrelationId
 
   "Reserve operation" should {
     "return the connection id and confirm the reservation" in new WithApplication {
       val requesterOperation: Promise[NsiRequesterOperation] = Promise()
-      val response = await(ConnectionProvider.handleRequest(Reserve(CorrelationId, InitialReserveType)) { requesterOperation.success(_) })
+      val response = await(ConnectionProvider.handleRequest(withEnvelope(Reserve(CorrelationId, InitialReserveType))) { requesterOperation.success(_) })
 
       response must beAnInstanceOf[ReserveResponse]
       response must beLike {

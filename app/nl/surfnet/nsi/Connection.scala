@@ -10,7 +10,7 @@ import org.ogf.schemas.nsi._2013._04.connection.types._
 case class Inbound(message: Message)
 case class Outbound(message: Message)
 
-class ConnectionActor(id: ConnectionId, newCorrelationId: () => CorrelationId, outbound: ActorRef) extends Actor with FSM[ReservationState, Connection] {
+class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: () => CorrelationId, outbound: ActorRef) extends Actor with FSM[ReservationState, Connection] {
 
   startWith(InitialReservationState, NewConnection(id))
 

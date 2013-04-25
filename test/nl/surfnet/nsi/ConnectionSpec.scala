@@ -41,7 +41,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
 
     var messages: Seq[Message] = Nil
 
-    val connection = TestFSMRef(new ConnectionActor(ConnectionId, Uuid.mockUuidGenerator(1), TestActorRef(new Actor {
+    val connection = TestFSMRef(new ConnectionActor(ConnectionId, "RequesterNSA", Uuid.mockUuidGenerator(1), TestActorRef(new Actor {
       def receive = { case m: Message => messages = messages :+ m }
     })))
 
