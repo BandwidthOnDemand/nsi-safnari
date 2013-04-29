@@ -20,7 +20,9 @@ object ConnectionRequester extends Controller with SoapWebService {
   def expectReplyFor(correlationId: CorrelationId): Future[NsiRequesterOperation] = continuations.register(correlationId)
 
   def request = NsiRequesterEndPoint {
-    case NsiEnvelope(headers, _) => Future.successful(NsiResponseMessage.ServiceException(headers.correlationId, "Not implemented yet"))
+    case NsiEnvelope(headers, response) =>
+      continuations.replyReceived(headers.correlationId, response)
+      Future.successful(NsiResponseMessage.GenericAck(headers.correlationId))
   }
 
   private val continuations = new Continuations[NsiRequesterOperation]()
