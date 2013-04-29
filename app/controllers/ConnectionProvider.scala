@@ -169,7 +169,7 @@ object ConnectionProvider extends Controller with SoapWebService {
           "end-time" -> criteria.getSchedule().getEndTime().toString(),
           "bandwidth" -> criteria.getBandwidth(),
           "reply-to" -> "http://localhost:9090/pce/reply",
-          "correation-id" -> correlationId.toString,
+          "correlation-id" -> correlationId.toString,
           "algorithm" -> "chain"))
     }
 
