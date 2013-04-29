@@ -12,6 +12,6 @@ case class PathComputationConfirmed(correlationId: CorrelationId, segments: Seq[
 sealed trait ProviderAuthentication
 case object NoAuthentication extends ProviderAuthentication
 case class BasicAuthentication(username: String, password: String) extends ProviderAuthentication
-case class OAuthAuthentictaion(token: String) extends ProviderAuthentication
+case class OAuthAuthentication(token: String) extends ProviderAuthentication
 
 case class ComputedSegment(sourceStp: StpType, destinationStp: StpType, providerNsa: String, providerUrl: URI, authentication: ProviderAuthentication)
