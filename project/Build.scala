@@ -22,7 +22,10 @@ object ApplicationBuild extends Build {
         "SURFnet BoD Snapshots" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-snapshots",
         "SURFnet BoD Releases" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-releases"
     ),
-    testFrameworks in Test := Seq(TestFrameworks.Specs2)
+    testFrameworks in Test := Seq(TestFrameworks.Specs2),
+
+    // Override Play! defaults to enable parallel test execution
+    testOptions in Test := Seq(Tests.Argument(TestFrameworks.Specs2, "junitxml", "console"))
   )
 
 }

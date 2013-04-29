@@ -5,12 +5,12 @@ import java.net.URI
 import scala.concurrent.stm._
 import scala.concurrent.duration._
 import scala.concurrent._
-import scala.concurrent.ExecutionContext.Implicits.global
 import play.api._
 import play.api.mvc.{ Request => _, Response => _, _ }
 import play.api.libs.concurrent.Akka
+import play.api.libs.concurrent.Execution.Implicits._
+import play.api.libs.json._
 import play.api.libs.ws.WS
-import play.api.libs.json.{ JsObject, Json }
 import play.api.Play.current
 import akka.actor._
 import akka.pattern.ask
@@ -32,7 +32,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
 
   private val connections = TMap.empty[ConnectionId, ActorRef]
-  private val continuations = TMap.empty[CorrelationId, NsiRequesterOperation => Unit]
+  private val continuations = new Continuations[NsiRequesterOperation]()
 
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
@@ -95,7 +95,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   }
 
   private def handleProviderOperation(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit)(connection: ActorRef): Future[NsiResponseMessage] = {
-    continuations.single(message.correlationId) = replyTo
+    continuations.register(message.correlationId)(replyTo)
     connection ? Inbound(message) map (_.asInstanceOf[NsiResponseMessage])
   }
 
@@ -176,9 +176,6 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
   }
 
-  private[controllers] def handleResponse(message: NsiRequesterOperation): Unit = atomic { implicit transaction =>
-    continuations.get(message.correlationId) foreach { f =>
-      f(message)
-    }
-  }
+  private[controllers] def handleResponse(message: NsiRequesterOperation): Unit =
+    continuations.replyReceived(message.correlationId, message)
 }
