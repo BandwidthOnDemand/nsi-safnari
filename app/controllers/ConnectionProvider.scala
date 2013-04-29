@@ -27,6 +27,7 @@ import scala.util.Failure
 import scala.util.Success
 import java.net.URL
 import com.twitter.bijection.Injection
+import com.ning.http.client.Realm.AuthScheme
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -107,7 +108,7 @@ object ConnectionProvider extends Controller with SoapWebService {
         val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
         val requesterNsa = current.configuration.getString("nsi.requester.nsa").getOrElse(sys.error("nsi.requester.nsa configuration property is not set"))
         val requesterUrl = current.configuration.getString("nsi.requester.url").getOrElse(sys.error("nsi.requester.url configuration property is not set"))
-        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(requesterUrl)))), Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint))))
+        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(requesterUrl)))), Akka.system.actorOf(Props[DummyPceRequesterActor]))
       } else
         (Akka.system.actorOf(Props[DummyNsiRequesterActor]), Akka.system.actorOf(Props[DummyPceRequesterActor]))
     }
@@ -135,8 +136,9 @@ object ConnectionProvider extends Controller with SoapWebService {
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
     def receive = {
       case Outbound(message: NsiProviderOperation, providerNsa, providerUrl, authentication) =>
+        val connection = sender
         ConnectionRequester.expectReplyFor(message.correlationId).onSuccess {
-          case reply => sender ! Inbound(reply)
+          case reply => connection ! Inbound(reply)
         }
 
         val headers = NsiHeaders(
@@ -145,7 +147,15 @@ object ConnectionProvider extends Controller with SoapWebService {
           providerNsa,
           Some(requesterUrl))
 
-        WS.url(providerUrl.toASCIIString()).post(NsiEnvelope(headers, message))
+        var request = WS.url(providerUrl.toASCIIString())
+
+        request = authentication match {
+          case OAuthAuthentication(token) => request.withHeaders("Authorization" -> s"bearer $token")
+          case BasicAuthentication(username, password) => request.withAuth(username, password, AuthScheme.BASIC)
+          case _ => request
+        }
+
+        request.post(NsiEnvelope(headers, message))
     }
   }
 
@@ -176,9 +186,9 @@ object ConnectionProvider extends Controller with SoapWebService {
             Seq(ComputedSegment(
               pce.criteria.getPath().getSourceSTP,
               pce.criteria.getPath().getDestSTP(),
-              "urn:ogf:network:surnfnet.nl",
-              URI.create("http://localhost:9000/nsi-v2/ConnectionServiceProvider"),
-              NoAuthentication))))
+              "urn:ogf:network:nsa:surfnet.nl",
+              URI.create("http://localhost:8082/bod/nsi/v2/provider"),
+              OAuthAuthentication("f44b1e47-0a19-4c11-861b-c9abf82d4cbf")))))
     }
   }
 
