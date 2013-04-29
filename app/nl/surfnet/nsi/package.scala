@@ -8,6 +8,7 @@ import org.ogf.schemas.nsi._2013._04.connection.types.ReservationRequestCriteria
 import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteriaType
 import com.twitter.bijection.AbstractInjection
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
+import scala.concurrent.Future
 
 package object nsi {
   type Message = Any

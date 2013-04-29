@@ -95,7 +95,9 @@ object ConnectionProvider extends Controller with SoapWebService {
   }
 
   private def handleProviderOperation(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit)(connection: ActorRef): Future[NsiResponseMessage] = {
-    continuations.register(message.correlationId)(replyTo)
+    continuations.register(message.correlationId).onSuccess {
+      case reply => replyTo(reply)
+    }
     connection ? Inbound(message) map (_.asInstanceOf[NsiResponseMessage])
   }
 
@@ -103,8 +105,9 @@ object ConnectionProvider extends Controller with SoapWebService {
     val (nsiRequester, pceRequester) = {
       if (current.mode == Mode.Prod) {
         val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
-        val requesterNsa = current.configuration.getString("nsi.requesterNsa").getOrElse(sys.error("nsi.requsterNsa configuration property is not set"))
-        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa))), Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint))))
+        val requesterNsa = current.configuration.getString("nsi.requester.nsa").getOrElse(sys.error("nsi.requester.nsa configuration property is not set"))
+        val requesterUrl = current.configuration.getString("nsi.requester.url").getOrElse(sys.error("nsi.requester.url configuration property is not set"))
+        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(requesterUrl)))), Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint))))
       } else
         (Akka.system.actorOf(Props[DummyNsiRequesterActor]), Akka.system.actorOf(Props[DummyPceRequesterActor]))
     }
@@ -129,17 +132,20 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
   }
 
-  class NsiRequesterActor(requesterNsa: String) extends Actor {
+  class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
     def receive = {
-      case Outbound(reserveType: Reserve, providerNsa, providerUrl, authentication) =>
+      case Outbound(message: NsiProviderOperation, providerNsa, providerUrl, authentication) =>
+        ConnectionRequester.expectReplyFor(message.correlationId).onSuccess {
+          case reply => sender ! Inbound(reply)
+        }
+
         val headers = NsiHeaders(
-          reserveType.correlationId,
+          message.correlationId,
           requesterNsa,
           providerNsa,
-          Some(new URI("http://localhost:9000" + routes.ConnectionRequester.request.url)))
+          Some(requesterUrl))
 
-        WS.url(providerUrl.toASCIIString()).post(NsiEnvelope(headers, reserveType))
-      case Outbound(commit: ReserveCommit, providerNsa, providerUrl, authentication) => ???
+        WS.url(providerUrl.toASCIIString()).post(NsiEnvelope(headers, message))
     }
   }
 
