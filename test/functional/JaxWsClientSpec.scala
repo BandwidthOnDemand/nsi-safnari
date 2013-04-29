@@ -54,8 +54,7 @@ class JaxWsClientSpec extends Specification with PendingUntilFixed {
         .withRequesterNSA("urn:ogf:network:surfnet")
         .withProviderNSA("urn:ogf:network:safnari"))
 
-      service.getConnectionServiceRequesterPort()
-        .reserveCommitConfirmed("", "123-abc", NsiHeader) must throwA[ClientTransportException](message = "The server sent HTTP status code 501: Not Implemented")
+      service.getConnectionServiceRequesterPort().reserveCommitConfirmed("", "123-abc", NsiHeader)
     }
   }
 

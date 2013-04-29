@@ -17,7 +17,11 @@ import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 class ConnectionProviderSpec extends org.specs2.mutable.Specification {
 
   def withEnvelope[T <: NsiMessage](message: T) = NsiEnvelope(NsiHeaders(message.correlationId, "RequesterNSA", "ProviderNSA", None), message)
-  val InitialReserveType = new ReserveType().withCriteria(new ReservationRequestCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType()))
+  val InitialReserveType = new ReserveType().withCriteria(new ReservationRequestCriteriaType().
+    withSchedule(new ScheduleType()).
+    withBandwidth(100).
+    withServiceAttributes(new TypeValuePairListType()).
+    withPath(new PathType().withDirectionality(DirectionalityType.BIDIRECTIONAL)))
   val CorrelationId = newCorrelationId
 
   "Reserve operation" should {

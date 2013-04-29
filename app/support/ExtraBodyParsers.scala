@@ -51,9 +51,17 @@ object ExtraBodyParsers {
     }
   }
 
-  def NsiEndPoint(action: NsiEnvelope[NsiProviderOperation] => Future[NsiResponseMessage]): Action[NsiEnvelope[NsiProviderOperation]] = Action(nsiRequestMessage) { request =>
+  def NsiProviderEndPoint(action: NsiEnvelope[NsiProviderOperation] => Future[NsiResponseMessage]): Action[NsiEnvelope[NsiProviderOperation]] = Action(nsiProviderOperation) { request =>
     AsyncResult { action(request.body).map(response => Results.Ok(NsiEnvelope(request.body.headers.asReply, response))) }
   }
+
+  def NsiRequesterEndPoint(action: NsiEnvelope[NsiRequesterOperation] => Future[NsiResponseMessage]): Action[NsiEnvelope[NsiRequesterOperation]] = Action(nsiRequesterOperation) { request =>
+    AsyncResult { action(request.body).map(response => Results.Ok(NsiEnvelope(request.body.headers.asReply, response))) }
+  }
+
+  def nsiProviderOperation = nsiBodyParser(bodyNameToProviderOperation)
+
+  def nsiRequesterOperation = nsiBodyParser(bodyNameToRequesterOperation)
 
   def soap: BodyParser[SOAPMessage] = soap(BodyParsers.parse.DEFAULT_MAX_TEXT_LENGTH)
 
@@ -83,19 +91,19 @@ object ExtraBodyParsers {
   private val NsiFrameworkHeaderNamespace = "http://schemas.ogf.org/nsi/2013/04/framework/headers"
   private val NsiConnectionTypesNamespace = "http://schemas.ogf.org/nsi/2013/04/connection/types"
 
-  trait NsiRequestMessageFactory {
+  trait NsiRequestMessageFactory[T <: NsiMessage] {
     type JaxbMessage
     def klass: Class[JaxbMessage]
-    def apply(headers: NsiHeaders, body: JaxbMessage): NsiEnvelope[NsiProviderOperation]
+    def apply(headers: NsiHeaders, body: JaxbMessage): NsiEnvelope[T]
   }
 
-  def NsiRequestMessageFactory[M](f: (CorrelationId, M) => NsiProviderOperation)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory {
+  def NsiRequestMessageFactory[M, T <: NsiMessage](f: (CorrelationId, M) => T)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory[T] {
     override type JaxbMessage = M
     override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]
-    override def apply(headers: NsiHeaders, body: M): NsiEnvelope[NsiProviderOperation] = NsiEnvelope(headers, f(headers.correlationId, body))
+    override def apply(headers: NsiHeaders, body: M): NsiEnvelope[T] = NsiEnvelope(headers, f(headers.correlationId, body))
   }
 
-  def nsiRequestMessage(): BodyParser[NsiEnvelope[NsiProviderOperation]] = soap.flatMap { soapMessage =>
+  def nsiBodyParser[T <: NsiMessage](elementToFactory: org.w3c.dom.Element => Either[String, NsiRequestMessageFactory[T]]): BodyParser[NsiEnvelope[T]] = soap.flatMap { soapMessage =>
     BodyParser { requestHeader =>
       val unmarshaller = NsiMessage.unmarshaller
 
@@ -106,7 +114,7 @@ object ExtraBodyParsers {
         correlationId <- tryEither(UUID.fromString(header.getCorrelationId().drop(9))).right
         replyTo <- tryEither(Option(header.getReplyTo()).map(URI.create)).right
         bodyNode <- onlyChildElementWithNamespace(NsiConnectionTypesNamespace, soapMessage.getSOAPBody()).right
-        messageFactory <- bodyNameToClass(bodyNode).right
+        messageFactory <- elementToFactory(bodyNode).right
         body <- tryEither(unmarshaller.unmarshal(bodyNode, messageFactory.klass).getValue).right
       } yield {
         val headers = NsiHeaders(
@@ -122,14 +130,21 @@ object ExtraBodyParsers {
     }
   }
 
-  private val MessageFactories = Map(
-    "reserve" -> NsiRequestMessageFactory[ReserveType](NsiProviderOperation.Reserve),
-    "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType]((correlationId, body) => NsiProviderOperation.ReserveCommit(correlationId, body.getConnectionId())),
-    "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType]((correlationId, body) => NsiProviderOperation.ReserveAbort(correlationId, body.getConnectionId())),
-    "querySummary" -> NsiRequestMessageFactory[QueryType]((correlationId, body) => NsiProviderOperation.QuerySummary(correlationId, body.getConnectionId().asScala)))
+  private val MessageProviderFactories = Map(
+    "reserve" -> NsiRequestMessageFactory[ReserveType, NsiProviderOperation](NsiProviderOperation.Reserve),
+    "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => NsiProviderOperation.ReserveCommit(correlationId, body.getConnectionId())),
+    "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => NsiProviderOperation.ReserveAbort(correlationId, body.getConnectionId())),
+    "querySummary" -> NsiRequestMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => NsiProviderOperation.QuerySummary(correlationId, body.getConnectionId().asScala)))
 
-  private def bodyNameToClass(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory] =
-    MessageFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
+  private val MessageRequesterFactories = Map (
+    "reserveConfirmed" -> NsiRequestMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((correlationId, body) => NsiRequesterOperation.ReserveConfirmed(correlationId, body.getConnectionId(), body.getCriteria().asScala.head)),
+    "reserveCommitConfirmed" -> NsiRequestMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => NsiRequesterOperation.ReserveCommitConfirmed(correlationId, body.getConnectionId)))
+
+  private def bodyNameToProviderOperation(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[NsiProviderOperation]] =
+    MessageProviderFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
+
+  private def bodyNameToRequesterOperation(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[NsiRequesterOperation]] =
+    MessageRequesterFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
 
   private def onlyChildElementWithNamespace(namespaceUri: String, elem: SOAPElement) =
     elem.getChildElements().asScala.collect {

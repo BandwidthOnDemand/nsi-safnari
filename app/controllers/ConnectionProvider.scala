@@ -63,12 +63,12 @@ object ConnectionProvider extends Controller with SoapWebService {
       Right(connectionActor)
   }
 
-  def request = NsiEndPoint({
+  def request = NsiProviderEndPoint {
     case NsiEnvelope(headers, query: NsiQuery) =>
       Future.successful(handleQuery(query)(replyToClient(headers)))
     case request @ NsiEnvelope(headers, _: NsiProviderOperation) =>
       handleRequest(request)(replyToClient(headers))
-  })
+  }
 
   private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
     case q: NsiProviderOperation.QuerySummary =>
@@ -136,7 +136,7 @@ object ConnectionProvider extends Controller with SoapWebService {
           reserveType.correlationId,
           requesterNsa,
           providerNsa,
-          Some(new URI("http://localhost:9000/" + routes.ConnectionRequester.request.url)))
+          Some(new URI("http://localhost:9000" + routes.ConnectionRequester.request.url)))
 
         WS.url(providerUrl.toASCIIString()).post(NsiEnvelope(headers, reserveType))
       case Outbound(commit: ReserveCommit, providerNsa, providerUrl, authentication) => ???

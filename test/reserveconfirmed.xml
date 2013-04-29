@@ -1,0 +1,41 @@
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+  <SOAP-ENV:Header>
+    <ns5:nsiHeader xmlns:ns6="http://schemas.ogf.org/nsi/2013/04/connection/types"
+      xmlns:ns5="http://schemas.ogf.org/nsi/2013/04/framework/headers"
+      xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#"
+      xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion">
+      <protocolVersion>2.0</protocolVersion>
+      <correlationId>urn:uuid:b3483b94-4840-44ba-b5c7-b1331649d50f</correlationId>
+      <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
+      <providerNSA>urn:ogf:network:nsa:surfnet.nl</providerNSA>
+    </ns5:nsiHeader>
+  </SOAP-ENV:Header>
+  <SOAP-ENV:Body>
+    <ns6:reserveConfirmed
+      xmlns:ns6="http://schemas.ogf.org/nsi/2013/04/connection/types"
+      xmlns:ns5="http://schemas.ogf.org/nsi/2013/04/framework/headers"
+      xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#"
+      xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion">
+      <connectionId>371ecf49-2085-4c6b-8839-5e23ca811acd</connectionId>
+      <criteria version="0">
+        <schedule>
+          <startTime>2013-04-29T13:07:00.000+02:00</startTime>
+          <endTime>2013-04-29T13:17:00.000+02:00</endTime>
+        </schedule>
+        <bandwidth>100</bandwidth>
+        <serviceAttributes />
+        <path>
+          <directionality>Bidirectional</directionality>
+          <sourceSTP>
+            <networkId>urn:ogf:network:stp:surfnet.nl</networkId>
+            <localId>22</localId>
+          </sourceSTP>
+          <destSTP>
+            <networkId>urn:ogf:network:stp:surfnet.nl</networkId>
+            <localId>33</localId>
+          </destSTP>
+        </path>
+      </criteria>
+    </ns6:reserveConfirmed>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

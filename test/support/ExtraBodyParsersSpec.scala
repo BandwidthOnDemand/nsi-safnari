@@ -16,6 +16,7 @@ import nl.surfnet.nsi.NsiProviderOperation
 import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions
 import nl.surfnet.nsi.NsiEnvelope
+import nl.surfnet.nsi.NsiRequesterOperation
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoTimeConversions {
@@ -50,16 +51,16 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
     }
   }
 
-  "NsiRequestParser" should {
+  "NsiProviderParser" should {
 
     "give NSI Reserve for a valid reserve request" in {
-      val result = await(Enumerator.fromFile(new File("test/reserve.xml")) |>>> nsiRequestMessage.apply(FakeSoapRequest()))
+      val result = await(Enumerator.fromFile(new File("test/reserve.xml")) |>>> nsiProviderOperation.apply(FakeSoapRequest()))
 
       result must beRight.like { case NsiEnvelope(_, _: NsiProviderOperation.Reserve) => ok }
     }
 
     "give Badrequest when NSI Reserve contains extra xml" in {
-      val result = await(Enumerator.fromFile(new File("test/reserve_additional_xml.xml")) |>>> nsiRequestMessage.apply(FakeSoapRequest()))
+      val result = await(Enumerator.fromFile(new File("test/reserve_additional_xml.xml")) |>>> nsiProviderOperation.apply(FakeSoapRequest()))
 
       result must beLeft.like {
         case result =>
@@ -69,7 +70,7 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
     }
 
     "give BadRequest when the NSI headers are missing" in {
-      val result = await(Enumerator.fromFile(new File("test/reserve_without_headers.xml")) |>>> nsiRequestMessage.apply(FakeSoapRequest()))
+      val result = await(Enumerator.fromFile(new File("test/reserve_without_headers.xml")) |>>> nsiProviderOperation.apply(FakeSoapRequest()))
 
       result must beLeft.like {
         case result =>
@@ -79,7 +80,7 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
     }
 
     "give BadRequest when there are multiple NSI headers" in {
-      val result = await(Enumerator.fromFile(new File("test/reserve_with_duplicate_headers.xml")) |>>> nsiRequestMessage.apply(FakeSoapRequest()))
+      val result = await(Enumerator.fromFile(new File("test/reserve_with_duplicate_headers.xml")) |>>> nsiProviderOperation.apply(FakeSoapRequest()))
 
       result must beLeft.like {
         case result =>
@@ -88,6 +89,15 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
       }
     }
 
+  }
+
+  "NsiRequesterParser" should {
+
+    "give NSI Reserve Commit for a valid reserve confirmed request" in {
+      val result = await(Enumerator.fromFile(new File("test/reserveconfirmed.xml")) |>>> nsiRequesterOperation.apply(FakeSoapRequest()))
+
+      result must beRight.like { case NsiEnvelope(_, _: NsiRequesterOperation.ReserveConfirmed) => ok }
+    }
   }
 
   object FakeSoapRequest {
