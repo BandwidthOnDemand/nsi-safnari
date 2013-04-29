@@ -34,6 +34,7 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private val connections = TMap.empty[ConnectionId, ActorRef]
   private val continuations = new Continuations[NsiRequesterOperation]()
+  private val pceContinuations = new Continuations[PceMessage]()
 
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
@@ -69,6 +70,11 @@ object ConnectionProvider extends Controller with SoapWebService {
     case request @ NsiEnvelope(headers, _: NsiProviderOperation) =>
       handleRequest(request)(replyToClient(headers))
   }
+
+  def pceReply(correlationId: CorrelationId) = Action(parse.json) { implicit request =>
+    pceContinuations.replyReceived(correlationId, null)
+    Results.Ok
+    }
 
   private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
     case q: NsiProviderOperation.QuerySummary =>
@@ -106,7 +112,7 @@ object ConnectionProvider extends Controller with SoapWebService {
       if (current.mode == Mode.Prod) {
         val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
         val requesterNsa = current.configuration.getString("nsi.requester.nsa").getOrElse(sys.error("nsi.requester.nsa configuration property is not set"))
-        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(ConnectionRequester.serviceUrl)))), Akka.system.actorOf(Props[DummyPceRequesterActor]))
+        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(ConnectionRequester.serviceUrl)))), Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint))))
       } else
         (Akka.system.actorOf(Props[DummyNsiRequesterActor]), Akka.system.actorOf(Props[DummyPceRequesterActor]))
     }
@@ -148,9 +154,9 @@ object ConnectionProvider extends Controller with SoapWebService {
         var request = WS.url(providerUrl.toASCIIString())
 
         request = authentication match {
-          case OAuthAuthentication(token) => request.withHeaders("Authorization" -> s"bearer $token")
+          case OAuthAuthentication(token)              => request.withHeaders("Authorization" -> s"bearer $token")
           case BasicAuthentication(username, password) => request.withAuth(username, password, AuthScheme.BASIC)
-          case _ => request
+          case _                                       => request
         }
 
         request.post(NsiEnvelope(headers, message))
@@ -160,18 +166,19 @@ object ConnectionProvider extends Controller with SoapWebService {
   class PceRequesterActor(endPoint: String) extends Actor {
     def receive = {
       case PathComputationRequest(correlationId, criteria) =>
-        WS.url(endPoint).post(Json.obj(
-          "source-stp" -> stpToJson(criteria.getPath().getSourceSTP()),
-          "destination-stp" -> stpToJson(criteria.getPath().getDestSTP()),
-          "start-time" -> criteria.getSchedule().getStartTime().toString(),
-          "end-time" -> criteria.getSchedule().getEndTime().toString(),
-          "bandwidth" -> criteria.getBandwidth(),
-          "reply-to" -> s"${Application.baseUrl}/pce/reply",
-          "correlation-id" -> correlationId.toString,
-          "algorithm" -> "chain"))
+        val fields = Seq(
+          Some("source-stp" -> stpToJson(criteria.getPath().getSourceSTP())),
+          Some("destination-stp" -> stpToJson(criteria.getPath().getDestSTP())),
+          Option(criteria.getSchedule().getStartTime()).map(t => "start-time" -> JsString(t.toString())),
+          Option(criteria.getSchedule().getEndTime()).map(t => "end-time" -> JsString(t.toString())),
+          Some("bandwidth" -> JsString(criteria.getBandwidth().toString())),
+          Some("reply-to" -> JsString(s"${Application.baseUrl}/pce/reply")),
+          Some("correlation-id" -> JsString(correlationId.toString)),
+          Some("algorithm" -> JsString("chain"))).flatten
+        WS.url(endPoint).post(JsObject(fields))
     }
 
-    private def stpToJson(stp: StpType): JsObject =
+    private def stpToJson(stp: StpType): JsValue =
       Json.obj("network-id" -> stp.getNetworkId(), "local-id" -> stp.getLocalId())
   }
 
