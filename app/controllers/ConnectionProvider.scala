@@ -37,8 +37,7 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
-  override def serviceUrl(implicit request: RequestHeader): String =
-    routes.ConnectionProvider.request().absoluteURL()
+  override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.request().url}"
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit = {
     requestHeaders.replyTo.foreach { replyTo =>
@@ -107,8 +106,7 @@ object ConnectionProvider extends Controller with SoapWebService {
       if (current.mode == Mode.Prod) {
         val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
         val requesterNsa = current.configuration.getString("nsi.requester.nsa").getOrElse(sys.error("nsi.requester.nsa configuration property is not set"))
-        val requesterUrl = current.configuration.getString("nsi.requester.url").getOrElse(sys.error("nsi.requester.url configuration property is not set"))
-        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(requesterUrl)))), Akka.system.actorOf(Props[DummyPceRequesterActor]))
+        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(ConnectionRequester.serviceUrl)))), Akka.system.actorOf(Props[DummyPceRequesterActor]))
       } else
         (Akka.system.actorOf(Props[DummyNsiRequesterActor]), Akka.system.actorOf(Props[DummyPceRequesterActor]))
     }
@@ -168,7 +166,7 @@ object ConnectionProvider extends Controller with SoapWebService {
           "start-time" -> criteria.getSchedule().getStartTime().toString(),
           "end-time" -> criteria.getSchedule().getEndTime().toString(),
           "bandwidth" -> criteria.getBandwidth(),
-          "reply-to" -> "http://localhost:9090/pce/reply",
+          "reply-to" -> s"${Application.baseUrl}/pce/reply",
           "correlation-id" -> correlationId.toString,
           "algorithm" -> "chain"))
     }

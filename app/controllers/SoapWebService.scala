@@ -10,13 +10,13 @@ trait SoapWebService {
 
   val BaseWsdlFilename: String
 
-  def serviceUrl(implicit request: RequestHeader): String
+  def serviceUrl: String
 
   def wsdl(ignore: String) = SoapWebService.serveWsdl(BaseWsdlFilename) { implicit request =>
     replaceSoapAddress
   }
 
-  private def replaceSoapAddress(wsdl: String)(implicit request: RequestHeader) = {
+  private def replaceSoapAddress(wsdl: String) = {
     wsdl.replaceAll(
       """(?i)<\s*soap:address\s+location\s*=\s*['"](.*)['"]\s*/>""",
       s"""<soap:address location="$serviceUrl" />""")

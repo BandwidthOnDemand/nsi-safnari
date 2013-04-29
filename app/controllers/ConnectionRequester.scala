@@ -14,8 +14,7 @@ object ConnectionRequester extends Controller with SoapWebService {
 
   val BaseWsdlFilename = "ogf_nsi_connection_requester_v2_0.wsdl"
 
-  override def serviceUrl(implicit request: RequestHeader): String =
-    routes.ConnectionRequester.request().absoluteURL()
+  override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionRequester.request().url}"
 
   def expectReplyFor(correlationId: CorrelationId): Future[NsiRequesterOperation] = continuations.register(correlationId)
 
