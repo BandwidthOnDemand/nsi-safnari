@@ -126,7 +126,10 @@ object ExtraBodyParsers {
         messageFactory(headers, body)
       }
 
-      Done(parsedMessage.left.map(Results.BadRequest(_)))
+      Done(parsedMessage.left.map { error =>
+        Logger.warn(s"Failed to parse $soapMessage with $error")
+        Results.BadRequest(error)
+      })
     }
   }
 

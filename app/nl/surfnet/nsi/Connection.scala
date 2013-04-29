@@ -34,7 +34,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
         case (correlationId, segment) =>
           val criteria = new ReservationRequestCriteriaType().
             withBandwidth(data.criteria.getBandwidth()).
-            withPath(new PathType().withSourceSTP(segment.sourceStp).withDestSTP(segment.destinationStp)).
+            withPath(new PathType().withSourceSTP(segment.sourceStp).withDestSTP(segment.destinationStp).withDirectionality(DirectionalityType.BIDIRECTIONAL)).
             withSchedule(data.criteria.getSchedule()).
             withServiceAttributes(data.criteria.getServiceAttributes()).
             withVersion(data.criteria.getVersion())
