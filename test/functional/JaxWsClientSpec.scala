@@ -31,6 +31,9 @@ import javax.xml.ws.Holder
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
 class JaxWsClientSpec extends Specification with PendingUntilFixed {
 
+  val ServerPort = Helpers.testServerPort
+  val Application = FakeApplication(additionalConfiguration = Map("nsi.base.url" -> s"http://localhost:$ServerPort"))
+
   "A JAX WS client" should {
 
     val NsiHeader = new Holder(new CommonHeaderType()
@@ -39,13 +42,13 @@ class JaxWsClientSpec extends Specification with PendingUntilFixed {
       .withRequesterNSA("urn:ogf:network:surfnet")
       .withProviderNSA("urn:ogf:network:safnari"))
 
-    "be able to talk to the connection provider endpoint" in new WithServer {
+    "be able to talk to the connection provider endpoint" in new WithServer(Application, ServerPort) {
       val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))
 
       service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String], NsiHeader)
     }
 
-    "be able to talk to the connection requester endpoint" in new WithServer {
+    "be able to talk to the connection requester endpoint" in new WithServer(Application, ServerPort) {
       val service = new ConnectionServiceRequester(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceRequester"))
 
       val header = new Holder(new CommonHeaderType()
