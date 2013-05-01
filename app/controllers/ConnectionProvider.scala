@@ -104,7 +104,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     continuations.register(message.correlationId).onSuccess {
       case reply => replyTo(reply)
     }
-    connection ? Inbound(message) map (_.asInstanceOf[NsiResponseMessage])
+    connection ? FromRequester(message) map (_.asInstanceOf[NsiResponseMessage])
   }
 
   private def outboundActor = {
@@ -122,27 +122,27 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef) extends Actor {
     def receive = {
-      case pceRequest: PathComputationRequest => pceRequester forward pceRequest
-      case nsiRequest: Outbound               => nsiRequester forward nsiRequest
-      case response: NsiRequesterOperation    => handleResponse(response)
+      case ToPce(pceRequest) => pceRequester forward pceRequest
+      case nsiRequest: ToProvider               => nsiRequester forward nsiRequest
+      case ToRequester(response)    => handleResponse(response)
     }
   }
 
   class DummyNsiRequesterActor extends Actor {
     def receive = {
-      case Outbound(reserve: Reserve, _, _, _) =>
-        sender ! Inbound(ReserveConfirmed(reserve.correlationId, newConnectionId, Injection.invert(reserve.body.getCriteria()).get))
-      case Outbound(commit: ReserveCommit, _, _, _) =>
-        sender ! Inbound(ReserveCommitConfirmed(commit.correlationId, commit.connectionId))
+      case ToProvider(reserve: Reserve, _, _, _) =>
+        sender ! FromProvider(ReserveConfirmed(reserve.correlationId, newConnectionId, Injection.invert(reserve.body.getCriteria()).get))
+      case ToProvider(commit: ReserveCommit, _, _, _) =>
+        sender ! FromProvider(ReserveCommitConfirmed(commit.correlationId, commit.connectionId))
     }
   }
 
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
     def receive = {
-      case Outbound(message: NsiProviderOperation, providerNsa, providerUrl, authentication) =>
+      case ToProvider(message: NsiProviderOperation, providerNsa, providerUrl, authentication) =>
         val connection = sender
         ConnectionRequester.expectReplyFor(message.correlationId).onSuccess {
-          case reply => connection ! Inbound(reply)
+          case reply => connection ! FromProvider(reply)
         }
 
         val headers = NsiHeaders(
@@ -186,7 +186,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     def receive = {
       case pce: PathComputationRequest =>
         sender !
-          Inbound(PathComputationConfirmed(
+          FromPce(PathComputationConfirmed(
             pce.correlationId,
             Seq(ComputedSegment(
               pce.criteria.getPath().getSourceSTP,

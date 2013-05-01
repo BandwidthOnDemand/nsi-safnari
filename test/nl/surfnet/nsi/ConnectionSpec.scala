@@ -38,7 +38,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
     val Headers = NsiHeaders(UUID.randomUUID, "RequesterNSA", "ProviderNSA", Some(URI.create("http://example.com/")))
     val ConnectionId = "ConnectionId"
     val CorrelationId = newCorrelationId
-    val InitialMessages = Seq(Inbound(Reserve(CorrelationId, InitialReserveType)))
+    val InitialMessages = Seq(FromRequester(Reserve(CorrelationId, InitialReserveType)))
 
     var messages: Seq[Message] = Nil
 
@@ -56,21 +56,21 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
 
   "A connection" should {
     "send a reserve response when reserve is requested" in new fixture {
-      val ack = when(Inbound(Reserve(CorrelationId, InitialReserveType)))
+      val ack = when(FromRequester(Reserve(CorrelationId, InitialReserveType)))
 
       ack.asInstanceOf[ReserveResponse].correlationId must beEqualTo(CorrelationId)
     }
 
     "send a path computation request when reserve is received" in new fixture {
-      when(Inbound(Reserve(CorrelationId, InitialReserveType)))
+      when(FromRequester(Reserve(CorrelationId, InitialReserveType)))
 
-      messages must haveOneElementLike { case request: PathComputationRequest => ok }
+      messages must haveOneElementLike { case ToPce(request: PathComputationRequest) => ok }
     }
 
     "send reserve requests to when path computation confirmed is received" in new fixture {
       given(InitialMessages: _*)
 
-      when(Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A, B))))
+      when(FromPce(PathComputationConfirmed(new UUID(0, 1), Seq(A, B))))
 
       messages must haveSize(2)
     }
@@ -78,89 +78,90 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
     "fail the connection when path computation fails" in new fixture {
       given(InitialMessages: _*)
 
-      when(Inbound(PathComputationFailed(new UUID(0, 1))))
+      when(FromPce(PathComputationFailed(new UUID(0, 1))))
 
-      messages must contain(ReserveFailed(CorrelationId, ConnectionId))
+      messages must contain(ToRequester(ReserveFailed(CorrelationId, ConnectionId)))
       connection.stateName must beEqualTo(FailedReservationState)
     }
 
     "confirm the reservation with a single path segment" in new fixture {
       given(InitialMessages ++ Seq(
-        Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A)))): _*)
+        FromPce(PathComputationConfirmed(new UUID(0, 1), Seq(A)))): _*)
 
-      when(Inbound(ReserveConfirmed(new UUID(0, 2), "connectionId", Criteria)))
+      when(FromProvider(ReserveConfirmed(new UUID(0, 2), "connectionId", Criteria)))
 
-      messages must contain(ReserveConfirmed(CorrelationId, ConnectionId, Criteria))
+      messages must contain(ToRequester(ReserveConfirmed(CorrelationId, ConnectionId, Criteria)))
 
       connection.stateName must beEqualTo(HeldReservationState)
     }
 
     "be in reservation held state when both segments are confirmed" in new fixture {
       given(InitialMessages ++ Seq(
-        Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A, B)))): _*)
+        FromPce(PathComputationConfirmed(new UUID(0, 1), Seq(A, B)))): _*)
 
-      when(Inbound(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA", Criteria)))
+      when(FromProvider(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA", Criteria)))
       messages must beEmpty
 
-      when(Inbound(ReserveConfirmed(new UUID(0, 3), "ConnectionIdB", Criteria)))
-      messages must contain(ReserveConfirmed(CorrelationId, ConnectionId, Criteria))
+      when(FromProvider(ReserveConfirmed(new UUID(0, 3), "ConnectionIdB", Criteria)))
+      messages must contain(ToRequester(ReserveConfirmed(CorrelationId, ConnectionId, Criteria)))
 
       connection.stateName must beEqualTo(HeldReservationState)
     }
 
     "fail the reservation with a single path segment" in new fixture {
       given(InitialMessages ++ Seq(
-        Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A)))): _*)
+        FromPce(PathComputationConfirmed(new UUID(0, 1), Seq(A)))): _*)
 
-      when(Inbound(ReserveFailed(new UUID(0, 2), ConnectionId)))
+      when(FromProvider(ReserveFailed(new UUID(0, 2), ConnectionId)))
 
-      messages must contain(ReserveFailed(CorrelationId, ConnectionId))
+      messages must contain(ToRequester(ReserveFailed(CorrelationId, ConnectionId)))
       connection.stateName must beEqualTo(FailedReservationState)
     }
 
     "fail the reservation with two segments and at least one fails" in new fixture {
       given(InitialMessages ++ Seq(
-        Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A, B))),
-        Inbound(ReserveFailed(new UUID(0, 2), ConnectionId))): _*)
+        FromPce(PathComputationConfirmed(new UUID(0, 1), Seq(A, B))),
+        FromProvider(ReserveFailed(new UUID(0, 2), ConnectionId))): _*)
 
-      when(Inbound(ReserveConfirmed(new UUID(0, 3), "connectionIdB", Criteria)))
+      when(FromProvider(ReserveConfirmed(new UUID(0, 3), "connectionIdB", Criteria)))
 
-      messages must contain(ReserveFailed(CorrelationId, ConnectionId))
+      messages must contain(ToRequester(ReserveFailed(CorrelationId, ConnectionId)))
       connection.stateName must beEqualTo(FailedReservationState)
     }
 
     "be in committing state when reserve commit is received" in new fixture {
       given(InitialMessages ++ Seq(
-        Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A))),
-        Inbound(ReserveConfirmed(new UUID(0, 2), ConnectionId, Criteria))): _*)
+        FromPce(PathComputationConfirmed(new UUID(0, 1), Seq(A))),
+        FromProvider(ReserveConfirmed(new UUID(0, 2), ConnectionId, Criteria))): _*)
 
-      when(Inbound(ReserveCommit(newCorrelationId, ConnectionId)))
+      when(FromRequester(ReserveCommit(newCorrelationId, ConnectionId)))
 
-      messages must haveOneElementLike { case Outbound(_: ReserveCommit, _, _, _) => ok }
+      messages must haveOneElementLike { case ToProvider(_: ReserveCommit, _, _, _) => ok }
       connection.stateName must beEqualTo(CommittingReservationState)
     }
 
     "be in reserved state when reserve commit confirmed is received" in new fixture {
       val CommitCorrelationId = newCorrelationId
       given(InitialMessages ++ Seq(
-        Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A))),
-        Inbound(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA", Criteria)),
-        Inbound(ReserveCommit(CommitCorrelationId, ConnectionId))): _*)
+        FromPce(PathComputationConfirmed(new UUID(0, 1), Seq(A))),
+        FromProvider(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA", Criteria)),
+        //ToRequester(ReserveConfirmed(new UUID(0, 0), ConnectionId, Criteria)),
+        FromRequester(ReserveCommit(CommitCorrelationId, ConnectionId))): _*)
 
-      when(Inbound(ReserveCommitConfirmed(new UUID(0, 3), "ConnectionIdA")))
+      when(FromProvider(ReserveCommitConfirmed(new UUID(0, 3), "ConnectionIdA")))
 
-      messages must contain(ReserveCommitConfirmed(CommitCorrelationId, ConnectionId))
+      messages must contain(ToRequester(ReserveCommitConfirmed(CommitCorrelationId, ConnectionId)))
       connection.stateName must beEqualTo(ReservedReservationState)
     }
 
     "be in aborting state when reserve abort is received" in new fixture {
       given(InitialMessages ++ Seq(
-        Inbound(PathComputationConfirmed(new UUID(0, 1), Seq(A))),
-        Inbound(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA", Criteria))): _*)
+        FromPce(PathComputationConfirmed(new UUID(0, 1), Seq(A))),
+        FromProvider(ReserveConfirmed(new UUID(0, 2), "ConnectionIdA", Criteria))): _*)
 
-      when(Inbound(ReserveAbort(CorrelationId, ConnectionId)))
+      when(FromRequester(ReserveAbort(CorrelationId, ConnectionId)))
 
-      messages must haveOneElementLike { case Outbound(_: ReserveAbort, _, _, _) => ok }
+      messages must haveOneElementLike { case ToProvider(_: ReserveAbort, _, _, _) => ok }
       connection.stateName must beEqualTo(AbortingReservationState)
     }
 

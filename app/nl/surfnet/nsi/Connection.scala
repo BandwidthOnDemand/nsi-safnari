@@ -8,15 +8,19 @@ import nl.surfnet.nsi.NsiResponseMessage._
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import java.net.URI
 
-case class Inbound(message: Message)
-case class Outbound(message: NsiProviderOperation, providerNsa: String, providerUrl: URI, authentication: ProviderAuthentication)
+case class FromRequester(message: NsiProviderOperation)
+case class ToRequester(message: NsiRequesterOperation)
+case class FromProvider(message: NsiRequesterOperation)
+case class ToProvider(message: NsiProviderOperation, providerNsa: String, providerUrl: URI, authentication: ProviderAuthentication)
+case class FromPce(message: PceMessage)
+case class ToPce(message: PathComputationRequest)
 
 class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: () => CorrelationId, outbound: ActorRef) extends Actor with FSM[ReservationState, Connection] {
 
   startWith(InitialReservationState, NewConnection(id))
 
   when(InitialReservationState) {
-    case Event(Inbound(message: Reserve), _) =>
+    case Event(FromRequester(message: Reserve), _) =>
       val criteria = Injection.invert(message.body.getCriteria())
       goto(CheckingReservationState) using ExistingConnection(
         id = id,
@@ -27,7 +31,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
   }
 
   when(CheckingReservationState) {
-    case Event(Inbound(message: PathComputationConfirmed), data: ExistingConnection) =>
+    case Event(FromPce(message: PathComputationConfirmed), data: ExistingConnection) =>
       val segments = message.segments.map(newCorrelationId() -> _)
 
       segments.foreach {
@@ -44,42 +48,42 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
               withDescription(data.description.orNull).
               withCriteria(criteria)
 
-          outbound ! Outbound(Reserve(correlationId, reserveType), segment.providerNsa, segment.providerUrl, segment.authentication)
+          outbound ! ToProvider(Reserve(correlationId, reserveType), segment.providerNsa, segment.providerUrl, segment.authentication)
       }
 
       val newData = data.copy(segments = segments.toMap)
       goto(newData.aggregatedReservationState) using newData replying 200
-    case Event(Inbound(message: PathComputationFailed), _) =>
+    case Event(FromPce(message: PathComputationFailed), _) =>
       goto(FailedReservationState) replying 200
 
-    case Event(Inbound(message: ReserveConfirmed), data: ExistingConnection) =>
+    case Event(FromProvider(message: ReserveConfirmed), data: ExistingConnection) =>
       val newData = data.receivedConnectionId(message.correlationId, message.connectionId, HeldReservationState)
       goto(newData.aggregatedReservationState) using newData replying GenericAck(message.correlationId)
-    case Event(Inbound(message: ReserveFailed), data: ExistingConnection) =>
+    case Event(FromProvider(message: ReserveFailed), data: ExistingConnection) =>
       val newData = data.receivedConnectionId(message.correlationId, message.connectionId, FailedReservationState)
       goto(newData.aggregatedReservationState) using newData replying GenericAck(message.correlationId)
   }
 
   when(HeldReservationState) {
-    case Event(Inbound(commit: ReserveCommit), data: ExistingConnection) =>
+    case Event(FromRequester(commit: ReserveCommit), data: ExistingConnection) =>
       val newData = data.copy(reserveCorrelationId = commit.correlationId, downstreamConnections = data.downstreamConnections.map { _.copy(_2 = CommittingReservationState) })
       goto(CommittingReservationState) using newData replying GenericAck(commit.correlationId)
-    case Event(Inbound(abort: ReserveAbort), data: ExistingConnection) =>
+    case Event(FromRequester(abort: ReserveAbort), data: ExistingConnection) =>
       val newData = data.copy(reserveCorrelationId = abort.correlationId, downstreamConnections = data.downstreamConnections.map { _.copy(_2 = AbortingReservationState) })
       goto(AbortingReservationState) using newData replying GenericAck(abort.correlationId)
   }
 
   when(CommittingReservationState) {
-    case Event(Inbound(message: ReserveCommitConfirmed), data: ExistingConnection) =>
+    case Event(FromProvider(message: ReserveCommitConfirmed), data: ExistingConnection) =>
       val newData = data.copy(downstreamConnections = data.downstreamConnections + (message.connectionId -> ReservedReservationState))
       goto(newData.aggregatedReservationState) using newData replying GenericAck(message.correlationId)
-    case Event(Inbound(message: ReserveCommitFailed), data: ExistingConnection) =>
+    case Event(FromProvider(message: ReserveCommitFailed), data: ExistingConnection) =>
       val newData = data.copy(downstreamConnections = data.downstreamConnections + (message.connectionId -> CommittingReservationState /* TODO really? */ ))
       stay replying GenericAck(message.correlationId)
   }
 
   when(AbortingReservationState) {
-    case Event(Inbound(confirmed: ReserveAbortConfirmed), _) => stay replying GenericAck(confirmed.correlationId)
+    case Event(FromProvider(confirmed: ReserveAbortConfirmed), _) => stay replying GenericAck(confirmed.correlationId)
   }
 
   when(FailedReservationState)(FSM.NullFunction)
@@ -103,26 +107,26 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
   }
 
   onTransition {
-    case InitialReservationState -> CheckingReservationState => outbound ! PathComputationRequest(newCorrelationId(), nextStateData.asInstanceOf[ExistingConnection].criteria)
-    case CheckingReservationState -> FailedReservationState  => outbound ! ReserveFailed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id)
+    case InitialReservationState -> CheckingReservationState => outbound ! ToPce(PathComputationRequest(newCorrelationId(), nextStateData.asInstanceOf[ExistingConnection].criteria))
+    case CheckingReservationState -> FailedReservationState  => outbound ! ToRequester(ReserveFailed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id))
     case CheckingReservationState -> HeldReservationState    =>
       val data = nextStateData.asInstanceOf[ExistingConnection]
-      outbound ! ReserveConfirmed(data.reserveCorrelationId, id, data.criteria)
+      outbound ! ToRequester(ReserveConfirmed(data.reserveCorrelationId, id, data.criteria))
     case HeldReservationState -> CommittingReservationState =>
       val data = nextStateData.asInstanceOf[ExistingConnection]
       data.connections.foreach {
         case (connectionId, correlationId) =>
           val seg = data.segments(correlationId)
-          outbound ! Outbound(ReserveCommit(newCorrelationId(), connectionId), seg.providerNsa, seg.providerUrl, seg.authentication)
+          outbound ! ToProvider(ReserveCommit(newCorrelationId(), connectionId), seg.providerNsa, seg.providerUrl, seg.authentication)
       }
     case HeldReservationState -> AbortingReservationState =>
       val data = nextStateData.asInstanceOf[ExistingConnection]
       data.connections.foreach {
         case (connectionId, correlationId) =>
           val seg = data.segments(correlationId)
-          outbound ! Outbound(ReserveAbort(newCorrelationId(), connectionId), seg.providerNsa, seg.providerUrl, seg.authentication)
+          outbound ! ToProvider(ReserveAbort(newCorrelationId(), connectionId), seg.providerNsa, seg.providerUrl, seg.authentication)
       }
-    case CommittingReservationState -> ReservedReservationState => outbound ! ReserveCommitConfirmed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id)
+    case CommittingReservationState -> ReservedReservationState => outbound ! ToRequester(ReserveCommitConfirmed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id))
     case ReservedReservationState -> CheckingReservationState   => ???
     case FailedReservationState -> AbortingReservationState     => ???
     case AbortingReservationState -> ReservedReservationState   => ???
