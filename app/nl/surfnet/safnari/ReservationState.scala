@@ -1,4 +1,4 @@
-package nl.surfnet.nsi
+package nl.surfnet.safnari
 
 import org.ogf.schemas.nsi._2013._04.connection.types.ReservationStateEnumType
 

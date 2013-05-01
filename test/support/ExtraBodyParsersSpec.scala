@@ -12,11 +12,13 @@ import play.api.test.Helpers._
 import play.api.libs.iteratee._
 import javax.xml.soap._
 import java.io.File
-import nl.surfnet.nsi.NsiProviderOperation
+import nl.surfnet.safnari.NsiProviderOperation
 import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions
-import nl.surfnet.nsi.NsiEnvelope
-import nl.surfnet.nsi.NsiRequesterOperation
+import nl.surfnet.safnari.NsiEnvelope
+import nl.surfnet.safnari.NsiRequesterOperation
+import nl.surfnet.safnari.Reserve
+import nl.surfnet.safnari.ReserveConfirmed
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoTimeConversions {
@@ -56,7 +58,7 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
     "give NSI Reserve for a valid reserve request" in {
       val result = await(Enumerator.fromFile(new File("test/reserve.xml")) |>>> nsiProviderOperation.apply(FakeSoapRequest()))
 
-      result must beRight.like { case NsiEnvelope(_, _: NsiProviderOperation.Reserve) => ok }
+      result must beRight.like { case NsiEnvelope(_, _: Reserve) => ok }
     }
 
     "give Badrequest when NSI Reserve contains extra xml" in {
@@ -96,7 +98,7 @@ class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoT
     "give NSI Reserve Commit for a valid reserve confirmed request" in {
       val result = await(Enumerator.fromFile(new File("test/reserveconfirmed.xml")) |>>> nsiRequesterOperation.apply(FakeSoapRequest()))
 
-      result must beRight.like { case NsiEnvelope(_, _: NsiRequesterOperation.ReserveConfirmed) => ok }
+      result must beRight.like { case NsiEnvelope(_, _: ReserveConfirmed) => ok }
     }
   }
 

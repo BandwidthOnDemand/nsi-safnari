@@ -1,10 +1,7 @@
-package nl.surfnet.nsi
+package nl.surfnet.safnari
 
 import akka.actor._
 import com.twitter.bijection.Injection
-import nl.surfnet.nsi.NsiProviderOperation._
-import nl.surfnet.nsi.NsiRequesterOperation._
-import nl.surfnet.nsi.NsiResponseMessage._
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import java.net.URI
 

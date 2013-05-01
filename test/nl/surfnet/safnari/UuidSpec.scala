@@ -1,4 +1,4 @@
-package nl.surfnet.nsi
+package nl.surfnet.safnari
 
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll

@@ -22,8 +22,8 @@ import javax.xml.bind.JAXBContext
 import javax.xml.parsers.DocumentBuilderFactory
 import org.ogf.schemas.nsi._2013._04.connection.requester.ConnectionServiceRequester
 import com.sun.xml.internal.ws.client.ClientTransportException
-import nl.surfnet.nsi.NsiMessage
-import nl.surfnet.nsi.NsiHeaders
+import nl.surfnet.safnari.NsiMessage
+import nl.surfnet.safnari.NsiHeaders
 import java.util.UUID
 import org.specs2.execute.PendingUntilFixed
 import javax.xml.ws.Holder

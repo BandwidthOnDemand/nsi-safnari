@@ -3,11 +3,12 @@ package controllers
 import play.api.mvc._
 import play.api.mvc.Results._
 import support.ExtraBodyParsers._
-import nl.surfnet.nsi.NsiResponseMessage
-import nl.surfnet.nsi.NsiEnvelope
-import nl.surfnet.nsi.Continuations
-import nl.surfnet.nsi.CorrelationId
-import nl.surfnet.nsi.NsiRequesterOperation
+import nl.surfnet.safnari.NsiAcknowledgement
+import nl.surfnet.safnari.NsiEnvelope
+import nl.surfnet.safnari.Continuations
+import nl.surfnet.safnari.CorrelationId
+import nl.surfnet.safnari.GenericAck
+import nl.surfnet.safnari.NsiRequesterOperation
 import scala.concurrent.Future
 
 object ConnectionRequester extends Controller with SoapWebService {
@@ -21,7 +22,7 @@ object ConnectionRequester extends Controller with SoapWebService {
   def request = NsiRequesterEndPoint {
     case NsiEnvelope(headers, response) =>
       continuations.replyReceived(headers.correlationId, response)
-      Future.successful(NsiResponseMessage.GenericAck(headers.correlationId))
+      Future.successful(GenericAck(headers.correlationId))
   }
 
   private val continuations = new Continuations[NsiRequesterOperation]()

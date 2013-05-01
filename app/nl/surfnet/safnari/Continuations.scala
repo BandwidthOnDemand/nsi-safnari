@@ -1,4 +1,4 @@
-package nl.surfnet.nsi
+package nl.surfnet.safnari
 
 import scala.concurrent.stm.TMap
 import scala.concurrent.Future

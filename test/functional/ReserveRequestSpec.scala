@@ -15,8 +15,7 @@ import org.ogf.schemas.nsi._2013._04.framework.types._
 import org.ogf.schemas.nsi._2013._04.connection.provider.ConnectionServiceProvider
 import support.ExtraBodyParsers
 import scala.concurrent._
-import nl.surfnet.nsi._
-import nl.surfnet.nsi.NsiRequesterOperation.ReserveConfirmed
+import nl.surfnet.safnari._
 import play.api.libs.concurrent.Execution
 import play.api.libs.ws.WS
 
@@ -30,10 +29,10 @@ class ReserveRequestSpec extends Specification with PendingUntilFixed {
       case "/fake/requester" => Some(ExtraBodyParsers.NsiRequesterEndPoint {
         case NsiEnvelope(headers, confirm: ReserveConfirmed) =>
           reserveConfirmed.success(confirm)
-          Future.successful(NsiResponseMessage.GenericAck(headers.correlationId))
+          Future.successful(GenericAck(headers.correlationId))
         case response =>
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
-          Future.successful(NsiResponseMessage.ServiceException(response.headers.correlationId, s"$response"))
+          Future.successful(ServiceException(response.headers.correlationId, s"$response"))
       })
       case "/fake/provider" => ???
       case "/fake/pce" =>

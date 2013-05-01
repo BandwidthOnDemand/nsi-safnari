@@ -3,10 +3,7 @@ package controllers
 import play.api.test._
 import play.api.test.Helpers._
 import scala.concurrent.Promise
-import nl.surfnet.nsi._
-import nl.surfnet.nsi.NsiProviderOperation._
-import nl.surfnet.nsi.NsiRequesterOperation._
-import nl.surfnet.nsi.NsiResponseMessage._
+import nl.surfnet.safnari._
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import org.specs2.matcher.BeNull

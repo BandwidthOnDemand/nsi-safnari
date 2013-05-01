@@ -1,4 +1,4 @@
-package nl.surfnet.nsi
+package nl.surfnet.safnari
 
 import java.util.UUID
 import java.net.URI
@@ -8,9 +8,6 @@ import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
 import org.specs2.time.NoTimeConversions
-import nl.surfnet.nsi.NsiProviderOperation._
-import nl.surfnet.nsi.NsiRequesterOperation._
-import nl.surfnet.nsi.NsiResponseMessage._
 import scala.concurrent.Await
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.specs2.mutable.After

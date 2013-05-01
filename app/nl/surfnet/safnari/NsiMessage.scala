@@ -1,4 +1,4 @@
-package nl.surfnet.nsi
+package nl.surfnet.safnari
 
 import java.net.URI
 import java.util.UUID

@@ -19,10 +19,7 @@ import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.headers._
 import support.ExtraBodyParsers._
 import models._
-import nl.surfnet.nsi._
-import nl.surfnet.nsi.NsiRequesterOperation._
-import nl.surfnet.nsi.NsiProviderOperation._
-import nl.surfnet.nsi.NsiResponseMessage._
+import nl.surfnet.safnari._
 import scala.util.Failure
 import scala.util.Success
 import java.net.URL
@@ -74,10 +71,10 @@ object ConnectionProvider extends Controller with SoapWebService {
   def pceReply(correlationId: CorrelationId) = Action(parse.json) { implicit request =>
     pceContinuations.replyReceived(correlationId, null)
     Results.Ok
-    }
+  }
 
-  private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiResponseMessage = message match {
-    case q: NsiProviderOperation.QuerySummary =>
+  private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiAcknowledgement = message match {
+    case q: QuerySummary =>
       val cs = connections.single.snapshot
       val connectionIds = if (q.connectionIds.isEmpty) cs.keys.toSeq else q.connectionIds
       val connectionStates = Future.sequence(connectionIds.flatMap { id =>
@@ -85,26 +82,26 @@ object ConnectionProvider extends Controller with SoapWebService {
       })
       connectionStates.onSuccess {
         case reservations =>
-          replyTo(NsiRequesterOperation.QuerySummaryConfirmed(q.correlationId, reservations))
+          replyTo(QuerySummaryConfirmed(q.correlationId, reservations))
       }
-      NsiResponseMessage.GenericAck(q.correlationId)
+      GenericAck(q.correlationId)
     case q => ???
   }
 
-  private[controllers] def handleRequest(request: NsiEnvelope[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiResponseMessage] = {
+  private[controllers] def handleRequest(request: NsiEnvelope[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
     findOrCreateConnection(request) match {
       case Left(connectionId) =>
-        Future.successful(NsiResponseMessage.ServiceException(request.body.correlationId, f"Unknown connection ${connectionId}"))
+        Future.successful(ServiceException(request.body.correlationId, f"Unknown connection ${connectionId}"))
       case Right(connectionActor) =>
         handleProviderOperation(request.body)(replyTo)(connectionActor)
     }
   }
 
-  private def handleProviderOperation(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit)(connection: ActorRef): Future[NsiResponseMessage] = {
+  private def handleProviderOperation(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit)(connection: ActorRef): Future[NsiAcknowledgement] = {
     continuations.register(message.correlationId).onSuccess {
       case reply => replyTo(reply)
     }
-    connection ? FromRequester(message) map (_.asInstanceOf[NsiResponseMessage])
+    connection ? FromRequester(message) map (_.asInstanceOf[NsiAcknowledgement])
   }
 
   private def outboundActor = {
@@ -122,9 +119,9 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef) extends Actor {
     def receive = {
-      case ToPce(pceRequest) => pceRequester forward pceRequest
-      case nsiRequest: ToProvider               => nsiRequester forward nsiRequest
-      case ToRequester(response)    => handleResponse(response)
+      case pceRequest: ToPce      => pceRequester forward pceRequest
+      case nsiRequest: ToProvider => nsiRequester forward nsiRequest
+      case ToRequester(response)  => handleResponse(response)
     }
   }
 
@@ -165,7 +162,7 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   class PceRequesterActor(endPoint: String) extends Actor {
     def receive = {
-      case PathComputationRequest(correlationId, criteria) =>
+      case ToPce(PathComputationRequest(correlationId, criteria)) =>
         val fields = Seq(
           Some("source-stp" -> stpToJson(criteria.getPath().getSourceSTP())),
           Some("destination-stp" -> stpToJson(criteria.getPath().getDestSTP())),
@@ -184,7 +181,7 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   class DummyPceRequesterActor extends Actor {
     def receive = {
-      case pce: PathComputationRequest =>
+      case ToPce(pce) =>
         sender !
           FromPce(PathComputationConfirmed(
             pce.correlationId,

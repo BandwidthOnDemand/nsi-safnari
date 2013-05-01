@@ -10,7 +10,7 @@ import com.twitter.bijection.AbstractInjection
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 import scala.concurrent.Future
 
-package object nsi {
+package object safnari {
   type Message = Any
   type ConnectionId = String
   type CorrelationId = java.util.UUID

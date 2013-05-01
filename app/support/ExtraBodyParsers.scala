@@ -21,7 +21,7 @@ import java.util.UUID
 import java.net.URI
 import play.api.Logger
 import scala.collection.JavaConverters._
-import nl.surfnet.nsi._
+import nl.surfnet.safnari._
 import scala.reflect.ClassTag
 import scala.concurrent.Future
 import play.api.mvc.AsyncResult
@@ -51,11 +51,11 @@ object ExtraBodyParsers {
     }
   }
 
-  def NsiProviderEndPoint(action: NsiEnvelope[NsiProviderOperation] => Future[NsiResponseMessage]): Action[NsiEnvelope[NsiProviderOperation]] = Action(nsiProviderOperation) { request =>
+  def NsiProviderEndPoint(action: NsiEnvelope[NsiProviderOperation] => Future[NsiAcknowledgement]): Action[NsiEnvelope[NsiProviderOperation]] = Action(nsiProviderOperation) { request =>
     AsyncResult { action(request.body).map(response => Results.Ok(NsiEnvelope(request.body.headers.asReply, response))) }
   }
 
-  def NsiRequesterEndPoint(action: NsiEnvelope[NsiRequesterOperation] => Future[NsiResponseMessage]): Action[NsiEnvelope[NsiRequesterOperation]] = Action(nsiRequesterOperation) { request =>
+  def NsiRequesterEndPoint(action: NsiEnvelope[NsiRequesterOperation] => Future[NsiAcknowledgement]): Action[NsiEnvelope[NsiRequesterOperation]] = Action(nsiRequesterOperation) { request =>
     AsyncResult { action(request.body).map(response => Results.Ok(NsiEnvelope(request.body.headers.asReply, response))) }
   }
 
@@ -134,14 +134,14 @@ object ExtraBodyParsers {
   }
 
   private val MessageProviderFactories = Map(
-    "reserve" -> NsiRequestMessageFactory[ReserveType, NsiProviderOperation](NsiProviderOperation.Reserve),
-    "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => NsiProviderOperation.ReserveCommit(correlationId, body.getConnectionId())),
-    "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => NsiProviderOperation.ReserveAbort(correlationId, body.getConnectionId())),
-    "querySummary" -> NsiRequestMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => NsiProviderOperation.QuerySummary(correlationId, body.getConnectionId().asScala)))
+    "reserve" -> NsiRequestMessageFactory[ReserveType, NsiProviderOperation](Reserve),
+    "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => ReserveCommit(correlationId, body.getConnectionId())),
+    "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => ReserveAbort(correlationId, body.getConnectionId())),
+    "querySummary" -> NsiRequestMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => QuerySummary(correlationId, body.getConnectionId().asScala)))
 
   private val MessageRequesterFactories = Map (
-    "reserveConfirmed" -> NsiRequestMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((correlationId, body) => NsiRequesterOperation.ReserveConfirmed(correlationId, body.getConnectionId(), body.getCriteria().asScala.head)),
-    "reserveCommitConfirmed" -> NsiRequestMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => NsiRequesterOperation.ReserveCommitConfirmed(correlationId, body.getConnectionId)))
+    "reserveConfirmed" -> NsiRequestMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveConfirmed(correlationId, body.getConnectionId(), body.getCriteria().asScala.head)),
+    "reserveCommitConfirmed" -> NsiRequestMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveCommitConfirmed(correlationId, body.getConnectionId)))
 
   private def bodyNameToProviderOperation(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[NsiProviderOperation]] =
     MessageProviderFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
