@@ -37,6 +37,18 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.request().url}"
 
+  def request = NsiProviderEndPoint {
+    case NsiEnvelope(headers, query: NsiQuery) =>
+      Future.successful(handleQuery(query)(replyToClient(headers)))
+    case request @ NsiEnvelope(headers, _: NsiCommand) =>
+      handleRequest(request)(replyToClient(headers))
+  }
+
+  def pceReply(correlationId: CorrelationId) = Action(parse.json) { implicit request =>
+    pceContinuations.replyReceived(correlationId, null)
+    Results.Ok
+  }
+
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit = {
     requestHeaders.replyTo.foreach { replyTo =>
       WS.url(replyTo.toASCIIString()).
@@ -44,33 +56,10 @@ object ConnectionProvider extends Controller with SoapWebService {
         onComplete {
           case Failure(error) =>
             Logger.info(f"replying to $replyTo: $error", error)
-          case Success(response) =>
-            Logger.debug(f"replying to $replyTo: ${response.status} ${response.statusText}")
+          case Success(acknowledgement) =>
+            Logger.debug(f"replying to $replyTo: ${acknowledgement.status} ${acknowledgement.statusText}")
         }
     }
-  }
-
-  private def findOrCreateConnection(request: NsiEnvelope[NsiProviderOperation]): Either[ConnectionId, ActorRef] = request.body.optionalConnectionId match {
-    case Some(connectionId) =>
-      connections.single.get(connectionId).toRight(connectionId)
-    case None =>
-      // Initial reserve request.
-      val connectionId = newConnectionId
-      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, Uuid.randomUuidGenerator(), outboundActor)))
-      connections.single(connectionId) = connectionActor
-      Right(connectionActor)
-  }
-
-  def request = NsiProviderEndPoint {
-    case NsiEnvelope(headers, query: NsiQuery) =>
-      Future.successful(handleQuery(query)(replyToClient(headers)))
-    case request @ NsiEnvelope(headers, _: NsiProviderOperation) =>
-      handleRequest(request)(replyToClient(headers))
-  }
-
-  def pceReply(correlationId: CorrelationId) = Action(parse.json) { implicit request =>
-    pceContinuations.replyReceived(correlationId, null)
-    Results.Ok
   }
 
   private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiAcknowledgement = message match {
@@ -95,6 +84,17 @@ object ConnectionProvider extends Controller with SoapWebService {
       case Right(connectionActor) =>
         handleProviderOperation(request.body)(replyTo)(connectionActor)
     }
+  }
+
+  private def findOrCreateConnection(request: NsiEnvelope[NsiProviderOperation]): Either[ConnectionId, ActorRef] = request.body.optionalConnectionId match {
+    case Some(connectionId) =>
+      connections.single.get(connectionId).toRight(connectionId)
+    case None =>
+      // Initial reserve request.
+      val connectionId = newConnectionId
+      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, Uuid.randomUuidGenerator(), outboundActor)))
+      connections.single(connectionId) = connectionActor
+      Right(connectionActor)
   }
 
   private def handleProviderOperation(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit)(connection: ActorRef): Future[NsiAcknowledgement] = {

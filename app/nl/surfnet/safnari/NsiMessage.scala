@@ -39,6 +39,8 @@ trait NsiMessage {
 
   def asDocument: Document
 }
+trait NsiQuery
+trait NsiCommand
 
 object NsiMessage {
   private def newDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
