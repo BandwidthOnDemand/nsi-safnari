@@ -44,9 +44,15 @@ object ConnectionProvider extends Controller with SoapWebService {
       handleRequest(request)(replyToClient(headers))
   }
 
-  def pceReply(correlationId: CorrelationId) = Action(parse.json) { implicit request =>
-    pceContinuations.replyReceived(correlationId, null)
-    Results.Ok
+  def pceReply = Action(parse.json) { implicit request =>
+    request.body.pp("PCE reply")
+    Json.fromJson[PceResponse](request.body) match {
+      case JsSuccess(response, _) =>
+        pceContinuations.replyReceived(response.correlationId, response)
+        Ok
+      case JsError(error) =>
+        BadRequest
+    }
   }
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit = {
@@ -86,13 +92,15 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
   }
 
+  private val uuidGenerator = Uuid.randomUuidGenerator()
+
   private def findOrCreateConnection(request: NsiEnvelope[NsiProviderOperation]): Either[ConnectionId, ActorRef] = request.body.optionalConnectionId match {
     case Some(connectionId) =>
       connections.single.get(connectionId).toRight(connectionId)
     case None =>
       // Initial reserve request.
       val connectionId = newConnectionId
-      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, Uuid.randomUuidGenerator(), outboundActor)))
+      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, () => CorrelationId.fromUuid(uuidGenerator()), outboundActor)))
       connections.single(connectionId) = connectionActor
       Right(connectionActor)
   }
@@ -105,13 +113,19 @@ object ConnectionProvider extends Controller with SoapWebService {
   }
 
   private def outboundActor = {
-    val (nsiRequester, pceRequester) = {
-      if (current.mode == Mode.Prod) {
-        val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
-        val requesterNsa = current.configuration.getString("nsi.requester.nsa").getOrElse(sys.error("nsi.requester.nsa configuration property is not set"))
-        (Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(ConnectionRequester.serviceUrl)))), Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint))))
-      } else
-        (Akka.system.actorOf(Props[DummyNsiRequesterActor]), Akka.system.actorOf(Props[DummyPceRequesterActor]))
+    val pceRequester = {
+      val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
+      current.configuration.getString("pce.actor") match {
+        case None | Some("dummy") => Akka.system.actorOf(Props[DummyPceRequesterActor])
+        case _                    => Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint)))
+      }
+    }
+    val nsiRequester = {
+      val requesterNsa = current.configuration.getString("safnari.requester.nsa").getOrElse(sys.error("safnari.requester.nsa configuration property is not set"))
+      current.configuration.getString("nsi.actor") match {
+        case None | Some("dummy") => Akka.system.actorOf(Props[DummyNsiRequesterActor])
+        case _                    => Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(ConnectionRequester.serviceUrl))))
+      }
     }
 
     Akka.system.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester)))
@@ -162,17 +176,8 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   class PceRequesterActor(endPoint: String) extends Actor {
     def receive = {
-      case ToPce(PathComputationRequest(correlationId, criteria)) =>
-        val fields = Seq(
-          Some("source-stp" -> stpToJson(criteria.getPath().getSourceSTP())),
-          Some("destination-stp" -> stpToJson(criteria.getPath().getDestSTP())),
-          Option(criteria.getSchedule().getStartTime()).map(t => "start-time" -> JsString(t.toString())),
-          Option(criteria.getSchedule().getEndTime()).map(t => "end-time" -> JsString(t.toString())),
-          Some("bandwidth" -> JsString(criteria.getBandwidth().toString())),
-          Some("reply-to" -> JsString(s"${Application.baseUrl}/pce/reply")),
-          Some("correlation-id" -> JsString(correlationId.toString)),
-          Some("algorithm" -> JsString("chain"))).flatten
-        WS.url(endPoint).post(JsObject(fields))
+      case ToPce(request) =>
+        WS.url(endPoint).post(Json.toJson(request))
     }
 
     private def stpToJson(stp: StpType): JsValue =

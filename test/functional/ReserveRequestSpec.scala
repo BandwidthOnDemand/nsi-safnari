@@ -34,7 +34,7 @@ class ReserveRequestSpec extends Specification with PendingUntilFixed {
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
           Future.successful(ServiceException(response.headers.correlationId, s"$response"))
       })
-      case "/fake/provider" => ???
+      case "/fake/provider" => println("message for fake provider"); ???
       case "/fake/pce" =>
         Some(Action(BodyParsers.parse.json) { request =>
           request.body.pp;
@@ -52,6 +52,8 @@ class ReserveRequestSpec extends Specification with PendingUntilFixed {
   val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
   val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"
   val Application = FakeApplication(additionalConfiguration = Map(
+    "nsi.actor" -> "real",
+    "pce.actor" -> "dummy",
     "pce.endpoint" -> FakePceUri,
     "nsi.base.url" -> s"http://localhost:$ServerPort"), withGlobal = Some(Global))
 

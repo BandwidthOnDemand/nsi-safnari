@@ -9,16 +9,16 @@ import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteria
 import com.twitter.bijection.AbstractInjection
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 import scala.concurrent.Future
+import java.util.UUID
 
 package object safnari {
   type Message = Any
   type ConnectionId = String
-  type CorrelationId = java.util.UUID
 
   private val UuidGenerator = Uuid.randomUuidGenerator
 
   def newConnectionId: ConnectionId = UuidGenerator().toString
-  def newCorrelationId: CorrelationId = UuidGenerator()
+  def newCorrelationId: CorrelationId = CorrelationId.fromUuid(UuidGenerator())
 
   implicit class AnyOps[A](a: A) {
     def tap(f: A => Unit): A = { f(a); a }

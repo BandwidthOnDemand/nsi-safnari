@@ -23,7 +23,7 @@ case class NsiHeaders(correlationId: CorrelationId, requesterNSA: String, provid
   def asDocument: Document = {
     val factory = new ObjectFactory()
     val header = factory.createCommonHeaderType()
-    header.setCorrelationId(f"urn:uuid:${correlationId}")
+    header.setCorrelationId(correlationId.toString)
     header.setReplyTo(replyTo.map(_.toASCIIString()).orNull)
     header.setProtocolVersion(protocolVersion.toASCIIString())
     header.setProviderNSA(providerNSA)

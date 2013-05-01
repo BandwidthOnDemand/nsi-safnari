@@ -111,7 +111,7 @@ object ExtraBodyParsers {
         headerNode <- onlyChildElementWithNamespace(NsiFrameworkHeaderNamespace, soapMessage.getSOAPHeader()).right
         header <- tryEither(unmarshaller.unmarshal(headerNode, classOf[CommonHeaderType]).getValue).right
         protocolVersion <- tryEither(URI.create(header.getProtocolVersion())).right
-        correlationId <- tryEither(UUID.fromString(header.getCorrelationId().drop(9))).right
+        correlationId <- CorrelationId.fromString(header.getCorrelationId()).toRight("bad correlation id").right
         replyTo <- tryEither(Option(header.getReplyTo()).map(URI.create)).right
         bodyNode <- onlyChildElementWithNamespace(NsiConnectionTypesNamespace, soapMessage.getSOAPBody()).right
         messageFactory <- elementToFactory(bodyNode).right

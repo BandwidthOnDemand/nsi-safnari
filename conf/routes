@@ -12,7 +12,7 @@ GET    /nsi-v2/ConnectionServiceRequester   controllers.ConnectionRequester.wsdl
 
 GET    /nsi-v2/:wsdlOrXsd                   controllers.SoapWebService.wsdlOrXsd(wsdlOrXsd: String)
 
-POST   /pce/reply/:correlationId            controllers.ConnectionProvider.pceReply(correlationId: nl.surfnet.safnari.CorrelationId)
+POST   /pce/reply                           controllers.ConnectionProvider.pceReply
 
 # Map static resources from the /public folder to the /assets URL path
 GET    /assets/*file                        controllers.Assets.at(path="/public", file)
