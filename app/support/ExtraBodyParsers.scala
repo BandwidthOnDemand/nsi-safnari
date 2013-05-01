@@ -51,11 +51,13 @@ object ExtraBodyParsers {
     }
   }
 
-  def NsiProviderEndPoint(action: NsiEnvelope[NsiProviderOperation] => Future[NsiAcknowledgement]): Action[NsiEnvelope[NsiProviderOperation]] = Action(nsiProviderOperation) { request =>
-    AsyncResult { action(request.body).map(response => Results.Ok(NsiEnvelope(request.body.headers.asReply, response))) }
-  }
+  def NsiProviderEndPoint(action: NsiEnvelope[NsiProviderOperation] => Future[NsiAcknowledgement]): Action[NsiEnvelope[NsiProviderOperation]] =
+    NsiEndPoint(nsiProviderOperation)(action)
 
-  def NsiRequesterEndPoint(action: NsiEnvelope[NsiRequesterOperation] => Future[NsiAcknowledgement]): Action[NsiEnvelope[NsiRequesterOperation]] = Action(nsiRequesterOperation) { request =>
+  def NsiRequesterEndPoint(action: NsiEnvelope[NsiRequesterOperation] => Future[NsiAcknowledgement]): Action[NsiEnvelope[NsiRequesterOperation]] =
+    NsiEndPoint(nsiRequesterOperation)(action)
+
+  def NsiEndPoint[T <: NsiMessage](parser: BodyParser[NsiEnvelope[T]])(action: NsiEnvelope[T] => Future[NsiAcknowledgement]) = Action(parser) { request =>
     AsyncResult { action(request.body).map(response => Results.Ok(NsiEnvelope(request.body.headers.asReply, response))) }
   }
 
@@ -133,21 +135,22 @@ object ExtraBodyParsers {
     }
   }
 
-  private val MessageProviderFactories = Map(
+  private val MessageProviderFactories = messageFactories(Map(
     "reserve" -> NsiRequestMessageFactory[ReserveType, NsiProviderOperation](Reserve),
     "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => ReserveCommit(correlationId, body.getConnectionId())),
     "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => ReserveAbort(correlationId, body.getConnectionId())),
-    "querySummary" -> NsiRequestMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => QuerySummary(correlationId, body.getConnectionId().asScala)))
+    "querySummary" -> NsiRequestMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => QuerySummary(correlationId, body.getConnectionId().asScala)))) _
 
-  private val MessageRequesterFactories = Map (
+  private val MessageRequesterFactories = messageFactories(Map(
     "reserveConfirmed" -> NsiRequestMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveConfirmed(correlationId, body.getConnectionId(), body.getCriteria().asScala.head)),
-    "reserveCommitConfirmed" -> NsiRequestMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveCommitConfirmed(correlationId, body.getConnectionId)))
+    "reserveCommitConfirmed" -> NsiRequestMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveCommitConfirmed(correlationId, body.getConnectionId)))) _
 
-  private def bodyNameToProviderOperation(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[NsiProviderOperation]] =
-    MessageProviderFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
+  private def messageFactories[T <: NsiMessage](factories: Map[String, NsiRequestMessageFactory[T]])(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[T]] =
+    factories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
 
-  private def bodyNameToRequesterOperation(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[NsiRequesterOperation]] =
-    MessageRequesterFactories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
+  private def bodyNameToProviderOperation(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[NsiProviderOperation]] = MessageProviderFactories(bodyNode)
+
+  private def bodyNameToRequesterOperation(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[NsiRequesterOperation]] = MessageRequesterFactories(bodyNode)
 
   private def onlyChildElementWithNamespace(namespaceUri: String, elem: SOAPElement) =
     elem.getChildElements().asScala.collect {
