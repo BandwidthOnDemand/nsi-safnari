@@ -44,7 +44,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
 
     val connection = TestFSMRef(new ConnectionActor(ConnectionId, "RequesterNSA", () => CorrelationId.fromUuid(mockUuidGenerator()), TestActorRef(new Actor {
       def receive = { case m: Message => messages = messages :+ m }
-    })))
+    }), URI.create("http://example.com/pce/reply")))
 
     def given(messages: Message*): Unit = messages.foreach(m => connection ! m)
 

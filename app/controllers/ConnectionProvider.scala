@@ -31,11 +31,13 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private val connections = TMap.empty[ConnectionId, ActorRef]
   private val continuations = new Continuations[NsiRequesterOperation]()
-  private val pceContinuations = new Continuations[PceMessage]()
+  private val pceContinuations = new Continuations[PceResponse]()
 
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
   override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.request().url}"
+
+  private def pceReplyUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.pceReply().url}"
 
   def request = NsiProviderEndPoint {
     case NsiEnvelope(headers, query: NsiQuery) =>
@@ -100,7 +102,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     case None =>
       // Initial reserve request.
       val connectionId = newConnectionId
-      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, () => CorrelationId.fromUuid(uuidGenerator()), outboundActor)))
+      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, () => CorrelationId.fromUuid(uuidGenerator()), outboundActor, URI.create(pceReplyUrl))))
       connections.single(connectionId) = connectionActor
       Right(connectionActor)
   }
@@ -177,6 +179,10 @@ object ConnectionProvider extends Controller with SoapWebService {
   class PceRequesterActor(endPoint: String) extends Actor {
     def receive = {
       case ToPce(request) =>
+        val connection = sender
+        pceContinuations.register(request.correlationId).onSuccess {
+          case reply => connection ! FromPce(reply)
+        }
         WS.url(endPoint).post(Json.toJson(request))
     }
 

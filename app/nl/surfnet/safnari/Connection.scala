@@ -12,7 +12,7 @@ case class ToProvider(message: NsiProviderOperation, providerNsa: String, provid
 case class FromPce(message: PceResponse)
 case class ToPce(message: PathComputationRequest)
 
-class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: () => CorrelationId, outbound: ActorRef) extends Actor with FSM[ReservationState, Connection] {
+class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: () => CorrelationId, outbound: ActorRef, pceReplyUri: URI) extends Actor with FSM[ReservationState, Connection] {
 
   startWith(InitialReservationState, NewConnection(id))
 
@@ -104,7 +104,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
   }
 
   onTransition {
-    case InitialReservationState -> CheckingReservationState => outbound ! ToPce(PathComputationRequest(newCorrelationId(), URI.create("http://hutsefluts.zilverline.org/"), nextStateData.asInstanceOf[ExistingConnection].criteria))
+    case InitialReservationState -> CheckingReservationState => outbound ! ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, nextStateData.asInstanceOf[ExistingConnection].criteria))
     case CheckingReservationState -> FailedReservationState  => outbound ! ToRequester(ReserveFailed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id))
     case CheckingReservationState -> HeldReservationState    =>
       val data = nextStateData.asInstanceOf[ExistingConnection]

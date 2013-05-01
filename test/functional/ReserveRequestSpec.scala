@@ -18,6 +18,10 @@ import scala.concurrent._
 import nl.surfnet.safnari._
 import play.api.libs.concurrent.Execution
 import play.api.libs.ws.WS
+import play.api.libs.json._
+import java.net.URI
+import com.twitter.bijection.Injection
+import support.ExtraBodyParsers._
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ReserveRequestSpec extends Specification with PendingUntilFixed {
@@ -34,14 +38,29 @@ class ReserveRequestSpec extends Specification with PendingUntilFixed {
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
           Future.successful(ServiceException(response.headers.correlationId, s"$response"))
       })
-      case "/fake/provider" => println("message for fake provider"); ???
+      case "/fake/provider" => Some(ExtraBodyParsers.NsiProviderEndPoint {
+        case NsiEnvelope(headers, reserve: Reserve) =>
+          val connectionId = newConnectionId
+          headers.replyTo.foreach { replyTo =>
+            WS.url(replyTo.toASCIIString()).post(NsiEnvelope(headers.asReply, ReserveConfirmed(headers.correlationId, connectionId, Injection.invert(reserve.body.getCriteria()).get)))
+          }
+          Future.successful(ReserveResponse(headers.correlationId, connectionId))
+      })
       case "/fake/pce" =>
         Some(Action(BodyParsers.parse.json) { request =>
-          request.body.pp;
-          WS.url((request.body \ "reply-to").as[String] + "/" + (request.body \ "correlation-id").as[String]).post(request.body).onSuccess {
-            case request => request.status.pp("pce notification result")
-          }(Execution.defaultContext)
-          Results.Ok
+          val pceRequest = Json.fromJson[PathComputationRequest](request.body)
+          pceRequest match {
+            case JsSuccess(request, _) =>
+              request.pp("PCE request")
+              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(request.criteria.getPath().getSourceSTP(), request.criteria.getPath().getDestSTP(), "provider-nsa", URI.create(FakeProviderUri), NoAuthentication) :: Nil)
+              response.pp("PCE response")
+              WS.url(request.replyTo.toASCIIString()).post(Json.toJson(response)).onSuccess {
+                case request => request.status.pp("pce notification result")
+              }(Execution.defaultContext)
+              Results.Ok
+            case _ =>
+              Results.BadRequest
+          }
         })
       case _ => super.onRouteRequest(request)
     }
@@ -53,7 +72,7 @@ class ReserveRequestSpec extends Specification with PendingUntilFixed {
   val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"
   val Application = FakeApplication(additionalConfiguration = Map(
     "nsi.actor" -> "real",
-    "pce.actor" -> "dummy",
+    "pce.actor" -> "real",
     "pce.endpoint" -> FakePceUri,
     "nsi.base.url" -> s"http://localhost:$ServerPort"), withGlobal = Some(Global))
 
@@ -77,8 +96,8 @@ class ReserveRequestSpec extends Specification with PendingUntilFixed {
 
       service.getConnectionServiceProviderPort().reserve(null, "description", ConnectionId, Criteria, NsiHeader)
 
-      await(reserveConfirmed.future).correlationId must beEqualTo("f8a23b90-832b-0130-d364-20c9d0879def")
-    }.pendingUntilFixed
+      await(reserveConfirmed.future).correlationId must beEqualTo(CorrelationId.fromString("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def").get)
+    }
 
   }
 
