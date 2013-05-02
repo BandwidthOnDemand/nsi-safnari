@@ -30,5 +30,5 @@ case class Release(correlationId: CorrelationId) extends NsiProviderOperation wi
 case class Terminate(correlationId: CorrelationId) extends NsiProviderOperation with NsiCommand
 
 case class QuerySummary(correlationId: CorrelationId, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery
-case class QuerySummarySync(correlationId: CorrelationId) extends NsiProviderOperation with NsiQuery
-case class QueryRecursive(correlationId: CorrelationId) extends NsiProviderOperation with NsiQuery
+case class QuerySummarySync(correlationId: CorrelationId, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery
+case class QueryRecursive(correlationId: CorrelationId, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery

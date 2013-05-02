@@ -41,7 +41,7 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   def request = NsiProviderEndPoint {
     case NsiEnvelope(headers, query: NsiQuery) =>
-      Future.successful(handleQuery(query)(replyToClient(headers)))
+      handleQuery(query)(replyToClient(headers))
     case request @ NsiEnvelope(headers, _: NsiCommand) =>
       handleRequest(request)(replyToClient(headers))
   }
@@ -70,19 +70,28 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
   }
 
-  private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): NsiAcknowledgement = message match {
+  private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = message match {
     case q: QuerySummary =>
-      val cs = connections.single.snapshot
-      val connectionIds = if (q.connectionIds.isEmpty) cs.keys.toSeq else q.connectionIds
-      val connectionStates = Future.sequence(connectionIds.flatMap { id =>
-        cs.get(id).map(_ ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
-      })
+      val connectionStates = queryConnections(q.connectionIds)
       connectionStates.onSuccess {
         case reservations =>
           replyTo(QuerySummaryConfirmed(q.correlationId, reservations))
       }
-      GenericAck(q.correlationId)
+      Future.successful(GenericAck(q.correlationId))
+    case q: QuerySummarySync =>
+      val connectionStates = queryConnections(q.connectionIds)
+      connectionStates map { states =>
+        QuerySummarySyncConfirmed(q.correlationId, states)
+      }
     case q => ???
+  }
+
+  private def queryConnections(connectionIds: Seq[ConnectionId]) = {
+    val cs = connections.single.snapshot
+    val ids = if (connectionIds.isEmpty) cs.keys.toSeq else connectionIds
+    Future.sequence(ids.flatMap { id =>
+      cs.get(id).map(_ ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
+    })
   }
 
   private[controllers] def handleRequest(request: NsiEnvelope[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {

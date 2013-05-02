@@ -21,8 +21,10 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
     withPath(new PathType().withDirectionality(DirectionalityType.BIDIRECTIONAL)))
   val CorrelationId = newCorrelationId
 
+  val Application = FakeApplication(additionalConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
+
   "Reserve operation" should {
-    "return the connection id and confirm the reservation" in new WithApplication {
+    "return the connection id and confirm the reservation" in new WithApplication(Application) {
       val requesterOperation: Promise[NsiRequesterOperation] = Promise()
       val response = await(ConnectionProvider.handleRequest(withEnvelope(Reserve(CorrelationId, InitialReserveType))) { requesterOperation.success(_) })
 
@@ -38,7 +40,7 @@ class ConnectionProviderSpec extends org.specs2.mutable.Specification {
           op.correlationId must beEqualTo(CorrelationId)
 
           val queryResult = Promise[NsiRequesterOperation]
-          ConnectionProvider.handleQuery(QuerySummary(newCorrelationId, Seq(op.connectionId))) { queryResult.success(_) }
+          await(ConnectionProvider.handleQuery(QuerySummary(newCorrelationId, Seq(op.connectionId))) { queryResult.success(_) })
 
           await(queryResult.future) must beLike {
             case QuerySummaryConfirmed(_, Seq(reservation: QuerySummaryResultType)) =>

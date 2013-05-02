@@ -2,9 +2,13 @@ package nl.surfnet.safnari
 
 import org.w3c.dom.Document
 import org.ogf.schemas.nsi._2013._04.connection.types.{ ObjectFactory => TypesObjectFactory }
+import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryConfirmedType
+import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType
 import org.ogf.schemas.nsi._2013._04.connection.types.ReserveResponseType
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
+import scala.collection.JavaConverters._
 import nl.surfnet.safnari.NsiMessage.marshal
+import NsiAcknowledgement.factory
 
 sealed trait NsiAcknowledgement extends NsiMessage {
   override def optionalConnectionId: Option[ConnectionId] = None
@@ -13,7 +17,6 @@ sealed trait NsiAcknowledgement extends NsiMessage {
 object NsiAcknowledgement {
   private[safnari] val factory = new TypesObjectFactory()
 }
-import NsiAcknowledgement.factory
 
 case class GenericAck(correlationId: CorrelationId) extends NsiAcknowledgement {
   override def asDocument = {
@@ -41,5 +44,13 @@ case class ServiceException(correlationId: CorrelationId, text: String) extends 
     response.setVariables(null) // TODO
     // children TODO
     marshal(factory.createServiceException(response))
+  }
+}
+
+case class QuerySummarySyncConfirmed(correlationId: CorrelationId, results: Seq[QuerySummaryResultType]) extends NsiAcknowledgement {
+  override def asDocument: Document = {
+    val response = new QuerySummaryConfirmedType().withReservation(results.asJava)
+
+    marshal(factory.createQuerySummarySyncConfirmed(response))
   }
 }
