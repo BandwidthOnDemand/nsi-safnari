@@ -27,6 +27,10 @@ case class OAuthAuthentication(token: String) extends ProviderAuthentication
 case class ComputedSegment(sourceStp: StpType, destinationStp: StpType, providerNsa: String, providerUrl: URI, authentication: ProviderAuthentication)
 
 object PceMessage {
+  private implicit class JsResultOps[A](js: JsResult[A]) {
+    def clearPath = js.fold(JsError(_), JsSuccess(_, path = JsPath()))
+  }
+
   implicit val CorrelationIdReads: Reads[CorrelationId] = Reads[CorrelationId] {
     case JsString(s) => CorrelationId.fromString(s).map { x => JsSuccess(x) }.getOrElse { JsError(ValidationError("bad.correlation.id", s)) }
     case json        => JsError(ValidationError("bad.correlation.id", json))
@@ -37,7 +41,7 @@ object PceMessage {
     case JsString(s) => Try { new URI(s) }.map { x => JsSuccess(x) }.getOrElse { JsError(ValidationError("bad.uri", s)) }
     case json        => JsError(ValidationError("bad.uri", json))
   }
-  implicit val UriWriteS: Writes[URI] = Writes[URI] { x => JsString(x.toASCIIString()) }
+  implicit val UriWrites: Writes[URI] = Writes[URI] { x => JsString(x.toASCIIString()) }
 
   // FIXME labels
   implicit val StpTypeFormat: Format[StpType] = (
@@ -47,22 +51,20 @@ object PceMessage {
       (networkId, localId, labels) => new StpType().withNetworkId(networkId).withLocalId(localId),
       stpType => (stpType.getNetworkId(), stpType.getLocalId(), None))
 
-  implicit val ProviderAuthenticationFormat: Format[ProviderAuthentication] = (
-    (__ \ "method").format[String] and
-    (__ \ "username").format[Option[String]] and
-    (__ \ "password").format[Option[String]] and
-    (__ \ "token").format[Option[String]])(
-      (method, username, password, token) => method match {
-        case "none"   => NoAuthentication
-        case "basic"  => BasicAuthentication(username.get, password.get)
-        case "oauth2" => OAuthAuthentication(token.get)
-        case _        => ???
-      },
-      {
-        case NoAuthentication                        => ("none", None, None, None)
-        case BasicAuthentication(username, password) => ("basic", Some(username), Some(password), None)
-        case OAuthAuthentication(token)              => ("oauth2", None, None, Some(token))
-      })
+  implicit val ProviderAuthenticationReads: Reads[ProviderAuthentication] = Reads { json =>
+    (__ \ "method").read[String].reads(json) match {
+      case JsSuccess("none", _)    => JsSuccess(NoAuthentication)
+      case JsSuccess("basic", _)   => Json.reads[BasicAuthentication].reads(json).clearPath
+      case JsSuccess("oauth2", _)  => Json.reads[OAuthAuthentication].reads(json).clearPath
+      case JsSuccess(method, path) => JsError(path -> ValidationError("bad.authentication.method", method))
+      case errors: JsError         => errors
+    }
+  }
+  implicit val ProviderAuthenticationWrites: Writes[ProviderAuthentication] = Writes {
+    case NoAuthentication                        => Json.obj("method" -> "none")
+    case BasicAuthentication(username, password) => Json.obj("method" -> "basic", "username" -> username, "password" -> password)
+    case OAuthAuthentication(token)              => Json.obj("method" -> "oauth2", "token" -> token)
+  }
 
   implicit val ComputedSegmentFormat: Format[ComputedSegment] = (
     (__ \ "source-stp").format[StpType] and

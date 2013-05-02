@@ -4,6 +4,7 @@ import play.api.libs.json._
 import java.net.URI
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types._
+import play.api.data.validation.ValidationError
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PceMessageSpec extends org.specs2.mutable.Specification {
@@ -46,6 +47,19 @@ class PceMessageSpec extends org.specs2.mutable.Specification {
 
       json \ "correlation-id" must beEqualTo(JsString(correlationId.toString))
       Json.fromJson[PceResponse](json) must beEqualTo(JsSuccess(response))
+    }
+
+    "deserialize authentication method" in {
+      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"foo"}""")) must beLike {
+        case JsError(errors) =>
+          errors must contain((JsPath \ "method") -> Seq(ValidationError("bad.authentication.method", "foo")))
+      }
+      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"basic"}""")) must beLike {
+        case JsError(errors) =>
+          errors must contain((JsPath \ "username") -> Seq(ValidationError("validate.error.missing-path")))
+      }
+      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"oauth2", "token":"oath2-token"}""")) must beEqualTo(JsSuccess(OAuthAuthentication("oath2-token")))
+      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"basic", "username":"user", "password":"pwd"}""")) must beEqualTo(JsSuccess(BasicAuthentication("user", "pwd")))
     }
   }
 }
