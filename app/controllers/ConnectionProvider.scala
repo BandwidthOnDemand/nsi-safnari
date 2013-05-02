@@ -47,7 +47,6 @@ object ConnectionProvider extends Controller with SoapWebService {
   }
 
   def pceReply = Action(parse.json) { implicit request =>
-    request.body.pp("PCE reply")
     Json.fromJson[PceResponse](request.body) match {
       case JsSuccess(response, _) =>
         pceContinuations.replyReceived(response.correlationId, response)

@@ -3,9 +3,6 @@ package functional
 import java.net.URL
 import java.util.Collections
 import javax.xml.ws.Holder
-import org.junit.runner.RunWith
-import org.specs2.execute.PendingUntilFixed
-import org.specs2.mutable.Specification
 import play.api.mvc._
 import play.api.test._
 import play.api.test.Helpers._
@@ -23,14 +20,14 @@ import java.net.URI
 import com.twitter.bijection.Injection
 import support.ExtraBodyParsers._
 
-@RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ReserveRequestSpec extends Specification with PendingUntilFixed {
+@org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
+class ReserveRequestSpec extends org.specs2.mutable.Specification {
 
   val reserveConfirmed = Promise[ReserveConfirmed]
 
   object Global extends play.api.GlobalSettings {
     override def onRouteRequest(request: RequestHeader): Option[Handler] = request.path match {
-      case "/fake/requester" => Some(ExtraBodyParsers.NsiRequesterEndPoint {
+      case "/fake/requester" => Some(NsiRequesterEndPoint {
         case NsiEnvelope(headers, confirm: ReserveConfirmed) =>
           reserveConfirmed.success(confirm)
           Future.successful(GenericAck(headers.correlationId))
@@ -38,7 +35,7 @@ class ReserveRequestSpec extends Specification with PendingUntilFixed {
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
           Future.successful(ServiceException(response.headers.correlationId, s"$response"))
       })
-      case "/fake/provider" => Some(ExtraBodyParsers.NsiProviderEndPoint {
+      case "/fake/provider" => Some(NsiProviderEndPoint {
         case NsiEnvelope(headers, reserve: Reserve) =>
           val connectionId = newConnectionId
           headers.replyTo.foreach { replyTo =>
@@ -51,12 +48,8 @@ class ReserveRequestSpec extends Specification with PendingUntilFixed {
           val pceRequest = Json.fromJson[PathComputationRequest](request.body)
           pceRequest match {
             case JsSuccess(request, _) =>
-              request.pp("PCE request")
               val response = PathComputationConfirmed(request.correlationId, ComputedSegment(request.criteria.getPath().getSourceSTP(), request.criteria.getPath().getDestSTP(), "provider-nsa", URI.create(FakeProviderUri), NoAuthentication) :: Nil)
-              response.pp("PCE response")
-              WS.url(request.replyTo.toASCIIString()).post(Json.toJson(response)).onSuccess {
-                case request => request.status.pp("pce notification result")
-              }(Execution.defaultContext)
+              WS.url(request.replyTo.toASCIIString()).post(Json.toJson(response))
               Results.Ok
             case _ =>
               Results.BadRequest
