@@ -24,7 +24,9 @@ case object NoAuthentication extends ProviderAuthentication
 case class BasicAuthentication(username: String, password: String) extends ProviderAuthentication
 case class OAuthAuthentication(token: String) extends ProviderAuthentication
 
-case class ComputedSegment(sourceStp: StpType, destinationStp: StpType, providerNsa: String, providerUrl: URI, authentication: ProviderAuthentication)
+case class ProviderEndPoint(nsa: String, url: URI, authentication: ProviderAuthentication)
+
+case class ComputedSegment(sourceStp: StpType, destinationStp: StpType, provider: ProviderEndPoint)
 
 object PceMessage {
   private implicit class JsResultOps[A](js: JsResult[A]) {
@@ -69,9 +71,9 @@ object PceMessage {
   implicit val ComputedSegmentFormat: Format[ComputedSegment] = (
     (__ \ "source-stp").format[StpType] and
     (__ \ "destination-stp").format[StpType] and
-    (__ \ "nsa").format[String] and
-    (__ \ "provider-url").format[URI] and
-    (__ \ "auth").format[ProviderAuthentication])(ComputedSegment.apply, unlift(ComputedSegment.unapply))
+    ((__ \ "nsa").format[String] and
+      (__ \ "provider-url").format[URI] and
+      (__ \ "auth").format[ProviderAuthentication])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply)))(ComputedSegment.apply, unlift(ComputedSegment.unapply))
 
   implicit val PceResponseFormat: Format[PceResponse] = (
     (__ \ "correlation-id").format[CorrelationId] and

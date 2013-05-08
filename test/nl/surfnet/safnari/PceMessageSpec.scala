@@ -41,7 +41,7 @@ class PceMessageSpec extends org.specs2.mutable.Specification {
     }
 
     "serialize computation confirmed response to json" in {
-      val response = PathComputationConfirmed(correlationId, List(ComputedSegment(sourceStp, destStp, "provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication)))
+      val response = PathComputationConfirmed(correlationId, List(ComputedSegment(sourceStp, destStp, ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication))))
 
       val json = Json.toJson(response)
 

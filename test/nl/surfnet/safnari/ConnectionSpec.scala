@@ -30,8 +30,8 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
 
     val Criteria = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType())
     val InitialReserveType = new ReserveType().withCriteria(Criteria)
-    val A = ComputedSegment(new StpType().withLocalId(""), new StpType().withLocalId(""), "urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication)
-    val B = ComputedSegment(new StpType().withLocalId(""), new StpType().withLocalId(""), "urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication)
+    val A = ComputedSegment(new StpType().withLocalId("A"), new StpType().withLocalId("X"), ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication))
+    val B = ComputedSegment(new StpType().withLocalId("X"), new StpType().withLocalId("B"), ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication))
 
     val Headers = NsiHeaders(newCorrelationId, "RequesterNSA", "ProviderNSA", Some(URI.create("http://example.com/")))
     val ConnectionId = "ConnectionId"
@@ -39,12 +39,13 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
     val InitialMessages = Seq(FromRequester(Reserve(ReserveCorrelationId, InitialReserveType)))
 
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
+    val PceReplyToUri = URI.create("http://example.com/pce/reply")
 
     var messages: Seq[Message] = Nil
 
     val connection = TestFSMRef(new ConnectionActor(ConnectionId, "RequesterNSA", () => CorrelationId.fromUuid(mockUuidGenerator()), TestActorRef(new Actor {
       def receive = { case m: Message => messages = messages :+ m }
-    }), URI.create("http://example.com/pce/reply")))
+    }), PceReplyToUri))
 
     def given(messages: Message*): Unit = messages.foreach(m => connection ! m)
 
@@ -64,15 +65,22 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
     "send a path computation request when reserve is received" in new fixture {
       when(FromRequester(Reserve(ReserveCorrelationId, InitialReserveType)))
 
-      messages must haveOneElementLike { case ToPce(request: PathComputationRequest) => ok }
+      messages must contain(ToPce(PathComputationRequest(
+        correlationId = CorrelationId(0, 1),
+        replyTo = PceReplyToUri,
+        criteria = Criteria)))
     }
 
-    "send reserve requests to when path computation confirmed is received" in new fixture {
+    "send reserve request for each segment when path computation confirmed is received" in new fixture {
       given(InitialMessages: _*)
 
       when(FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))))
 
       messages must haveSize(2)
+      messages must haveAllElementsLike {
+        case ToProvider(reserve: Reserve, A.provider) => ok
+        case ToProvider(reserve: Reserve, B.provider) => ok
+      }
     }
 
     "fail the connection when path computation fails" in new fixture {
@@ -136,7 +144,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
 
       when(FromRequester(ReserveCommit(newCorrelationId, ConnectionId)))
 
-      messages must haveOneElementLike { case ToProvider(_: ReserveCommit, _, _, _) => ok }
+      messages must haveOneElementLike { case ToProvider(_: ReserveCommit, _) => ok }
       connection.stateName must beEqualTo(CommittingReservationState)
     }
 
@@ -161,7 +169,7 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
 
       when(FromRequester(ReserveAbort(ReserveCorrelationId, ConnectionId)))
 
-      messages must haveOneElementLike { case ToProvider(_: ReserveAbort, _, _, _) => ok }
+      messages must haveOneElementLike { case ToProvider(_: ReserveAbort, _) => ok }
       connection.stateName must beEqualTo(AbortingReservationState)
     }
 

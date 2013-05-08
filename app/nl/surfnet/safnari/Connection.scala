@@ -8,7 +8,7 @@ import java.net.URI
 case class FromRequester(message: NsiProviderOperation)
 case class ToRequester(message: NsiRequesterOperation)
 case class FromProvider(message: NsiRequesterOperation)
-case class ToProvider(message: NsiProviderOperation, providerNsa: String, providerUrl: URI, authentication: ProviderAuthentication)
+case class ToProvider(message: NsiProviderOperation, provider: ProviderEndPoint)
 case class FromPce(message: PceResponse)
 case class ToPce(message: PathComputationRequest)
 
@@ -19,7 +19,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
   when(InitialReservationState) {
     case Event(FromRequester(message: Reserve), _) =>
       val criteria = Injection.invert(message.body.getCriteria())
-      goto(CheckingReservationState) using ExistingConnection(
+      goto(PathComputationState) using ExistingConnection(
         id = id,
         reserveCorrelationId = message.correlationId,
         globalReservationId = Option(message.body.getGlobalReservationId()),
@@ -27,32 +27,15 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
         criteria = criteria.getOrElse(sys.error("Bad initial reservation criteria"))) replying ReserveResponse(message.correlationId, id)
   }
 
-  when(CheckingReservationState) {
+  when(PathComputationState) {
     case Event(FromPce(message: PathComputationConfirmed), data: ExistingConnection) =>
       val segments = message.segments.map(newCorrelationId() -> _)
-
-      segments.foreach {
-        case (correlationId, segment) =>
-          val criteria = new ReservationRequestCriteriaType().
-            withBandwidth(data.criteria.getBandwidth()).
-            withPath(new PathType().withSourceSTP(segment.sourceStp).withDestSTP(segment.destinationStp).withDirectionality(DirectionalityType.BIDIRECTIONAL)).
-            withSchedule(data.criteria.getSchedule()).
-            withServiceAttributes(data.criteria.getServiceAttributes()).
-            withVersion(data.criteria.getVersion())
-
-          val reserveType = new ReserveType().
-              withGlobalReservationId(data.globalReservationId.orNull).
-              withDescription(data.description.orNull).
-              withCriteria(criteria)
-
-          outbound ! ToProvider(Reserve(correlationId, reserveType), segment.providerNsa, segment.providerUrl, segment.authentication)
-      }
-
-      val newData = data.copy(segments = segments.toMap)
-      goto(newData.aggregatedReservationState) using newData replying 200
+      goto(CheckingReservationState) using data.copy(segments = segments.toMap) replying 200
     case Event(FromPce(message: PathComputationFailed), _) =>
       goto(FailedReservationState) replying 200
+  }
 
+  when(CheckingReservationState) {
     case Event(FromProvider(message: ReserveConfirmed), data: ExistingConnection) =>
       val newData = data.receivedConnectionId(message.correlationId, message.connectionId, HeldReservationState)
       goto(newData.aggregatedReservationState) using newData replying GenericAck(message.correlationId)
@@ -97,16 +80,38 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
         withConnectionStates(
           new ConnectionStatesType().
             withReservationState(new ReservationStateType().withVersion(data.criteria.getVersion()).withState(stateName.jaxb)).
-            withProvisionState(new ProvisionStateType().withVersion(data.criteria.getVersion()).withState(ProvisionStateEnumType.UNKNOWN /*TODO*/)).
-            withLifecycleState(new LifecycleStateType().withVersion(data.criteria.getVersion()).withState(LifecycleStateEnumType.INITIAL /*TODO*/)).
-            withDataPlaneStatus(new DataPlaneStatusType().withVersion(data.criteria.getVersion()).withActive(false /*TODO*/).withVersionConsistent(true))).
-        withChildren(null /*TODO*/ ))
+            withProvisionState(new ProvisionStateType().withVersion(data.criteria.getVersion()).withState(ProvisionStateEnumType.UNKNOWN /*TODO*/ )).
+            withLifecycleState(new LifecycleStateType().withVersion(data.criteria.getVersion()).withState(LifecycleStateEnumType.INITIAL /*TODO*/ )).
+            withDataPlaneStatus(new DataPlaneStatusType().withVersion(data.criteria.getVersion()).withActive(false /*TODO*/ ).withVersionConsistent(true))).
+          withChildren(null /*TODO*/ ))
   }
 
   onTransition {
-    case InitialReservationState -> CheckingReservationState => outbound ! ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, nextStateData.asInstanceOf[ExistingConnection].criteria))
-    case CheckingReservationState -> FailedReservationState  => outbound ! ToRequester(ReserveFailed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id))
-    case CheckingReservationState -> HeldReservationState    =>
+    case InitialReservationState -> PathComputationState =>
+      outbound ! ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, nextStateData.asInstanceOf[ExistingConnection].criteria))
+
+    case PathComputationState -> CheckingReservationState =>
+      val data = nextStateData.asInstanceOf[ExistingConnection]
+      data.segments.foreach {
+        case (correlationId, segment) =>
+          val criteria = new ReservationRequestCriteriaType().
+            withBandwidth(data.criteria.getBandwidth()).
+            withPath(new PathType().withSourceSTP(segment.sourceStp).withDestSTP(segment.destinationStp).withDirectionality(DirectionalityType.BIDIRECTIONAL)).
+            withSchedule(data.criteria.getSchedule()).
+            withServiceAttributes(data.criteria.getServiceAttributes()).
+            withVersion(data.criteria.getVersion())
+
+          val reserveType = new ReserveType().
+            withGlobalReservationId(data.globalReservationId.orNull).
+            withDescription(data.description.orNull).
+            withCriteria(criteria)
+
+          outbound ! ToProvider(Reserve(correlationId, reserveType), segment.provider)
+      }
+
+    case (PathComputationState | CheckingReservationState) -> FailedReservationState =>
+      outbound ! ToRequester(ReserveFailed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id))
+    case CheckingReservationState -> HeldReservationState =>
       val data = nextStateData.asInstanceOf[ExistingConnection]
       outbound ! ToRequester(ReserveConfirmed(data.reserveCorrelationId, id, data.criteria))
     case HeldReservationState -> CommittingReservationState =>
@@ -114,19 +119,20 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
       data.connections.foreach {
         case (connectionId, correlationId) =>
           val seg = data.segments(correlationId)
-          outbound ! ToProvider(ReserveCommit(newCorrelationId(), connectionId), seg.providerNsa, seg.providerUrl, seg.authentication)
+          outbound ! ToProvider(ReserveCommit(newCorrelationId(), connectionId), seg.provider)
       }
     case HeldReservationState -> AbortingReservationState =>
       val data = nextStateData.asInstanceOf[ExistingConnection]
       data.connections.foreach {
         case (connectionId, correlationId) =>
           val seg = data.segments(correlationId)
-          outbound ! ToProvider(ReserveAbort(newCorrelationId(), connectionId), seg.providerNsa, seg.providerUrl, seg.authentication)
+          outbound ! ToProvider(ReserveAbort(newCorrelationId(), connectionId), seg.provider)
       }
-    case CommittingReservationState -> ReservedReservationState => outbound ! ToRequester(ReserveCommitConfirmed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id))
-    case ReservedReservationState -> CheckingReservationState   => ???
-    case FailedReservationState -> AbortingReservationState     => ???
-    case AbortingReservationState -> ReservedReservationState   => ???
+    case CommittingReservationState -> ReservedReservationState =>
+      outbound ! ToRequester(ReserveCommitConfirmed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id))
+    case ReservedReservationState -> CheckingReservationState => ???
+    case FailedReservationState -> AbortingReservationState   => ???
+    case AbortingReservationState -> ReservedReservationState => ???
   }
 }
 

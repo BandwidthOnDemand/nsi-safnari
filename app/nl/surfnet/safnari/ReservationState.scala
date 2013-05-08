@@ -14,6 +14,9 @@ case object FailedReservationState extends ReservationState {
 case object ReservedReservationState extends ReservationState {
   def jaxb = ReservationStateEnumType.RESERVED
 }
+case object PathComputationState extends ReservationState {
+  def jaxb = ReservationStateEnumType.RESERVE_CHECKING
+}
 case object CheckingReservationState extends ReservationState {
   def jaxb = ReservationStateEnumType.RESERVE_CHECKING
 }

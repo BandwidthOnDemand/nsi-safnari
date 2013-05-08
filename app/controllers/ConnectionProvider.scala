@@ -151,16 +151,16 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   class DummyNsiRequesterActor extends Actor {
     def receive = {
-      case ToProvider(reserve: Reserve, _, _, _) =>
+      case ToProvider(reserve: Reserve, _) =>
         sender ! FromProvider(ReserveConfirmed(reserve.correlationId, newConnectionId, Injection.invert(reserve.body.getCriteria()).get))
-      case ToProvider(commit: ReserveCommit, _, _, _) =>
+      case ToProvider(commit: ReserveCommit, _) =>
         sender ! FromProvider(ReserveCommitConfirmed(commit.correlationId, commit.connectionId))
     }
   }
 
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
     def receive = {
-      case ToProvider(message: NsiProviderOperation, providerNsa, providerUrl, authentication) =>
+      case ToProvider(message: NsiProviderOperation, provider) =>
         val connection = sender
         ConnectionRequester.expectReplyFor(message.correlationId).onSuccess {
           case reply => connection ! FromProvider(reply)
@@ -169,12 +169,12 @@ object ConnectionProvider extends Controller with SoapWebService {
         val headers = NsiHeaders(
           message.correlationId,
           requesterNsa,
-          providerNsa,
+          provider.nsa,
           Some(requesterUrl))
 
-        var request = WS.url(providerUrl.toASCIIString())
+        var request = WS.url(provider.url.toASCIIString())
 
-        request = authentication match {
+        request = provider.authentication match {
           case OAuthAuthentication(token)              => request.withHeaders("Authorization" -> s"bearer $token")
           case BasicAuthentication(username, password) => request.withAuth(username, password, AuthScheme.BASIC)
           case _                                       => request
@@ -207,9 +207,10 @@ object ConnectionProvider extends Controller with SoapWebService {
             Seq(ComputedSegment(
               pce.criteria.getPath().getSourceSTP,
               pce.criteria.getPath().getDestSTP(),
-              "urn:ogf:network:nsa:surfnet.nl",
-              URI.create("http://localhost:8082/bod/nsi/v2/provider"),
-              OAuthAuthentication("f44b1e47-0a19-4c11-861b-c9abf82d4cbf")))))
+              ProviderEndPoint(
+                "urn:ogf:network:nsa:surfnet.nl",
+                URI.create("http://localhost:8082/bod/nsi/v2/provider"),
+                OAuthAuthentication("f44b1e47-0a19-4c11-861b-c9abf82d4cbf"))))))
     }
   }
 

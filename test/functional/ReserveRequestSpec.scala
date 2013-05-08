@@ -48,7 +48,7 @@ class ReserveRequestSpec extends org.specs2.mutable.Specification {
           val pceRequest = Json.fromJson[PathComputationRequest](request.body)
           pceRequest match {
             case JsSuccess(request, _) =>
-              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(request.criteria.getPath().getSourceSTP(), request.criteria.getPath().getDestSTP(), "provider-nsa", URI.create(FakeProviderUri), NoAuthentication) :: Nil)
+              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(request.criteria.getPath().getSourceSTP(), request.criteria.getPath().getDestSTP(), ProviderEndPoint("provider-nsa", URI.create(FakeProviderUri), NoAuthentication)) :: Nil)
               WS.url(request.replyTo.toASCIIString()).post(Json.toJson(response))
               Results.Ok
             case _ =>
