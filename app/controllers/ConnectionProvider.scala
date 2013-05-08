@@ -25,6 +25,7 @@ import scala.util.Success
 import java.net.URL
 import com.twitter.bijection.Injection
 import com.ning.http.client.Realm.AuthScheme
+import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -96,7 +97,12 @@ object ConnectionProvider extends Controller with SoapWebService {
   private[controllers] def handleRequest(request: NsiEnvelope[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
     findOrCreateConnection(request) match {
       case Left(connectionId) =>
-        Future.successful(ServiceException(request.body.correlationId, f"Unknown connection ${connectionId}"))
+        val exception = new ServiceExceptionType()
+          .withNsaId("MYNSAID") // TODO
+          .withErrorId("UNKNOWN") // TODO
+          .withText(f"Unknown connection ${connectionId}")
+          .withVariables(null) // TODO
+        Future.successful(ServiceException(request.body.correlationId, exception))
       case Right(connectionActor) =>
         handleProviderOperation(request.body)(replyTo)(connectionActor)
     }

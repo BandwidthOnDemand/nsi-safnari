@@ -33,7 +33,7 @@ class ReserveRequestSpec extends org.specs2.mutable.Specification {
           Future.successful(GenericAck(headers.correlationId))
         case response =>
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
-          Future.successful(ServiceException(response.headers.correlationId, s"$response"))
+          Future.successful(ServiceException(response.headers.correlationId, new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response")))
       })
       case "/fake/provider" => Some(NsiProviderEndPoint {
         case NsiEnvelope(headers, reserve: Reserve) =>

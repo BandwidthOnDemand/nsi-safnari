@@ -66,13 +66,8 @@ object ToXmlDocument {
           factory.createAcknowledgment(new GenericAcknowledgmentType())
         case ReserveResponse(_, connectionId) =>
           factory.createReserveResponse(new ReserveResponseType().withConnectionId(connectionId))
-        case ServiceException(_, text) =>
-          factory.createServiceException(
-            new ServiceExceptionType()
-              .withNsaId("MYNSAID") // TODO
-              .withErrorId("UNKNOWN") // TODO
-              .withText(text)
-              .withVariables(null)) // TODO
+        case ServiceException(_, exception) =>
+          factory.createServiceException(exception)
         case QuerySummarySyncConfirmed(_, results) =>
           factory.createQuerySummarySyncConfirmed(new QuerySummaryConfirmedType().withReservation(results.asJava))
       })
