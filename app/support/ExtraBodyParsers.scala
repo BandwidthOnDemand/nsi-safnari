@@ -30,15 +30,15 @@ import play.api.libs.concurrent.Execution.Implicits._
 object ExtraBodyParsers {
   private val logger = Logger("ExtraBodyParsers")
 
-  implicit def NsiMessageContentType[T <: NsiMessage]: ContentTypeOf[NsiEnvelope[T]] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+  implicit def NsiMessageContentType[T: ToXmlDocument]: ContentTypeOf[NsiEnvelope[T]] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
-  implicit def NsiMessageWriteable[T <: NsiMessage]: Writeable[NsiEnvelope[T]] = Writeable { message =>
+  implicit def NsiMessageWriteable[T: ToXmlDocument]: Writeable[NsiEnvelope[T]] = Writeable { message =>
     try {
       val soap = MessageFactory.newInstance().createMessage()
 
-      val header = SOAPFactory.newInstance().createElement(message.headerDocument.getDocumentElement())
+      val header = SOAPFactory.newInstance().createElement(ToXmlDocument[NsiHeaders].asDocument(message.headers).getDocumentElement())
 
-      soap.getSOAPBody().addDocument(message.bodyDocument)
+      soap.getSOAPBody().addDocument(ToXmlDocument[T].asDocument(message.body))
       soap.getSOAPHeader().addChildElement(header)
       soap.saveChanges()
 
@@ -93,13 +93,13 @@ object ExtraBodyParsers {
   private val NsiFrameworkHeaderNamespace = "http://schemas.ogf.org/nsi/2013/04/framework/headers"
   private val NsiConnectionTypesNamespace = "http://schemas.ogf.org/nsi/2013/04/connection/types"
 
-  trait NsiRequestMessageFactory[T <: NsiMessage] {
+  trait NsiRequestMessageFactory[T] {
     type JaxbMessage
     def klass: Class[JaxbMessage]
     def apply(headers: NsiHeaders, body: JaxbMessage): NsiEnvelope[T]
   }
 
-  def NsiRequestMessageFactory[M, T <: NsiMessage](f: (CorrelationId, M) => T)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory[T] {
+  def NsiRequestMessageFactory[M, T](f: (CorrelationId, M) => T)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory[T] {
     override type JaxbMessage = M
     override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]
     override def apply(headers: NsiHeaders, body: M): NsiEnvelope[T] = NsiEnvelope(headers, f(headers.correlationId, body))
@@ -107,7 +107,7 @@ object ExtraBodyParsers {
 
   def nsiBodyParser[T <: NsiMessage](elementToFactory: org.w3c.dom.Element => Either[String, NsiRequestMessageFactory[T]]): BodyParser[NsiEnvelope[T]] = soap.flatMap { soapMessage =>
     BodyParser { requestHeader =>
-      val unmarshaller = NsiMessage.unmarshaller
+      val unmarshaller = ToXmlDocument.unmarshaller
 
       val parsedMessage = for {
         headerNode <- onlyChildElementWithNamespace(NsiFrameworkHeaderNamespace, soapMessage.getSOAPHeader()).right
