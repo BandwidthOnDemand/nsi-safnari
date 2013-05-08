@@ -88,7 +88,10 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
 
       when(FromPce(PathComputationFailed(CorrelationId(0, 1))))
 
-      messages must contain(ToRequester(ReserveFailed(ReserveCorrelationId, ConnectionId)))
+      messages must haveSize(1)
+      messages must haveOneElementLike {
+        case ToRequester(ReserveFailed(ReserveCorrelationId, _)) => ok
+      }
       connection.stateName must beEqualTo(FailedReservationState)
     }
 
@@ -120,20 +123,26 @@ class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConvers
       given(InitialMessages ++ Seq(
         FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A)))): _*)
 
-      when(FromProvider(ReserveFailed(CorrelationId(0, 2), ConnectionId)))
+      when(FromProvider(ReserveFailed(CorrelationId(0, 2), new GenericFailedType())))
 
-      messages must contain(ToRequester(ReserveFailed(ReserveCorrelationId, ConnectionId)))
+      messages must haveSize(1)
+      messages must haveOneElementLike {
+        case ToRequester(ReserveFailed(ReserveCorrelationId, _)) => ok
+      }
       connection.stateName must beEqualTo(FailedReservationState)
     }
 
     "fail the reservation with two segments and at least one fails" in new fixture {
       given(InitialMessages ++ Seq(
         FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))),
-        FromProvider(ReserveFailed(CorrelationId(0, 2), ConnectionId))): _*)
+        FromProvider(ReserveFailed(CorrelationId(0, 2), new GenericFailedType()))): _*)
 
       when(FromProvider(ReserveConfirmed(CorrelationId(0, 3), "connectionIdB", Criteria)))
 
-      messages must contain(ToRequester(ReserveFailed(ReserveCorrelationId, ConnectionId)))
+      messages must haveSize(1)
+      messages must haveOneElementLike {
+        case ToRequester(ReserveFailed(ReserveCorrelationId, _)) => ok
+      }
       connection.stateName must beEqualTo(FailedReservationState)
     }
 

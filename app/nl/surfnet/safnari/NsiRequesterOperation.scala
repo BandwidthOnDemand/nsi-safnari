@@ -1,15 +1,16 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteriaType
+import org.ogf.schemas.nsi._2013._04.connection.types.GenericFailedType
 import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType
+import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteriaType
 
-sealed trait NsiRequesterOperation extends NsiMessage {
-  def optionalConnectionId: Option[ConnectionId] = ???
-}
+sealed trait NsiRequesterOperation extends NsiMessage
 
 case class ReserveConfirmed(correlationId: CorrelationId, connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiRequesterOperation
 
-case class ReserveFailed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
+case class ReserveFailed(correlationId: CorrelationId, failed: GenericFailedType) extends NsiRequesterOperation {
+  def connectionId: ConnectionId = failed.getConnectionId()
+}
 case class ReserveCommitConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
 case class ReserveCommitFailed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
 case class ReserveAbortConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation

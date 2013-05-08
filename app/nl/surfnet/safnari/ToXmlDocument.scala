@@ -86,22 +86,8 @@ object ToXmlDocument {
       case ReserveConfirmed(_, connectionId, criteria) =>
         val confirmed = factory.createReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria)
         factory.createReserveConfirmed(confirmed)
-      case ReserveFailed(_, connectionId) =>
-        val genericFailed = factory.createGenericFailedType()
-          .withConnectionId(connectionId)
-          .withConnectionStates(factory.createConnectionStatesType()
-            .withDataPlaneStatus(factory.createDataPlaneStatusType()
-              .withActive(false)
-              .withVersion(0)
-              .withVersionConsistent(true))
-            .withLifecycleState(factory.createLifecycleStateType().withState(LifecycleStateEnumType.TERMINATED))
-            .withProvisionState(factory.createProvisionStateType().withState(ProvisionStateEnumType.RELEASED))
-            .withReservationState(factory.createReservationStateType().withState(ReservationStateEnumType.RESERVE_FAILED)))
-          .withServiceException(new ServiceExceptionType()
-            .withErrorId("0600")
-            .withNsaId("urn:ogf:surfnet.nl")
-            .withText("Creating reservation is not supported yet"))
-        factory.createReserveFailed(genericFailed)
+      case ReserveFailed(_, failure) =>
+        factory.createReserveFailed(failure)
       case ReserveCommitConfirmed(_, connectionId) =>
         val confirmed = factory.createGenericConfirmedType().withConnectionId(connectionId)
         factory.createReserveCommitConfirmed(confirmed)

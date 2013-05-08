@@ -4,6 +4,7 @@ import akka.actor._
 import com.twitter.bijection.Injection
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import java.net.URI
+import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
 case class FromRequester(message: NsiProviderOperation)
 case class ToRequester(message: NsiRequesterOperation)
@@ -77,13 +78,8 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
         withConnectionId(data.id).
         withCriteria(data.criteria).
         withRequesterNSA(requesterNSA).
-        withConnectionStates(
-          new ConnectionStatesType().
-            withReservationState(new ReservationStateType().withVersion(data.criteria.getVersion()).withState(stateName.jaxb)).
-            withProvisionState(new ProvisionStateType().withVersion(data.criteria.getVersion()).withState(ProvisionStateEnumType.UNKNOWN /*TODO*/ )).
-            withLifecycleState(new LifecycleStateType().withVersion(data.criteria.getVersion()).withState(LifecycleStateEnumType.INITIAL /*TODO*/ )).
-            withDataPlaneStatus(new DataPlaneStatusType().withVersion(data.criteria.getVersion()).withActive(false /*TODO*/ ).withVersionConsistent(true))).
-          withChildren(null /*TODO*/ ))
+        withConnectionStates(connectionStates)).
+        withChildren(null /*TODO*/ )
   }
 
   onTransition {
@@ -110,7 +106,11 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
       }
 
     case (PathComputationState | CheckingReservationState) -> FailedReservationState =>
-      outbound ! ToRequester(ReserveFailed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, id))
+      val failed = new GenericFailedType().withConnectionId(id).withConnectionStates(connectionStates).withServiceException(new ServiceExceptionType()
+        .withErrorId("0600")
+        .withNsaId("urn:ogf:surfnet.nl")
+        .withText("Creating reservation is not supported yet"))
+      outbound ! ToRequester(ReserveFailed(nextStateData.asInstanceOf[ExistingConnection].reserveCorrelationId, failed))
     case CheckingReservationState -> HeldReservationState =>
       val data = nextStateData.asInstanceOf[ExistingConnection]
       outbound ! ToRequester(ReserveConfirmed(data.reserveCorrelationId, id, data.criteria))
@@ -133,6 +133,15 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
     case ReservedReservationState -> CheckingReservationState => ???
     case FailedReservationState -> AbortingReservationState   => ???
     case AbortingReservationState -> ReservedReservationState => ???
+  }
+
+  private def connectionStates = {
+    val data = stateData.asInstanceOf[ExistingConnection]
+    new ConnectionStatesType().
+      withReservationState(new ReservationStateType().withVersion(data.criteria.getVersion()).withState(stateName.jaxb)).
+      withProvisionState(new ProvisionStateType().withVersion(data.criteria.getVersion()).withState(ProvisionStateEnumType.UNKNOWN /*TODO*/ )).
+      withLifecycleState(new LifecycleStateType().withVersion(data.criteria.getVersion()).withState(LifecycleStateEnumType.INITIAL /*TODO*/ )).
+      withDataPlaneStatus(new DataPlaneStatusType().withVersion(data.criteria.getVersion()).withActive(false /*TODO*/ ).withVersionConsistent(true))
   }
 }
 
