@@ -139,9 +139,20 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
     val data = stateData.asInstanceOf[ExistingConnection]
     new ConnectionStatesType().
       withReservationState(new ReservationStateType().withVersion(data.criteria.getVersion()).withState(stateName.jaxb)).
-      withProvisionState(new ProvisionStateType().withVersion(data.criteria.getVersion()).withState(ProvisionStateEnumType.UNKNOWN /*TODO*/ )).
+      withProvisionState(provisionState).
       withLifecycleState(new LifecycleStateType().withVersion(data.criteria.getVersion()).withState(LifecycleStateEnumType.INITIAL /*TODO*/ )).
       withDataPlaneStatus(new DataPlaneStatusType().withVersion(data.criteria.getVersion()).withActive(false /*TODO*/ ).withVersionConsistent(true))
+  }
+
+  private def provisionState = {
+    // TODO delegate to provisioning state machine
+    val data = stateData.asInstanceOf[ExistingConnection]
+    stateName match {
+      case ReservedReservationState =>
+        new ProvisionStateType().withVersion(data.criteria.getVersion()).withState(ProvisionStateEnumType.RELEASED)
+      case _ =>
+        new ProvisionStateType().withVersion(null).withState(ProvisionStateEnumType.UNKNOWN)
+    }
   }
 }
 

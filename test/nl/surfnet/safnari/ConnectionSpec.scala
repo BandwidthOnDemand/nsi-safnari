@@ -33,6 +33,7 @@ class ConnectionSpec extends helpers.Specification {
     val Headers = NsiHeaders(newCorrelationId, "RequesterNSA", "ProviderNSA", Some(URI.create("http://example.com/")))
     val ConnectionId = "ConnectionId"
     val ReserveCorrelationId = newCorrelationId
+    val CommitCorrelationId = newCorrelationId
     val InitialMessages = Seq(FromRequester(Reserve(ReserveCorrelationId, InitialReserveType)))
 
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
@@ -49,6 +50,12 @@ class ConnectionSpec extends helpers.Specification {
     def when(message: Message): Message = {
       messages = Nil
       Await.result(connection ? message, Duration.Inf)
+    }
+
+    def connectionData = {
+      val result = Await.result(connection ? 'query, Duration.Inf)
+      result must beAnInstanceOf[QuerySummaryResultType]
+      result.asInstanceOf[QuerySummaryResultType]
     }
   }
 
@@ -155,7 +162,6 @@ class ConnectionSpec extends helpers.Specification {
     }
 
     "be in reserved state when reserve commit confirmed is received" in new fixture {
-      val CommitCorrelationId = newCorrelationId
       given(InitialMessages ++ Seq(
         FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
         FromProvider(ReserveConfirmed(CorrelationId(0, 2), "ConnectionIdA", Criteria)),
@@ -188,6 +194,24 @@ class ConnectionSpec extends helpers.Specification {
         case result: QuerySummaryResultType =>
           result.getConnectionId() must beEqualTo(ConnectionId)
       }
+    }
+
+    "initialize the provisioning state machine when reservation is committed" in new fixture {
+      given(InitialMessages ++ Seq(
+        FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
+        FromProvider(ReserveConfirmed(CorrelationId(0, 2), "ConnectionIdA", Criteria))): _*)
+
+      val unknownProvisionState = connectionData.getConnectionStates().getProvisionState()
+      unknownProvisionState.getState() must beEqualTo(ProvisionStateEnumType.UNKNOWN)
+      unknownProvisionState.getVersion() must beNull
+
+      given(
+        FromRequester(ReserveCommit(CommitCorrelationId, ConnectionId)),
+        FromProvider(ReserveCommitConfirmed(CorrelationId(0, 3), "ConnectionIdA")))
+
+      val releasedState = connectionData.getConnectionStates().getProvisionState()
+      releasedState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
+      releasedState.getVersion() must beEqualTo(0)
     }
   }
 }
