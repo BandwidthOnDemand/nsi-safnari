@@ -21,7 +21,7 @@ import nl.surfnet.safnari.Reserve
 import nl.surfnet.safnari.ReserveConfirmed
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ExtraBodyParsersSpec extends Specification with PendingUntilFixed with NoTimeConversions {
+class ExtraBodyParsersSpec extends helpers.Specification {
 
   import ExtraBodyParsers._
 

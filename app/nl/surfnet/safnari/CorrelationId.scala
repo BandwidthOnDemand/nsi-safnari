@@ -18,4 +18,3 @@ object CorrelationId {
     case _              => None
   }
 }
-

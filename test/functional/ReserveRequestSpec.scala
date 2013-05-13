@@ -21,7 +21,7 @@ import com.twitter.bijection.Injection
 import support.ExtraBodyParsers._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ReserveRequestSpec extends org.specs2.mutable.Specification {
+class ReserveRequestSpec extends helpers.Specification {
 
   val reserveConfirmed = Promise[ReserveConfirmed]
 

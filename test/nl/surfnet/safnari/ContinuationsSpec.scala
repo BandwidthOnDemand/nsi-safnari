@@ -3,7 +3,7 @@ package nl.surfnet.safnari
 import play.api.test.Helpers._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ContinuationsSpec extends org.specs2.mutable.Specification {
+class ContinuationsSpec extends helpers.Specification {
   trait fixture extends org.specs2.specification.Scope {
     val CorrelationId = newCorrelationId
     val continuations = new Continuations[String]()

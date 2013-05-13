@@ -6,12 +6,11 @@ import scala.concurrent.Promise
 import nl.surfnet.safnari._
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import org.specs2.matcher.BeNull
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ConnectionProviderSpec extends org.specs2.mutable.Specification {
+class ConnectionProviderSpec extends helpers.Specification {
 
   def withEnvelope[T <: NsiMessage](message: T) = NsiEnvelope(NsiHeaders(message.correlationId, "RequesterNSA", "ProviderNSA", None), message)
   val InitialReserveType = new ReserveType().withCriteria(new ReservationRequestCriteriaType().

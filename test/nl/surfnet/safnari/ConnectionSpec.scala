@@ -7,16 +7,13 @@ import akka.testkit._
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
-import org.specs2.time.NoTimeConversions
 import scala.concurrent.Await
-import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.specs2.mutable.After
-import org.specs2.execute.PendingUntilFixed
+import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
-import java.net.URL
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ConnectionSpec extends org.specs2.mutable.Specification with NoTimeConversions with PendingUntilFixed {
+class ConnectionSpec extends helpers.Specification {
 
   trait fixture extends After {
 

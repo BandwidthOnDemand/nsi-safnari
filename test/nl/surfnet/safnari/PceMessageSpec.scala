@@ -7,7 +7,7 @@ import org.ogf.schemas.nsi._2013._04.framework.types._
 import play.api.data.validation.ValidationError
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class PceMessageSpec extends org.specs2.mutable.Specification {
+class PceMessageSpec extends helpers.Specification {
   val sourceStp = new StpType().withNetworkId("network-id").withLocalId("source")
 
   val destStp = new StpType().withNetworkId("network-id").withLocalId("dest")

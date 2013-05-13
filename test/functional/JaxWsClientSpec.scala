@@ -1,6 +1,5 @@
 package functional
 
-import org.specs2.mutable.Specification
 import org.junit.runner.RunWith
 import play.api.test._
 import org.ogf.schemas.nsi._2013._04.connection.provider.ConnectionProviderPort
@@ -25,11 +24,10 @@ import com.sun.xml.internal.ws.client.ClientTransportException
 import nl.surfnet.safnari.NsiMessage
 import nl.surfnet.safnari.NsiHeaders
 import java.util.UUID
-import org.specs2.execute.PendingUntilFixed
 import javax.xml.ws.Holder
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
-class JaxWsClientSpec extends Specification with PendingUntilFixed {
+class JaxWsClientSpec extends helpers.Specification {
 
   val ServerPort = Helpers.testServerPort
   val Application = FakeApplication(additionalConfiguration = Map("nsi.base.url" -> s"http://localhost:$ServerPort"))
