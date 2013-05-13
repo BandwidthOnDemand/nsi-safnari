@@ -96,10 +96,15 @@ object ToXmlDocument {
     private val factory = new ObjectFactory()
 
     def asDocument(a: NsiProviderOperation) = marshal(a match {
-      case Reserve(_, body)               => factory.createReserve(body)
-      case ReserveCommit(_, connectionId) => factory.createReserveCommit(new GenericRequestType().withConnectionId(connectionId))
-      case ReserveAbort(_, connectionId)  => factory.createReserveAbort(new GenericRequestType().withConnectionId(connectionId))
-      case _                              => ???
+      case Reserve(_, body)                   => factory.createReserve(body)
+      case ReserveCommit(_, connectionId)     => factory.createReserveCommit(new GenericRequestType().withConnectionId(connectionId))
+      case ReserveAbort(_, connectionId)      => factory.createReserveAbort(new GenericRequestType().withConnectionId(connectionId))
+      case Provision(_, connectionId)         => factory.createProvision(new GenericRequestType().withConnectionId(connectionId))
+      case Release(_, connectionId)           => factory.createRelease(new GenericRequestType().withConnectionId(connectionId))
+      case Terminate(_, connectionId)         => factory.createTerminate(new GenericRequestType().withConnectionId(connectionId))
+      case QuerySummary(_, connectionIds)     => factory.createQuerySummary(new QueryType().withConnectionId(connectionIds.asJava))
+      case QuerySummarySync(_, connectionIds) => factory.createQuerySummarySync(new QueryType().withConnectionId(connectionIds.asJava))
+      case QueryRecursive(_, connectionIds)   => factory.createQueryRecursive(new QueryType().withConnectionId(connectionIds.asJava))
     })
   }
 }

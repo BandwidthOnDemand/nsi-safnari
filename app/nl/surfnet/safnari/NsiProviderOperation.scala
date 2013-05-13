@@ -18,9 +18,9 @@ case class ReserveAbort(correlationId: CorrelationId, connectionId: ConnectionId
   override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
 }
 
-case class Provision(correlationId: CorrelationId) extends NsiProviderOperation with NsiCommand
-case class Release(correlationId: CorrelationId) extends NsiProviderOperation with NsiCommand
-case class Terminate(correlationId: CorrelationId) extends NsiProviderOperation with NsiCommand
+case class Provision(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand
+case class Release(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand
+case class Terminate(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand
 
 case class QuerySummary(correlationId: CorrelationId, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery
 case class QuerySummarySync(correlationId: CorrelationId, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery
