@@ -59,6 +59,8 @@ class ConnectionSpec extends helpers.Specification {
     }
 
     def reservationState = connectionData.getConnectionStates().getReservationState().getState()
+    def provisionState = connectionData.getConnectionStates().getProvisionState()
+    def lifecycleState = connectionData.getConnectionStates().getLifecycleState()
   }
 
   trait ReservedConnection extends fixture {
@@ -211,20 +213,18 @@ class ConnectionSpec extends helpers.Specification {
         FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
         FromProvider(ReserveConfirmed(CorrelationId(0, 2), "ConnectionIdA", Criteria))): _*)
 
-      val unknownProvisionState = connectionData.getConnectionStates().getProvisionState()
-      unknownProvisionState.getState() must beEqualTo(ProvisionStateEnumType.UNKNOWN)
-      unknownProvisionState.getVersion() must beNull
+      provisionState.getState() must beEqualTo(ProvisionStateEnumType.UNKNOWN)
+      provisionState.getVersion() must beNull
 
       given(
         FromRequester(ReserveCommit(CommitCorrelationId, ConnectionId)),
         FromProvider(ReserveCommitConfirmed(CorrelationId(0, 3), "ConnectionIdA")))
 
-      val releasedState = connectionData.getConnectionStates().getProvisionState()
-      releasedState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
-      releasedState.getVersion() must beEqualTo(0)
+      provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
+      provisionState.getVersion() must beEqualTo(0)
     }
 
-    "become provisioning on provision requests" in new ReservedConnection {
+    "become provisioning on provision request" in new ReservedConnection {
       val ProvisionCorrelationId = newCorrelationId
 
       val ack = when(FromRequester(Provision(ProvisionCorrelationId, ConnectionId)))
@@ -232,5 +232,69 @@ class ConnectionSpec extends helpers.Specification {
       ack must beEqualTo(GenericAck(ProvisionCorrelationId))
       messages must contain(ToProvider(Provision(CorrelationId(0, 4), "ConnectionIdA"), A.provider))
     }
+
+    "send a provision confirmed to requester" in new ReservedConnection {
+      val ProvisionCorrelationId = newCorrelationId
+
+      given(FromRequester(Provision(ProvisionCorrelationId, ConnectionId)))
+
+      when(FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")))
+
+      provisionState.getState() must beEqualTo(ProvisionStateEnumType.PROVISIONED)
+      messages must contain(ToRequester(ProvisionConfirmed(ProvisionCorrelationId, ConnectionId)))
+    }
+
+    "become releasing on release request" in new ReservedConnection {
+      val ReleaseCorrelationId = newCorrelationId
+
+      given(
+        FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
+        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA"))
+      )
+
+      val ack = when(FromRequester(Release(ReleaseCorrelationId, ConnectionId)))
+
+      provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASING)
+      ack must beEqualTo(GenericAck(ReleaseCorrelationId))
+      messages must contain(ToProvider(Release(CorrelationId(0, 5), "ConnectionIdA"), A.provider))
+    }
+
+    "send release confirmed to requester" in new ReservedConnection {
+      val ReleaseCorrelationId = newCorrelationId
+
+      given(
+        FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
+        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")),
+        FromRequester(Release(ReleaseCorrelationId, ConnectionId))
+      )
+
+      val ack = when(FromProvider(ReleaseConfirmed(CorrelationId(0, 5), "ConnectionIdA")))
+
+      provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
+      ack must beEqualTo(GenericAck(CorrelationId(0, 5)))
+      messages must contain(ToRequester(ReleaseConfirmed(ReleaseCorrelationId, ConnectionId)))
+    }
+
+    "become terminating on terminate request" in new ReservedConnection {
+      val TerminateCorrelationId = newCorrelationId
+
+      val ack = when(FromRequester(Terminate(TerminateCorrelationId, ConnectionId)))
+
+      lifecycleState.getState() must beEqualTo(LifecycleStateEnumType.TERMINATING)
+      ack must beEqualTo(GenericAck(TerminateCorrelationId))
+      messages must contain(ToProvider(Terminate(CorrelationId(0, 4), "ConnectionIdA"), A.provider))
+    }
+
+    "send a terminate confirmed to requester" in new ReservedConnection {
+      val TerminateCorrelationId = newCorrelationId
+
+      given(FromRequester(Terminate(TerminateCorrelationId, ConnectionId)))
+
+      when(FromProvider(TerminateConfirmed(CorrelationId(0, 4), "ConnectionIdA")))
+
+      lifecycleState.getState() must beEqualTo(LifecycleStateEnumType.TERMINATED)
+      messages must contain(ToRequester(TerminateConfirmed(TerminateCorrelationId, ConnectionId)))
+    }
+
   }
 }

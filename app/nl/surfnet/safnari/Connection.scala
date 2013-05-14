@@ -14,8 +14,12 @@ case class FromPce(message: PceResponse)
 case class ToPce(message: PathComputationRequest)
 
 class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: () => CorrelationId, outbound: ActorRef, pceReplyUri: URI) extends Actor {
-  val psm = new ProvisionStateMachine(newCorrelationId, outbound ! _)
-  val rsm = new ReservationStateMachine(id, requesterNSA, newCorrelationId, outbound ! _, pceReplyUri, data => psm ask data.providers)
+  val psm = new ProvisionStateMachine(id, newCorrelationId, outbound ! _)
+  val lsm = new LifecycleStateMachine(id, newCorrelationId, outbound ! _)
+  val rsm = new ReservationStateMachine(id, requesterNSA, newCorrelationId, outbound ! _, pceReplyUri, data => {
+    psm ask data.providers
+    lsm ask data.providers
+  })
 
   override def receive = {
     // RSM messages
@@ -36,6 +40,10 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
     case message @ FromRequester(_: Release) => psm ask message foreach (sender ! _)
     case message @ FromProvider(_: ProvisionConfirmed) => psm ask message foreach (sender ! _)
     case message @ FromProvider(_: ReleaseConfirmed) => psm ask message foreach (sender ! _)
+
+    // LSM messages
+    case message @ FromRequester(_: Terminate) => lsm ask message foreach (sender ! _)
+    case message @ FromProvider(_: TerminateConfirmed) => lsm ask message foreach (sender ! _)
 
     case 'query => sender ! query
 
@@ -59,7 +67,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
     new ConnectionStatesType().
       withReservationState(new ReservationStateType().withVersion(version).withState(rsm.stateName.jaxb)).
       withProvisionState(psm.provisionState(version)).
-      withLifecycleState(new LifecycleStateType().withVersion(version).withState(LifecycleStateEnumType.INITIAL /*TODO*/ )).
+      withLifecycleState(lsm.lifecycleState(version)).
       withDataPlaneStatus(new DataPlaneStatusType().withVersion(version).withActive(false))
   }
 

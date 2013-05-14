@@ -4,7 +4,7 @@ import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateEnumType
 import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateEnumType._
 import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateType
 
-case class ProvisionStateMachineData(providers: Map[ConnectionId, ProviderEndPoint], states: Map[ConnectionId, ProvisionStateEnumType]) {
+case class ProvisionStateMachineData(providers: Map[ConnectionId, ProviderEndPoint], states: Map[ConnectionId, ProvisionStateEnumType], correlationId: Option[CorrelationId] = None) {
   def initialize(providers: Map[ConnectionId, ProviderEndPoint]): ProvisionStateMachineData = {
     ProvisionStateMachineData(providers, providers.keys.map(_ -> UNKNOWN).toMap)
   }
@@ -23,7 +23,7 @@ case class ProvisionStateMachineData(providers: Map[ConnectionId, ProviderEndPoi
   }
 }
 
-class ProvisionStateMachine(newCorrelationId: () => CorrelationId, outbound: Message => Unit)
+class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => CorrelationId, outbound: Message => Unit)
   extends FiniteStateMachine[ProvisionStateEnumType, ProvisionStateMachineData](UNKNOWN, ProvisionStateMachineData(Map.empty, Map.empty)) {
 
   when(UNKNOWN) {
@@ -32,8 +32,8 @@ class ProvisionStateMachine(newCorrelationId: () => CorrelationId, outbound: Mes
   }
 
   when(RELEASED) {
-    case Event(FromRequester(message: Provision), _) =>
-      goto(PROVISIONING) replying GenericAck(message.correlationId)
+    case Event(FromRequester(message: Provision), data) =>
+      goto(PROVISIONING) using(data.copy(correlationId = Some(message.correlationId))) replying GenericAck(message.correlationId)
   }
 
   when(PROVISIONING) {
@@ -43,8 +43,8 @@ class ProvisionStateMachine(newCorrelationId: () => CorrelationId, outbound: Mes
   }
 
   when(PROVISIONED) {
-    case Event(FromRequester(message: Release), _) =>
-      goto(RELEASING) replying GenericAck(message.correlationId)
+    case Event(FromRequester(message: Release), data) =>
+      goto(RELEASING) using(data.copy(correlationId = Some(message.correlationId))) replying GenericAck(message.correlationId)
 
   }
 
@@ -65,6 +65,10 @@ class ProvisionStateMachine(newCorrelationId: () => CorrelationId, outbound: Mes
         case (connectionId, provider) =>
           outbound(ToProvider(Release(newCorrelationId(), connectionId), provider))
       }
+    case RELEASING -> RELEASED =>
+      outbound(ToRequester(ReleaseConfirmed(stateData.correlationId.get, connectionId)))
+    case PROVISIONING -> PROVISIONED =>
+      outbound(ToRequester(ProvisionConfirmed(stateData.correlationId.get, connectionId)))
   }
 
   def provisionState(reservationVersion: Int) = stateName match {
