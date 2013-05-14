@@ -110,15 +110,16 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private val uuidGenerator = Uuid.randomUuidGenerator()
 
-  private def findOrCreateConnection(request: NsiEnvelope[NsiProviderOperation]): Either[ConnectionId, ActorRef] = request.body.optionalConnectionId match {
-    case Some(connectionId) =>
+  private def findOrCreateConnection(request: NsiEnvelope[NsiProviderOperation]): Either[ConnectionId, ActorRef] = (request.body, request.body.optionalConnectionId) match {
+    case (_, Some(connectionId)) =>
       connections.single.get(connectionId).toRight(connectionId)
-    case None =>
-      // Initial reserve request.
+    case (initialReserve: Reserve, None) =>
       val connectionId = newConnectionId
-      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, () => CorrelationId.fromUuid(uuidGenerator()), outboundActor, URI.create(pceReplyUrl))))
+      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, initialReserve, () => CorrelationId.fromUuid(uuidGenerator()), outboundActor, URI.create(pceReplyUrl))))
       connections.single(connectionId) = connectionActor
       Right(connectionActor)
+    case _ =>
+      sys.error("illegal initial message")
   }
 
   private def handleProviderOperation(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit)(connection: ActorRef): Future[NsiAcknowledgement] = {

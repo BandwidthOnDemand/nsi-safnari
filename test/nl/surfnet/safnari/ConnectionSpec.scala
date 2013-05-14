@@ -34,14 +34,16 @@ class ConnectionSpec extends helpers.Specification {
     val ConnectionId = "ConnectionId"
     val ReserveCorrelationId = newCorrelationId
     val CommitCorrelationId = newCorrelationId
-    val InitialMessages = Seq(FromRequester(Reserve(ReserveCorrelationId, InitialReserveType)))
+
+    val InitialReserve = Reserve(ReserveCorrelationId, InitialReserveType)
+    val InitialMessages = Seq(FromRequester(InitialReserve))
 
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     val PceReplyToUri = URI.create("http://example.com/pce/reply")
 
     var messages: Seq[Message] = Nil
 
-    val connection = TestActorRef(new ConnectionActor(ConnectionId, "RequesterNSA", () => CorrelationId.fromUuid(mockUuidGenerator()), TestActorRef(new Actor {
+    val connection = TestActorRef(new ConnectionActor(ConnectionId, "RequesterNSA", InitialReserve, () => CorrelationId.fromUuid(mockUuidGenerator()), TestActorRef(new Actor {
       def receive = { case m: Message => messages = messages :+ m }
     }), PceReplyToUri))
 

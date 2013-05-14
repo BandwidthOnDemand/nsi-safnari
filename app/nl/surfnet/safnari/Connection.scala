@@ -13,11 +13,11 @@ case class ToProvider(message: NsiProviderOperation, provider: ProviderEndPoint)
 case class FromPce(message: PceResponse)
 case class ToPce(message: PathComputationRequest)
 
-class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: () => CorrelationId, outbound: ActorRef, pceReplyUri: URI) extends Actor {
+class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Reserve, newCorrelationId: () => CorrelationId, outbound: ActorRef, pceReplyUri: URI) extends Actor {
   val psm = new ProvisionStateMachine(id, newCorrelationId, outbound ! _)
   val lsm = new LifecycleStateMachine(id, newCorrelationId, outbound ! _)
   val dsm = new DataPlaneStateMachine(id, newCorrelationId, outbound ! _)
-  val rsm = new ReservationStateMachine(id, requesterNSA, newCorrelationId, outbound ! _, pceReplyUri, data => {
+  val rsm = new ReservationStateMachine(id, initialReserve, newCorrelationId, outbound ! _, pceReplyUri, data => {
     psm ask data.providers
     lsm ask data.providers
     dsm ask data.providers
@@ -57,8 +57,8 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
 
   private def query = {
     new QuerySummaryResultType().
-        withGlobalReservationId(rsm.globalReservationId.orNull).
-        withDescription(rsm.description.orNull).
+        withGlobalReservationId(initialReserve.body.getGlobalReservationId()).
+        withDescription(initialReserve.body.getDescription()).
         withConnectionId(id).
         withCriteria(rsm.criteria).
         withRequesterNSA(requesterNSA).
@@ -74,7 +74,4 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
       withLifecycleState(lsm.lifecycleState(version)).
       withDataPlaneStatus(dsm.dataPlaneStatus(version))
   }
-
 }
-
-
