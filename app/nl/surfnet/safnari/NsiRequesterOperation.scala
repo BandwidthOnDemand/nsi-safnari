@@ -3,6 +3,7 @@ package nl.surfnet.safnari
 import org.ogf.schemas.nsi._2013._04.connection.types.GenericFailedType
 import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType
 import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteriaType
+import org.ogf.schemas.nsi._2013._04.connection.types.DataPlaneStatusType
 
 sealed trait NsiRequesterOperation extends NsiMessage
 
@@ -26,5 +27,5 @@ case class QueryRecursiveConfirmed(correlationId: CorrelationId) extends NsiRequ
 case class QueryRecursiveFailed(correlationId: CorrelationId) extends NsiRequesterOperation
 
 case class ErrorEvent(correlationId: CorrelationId) extends NsiRequesterOperation
-case class DataPlaneStateChanged(correlationId: CorrelationId) extends NsiRequesterOperation
+case class DataPlaneStateChanged(correlationId: CorrelationId, connectionId: ConnectionId, status: DataPlaneStatusType) extends NsiRequesterOperation
 case class MessageDeliveryTimeout(correlationId: CorrelationId) extends NsiRequesterOperation

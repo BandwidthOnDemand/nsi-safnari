@@ -16,9 +16,11 @@ case class ToPce(message: PathComputationRequest)
 class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: () => CorrelationId, outbound: ActorRef, pceReplyUri: URI) extends Actor {
   val psm = new ProvisionStateMachine(id, newCorrelationId, outbound ! _)
   val lsm = new LifecycleStateMachine(id, newCorrelationId, outbound ! _)
+  val dsm = new DataPlaneStateMachine(id, newCorrelationId, outbound ! _)
   val rsm = new ReservationStateMachine(id, requesterNSA, newCorrelationId, outbound ! _, pceReplyUri, data => {
     psm ask data.providers
     lsm ask data.providers
+    dsm ask data.providers
   })
 
   override def receive = {
@@ -45,10 +47,12 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
     case message @ FromRequester(_: Terminate) => lsm ask message foreach (sender ! _)
     case message @ FromProvider(_: TerminateConfirmed) => lsm ask message foreach (sender ! _)
 
+    // Data Plane Status messages
+    case message @ FromProvider(_: DataPlaneStateChanged) => dsm ask message foreach (sender ! _)
+
     case 'query => sender ! query
 
     case message => message.pp("unexpected")
-    //    case message => rsm ask message foreach (sender ! _)
   }
 
   private def query = {
@@ -68,48 +72,9 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, newCorrelationId: 
       withReservationState(new ReservationStateType().withVersion(version).withState(rsm.stateName.jaxb)).
       withProvisionState(psm.provisionState(version)).
       withLifecycleState(lsm.lifecycleState(version)).
-      withDataPlaneStatus(new DataPlaneStatusType().withVersion(version).withActive(false))
+      withDataPlaneStatus(dsm.dataPlaneStatus(version))
   }
 
 }
 
 
-sealed trait Connection {
-  def id: ConnectionId
-}
-case class NewConnection(id: ConnectionId) extends Connection
-case class ExistingConnection(
-  id: ConnectionId,
-  reserveCorrelationId: CorrelationId,
-  globalReservationId: Option[String],
-  description: Option[String],
-  criteria: ReservationConfirmCriteriaType,
-  segments: Map[CorrelationId, ComputedSegment] = Map.empty,
-  connections: Map[ConnectionId, CorrelationId] = Map.empty,
-  downstreamConnections: Map[ConnectionId, ReservationState] = Map.empty) extends Connection {
-
-  def awaitingConnectionId = segments.keySet -- connections.values
-
-  def aggregatedReservationState: ReservationState =
-    if (awaitingConnectionId.isEmpty && downstreamConnections.isEmpty) CheckingReservationState
-    else if (awaitingConnectionId.nonEmpty || downstreamConnections.values.exists(_ == CheckingReservationState)) CheckingReservationState
-    else if (downstreamConnections.values.exists(_ == FailedReservationState)) FailedReservationState
-    else if (downstreamConnections.values.forall(_ == HeldReservationState)) HeldReservationState
-    else if (downstreamConnections.values.exists(_ == CommittingReservationState)) CommittingReservationState
-    else if (downstreamConnections.values.exists(_ == AbortingReservationState)) CommittingReservationState /* FIXME really? */
-    else if (downstreamConnections.values.forall(_ == ReservedReservationState)) ReservedReservationState
-    else ???
-
-  def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId, reservationState: ReservationState): ExistingConnection = {
-    require(awaitingConnectionId.contains(correlationId), s"bad correlationId: $correlationId, awaiting $awaitingConnectionId")
-    require(!downstreamConnections.contains(connectionId), s"duplicate connectionId: $connectionId, already have $downstreamConnections")
-    copy(
-      connections = connections + (connectionId -> correlationId),
-      downstreamConnections = downstreamConnections + (connectionId -> reservationState))
-  }
-
-  def providers = connections.map {
-    case (connectionId, correlationId) =>
-      connectionId -> segments(correlationId).provider
-  }
-}

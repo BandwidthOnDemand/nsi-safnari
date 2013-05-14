@@ -5,22 +5,20 @@ import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateEnumType._
 import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateType
 
 case class ProvisionStateMachineData(providers: Map[ConnectionId, ProviderEndPoint], states: Map[ConnectionId, ProvisionStateEnumType], correlationId: Option[CorrelationId] = None) {
-  def initialize(providers: Map[ConnectionId, ProviderEndPoint]): ProvisionStateMachineData = {
-    ProvisionStateMachineData(providers, providers.keys.map(_ -> UNKNOWN).toMap)
-  }
 
-  def aggregatedProvisionStatus: ProvisionStateEnumType = {
+  def initialize(providers: Map[ConnectionId, ProviderEndPoint]) =
+    ProvisionStateMachineData(providers, providers.keys.map(_ -> UNKNOWN).toMap)
+
+  def aggregatedProvisionStatus: ProvisionStateEnumType =
     if (states.values.exists(_ == UNKNOWN)) UNKNOWN
     else if (states.values.exists(_ == RELEASING)) RELEASING
     else if (states.values.exists(_ == PROVISIONING)) PROVISIONING
     else if (states.values.forall(_ == RELEASED)) RELEASED
     else if (states.values.forall(_ == PROVISIONED)) PROVISIONED
     else throw new IllegalStateException(s"cannot determine aggregated status from ${states.values}")
-  }
 
-  def updateState(connectionId: ConnectionId, state: ProvisionStateEnumType): ProvisionStateMachineData = {
+  def updateState(connectionId: ConnectionId, state: ProvisionStateEnumType) =
     copy(states = states + (connectionId -> state))
-  }
 }
 
 class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => CorrelationId, outbound: Message => Unit)
@@ -33,7 +31,7 @@ class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
 
   when(RELEASED) {
     case Event(FromRequester(message: Provision), data) =>
-      goto(PROVISIONING) using(data.copy(correlationId = Some(message.correlationId))) replying GenericAck(message.correlationId)
+      goto(PROVISIONING) using data.copy(correlationId = Some(message.correlationId)) replying GenericAck(message.correlationId)
   }
 
   when(PROVISIONING) {
@@ -44,7 +42,7 @@ class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
 
   when(PROVISIONED) {
     case Event(FromRequester(message: Release), data) =>
-      goto(RELEASING) using(data.copy(correlationId = Some(message.correlationId))) replying GenericAck(message.correlationId)
+      goto(RELEASING) using data.copy(correlationId = Some(message.correlationId)) replying GenericAck(message.correlationId)
 
   }
 

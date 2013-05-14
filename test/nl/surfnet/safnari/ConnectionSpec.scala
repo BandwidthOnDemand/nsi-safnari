@@ -61,6 +61,7 @@ class ConnectionSpec extends helpers.Specification {
     def reservationState = connectionData.getConnectionStates().getReservationState().getState()
     def provisionState = connectionData.getConnectionStates().getProvisionState()
     def lifecycleState = connectionData.getConnectionStates().getLifecycleState()
+    def dataPlaneStatus = connectionData.getConnectionStates().getDataPlaneStatus()
   }
 
   trait ReservedConnection extends fixture {
@@ -296,5 +297,43 @@ class ConnectionSpec extends helpers.Specification {
       messages must contain(ToRequester(TerminateConfirmed(TerminateCorrelationId, ConnectionId)))
     }
 
+    "have a data plane inactive" in new ReservedConnection {
+      given(
+        FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
+        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA"))
+      )
+
+      dataPlaneStatus.isActive() must beFalse
+    }
+
+    "have a data plane active on data plane change" in new ReservedConnection {
+      given(
+        FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
+        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA"))
+      )
+
+      when(FromProvider(DataPlaneStateChanged(CorrelationId(0, 5), "ConnectionIdA", dataPlaneStatusType(true))))
+
+      dataPlaneStatus.isActive() must beTrue
+      dataPlaneStatus.isVersionConsistent() must beTrue
+      messages must contain(ToRequester(DataPlaneStateChanged(CorrelationId(0, 5), ConnectionId, dataPlaneStatusType(true))))
+    }
+
+    "have a data plane inactive on data plane change" in new ReservedConnection {
+      given(
+        FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
+        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")),
+        FromProvider(DataPlaneStateChanged(CorrelationId(0, 5), "ConnectionIdA", dataPlaneStatusType(true)))
+      )
+
+      when(FromProvider(DataPlaneStateChanged(CorrelationId(0, 6), "ConnectionIdA", dataPlaneStatusType(false))))
+
+      dataPlaneStatus.isActive() must beFalse
+      dataPlaneStatus.isVersionConsistent() must beTrue
+      messages must contain(ToRequester(DataPlaneStateChanged(CorrelationId(0, 6), ConnectionId, dataPlaneStatusType(false))))
+    }
   }
+
+  private def dataPlaneStatusType(active: Boolean) = new DataPlaneStatusType().withActive(active).withVersion(0).withVersionConsistent(true)
+
 }
