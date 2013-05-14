@@ -160,46 +160,7 @@ class ReservationStateMachine(id: ConnectionId, initialReserve: Reserve, newCorr
     case AbortingReservationState -> ReservedReservationState => ???
   }
 
+  def reservationState = new ReservationStateType().withVersion(version).withState(stateName.jaxb)
   def criteria = stateData.criteria
   def version = stateData.criteria.getVersion()
-}
-
-sealed trait Connection {
-  def id: ConnectionId
-}
-case class NewConnection(id: ConnectionId) extends Connection
-case class ExistingConnection(
-  id: ConnectionId,
-  reserveCorrelationId: CorrelationId,
-  globalReservationId: Option[String],
-  description: Option[String],
-  criteria: ReservationConfirmCriteriaType,
-  segments: Map[CorrelationId, ComputedSegment] = Map.empty,
-  connections: Map[ConnectionId, CorrelationId] = Map.empty,
-  downstreamConnections: Map[ConnectionId, ReservationState] = Map.empty) extends Connection {
-
-  def awaitingConnectionId = segments.keySet -- connections.values
-
-  def aggregatedReservationState: ReservationState =
-    if (awaitingConnectionId.isEmpty && downstreamConnections.isEmpty) CheckingReservationState
-    else if (awaitingConnectionId.nonEmpty || downstreamConnections.values.exists(_ == CheckingReservationState)) CheckingReservationState
-    else if (downstreamConnections.values.exists(_ == FailedReservationState)) FailedReservationState
-    else if (downstreamConnections.values.forall(_ == HeldReservationState)) HeldReservationState
-    else if (downstreamConnections.values.exists(_ == CommittingReservationState)) CommittingReservationState
-    else if (downstreamConnections.values.exists(_ == AbortingReservationState)) CommittingReservationState /* FIXME really? */
-    else if (downstreamConnections.values.forall(_ == ReservedReservationState)) ReservedReservationState
-    else ???
-
-  def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId, reservationState: ReservationState): ExistingConnection = {
-    require(awaitingConnectionId.contains(correlationId), s"bad correlationId: $correlationId, awaiting $awaitingConnectionId")
-    require(!downstreamConnections.contains(connectionId), s"duplicate connectionId: $connectionId, already have $downstreamConnections")
-    copy(
-      connections = connections + (connectionId -> correlationId),
-      downstreamConnections = downstreamConnections + (connectionId -> reservationState))
-  }
-
-  def providers = connections.map {
-    case (connectionId, correlationId) =>
-      connectionId -> segments(correlationId).provider
-  }
 }

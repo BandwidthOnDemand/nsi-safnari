@@ -27,7 +27,7 @@ abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D
   }
   protected[this] case class Event(message: Any, data: D)
 
-  def stateName = _stateName
+  protected[this] def stateName = _stateName
   protected[this] def stateData = _stateData
 
   protected[this] def nextStateName = _nextStateName

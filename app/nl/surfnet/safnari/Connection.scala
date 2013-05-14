@@ -71,7 +71,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
   def connectionStates = {
     val version = rsm.version
     new ConnectionStatesType().
-      withReservationState(new ReservationStateType().withVersion(version).withState(rsm.stateName.jaxb)).
+      withReservationState(rsm.reservationState).
       withProvisionState(psm.provisionState(version)).
       withLifecycleState(lsm.lifecycleState(version)).
       withDataPlaneStatus(dsm.dataPlaneStatus(version))
