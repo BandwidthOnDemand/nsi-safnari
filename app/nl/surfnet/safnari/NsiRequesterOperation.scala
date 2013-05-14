@@ -16,9 +16,9 @@ case class ReserveCommitFailed(correlationId: CorrelationId, connectionId: Conne
 case class ReserveAbortConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
 case class ReserveTimeout(correlationId: CorrelationId) extends NsiRequesterOperation
 
-case class ProvisionConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
-case class ReleaseConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
-case class TerminateConfirmed(correlationId: CorrelationId) extends NsiRequesterOperation
+case class ProvisionConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
+case class ReleaseConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
+case class TerminateConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
 
 case class QuerySummaryConfirmed(correlationId: CorrelationId, reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
 case class QuerySummaryFailed(correlationId: CorrelationId) extends NsiRequesterOperation

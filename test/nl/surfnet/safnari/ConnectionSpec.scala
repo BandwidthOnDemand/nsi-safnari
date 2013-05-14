@@ -41,7 +41,7 @@ class ConnectionSpec extends helpers.Specification {
 
     var messages: Seq[Message] = Nil
 
-    val connection = TestFSMRef(new ConnectionActor(ConnectionId, "RequesterNSA", () => CorrelationId.fromUuid(mockUuidGenerator()), TestActorRef(new Actor {
+    val connection = TestActorRef(new ConnectionActor(ConnectionId, "RequesterNSA", () => CorrelationId.fromUuid(mockUuidGenerator()), TestActorRef(new Actor {
       def receive = { case m: Message => messages = messages :+ m }
     }), PceReplyToUri))
 
@@ -57,6 +57,16 @@ class ConnectionSpec extends helpers.Specification {
       result must beAnInstanceOf[QuerySummaryResultType]
       result.asInstanceOf[QuerySummaryResultType]
     }
+
+    def reservationState = connectionData.getConnectionStates().getReservationState().getState()
+  }
+
+  trait ReservedConnection extends fixture {
+    given(InitialMessages ++ Seq(
+      FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
+      FromProvider(ReserveConfirmed(CorrelationId(0, 2), "ConnectionIdA", Criteria)),
+      FromRequester(ReserveCommit(CommitCorrelationId, ConnectionId)),
+      FromProvider(ReserveCommitConfirmed(CorrelationId(0, 3), "ConnectionIdA"))): _*)
   }
 
   "A connection" should {
@@ -96,7 +106,7 @@ class ConnectionSpec extends helpers.Specification {
       messages must haveOneElementLike {
         case ToRequester(ReserveFailed(ReserveCorrelationId, _)) => ok
       }
-      connection.stateName must beEqualTo(FailedReservationState)
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
 
     "confirm the reservation with a single path segment" in new fixture {
@@ -107,7 +117,7 @@ class ConnectionSpec extends helpers.Specification {
 
       messages must contain(ToRequester(ReserveConfirmed(ReserveCorrelationId, ConnectionId, Criteria)))
 
-      connection.stateName must beEqualTo(HeldReservationState)
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
     }
 
     "be in reservation held state when both segments are confirmed" in new fixture {
@@ -120,7 +130,7 @@ class ConnectionSpec extends helpers.Specification {
       when(FromProvider(ReserveConfirmed(CorrelationId(0, 3), "ConnectionIdB", Criteria)))
       messages must contain(ToRequester(ReserveConfirmed(ReserveCorrelationId, ConnectionId, Criteria)))
 
-      connection.stateName must beEqualTo(HeldReservationState)
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
     }
 
     "fail the reservation with a single path segment" in new fixture {
@@ -133,7 +143,7 @@ class ConnectionSpec extends helpers.Specification {
       messages must haveOneElementLike {
         case ToRequester(ReserveFailed(ReserveCorrelationId, _)) => ok
       }
-      connection.stateName must beEqualTo(FailedReservationState)
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
 
     "fail the reservation with two segments and at least one fails" in new fixture {
@@ -147,7 +157,7 @@ class ConnectionSpec extends helpers.Specification {
       messages must haveOneElementLike {
         case ToRequester(ReserveFailed(ReserveCorrelationId, _)) => ok
       }
-      connection.stateName must beEqualTo(FailedReservationState)
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
 
     "be in committing state when reserve commit is received" in new fixture {
@@ -158,7 +168,7 @@ class ConnectionSpec extends helpers.Specification {
       when(FromRequester(ReserveCommit(newCorrelationId, ConnectionId)))
 
       messages must haveOneElementLike { case ToProvider(_: ReserveCommit, _) => ok }
-      connection.stateName must beEqualTo(CommittingReservationState)
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_COMMITTING)
     }
 
     "be in reserved state when reserve commit confirmed is received" in new fixture {
@@ -171,7 +181,7 @@ class ConnectionSpec extends helpers.Specification {
       when(FromProvider(ReserveCommitConfirmed(CorrelationId(0, 3), "ConnectionIdA")))
 
       messages must contain(ToRequester(ReserveCommitConfirmed(CommitCorrelationId, ConnectionId)))
-      connection.stateName must beEqualTo(ReservedReservationState)
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVED)
     }
 
     "be in aborting state when reserve abort is received" in new fixture {
@@ -182,7 +192,7 @@ class ConnectionSpec extends helpers.Specification {
       when(FromRequester(ReserveAbort(ReserveCorrelationId, ConnectionId)))
 
       messages must haveOneElementLike { case ToProvider(_: ReserveAbort, _) => ok }
-      connection.stateName must beEqualTo(AbortingReservationState)
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
     }
 
     "provide information about connections" in new fixture {
@@ -212,6 +222,15 @@ class ConnectionSpec extends helpers.Specification {
       val releasedState = connectionData.getConnectionStates().getProvisionState()
       releasedState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
       releasedState.getVersion() must beEqualTo(0)
+    }
+
+    "become provisioning on provision requests" in new ReservedConnection {
+      val ProvisionCorrelationId = newCorrelationId
+
+      val ack = when(FromRequester(Provision(ProvisionCorrelationId, ConnectionId)))
+
+      ack must beEqualTo(GenericAck(ProvisionCorrelationId))
+      messages must contain(ToProvider(Provision(CorrelationId(0, 4), "ConnectionIdA"), A.provider))
     }
   }
 }
