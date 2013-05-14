@@ -1,63 +1,72 @@
 package nl.surfnet.safnari
 
-import scala.concurrent.Future
-
-final case class HandlerResult[S, D](name: S, data: D, reply: Option[Any] = None) {
-  def using(nextData: D) = copy(data = nextData)
-  def replying(message: Any) = copy(reply = Some(message))
-}
-final case class Event[D](message: Any, data: D)
-
+/**
+ * Simplified re-implementation of Akka's finite state machine [[akka.actor.FSM]]
+ * DSL, without the dependencies on actors.
+ */
 abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D) {
-  type StateName = S
-  type StateData = D
-  type State = HandlerResult[S, D]
 
-  private var _stateName: S = initialStateName
-  private var _stateData: D = initialStateData
-
-  def stateName = _stateName
-  protected def stateData = _stateData
-
-  private var _nextStateName: S = stateName
-  private var _nextStateData: D = stateData
-
-  protected def nextStateName = _nextStateName
-  protected def nextStateData = _nextStateData
-
-  type Handler = PartialFunction[Event[D], State]
-  private var handlers: Map[S, Handler] = Map.empty
-  private var unhandled: Handler = PartialFunction.empty
-  private var transitionHandler: PartialFunction[(S, S), Unit] = { case _ => () }
-
-  protected def when(stateName: StateName)(handler: Handler) = {
-    require(!handlers.contains(stateName), s"handler for state $stateName already defined")
-    handlers += stateName -> handler
-  }
-  protected def whenUnhandled(handler: PartialFunction[Event[D], State]): Unit = {
-    unhandled = handler
-  }
-  protected def onTransition(handler: PartialFunction[(S, S), Unit]): Unit = {
-    transitionHandler = handler
-  }
-  protected def goto(stateName: StateName): State = HandlerResult(stateName, stateData)
-  protected def stay = goto(stateName)
-
-  def ask(message: Any): Option[Any] = {
-    val next = handlers(stateName).orElse(unhandled).apply(Event(message, stateData))
-    _nextStateName = next.name
-    _nextStateData = next.data
-    transitionHandler.applyOrElse((stateName, nextStateName), (_: (S, S)) => ())
+  def process(message: Any): Seq[Any] = {
+    val nextState = _handlers(stateName).orElse(_unhandled).apply(Event(message, _stateData))
+    _nextStateName = nextState.name
+    _nextStateData = nextState.data
+    _transitionHandler.applyOrElse((_stateName, _nextStateName), (_: (S, S)) => ())
     _stateName = _nextStateName
     _stateData = _nextStateData
-    next.reply
+    nextState.replies
   }
+
+  /**
+   * This captures all of the managed state of the state machine: the state
+   * name, the state data, and replies accumulated while processing the last
+   * message.
+   */
+  protected[this] case class State(name: S, data: D, replies: Seq[Any] = Vector.empty) {
+    def using(nextData: D) = copy(data = nextData)
+    def replying(reply: Any) = copy(replies = replies :+ reply)
+  }
+  protected[this] case class Event(message: Any, data: D)
+
+  def stateName = _stateName
+  protected[this] def stateData = _stateData
+
+  protected[this] def nextStateName = _nextStateName
+  protected[this] def nextStateData = _nextStateData
+
+  protected[this] type EventHandler = PartialFunction[Event, State]
+  protected[this] type TransitionHandler = PartialFunction[(S, S), Unit]
+
+  protected[this] def when(stateName: S)(handler: EventHandler) {
+    require(!_handlers.contains(stateName), s"handler for state $stateName is already defined")
+    _handlers += stateName -> handler
+  }
+  protected[this] def whenUnhandled(handler: EventHandler) {
+    _unhandled = handler
+  }
+  protected[this] def onTransition(handler: TransitionHandler) {
+    _transitionHandler = handler
+  }
+
+  protected[this] def goto(stateName: S): State = {
+    require(_handlers contains stateName, s"cannot goto $stateName: state does not exist")
+    State(stateName, stateData)
+  }
+  protected[this] def stay = goto(stateName)
 
   /**
    * This extractor is just convenience for matching a (S, S) pair, including a
    * reminder what the new state is.
    */
-  object -> {
+  protected[this] object -> {
     def unapply[S](in: (S, S)) = Some(in)
   }
+
+  private var _stateName: S = initialStateName
+  private var _stateData: D = initialStateData
+  private var _nextStateName: S = stateName
+  private var _nextStateData: D = stateData
+
+  private var _handlers: Map[S, EventHandler] = Map.empty
+  private var _unhandled: EventHandler = PartialFunction.empty
+  private var _transitionHandler: TransitionHandler = { case _ => () }
 }

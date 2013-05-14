@@ -18,52 +18,54 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
   val lsm = new LifecycleStateMachine(id, newCorrelationId, outbound ! _)
   val dsm = new DataPlaneStateMachine(id, newCorrelationId, outbound ! _)
   val rsm = new ReservationStateMachine(id, initialReserve, newCorrelationId, outbound ! _, pceReplyUri, data => {
-    psm ask data.providers
-    lsm ask data.providers
-    dsm ask data.providers
+    psm process data.providers
+    lsm process data.providers
+    dsm process data.providers
   })
 
   override def receive = {
-    // RSM messages
-    case message @ FromRequester(_: Reserve) => rsm ask message foreach (sender ! _)
-    case message @ FromRequester(_: ReserveCommit) => rsm ask message foreach (sender ! _)
-    case message @ FromRequester(_: ReserveAbort) => rsm ask message foreach (sender ! _)
-    case message @ FromProvider(_: ReserveConfirmed) => rsm ask message foreach (sender ! _)
-    case message @ FromProvider(_: ReserveFailed) => rsm ask message foreach (sender ! _)
-    case message @ FromProvider(_: ReserveCommitConfirmed) => rsm ask message foreach (sender ! _)
-    case message @ FromProvider(_: ReserveCommitFailed) => rsm ask message foreach (sender ! _)
-    case message @ FromProvider(_: ReserveAbortConfirmed) => rsm ask message foreach (sender ! _)
-    case message @ FromProvider(_: ReserveTimeout) => ??? // TODO
-    case message: FromPce => rsm ask message foreach (sender ! _)
-    case message: ToPce => rsm ask message foreach (sender ! _)
-
-    // PSM messages
-    case message @ FromRequester(_: Provision) => psm ask message foreach (sender ! _)
-    case message @ FromRequester(_: Release) => psm ask message foreach (sender ! _)
-    case message @ FromProvider(_: ProvisionConfirmed) => psm ask message foreach (sender ! _)
-    case message @ FromProvider(_: ReleaseConfirmed) => psm ask message foreach (sender ! _)
-
-    // LSM messages
-    case message @ FromRequester(_: Terminate) => lsm ask message foreach (sender ! _)
-    case message @ FromProvider(_: TerminateConfirmed) => lsm ask message foreach (sender ! _)
-
-    // Data Plane Status messages
-    case message @ FromProvider(_: DataPlaneStateChanged) => dsm ask message foreach (sender ! _)
-
     case 'query => sender ! query
 
-    case message => message.pp("unexpected")
+    case message =>
+      val stateMachine: FiniteStateMachine[_, _] = message match {
+        // RSM messages
+        case FromRequester(_: Reserve)               => rsm
+        case FromRequester(_: ReserveCommit)         => rsm
+        case FromRequester(_: ReserveAbort)          => rsm
+        case FromProvider(_: ReserveConfirmed)       => rsm
+        case FromProvider(_: ReserveFailed)          => rsm
+        case FromProvider(_: ReserveCommitConfirmed) => rsm
+        case FromProvider(_: ReserveCommitFailed)    => rsm
+        case FromProvider(_: ReserveAbortConfirmed)  => rsm
+        case FromProvider(_: ReserveTimeout)         => ??? // TODO
+        case FromPce(_)                              => rsm
+        case ToPce(_)                                => rsm
+
+        // Data Plane Status messages
+        case FromProvider(_: DataPlaneStateChanged)  => dsm
+
+        // PSM messages
+        case FromRequester(_: Provision)             => psm
+        case FromRequester(_: Release)               => psm
+        case FromProvider(_: ProvisionConfirmed)     => psm
+        case FromProvider(_: ReleaseConfirmed)       => psm
+
+        // LSM messages
+        case FromRequester(_: Terminate)             => lsm
+        case FromProvider(_: TerminateConfirmed)     => lsm
+      }
+      stateMachine process message foreach (sender ! _)
   }
 
   private def query = {
     new QuerySummaryResultType().
-        withGlobalReservationId(initialReserve.body.getGlobalReservationId()).
-        withDescription(initialReserve.body.getDescription()).
-        withConnectionId(id).
-        withCriteria(rsm.criteria).
-        withRequesterNSA(requesterNSA).
-        withConnectionStates(connectionStates).
-        withChildren(null /*TODO*/ )
+      withGlobalReservationId(initialReserve.body.getGlobalReservationId()).
+      withDescription(initialReserve.body.getDescription()).
+      withConnectionId(id).
+      withCriteria(rsm.criteria).
+      withRequesterNSA(requesterNSA).
+      withConnectionStates(connectionStates).
+      withChildren(null /*TODO*/ )
   }
 
   def connectionStates = {
