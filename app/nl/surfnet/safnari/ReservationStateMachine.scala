@@ -161,6 +161,7 @@ class ReservationStateMachine(id: ConnectionId, initialReserve: Reserve, newCorr
     case AbortingReservationState -> ReservedReservationState => ???
   }
 
+  def segmentKnown(connectionId: ConnectionId) = stateData.downstreamConnections.exists { case (id, _) => id == connectionId }
   def reservationState = new ReservationStateType().withVersion(version).withState(stateName.jaxb)
   def criteria = stateData.criteria
   def version = stateData.criteria.getVersion()

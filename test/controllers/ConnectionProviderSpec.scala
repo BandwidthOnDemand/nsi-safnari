@@ -23,6 +23,7 @@ class ConnectionProviderSpec extends helpers.Specification {
   val Application = FakeApplication(additionalConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
 
   "Reserve operation" should {
+
     "return the connection id and confirm the reservation" in new WithApplication(Application) {
       val requesterOperation: Promise[NsiRequesterOperation] = Promise()
       val response = await(ConnectionProvider.handleRequest(withEnvelope(Reserve(CorrelationId, InitialReserveType))) { requesterOperation.success(_) })
@@ -47,5 +48,6 @@ class ConnectionProviderSpec extends helpers.Specification {
           }
       }
     }
+
   }
 }

@@ -17,21 +17,19 @@ import akka.pattern.ask
 import akka.util.Timeout
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.headers._
+import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 import support.ExtraBodyParsers._
 import models._
 import nl.surfnet.safnari._
-import scala.util.Failure
-import scala.util.Success
-import java.net.URL
+import scala.util.{ Failure, Success }
 import com.twitter.bijection.Injection
 import com.ning.http.client.Realm.AuthScheme
-import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
 
-  private val connections = TMap.empty[ConnectionId, ActorRef]
   private val continuations = new Continuations[NsiRequesterOperation]()
+  private val notificationContinuations = TMap.empty[ConnectionId, NsiRequesterOperation => Unit].single
   private val pceContinuations = new Continuations[PceResponse]()
 
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
@@ -41,10 +39,8 @@ object ConnectionProvider extends Controller with SoapWebService {
   private def pceReplyUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.pceReply().url}"
 
   def request = NsiProviderEndPoint {
-    case NsiEnvelope(headers, query: NsiQuery) =>
-      handleQuery(query)(replyToClient(headers))
-    case request @ NsiEnvelope(headers, _: NsiCommand) =>
-      handleRequest(request)(replyToClient(headers))
+    case NsiEnvelope(headers, query: NsiQuery)         => handleQuery(query)(replyToClient(headers))
+    case request @ NsiEnvelope(headers, _: NsiCommand) => handleRequest(request)(replyToClient(headers))
   }
 
   def pceReply = Action(parse.json) { implicit request =>
@@ -60,12 +56,12 @@ object ConnectionProvider extends Controller with SoapWebService {
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit = {
     requestHeaders.replyTo.foreach { replyTo =>
       WS.url(replyTo.toASCIIString()).
-        post(NsiEnvelope(requestHeaders.asReply, response)).
+        post(NsiEnvelope(requestHeaders.copy(replyTo = None, correlationId = response.correlationId), response)).
         onComplete {
           case Failure(error) =>
-            Logger.info(f"replying to $replyTo: $error", error)
+            Logger.info(s"Replying to $replyTo: $error", error)
           case Success(acknowledgement) =>
-            Logger.debug(f"replying to $replyTo: ${acknowledgement.status} ${acknowledgement.statusText}")
+            Logger.debug(s"Replying $response to $replyTo")
         }
     }
   }
@@ -87,15 +83,12 @@ object ConnectionProvider extends Controller with SoapWebService {
   }
 
   private def queryConnections(connectionIds: Seq[ConnectionId]) = {
-    val cs = connections.single.snapshot
-    val ids = if (connectionIds.isEmpty) cs.keys.toSeq else connectionIds
-    Future.sequence(ids.flatMap { id =>
-      cs.get(id).map(_ ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
-    })
+    val cs: Seq[ActorRef] = if(connectionIds.isEmpty) ConnectionManager.all else ConnectionManager.find(connectionIds)
+    Future.traverse(cs)(c => c ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
   }
 
   private[controllers] def handleRequest(request: NsiEnvelope[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
-    findOrCreateConnection(request) match {
+    findOrCreateConnection(request)(replyTo) match {
       case Left(connectionId) =>
         val exception = new ServiceExceptionType()
           .withNsaId("MYNSAID") // TODO
@@ -110,13 +103,14 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private val uuidGenerator = Uuid.randomUuidGenerator()
 
-  private def findOrCreateConnection(request: NsiEnvelope[NsiProviderOperation]): Either[ConnectionId, ActorRef] = (request.body, request.body.optionalConnectionId) match {
+  private def findOrCreateConnection(request: NsiEnvelope[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Either[ConnectionId, ActorRef] = (request.body, request.body.optionalConnectionId) match {
     case (_, Some(connectionId)) =>
-      connections.single.get(connectionId).toRight(connectionId)
+      ConnectionManager.get(connectionId).toRight(connectionId)
     case (initialReserve: Reserve, None) =>
       val connectionId = newConnectionId
       val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, initialReserve, () => CorrelationId.fromUuid(uuidGenerator()), outboundActor, URI.create(pceReplyUrl))))
-      connections.single(connectionId) = connectionActor
+      ConnectionManager.add(connectionId, connectionActor)
+      notificationContinuations(connectionId) = replyTo
       Right(connectionActor)
     case _ =>
       sys.error("illegal initial message")
@@ -150,9 +144,10 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef) extends Actor {
     def receive = {
-      case pceRequest: ToPce      => pceRequester forward pceRequest
-      case nsiRequest: ToProvider => nsiRequester forward nsiRequest
-      case ToRequester(response)  => handleResponse(response)
+      case pceRequest: ToPce                         => pceRequester forward pceRequest
+      case nsiRequest: ToProvider                    => nsiRequester forward nsiRequest
+      case ToRequester(notify: DataPlaneStateChange) => handleNotification(notify)
+      case ToRequester(response)                     => handleResponse(response)
     }
   }
 
@@ -220,6 +215,9 @@ object ConnectionProvider extends Controller with SoapWebService {
                 OAuthAuthentication("f44b1e47-0a19-4c11-861b-c9abf82d4cbf"))))))
     }
   }
+
+  private def handleNotification(notify: DataPlaneStateChange): Unit =
+    notificationContinuations(notify.connectionId)(notify)
 
   private[controllers] def handleResponse(message: NsiRequesterOperation): Unit =
     continuations.replyReceived(message.correlationId, message)

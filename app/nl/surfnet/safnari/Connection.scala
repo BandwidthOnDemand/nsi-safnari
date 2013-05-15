@@ -13,6 +13,8 @@ case class ToProvider(message: NsiProviderOperation, provider: ProviderEndPoint)
 case class FromPce(message: PceResponse)
 case class ToPce(message: PathComputationRequest)
 
+case class SegmentKnown(segmentId: ConnectionId)
+
 class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Reserve, newCorrelationId: () => CorrelationId, outbound: ActorRef, pceReplyUri: URI) extends Actor {
   val psm = new ProvisionStateMachine(id, newCorrelationId, outbound ! _)
   val lsm = new LifecycleStateMachine(id, newCorrelationId, outbound ! _)
@@ -25,6 +27,8 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
 
   override def receive = {
     case 'query => sender ! query
+
+    case SegmentKnown(connectionId) => sender ! rsm.segmentKnown(connectionId)
 
     case message =>
       val stateMachine: FiniteStateMachine[_, _] = message match {

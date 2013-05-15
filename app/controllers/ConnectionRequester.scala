@@ -1,15 +1,12 @@
 package controllers
 
-import play.api.mvc._
-import play.api.mvc.Results._
-import support.ExtraBodyParsers._
-import nl.surfnet.safnari.NsiAcknowledgement
-import nl.surfnet.safnari.NsiEnvelope
-import nl.surfnet.safnari.Continuations
-import nl.surfnet.safnari.CorrelationId
-import nl.surfnet.safnari.GenericAck
-import nl.surfnet.safnari.NsiRequesterOperation
 import scala.concurrent.Future
+
+import akka.actor.actorRef2Scala
+import nl.surfnet.safnari._
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
+import play.api.mvc.Controller
+import support.ExtraBodyParsers.NsiRequesterEndPoint
 
 object ConnectionRequester extends Controller with SoapWebService {
 
@@ -20,6 +17,13 @@ object ConnectionRequester extends Controller with SoapWebService {
   def expectReplyFor(correlationId: CorrelationId): Future[NsiRequesterOperation] = continuations.register(correlationId)
 
   def request = NsiRequesterEndPoint {
+    case NsiEnvelope(headers, notification: DataPlaneStateChange) =>
+      ConnectionManager.findBySegment(notification.connectionId).map {
+        _.fold[NsiAcknowledgement](ServiceException(headers.correlationId, null)) { c =>
+          c ! FromProvider(notification)
+          GenericAck(headers.correlationId)
+        }
+      }
     case NsiEnvelope(headers, response) =>
       continuations.replyReceived(headers.correlationId, response)
       Future.successful(GenericAck(headers.correlationId))
