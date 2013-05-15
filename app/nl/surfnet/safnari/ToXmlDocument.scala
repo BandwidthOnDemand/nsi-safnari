@@ -81,22 +81,38 @@ object ToXmlDocument {
 
     def asDocument(a: NsiRequesterOperation) = marshal(a match {
       case ReserveConfirmed(_, connectionId, criteria) =>
-        val confirmed = new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria)
-        factory.createReserveConfirmed(confirmed)
+        factory.createReserveConfirmed(new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria))
       case ReserveFailed(_, failure) =>
         factory.createReserveFailed(failure)
       case ReserveCommitConfirmed(_, connectionId) =>
         factory.createReserveCommitConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case ReserveCommitFailed(_, failure) =>
+        factory.createReserveCommitFailed(failure)
+      case ReserveAbortConfirmed(_, connectionId) =>
+        factory.createReserveAbortConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case ReserveTimeout(_, timeout) =>
+        factory.createReserveTimeout(timeout)
       case ProvisionConfirmed(_, connectionId) =>
         factory.createProvisionConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case ReleaseConfirmed(_, connectionId) =>
+        factory.createReleaseConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case TerminateConfirmed(_, connectionId) =>
+        factory.createTerminateConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
       case QuerySummaryConfirmed(_, reservations) =>
         factory.createQuerySummaryConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava))
+      case QuerySummaryFailed(_, failed) =>
+        factory.createQuerySummaryFailed(failed)
+      case QueryRecursiveConfirmed(_, reservations) =>
+        factory.createQueryRecursiveConfirmed(new QueryRecursiveConfirmedType().withReservation(reservations.asJava))
+      case QueryRecursiveFailed(_, failed) =>
+        factory.createQueryRecursiveFailed(failed)
       case DataPlaneStateChange(_, connectionId, status, timeStamp) =>
         val request = new DataPlaneStateChangeRequestType().withConnectionId(connectionId).withDataPlaneStatus(status).withTimeStamp(timeStamp)
         factory.createDataPlaneStateChange(request)
-      case _ =>
-        Logger.error("Could not marshal $a")
-        ???
+      case ErrorEvent(_, error) =>
+        factory.createErrorEvent(error)
+      case MessageDeliveryTimeout(correlationId, timeStamp) =>
+        factory.createMessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType().withCorrelationId(correlationId.toString).withTimeStamp(timeStamp))
     })
   }
 
