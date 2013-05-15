@@ -2,7 +2,6 @@ package controllers
 
 import scala.concurrent.Future
 
-import akka.actor.actorRef2Scala
 import nl.surfnet.safnari._
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.mvc.Controller

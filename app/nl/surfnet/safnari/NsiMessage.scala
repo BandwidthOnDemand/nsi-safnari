@@ -2,6 +2,7 @@ package nl.surfnet.safnari
 
 import java.net.URI
 import java.util.UUID
+import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
 case class NsiEnvelope[T](headers: NsiHeaders, body: T) {
   def replyTo = headers.replyTo
@@ -19,6 +20,8 @@ trait NsiCommand
 
 final case class NsiError(id: String, description: String, text: String) {
   override def toString = s"$id: $description: $text"
+
+  def toServiceException(nsaId: String) = new ServiceExceptionType().withErrorId(id).withText(text).withNsaId(nsaId)
 }
 object NsiError {
   val MissingParameter = NsiError("SVC0001", "MISSING_PARAMETER", "Invalid or missing parameter")
@@ -34,4 +37,6 @@ object NsiError {
   val InternalNrmError = NsiError("SVC0011", "INTERNAL_NRM_ERROR", "An internal NRM error has caused a message processing failure")
   val StpAlreadyInUse = NsiError("SVC0012", "STP_ALREADY_IN_USE", "Specified STP already in use")
   val BandwidthNotAvailable = NsiError("SVC0012", "BANDWIDTH_NOT_AVAILABLE", "Insufficient bandwidth available for reservation")
+
+  val ChildError = NsiError("SVC????", "CHILD_ERROR", "Child reported an error. See child exceptions for details.")
 }

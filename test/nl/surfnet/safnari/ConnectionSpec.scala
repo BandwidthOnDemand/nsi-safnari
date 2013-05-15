@@ -7,11 +7,13 @@ import akka.testkit._
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
+import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import org.specs2.mutable.After
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 import javax.xml.datatype.DatatypeFactory
+import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionSpec extends helpers.Specification {
@@ -110,7 +112,9 @@ class ConnectionSpec extends helpers.Specification {
 
       messages must haveSize(1)
       messages must haveOneElementLike {
-        case ToRequester(ReserveFailed(ReserveCorrelationId, _)) => ok
+        case ToRequester(ReserveFailed(ReserveCorrelationId, failed)) =>
+          failed.getConnectionId() must beEqualTo(ConnectionId)
+          failed.getServiceException().getErrorId() must beEqualTo(NsiError.PathComputationNoPath.id)
       }
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
@@ -143,11 +147,15 @@ class ConnectionSpec extends helpers.Specification {
       given(InitialMessages ++ Seq(
         FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A)))): _*)
 
-      when(FromProvider(ReserveFailed(CorrelationId(0, 2), new GenericFailedType())))
+      when(FromProvider(ReserveFailed(CorrelationId(0, 2), new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthNotAvailable.toServiceException(A.provider.nsa)))))
 
       messages must haveSize(1)
       messages must haveOneElementLike {
-        case ToRequester(ReserveFailed(ReserveCorrelationId, _)) => ok
+        case ToRequester(ReserveFailed(ReserveCorrelationId, failed)) =>
+          failed.getConnectionId() must beEqualTo(ConnectionId)
+          failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+          failed.getServiceException().getChildException().asScala must haveSize(1)
+          failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.BandwidthNotAvailable.id)
       }
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
@@ -155,13 +163,37 @@ class ConnectionSpec extends helpers.Specification {
     "fail the reservation with two segments and at least one fails" in new fixture {
       given(InitialMessages ++ Seq(
         FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))),
-        FromProvider(ReserveFailed(CorrelationId(0, 2), new GenericFailedType()))): _*)
+        FromProvider(ReserveFailed(CorrelationId(0, 2), new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthNotAvailable.toServiceException(A.provider.nsa))))): _*)
+
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
 
       when(FromProvider(ReserveConfirmed(CorrelationId(0, 3), "connectionIdB", Criteria)))
 
       messages must haveSize(1)
       messages must haveOneElementLike {
-        case ToRequester(ReserveFailed(ReserveCorrelationId, _)) => ok
+        case ToRequester(ReserveFailed(ReserveCorrelationId, failed)) =>
+          failed.getConnectionId() must beEqualTo(ConnectionId)
+          failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+          failed.getServiceException().getChildException().asScala must haveSize(1)
+      }
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
+    }
+
+    "fail the reservation with two segments when both fail" in new fixture {
+      given(InitialMessages ++ Seq(
+        FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))),
+        FromProvider(ReserveFailed(CorrelationId(0, 2), new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthNotAvailable.toServiceException(A.provider.nsa))))): _*)
+
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+
+      when(FromProvider(ReserveFailed(CorrelationId(0, 3), new GenericFailedType().withConnectionId("ConnectionIdB").withServiceException(NsiError.BandwidthNotAvailable.toServiceException(B.provider.nsa)))))
+
+      messages must haveSize(1)
+      messages must haveOneElementLike {
+        case ToRequester(ReserveFailed(ReserveCorrelationId, failed)) =>
+          failed.getConnectionId() must beEqualTo(ConnectionId)
+          failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+          failed.getServiceException().getChildException().asScala must haveSize(2)
       }
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
@@ -251,8 +283,7 @@ class ConnectionSpec extends helpers.Specification {
 
       given(
         FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
-        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA"))
-      )
+        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")))
 
       val ack = when(FromRequester(Release(ReleaseCorrelationId, ConnectionId)))
 
@@ -267,8 +298,7 @@ class ConnectionSpec extends helpers.Specification {
       given(
         FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
         FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")),
-        FromRequester(Release(ReleaseCorrelationId, ConnectionId))
-      )
+        FromRequester(Release(ReleaseCorrelationId, ConnectionId)))
 
       val ack = when(FromProvider(ReleaseConfirmed(CorrelationId(0, 5), "ConnectionIdA")))
 
@@ -301,8 +331,7 @@ class ConnectionSpec extends helpers.Specification {
     "have a data plane inactive" in new ReservedConnection {
       given(
         FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
-        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA"))
-      )
+        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")))
 
       dataPlaneStatus.isActive() must beFalse
     }
@@ -310,8 +339,7 @@ class ConnectionSpec extends helpers.Specification {
     "have a data plane active on data plane change" in new ReservedConnection {
       given(
         FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
-        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA"))
-      )
+        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")))
 
       when(FromProvider(DataPlaneStateChange(CorrelationId(0, 5), "ConnectionIdA", dataPlaneStatusType(true), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
 
@@ -324,8 +352,7 @@ class ConnectionSpec extends helpers.Specification {
       given(
         FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
         FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")),
-        FromProvider(DataPlaneStateChange(CorrelationId(0, 5), "ConnectionIdA", dataPlaneStatusType(true), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00")))
-      )
+        FromProvider(DataPlaneStateChange(CorrelationId(0, 5), "ConnectionIdA", dataPlaneStatusType(true), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
 
       when(FromProvider(DataPlaneStateChange(CorrelationId(0, 6), "ConnectionIdA", dataPlaneStatusType(false), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
 

@@ -19,10 +19,13 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
   val psm = new ProvisionStateMachine(id, newCorrelationId, outbound ! _)
   val lsm = new LifecycleStateMachine(id, newCorrelationId, outbound ! _)
   val dsm = new DataPlaneStateMachine(id, newCorrelationId, outbound ! _)
-  val rsm = new ReservationStateMachine(id, initialReserve, newCorrelationId, outbound ! _, pceReplyUri, data => {
-    psm process data.providers
-    lsm process data.providers
-    dsm process data.providers
+  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, outbound ! _, data => {
+    psm process data.children
+    lsm process data.children
+    dsm process data.children
+  }, error => {
+    new GenericFailedType().withConnectionId(id).withConnectionStates(connectionStates).
+      withServiceException(new ServiceExceptionType().withErrorId(error.id).withText(error.text).withNsaId("NSA-ID"))
   })
 
   override def receive = {
@@ -46,7 +49,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
         case ToPce(_)                                => rsm
 
         // Data Plane Status messages
-        case FromProvider(_: DataPlaneStateChange)  => dsm
+        case FromProvider(_: DataPlaneStateChange)   => dsm
 
         // PSM messages
         case FromRequester(_: Provision)             => psm
@@ -72,7 +75,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
       withChildren(null /*TODO*/ )
   }
 
-  def connectionStates = {
+  def connectionStates: ConnectionStatesType = {
     val version = rsm.version
     new ConnectionStatesType().
       withReservationState(rsm.reservationState).
