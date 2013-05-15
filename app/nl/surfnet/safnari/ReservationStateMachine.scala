@@ -59,6 +59,7 @@ class ReservationStateMachine(id: ConnectionId, initialReserve: Reserve, newCorr
         Option(initialReserve.body.getGlobalReservationId()),
         Option(initialReserve.body.getDescription()),
         Injection.invert(initialReserve.body.getCriteria()).getOrElse(sys.error("Bad initial reservation criteria")))) {
+
   when(InitialReservationState) {
     case Event(FromRequester(message: Reserve), _) =>
       goto(PathComputationState) replying ReserveResponse(message.correlationId, id)

@@ -10,6 +10,8 @@ import com.twitter.bijection.AbstractInjection
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 import scala.concurrent.Future
 import java.util.UUID
+import javax.xml.datatype.XMLGregorianCalendar
+import javax.xml.datatype.DatatypeFactory
 
 package object safnari {
   type Message = Any
@@ -66,4 +68,9 @@ package object safnari {
           withVersion(if (b.getVersion() == null) 0 else b.getVersion())
       }
   }
+
+  implicit object XmlGregorianCalendarOrdering extends Ordering[XMLGregorianCalendar] {
+    def compare(x: XMLGregorianCalendar, y: XMLGregorianCalendar): Int = x compare y
+  }
+
 }

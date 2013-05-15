@@ -42,7 +42,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
         case ToPce(_)                                => rsm
 
         // Data Plane Status messages
-        case FromProvider(_: DataPlaneStateChanged)  => dsm
+        case FromProvider(_: DataPlaneStateChange)  => dsm
 
         // PSM messages
         case FromRequester(_: Provision)             => psm

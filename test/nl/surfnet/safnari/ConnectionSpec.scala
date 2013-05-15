@@ -11,6 +11,7 @@ import scala.concurrent.Await
 import org.specs2.mutable.After
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
+import javax.xml.datatype.DatatypeFactory
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionSpec extends helpers.Specification {
@@ -314,25 +315,25 @@ class ConnectionSpec extends helpers.Specification {
         FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA"))
       )
 
-      when(FromProvider(DataPlaneStateChanged(CorrelationId(0, 5), "ConnectionIdA", dataPlaneStatusType(true))))
+      when(FromProvider(DataPlaneStateChange(CorrelationId(0, 5), "ConnectionIdA", dataPlaneStatusType(true), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
 
       dataPlaneStatus.isActive() must beTrue
       dataPlaneStatus.isVersionConsistent() must beTrue
-      messages must contain(ToRequester(DataPlaneStateChanged(CorrelationId(0, 5), ConnectionId, dataPlaneStatusType(true))))
+      messages must contain(ToRequester(DataPlaneStateChange(CorrelationId(0, 5), ConnectionId, dataPlaneStatusType(true), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
     }
 
     "have a data plane inactive on data plane change" in new ReservedConnection {
       given(
         FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
         FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")),
-        FromProvider(DataPlaneStateChanged(CorrelationId(0, 5), "ConnectionIdA", dataPlaneStatusType(true)))
+        FromProvider(DataPlaneStateChange(CorrelationId(0, 5), "ConnectionIdA", dataPlaneStatusType(true), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00")))
       )
 
-      when(FromProvider(DataPlaneStateChanged(CorrelationId(0, 6), "ConnectionIdA", dataPlaneStatusType(false))))
+      when(FromProvider(DataPlaneStateChange(CorrelationId(0, 6), "ConnectionIdA", dataPlaneStatusType(false), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
 
       dataPlaneStatus.isActive() must beFalse
       dataPlaneStatus.isVersionConsistent() must beTrue
-      messages must contain(ToRequester(DataPlaneStateChanged(CorrelationId(0, 6), ConnectionId, dataPlaneStatusType(false))))
+      messages must contain(ToRequester(DataPlaneStateChange(CorrelationId(0, 6), ConnectionId, dataPlaneStatusType(false), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
     }
   }
 

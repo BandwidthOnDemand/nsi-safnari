@@ -10,6 +10,8 @@ import javax.xml.validation.SchemaFactory
 import javax.xml.bind.JAXBContext
 import javax.xml.XMLConstants
 import javax.xml.transform.Source
+import org.ogf.schemas.nsi._2011._10.connection._interface.ProvisionConfirmedRequestType
+import play.api.Logger
 
 trait ToXmlDocument[-A] {
   def asDocument(a: A): Document
@@ -79,16 +81,22 @@ object ToXmlDocument {
 
     def asDocument(a: NsiRequesterOperation) = marshal(a match {
       case ReserveConfirmed(_, connectionId, criteria) =>
-        val confirmed = factory.createReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria)
+        val confirmed = new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria)
         factory.createReserveConfirmed(confirmed)
       case ReserveFailed(_, failure) =>
         factory.createReserveFailed(failure)
       case ReserveCommitConfirmed(_, connectionId) =>
-        val confirmed = factory.createGenericConfirmedType().withConnectionId(connectionId)
-        factory.createReserveCommitConfirmed(confirmed)
+        factory.createReserveCommitConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case ProvisionConfirmed(_, connectionId) =>
+        factory.createProvisionConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
       case QuerySummaryConfirmed(_, reservations) =>
         factory.createQuerySummaryConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava))
-      case _ => ???
+      case DataPlaneStateChange(_, connectionId, status, timeStamp) =>
+        val request = new DataPlaneStateChangeRequestType().withConnectionId(connectionId).withDataPlaneStatus(status).withTimeStamp(timeStamp)
+        factory.createDataPlaneStateChange(request)
+      case _ =>
+        Logger.error("Could not marshal $a")
+        ???
     })
   }
 
