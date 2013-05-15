@@ -58,7 +58,12 @@ object ExtraBodyParsers {
     NsiEndPoint(nsiRequesterOperation)(action)
 
   def NsiEndPoint[T <: NsiMessage](parser: BodyParser[NsiEnvelope[T]])(action: NsiEnvelope[T] => Future[NsiAcknowledgement]) = Action(parser) { request =>
-    AsyncResult { action(request.body).map(response => Results.Ok(NsiEnvelope(request.body.headers.asReply, response))) }
+    Logger.debug(s"Received: ${request.body.body}")
+    AsyncResult { action(request.body).map { response =>
+      Logger.debug(s"Respond: $response")
+      Results.Ok(NsiEnvelope(request.body.headers.asReply, response))
+      }
+    }
   }
 
   def nsiProviderOperation = nsiBodyParser(bodyNameToProviderOperation)
