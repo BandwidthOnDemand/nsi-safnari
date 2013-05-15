@@ -87,7 +87,7 @@ class ReserveRequestSpec extends helpers.Specification {
     "send a reserve request to the ultimate provider agent" in new WithServer(Application, ServerPort) {
       val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))
 
-      service.getConnectionServiceProviderPort().reserve(null, "description", ConnectionId, Criteria, NsiHeader)
+      service.getConnectionServiceProviderPort().reserve(ConnectionId, null, "description", Criteria, NsiHeader)
 
       await(reserveConfirmed.future).correlationId must beEqualTo(CorrelationId.fromString("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def").get)
     }

@@ -55,7 +55,7 @@ class JaxWsClientSpec extends helpers.Specification {
         .withRequesterNSA("urn:ogf:network:surfnet")
         .withProviderNSA("urn:ogf:network:safnari"))
 
-      service.getConnectionServiceRequesterPort().reserveCommitConfirmed("", "123-abc", NsiHeader)
+      service.getConnectionServiceRequesterPort().reserveCommitConfirmed("123-abc", NsiHeader)
     }
   }
 

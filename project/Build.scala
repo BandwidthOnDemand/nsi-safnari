@@ -8,7 +8,7 @@ object ApplicationBuild extends Build {
   val appVersion      = "1.0-SNAPSHOT"
 
   val appDependencies = Seq(
-    "nl.surfnet.bod" % "bod-nsi" % "0.2.0-SNAPSHOT" changing(),
+    "nl.surfnet.bod" % "bod-nsi" % "0.2.1-SNAPSHOT" changing(),
     "org.scala-stm" %% "scala-stm" % "0.7",
     "com.twitter" %% "bijection-core" % "0.3.0",
     "org.scalacheck" %% "scalacheck" % "1.10.1" % "test",

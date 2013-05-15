@@ -70,7 +70,7 @@ class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
   }
 
   def provisionState(reservationVersion: Int) = stateName match {
-    case UNKNOWN => new ProvisionStateType().withState(UNKNOWN).withVersion(null)
-    case state   => new ProvisionStateType().withState(state).withVersion(reservationVersion)
+    case UNKNOWN => new ProvisionStateType().withState(UNKNOWN)
+    case state   => new ProvisionStateType().withState(state)
   }
 }

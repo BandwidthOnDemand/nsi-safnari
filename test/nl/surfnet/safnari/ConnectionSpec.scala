@@ -218,14 +218,12 @@ class ConnectionSpec extends helpers.Specification {
         FromProvider(ReserveConfirmed(CorrelationId(0, 2), "ConnectionIdA", Criteria))): _*)
 
       provisionState.getState() must beEqualTo(ProvisionStateEnumType.UNKNOWN)
-      provisionState.getVersion() must beNull
 
       given(
         FromRequester(ReserveCommit(CommitCorrelationId, ConnectionId)),
         FromProvider(ReserveCommitConfirmed(CorrelationId(0, 3), "ConnectionIdA")))
 
       provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
-      provisionState.getVersion() must beEqualTo(0)
     }
 
     "become provisioning on provision request" in new ReservedConnection {
