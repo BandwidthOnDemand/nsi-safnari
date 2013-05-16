@@ -53,5 +53,5 @@ class LifecycleStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
       outbound(ToRequester(TerminateConfirmed(stateData.correlationId.get, connectionId)))
   }
 
-  def lifecycleState(version: Int) = new LifecycleStateType().withState(stateName)
+  def lifecycleState = new LifecycleStateType().withState(stateName)
 }

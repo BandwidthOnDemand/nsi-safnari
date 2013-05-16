@@ -72,8 +72,5 @@ class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
       outbound(ToRequester(ProvisionConfirmed(stateData.correlationId.get, connectionId)))
   }
 
-  def provisionState(reservationVersion: Int) = stateName match {
-    case UNKNOWN => new ProvisionStateType().withState(UNKNOWN)
-    case state   => new ProvisionStateType().withState(state)
-  }
+  def provisionState = new ProvisionStateType().withState(stateName)
 }
