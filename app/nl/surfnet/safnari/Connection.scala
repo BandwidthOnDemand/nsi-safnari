@@ -29,7 +29,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
   })
 
   override def receive = {
-    case 'query => sender ! query
+    case 'query                     => sender ! query
 
     case SegmentKnown(connectionId) => sender ! rsm.segmentKnown(connectionId)
 
@@ -61,7 +61,9 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
         case FromRequester(_: Terminate)             => lsm
         case FromProvider(_: TerminateConfirmed)     => lsm
       }
-      stateMachine process message foreach (sender ! _)
+
+      val replies = stateMachine.process(message).getOrElse(messageNotApplicable(message))
+      replies foreach (sender ! _)
   }
 
   private def query = {
@@ -83,4 +85,10 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
       withLifecycleState(lsm.lifecycleState(version)).
       withDataPlaneStatus(dsm.dataPlaneStatus(version))
   }
+
+  private def messageNotApplicable(message: Message) = Vector(message match {
+    case FromRequester(message) => ServiceException(message.correlationId, NsiError.InvalidState.toServiceException("NSA-ID"))
+    case FromProvider(message)  => ServiceException(message.correlationId, NsiError.InvalidState.toServiceException("NSA-ID"))
+    case FromPce(message)       => 400
+  })
 }

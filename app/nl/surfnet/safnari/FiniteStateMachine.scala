@@ -6,14 +6,20 @@ package nl.surfnet.safnari
  */
 abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D) {
 
-  def process(message: Any): Seq[Any] = {
-    val nextState = _handlers(stateName).orElse(_unhandled).apply(Event(message, _stateData))
-    _nextStateName = nextState.name
-    _nextStateData = nextState.data
-    _transitionHandler.applyOrElse((_stateName, _nextStateName), (_: (S, S)) => ())
-    _stateName = _nextStateName
-    _stateData = _nextStateData
-    nextState.replies
+  /**
+   * Process the given message. Returns `None` if the FSM did not handle the
+   * message. Otherwise the replies (if any) are returned.
+   */
+  def process(message: Any): Option[Seq[Any]] = {
+    val nextState = _handlers(stateName).orElse(_unhandled).lift.apply(Event(message, _stateData))
+    nextState map { nextState =>
+      _nextStateName = nextState.name
+      _nextStateData = nextState.data
+      _transitionHandler.applyOrElse((_stateName, _nextStateName), (_: (S, S)) => ())
+      _stateName = _nextStateName
+      _stateData = _nextStateData
+      nextState.replies
+    }
   }
 
   /**
@@ -33,8 +39,8 @@ abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D
   protected[this] def nextStateName = _nextStateName
   protected[this] def nextStateData = _nextStateData
 
-  protected[this] type EventHandler = PartialFunction[Event, State]
-  protected[this] type TransitionHandler = PartialFunction[(S, S), Unit]
+  protected[this]type EventHandler = PartialFunction[Event, State]
+  protected[this]type TransitionHandler = PartialFunction[(S, S), Unit]
 
   protected[this] def when(stateName: S)(handler: EventHandler) {
     require(!_handlers.contains(stateName), s"handler for state $stateName is already defined")

@@ -222,6 +222,15 @@ class ConnectionSpec extends helpers.Specification {
       reservationState must beEqualTo(ReservationStateEnumType.RESERVED)
     }
 
+    "reject commit when in initial state" in new fixture {
+      val ack = when(FromRequester(ReserveCommit(CommitCorrelationId, ConnectionId)))
+
+      ack must beLike {
+        case ServiceException(CommitCorrelationId, exception) =>
+          exception.getErrorId() must beEqualTo(NsiError.InvalidState.id)
+      }
+    }
+
     "be in aborting state when reserve abort is received" in new fixture {
       given(InitialMessages ++ Seq(
         FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
