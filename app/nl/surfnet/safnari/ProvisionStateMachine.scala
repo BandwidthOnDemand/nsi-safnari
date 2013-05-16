@@ -4,29 +4,32 @@ import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateEnumType
 import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateEnumType._
 import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateType
 
-case class ProvisionStateMachineData(providers: Map[ConnectionId, ProviderEndPoint], states: Map[ConnectionId, ProvisionStateEnumType], correlationId: Option[CorrelationId] = None) {
+case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, ProvisionStateEnumType], correlationId: Option[CorrelationId] = None) {
 
-  def initialize(providers: Map[ConnectionId, ProviderEndPoint]) =
-    ProvisionStateMachineData(providers, providers.keys.map(_ -> UNKNOWN).toMap)
+  def initialize(children: Map[ConnectionId, ProviderEndPoint]) =
+    ProvisionStateMachineData(children, children.keys.map(_ -> RELEASED).toMap)
 
   def aggregatedProvisionStatus: ProvisionStateEnumType =
-    if (states.values.exists(_ == UNKNOWN)) UNKNOWN
-    else if (states.values.exists(_ == RELEASING)) RELEASING
-    else if (states.values.exists(_ == PROVISIONING)) PROVISIONING
-    else if (states.values.forall(_ == RELEASED)) RELEASED
-    else if (states.values.forall(_ == PROVISIONED)) PROVISIONED
-    else throw new IllegalStateException(s"cannot determine aggregated status from ${states.values}")
+    if (childStates.values.exists(_ == UNKNOWN)) UNKNOWN
+    else if (childStates.values.exists(_ == RELEASING)) RELEASING
+    else if (childStates.values.forall(_ == RELEASED)) RELEASED
+    else if (childStates.values.exists(_ == PROVISIONING)) PROVISIONING
+    else if (childStates.values.forall(_ == PROVISIONED)) PROVISIONED
+    else throw new IllegalStateException(s"cannot determine aggregated status from ${childStates.values}")
 
-  def updateState(connectionId: ConnectionId, state: ProvisionStateEnumType) =
-    copy(states = states + (connectionId -> state))
+  def updateChild(connectionId: ConnectionId, state: ProvisionStateEnumType) =
+    copy(childStates = childStates.updated(connectionId, state))
+
+  def childHasState(connectionId: ConnectionId, state: ProvisionStateEnumType) =
+    childStates.getOrElse(connectionId, UNKNOWN) == state
 }
 
 class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => CorrelationId, outbound: Message => Unit)
   extends FiniteStateMachine[ProvisionStateEnumType, ProvisionStateMachineData](UNKNOWN, ProvisionStateMachineData(Map.empty, Map.empty)) {
 
   when(UNKNOWN) {
-    case Event(downstreamConnections: Map[_, _], data) =>
-      goto(RELEASED) using data.initialize(downstreamConnections.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ProviderEndPoint]))
+    case Event(children: Map[_, _], data) =>
+      goto(RELEASED) using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ProviderEndPoint]))
   }
 
   when(RELEASED) {
@@ -35,8 +38,8 @@ class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
   }
 
   when(PROVISIONING) {
-    case Event(FromProvider(message: ProvisionConfirmed), data) =>
-      val newData = data.updateState(message.connectionId, PROVISIONED)
+    case Event(FromProvider(message: ProvisionConfirmed), data) if data.childHasState(message.connectionId, RELEASED) =>
+      val newData = data.updateChild(message.connectionId, PROVISIONED)
       goto(newData.aggregatedProvisionStatus) using newData replying GenericAck(message.correlationId)
   }
 
@@ -47,19 +50,19 @@ class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
   }
 
   when(RELEASING) {
-    case Event(FromProvider(message: ReleaseConfirmed), data) =>
-      val newData = data.updateState(message.connectionId, RELEASED)
+    case Event(FromProvider(message: ReleaseConfirmed), data) if data.childHasState(message.connectionId, PROVISIONED) =>
+      val newData = data.updateChild(message.connectionId, RELEASED)
       goto(newData.aggregatedProvisionStatus) using newData replying GenericAck(message.correlationId)
   }
 
   onTransition {
     case RELEASED -> PROVISIONING =>
-      stateData.providers.foreach {
+      stateData.children.foreach {
         case (connectionId, provider) =>
           outbound(ToProvider(Provision(newCorrelationId(), connectionId), provider))
       }
     case PROVISIONED -> RELEASING =>
-      stateData.providers.foreach {
+      stateData.children.foreach {
         case (connectionId, provider) =>
           outbound(ToProvider(Release(newCorrelationId(), connectionId), provider))
       }
