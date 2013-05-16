@@ -77,6 +77,17 @@ class ConnectionSpec extends helpers.Specification {
       FromProvider(ReserveCommitConfirmed(CorrelationId(0, 3), "ConnectionIdA"))): _*)
   }
 
+  trait Released { this: ReservedConnection =>
+  }
+
+  trait Provisioned { this: ReservedConnection =>
+    val ProvisionCorrelationId = newCorrelationId
+
+    given(
+      FromRequester(Provision(ProvisionCorrelationId, ConnectionId)),
+      FromProvider(ProvisionConfirmed(newCorrelationId, "ConnectionIdA")))
+  }
+
   "A connection" should {
     "send a reserve response when reserve is requested" in new fixture {
       val ack = when(FromRequester(Reserve(ReserveCorrelationId, InitialReserveType)))
@@ -267,7 +278,7 @@ class ConnectionSpec extends helpers.Specification {
       provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
     }
 
-    "become provisioning on provision request" in new ReservedConnection {
+    "become provisioning on provision request" in new ReservedConnection with Released {
       val ProvisionCorrelationId = newCorrelationId
 
       val ack = when(FromRequester(Provision(ProvisionCorrelationId, ConnectionId)))
@@ -276,7 +287,7 @@ class ConnectionSpec extends helpers.Specification {
       messages must contain(ToProvider(Provision(CorrelationId(0, 4), "ConnectionIdA"), A.provider))
     }
 
-    "send a provision confirmed to requester" in new ReservedConnection {
+    "send a provision confirmed to requester" in new ReservedConnection with Released  {
       val ProvisionCorrelationId = newCorrelationId
 
       given(FromRequester(Provision(ProvisionCorrelationId, ConnectionId)))
@@ -287,12 +298,8 @@ class ConnectionSpec extends helpers.Specification {
       messages must contain(ToRequester(ProvisionConfirmed(ProvisionCorrelationId, ConnectionId)))
     }
 
-    "become releasing on release request" in new ReservedConnection {
+    "become releasing on release request" in new ReservedConnection with Provisioned {
       val ReleaseCorrelationId = newCorrelationId
-
-      given(
-        FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
-        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")))
 
       val ack = when(FromRequester(Release(ReleaseCorrelationId, ConnectionId)))
 
@@ -301,19 +308,34 @@ class ConnectionSpec extends helpers.Specification {
       messages must contain(ToProvider(Release(CorrelationId(0, 5), "ConnectionIdA"), A.provider))
     }
 
-    "send release confirmed to requester" in new ReservedConnection {
+    "send release confirmed to requester" in new ReservedConnection with Provisioned {
       val ReleaseCorrelationId = newCorrelationId
 
-      given(
-        FromRequester(Provision(CorrelationId(0, 3), ConnectionId)),
-        FromProvider(ProvisionConfirmed(CorrelationId(0, 4), "ConnectionIdA")),
-        FromRequester(Release(ReleaseCorrelationId, ConnectionId)))
+      given(FromRequester(Release(ReleaseCorrelationId, ConnectionId)))
 
       val ack = when(FromProvider(ReleaseConfirmed(CorrelationId(0, 5), "ConnectionIdA")))
 
       provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
       ack must beEqualTo(GenericAck(CorrelationId(0, 5)))
       messages must contain(ToRequester(ReleaseConfirmed(ReleaseCorrelationId, ConnectionId)))
+    }
+
+    "reject release request when released" in new ReservedConnection with Released {
+      val ack = when(FromRequester(Release(newCorrelationId, ConnectionId)))
+
+      ack must beLike {
+        case ServiceException(_, exception) =>
+          exception.getErrorId() must beEqualTo(NsiError.InvalidState.id)
+      }
+    }
+
+    "reject provision request when provisioned" in new ReservedConnection with Provisioned {
+      val ack = when(FromRequester(Provision(newCorrelationId, ConnectionId)))
+
+      ack must beLike {
+        case ServiceException(_, exception) =>
+          exception.getErrorId() must beEqualTo(NsiError.InvalidState.id)
+      }
     }
 
     "become terminating on terminate request" in new ReservedConnection {
