@@ -1,7 +1,13 @@
-@(title: String)(content: Html)
+@(title: String, activeMenu: String)(content: Html)
+
+@menus = @{
+  List(
+    ("usage", routes.Application.index),
+    ("connections", routes.Application.connections)
+  )
+}
 
 <!DOCTYPE html>
-
 <html>
     <head>
         <title>@title</title>
@@ -19,8 +25,9 @@
                 <div class="navbar-inner">
                     <div class="container">
                         <ul class="nav">
-                            <li class="active"><a href="#">Connections</a></li>
-                            <li><a href="#">New menu</a></li>
+                            @for((name, href) <- menus) {
+                              <li @if(name == activeMenu) {class="active"}><a href="@href">@name.capitalize</a></li>
+                            }
                         </ul>
                     </div>
                 </div>

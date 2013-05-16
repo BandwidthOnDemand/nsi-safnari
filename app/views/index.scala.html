@@ -1,10 +1,13 @@
-@main("Welcome to the NSI Aggregator Safnari") {
+@()(implicit request: play.api.mvc.RequestHeader)
+
+@main("Welcome to the NSI Safnari", "usage") {
 <section>
-    <h1>Welcome to the NSI Aggregator Safnari</h1>
+    <h1>Welcome</h1>
     <div class="content">
-        <ul>
-            <li><a href="@routes.ConnectionProvider.wsdl("")">Connection Provider Service endpoint</a></li>
-        </ul>
+        <h3>Using NSI Safnari</h3>
+        Safnari is a NSI Aggregator supporting the NSI v2 specification.<br/>
+        The location of the Connection Provider Service WSDL is <a href="@routes.ConnectionProvider.wsdl("")">@routes.ConnectionProvider.wsdl("").absoluteURL(false)</a>. This endpoint can be used to send NSI v2 request to.
     </div>
 </section>
 }
+

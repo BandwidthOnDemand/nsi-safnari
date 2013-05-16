@@ -1,0 +1,36 @@
+@(connections: Seq[org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType])
+
+@main("Connections", "connections") {
+<section>
+    <h1>Connections</h1>
+    <div class="content">
+
+        @if(connections.isEmpty) {
+            No Connections found
+        } else {
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>ConnectionId</th>
+                        <th>Description</th>
+                        <th>LSM</th>
+                        <th>RSM</th>
+                        <th>PSM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for(connection <- connections) {
+                        <tr>
+                            <td>@connection.getConnectionId()</td>
+                            <td>@connection.getDescription()</td>
+                            <td>@connection.getConnectionStates().getLifecycleState().getState()</td>
+                            <td>@connection.getConnectionStates().getReservationState().getState()</td>
+                            <td>@connection.getConnectionStates().getProvisionState().getState()</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</section>
+}
