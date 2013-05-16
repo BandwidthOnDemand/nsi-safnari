@@ -5,10 +5,32 @@
 <html>
     <head>
         <title>@title</title>
-        <link rel="stylesheet" media="screen" href="@routes.Assets.at("stylesheets/main.css")">
+        <link rel="stylesheet" media="screen" href="@routes.Assets.at("css/bootstrap.min.css")">
+        <link rel="stylesheet" media="screen" href="@routes.Assets.at("css/main.css")">
         <link rel="shortcut icon" type="image/png" href="@routes.Assets.at("images/favicon.png")">
     </head>
     <body>
-        @content
+        <div class="wrapper">
+            <header>
+                <a href="@routes.Application.index">Home</a>
+                <h1>NSI Safnari</h1>
+            </header>
+            <nav class="navbar">
+                <div class="navbar-inner">
+                    <div class="container">
+                        <ul class="nav">
+                            <li class="active"><a href="#">Connections</a></li>
+                            <li><a href="#">New menu</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+            @content
+            <footer>
+                <div class="content-some-dense">
+                    SURFnet bv | Postbus 19035, 3501 DA Utrecht | T +31 302 305 305 | F +31 302 305 329 | <a href="mailto:admin@@surfnet.nl">admin@@surfnet.nl</a><br/>
+                </div>
+            </footer>
+        </div>
     </body>
 </html>
