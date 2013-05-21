@@ -22,58 +22,29 @@
 }
 
 .table-striped {
-    tbody tr:nth-child(2n+1) td,
-    tbody tr:nth-child(2n+1) th {
-        background-color: @white;
-    }
-
-    tbody tr:nth-child(2n) td,
-    tbody tr:nth-child(2n) th {
-        background-color: @gray;
-    }
-
-    tbody tr.existing.odd td {
-        background-color: @white;
-    }
-
-    tbody tr.existing.even td {
-        background-color: @gray;
+    tbody {
+        > tr:nth-child(2n+1) > td,
+        > tr:nth-child(2n+1) > th {
+            background-color: @white;
+        }
+        > tr:nth-child(2n) > td,
+        > tr:nth-child(2n) > th {
+            background-color: @gray;
+        }
     }
 }
 
-
 /* table column/cell layout */
-
 .table {
     margin-bottom: 10px;
 
-    .cw35 {
-        width: 35px;
-    }
-
-    .cw55 {
-        width: 55px;
-    }
-
-    .cw65 {
-        width: 65px;
-    }
-
-    .cw70 {
-        width: 70px;
-    }
-
-    .cw75 {
-        width: 75px;
-    }
-
-    .cw80 {
-        width: 80px;
-    }
-
-    .center {
-        text-align: center;
-    }
+    .cw35 { width: 35px; }
+    .cw55 { width: 55px; }
+    .cw65 { width: 65px; }
+    .cw70 { width: 70px; }
+    .cw75 { width: 75px; }
+    .cw80 { width: 80px; }
+    .center { text-align: center; }
 
     a[rel="tooltip"],
     .disabled-icon,
@@ -87,96 +58,91 @@
 
     .rowdetails {
         position: relative;
-    }
 
-    .rowdetails td:first-child {
-        cursor: pointer;
-    }
+        td:first-child {
+            cursor: pointer;
+            &.disabled {
+                cursor: default;
+            }
+        }
+        .icon-minus-sign {
+            display: none;
+        }
+        &.expanded {
+            .icon-minus-sign {
+                display: inline;
+            }
+            .icon-plus-sign {
+                display: none;
+            }
+            .rowdetails-content {
+                display: block;
+            }
+        }
 
-    .rowdetails .icon-minus-sign {
-        display: none;
-    }
+        .rowdetails-content {
+            display: none;
+            position: absolute;
+            margin: 10px 16px 10px 38px;
+            width: 88%;
+            background-color: #ecf8fa;
+            border: 1px solid #85cadd;
+            .box-shadow(2px 2px 5px #bfbfbf);
 
-    .rowdetails.expanded .icon-minus-sign {
-        display: inline;
-    }
+            dt:after {
+                content: ":";
+            }
+            dd {
+                text-align: left;
+            }
+            &:before {
+                content: "";
+                position: absolute;
+                left: -12px;
+                top: -6px;
+                width: 11px;
+                height: 50%;
+                border-left: 1px solid #85cadd;
+                border-bottom: 1px solid #85cadd;
+            }
+            .table {
+                margin-bottom: 0;
+            }
+        }
 
-    .rowdetails.expanded .icon-plus-sign {
-        display: none;
-    }
+        th[colspan] {
+            padding-bottom: 3px;
+        }
 
-    .rowdetails.expanded .rowdetails-content {
-        display: block;
-    }
-
-    .rowdetails-content {
-        display: none;
-        position: absolute;
-        margin: 10px 16px 10px 38px;
-        width: 88%;
-        background-color: #ecf8fa;
-        border: 1px solid #85cadd;
-        .box-shadow(2px 2px 5px #bfbfbf);
-    }
-
-    .rowdetails .rowdetails-content dt:after {
-        content: ":";
-    }
-
-    .rowdetails .rowdetails-content dd {
-        text-align: left;
-    }
-
-    .rowdetails-content:before {
-        content: "";
-        position: absolute;
-        left: -12px;
-        top: -6px;
-        width: 11px;
-        height: 50%;
-        border-left: 1px solid #85cadd;
-        border-bottom: 1px solid #85cadd;
-    }
-
-    th[colspan] {
-        padding-bottom: 3px;
-    }
-
-    .subheader {
-        padding-top: 0;
+        .subheader {
+            padding-top: 0;
+        }
     }
 }
 
 /* sortable table */
-
 th.sortable {
     padding: 0;
-}
 
-th.sortable a {
-    display: block;
-    width: 100%;
-    margin: 0;
-    padding: 8px;
-    .box-sizing(border-box);
-}
-
-th.sortable a:hover {
-    text-decoration: none;
-}
-
-th.sortable i {
-    float: right;
-    visibility: hidden;
-}
-
-th.sortable:hover i {
-    visibility: visible;
-}
-
-th.sortable.headerSortDown i,
-th.sortable.headerSortUp i {
-    visibility: visible;
+    a {
+        display: block;
+        width: 100%;
+        margin: 0;
+        padding: 8px;
+        .box-sizing(border-box);
+        &:hover { text-decoration: none; }
+    }
+    i {
+        float: right;
+        visibility: hidden;
+    }
+    &:hover i {
+        visibility: visible;
+    }
+    &.headerSortDown i,
+    &.headerSortUp i {
+        visibility: visible;
+    }
 }
 
 th.sortable.headerSortDown i:before {

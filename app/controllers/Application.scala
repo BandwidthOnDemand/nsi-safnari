@@ -9,6 +9,9 @@ import scala.concurrent.duration._
 import akka.pattern.ask
 import akka.util.Timeout
 import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType
+import nl.surfnet.safnari.ConnectionId
+import nl.surfnet.safnari.ReservationState
+import nl.surfnet.safnari.ConnectionData
 
 object Application extends Controller {
   implicit val timeout = Timeout(2.seconds)
@@ -22,7 +25,7 @@ object Application extends Controller {
   def connections = Action {
     Async {
       Future.traverse(ConnectionManager.all) { c =>
-        c ? 'query map (_.asInstanceOf[QuerySummaryResultType])
+        (c ? 'query).map (_.asInstanceOf[QuerySummaryResultType]).flatMap(summary => c ? 'querySegments map (segs => (summary -> segs.asInstanceOf[Seq[ConnectionData]])))
       }.map { cs =>
         Ok(views.html.connections(cs))
       }

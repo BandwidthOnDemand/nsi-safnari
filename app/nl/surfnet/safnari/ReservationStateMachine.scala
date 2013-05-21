@@ -74,7 +74,7 @@ class ReservationStateMachine(
   id: ConnectionId, initialReserve: Reserve, pceReplyUri: URI,
   newCorrelationId: () => CorrelationId,
   outbound: Message => Unit,
-  reservationCommitted: ReservationStateMachineData => Unit,
+  reservationHeld: ReservationStateMachineData => Unit,
   failed: NsiError => GenericFailedType)
   extends FiniteStateMachine[ReservationState, ReservationStateMachineData](
     InitialReservationState,
@@ -161,12 +161,12 @@ class ReservationStateMachine(
 
           outbound(ToProvider(Reserve(correlationId, reserveType), segment.provider))
       }
-
     case PathComputationState -> FailedReservationState =>
       outbound(ToRequester(ReserveFailed(nextStateData.commandCorrelationId, failed(NsiError.PathComputationNoPath))))
     case CheckingReservationState -> FailedReservationState =>
       outbound(ToRequester(ReserveFailed(nextStateData.commandCorrelationId, failed(NsiError.ChildError).tap(_.getServiceException().withChildException(nextStateData.childExceptions.values.toSeq.asJava)))))
     case CheckingReservationState -> HeldReservationState =>
+      reservationHeld(nextStateData)
       outbound(ToRequester(ReserveConfirmed(nextStateData.commandCorrelationId, id, nextStateData.criteria)))
     case HeldReservationState -> CommittingReservationState =>
       nextStateData.connections.foreach {
@@ -181,18 +181,16 @@ class ReservationStateMachine(
           outbound(ToProvider(ReserveAbort(newCorrelationId(), connectionId), seg.provider))
       }
     case CommittingReservationState -> ReservedReservationState =>
-      reservationCommitted(nextStateData)
       outbound(ToRequester(ReserveCommitConfirmed(nextStateData.commandCorrelationId, id)))
     case CommittingReservationState -> CommitFailedReservationState =>
-      reservationCommitted(nextStateData)
       outbound(ToRequester(ReserveCommitFailed(nextStateData.commandCorrelationId, failed(NsiError.InternalError).tap(_.getServiceException().withChildException(stateData.childExceptions.values.toSeq.asJava)))))
     case ReservedReservationState -> CheckingReservationState => ???
     case FailedReservationState -> AbortingReservationState   => ???
     case AbortingReservationState -> ReservedReservationState => ???
   }
 
-//  def segmentKnown(connectionId: ConnectionId) = stateData.downstreamConnections.exists { case (id, _) => id == connectionId }
   def segmentKnown(connectionId: ConnectionId) = stateData.childConnectionStates.contains(connectionId)
+  def segments = stateData.childConnectionStates
   def reservationState = new ReservationStateType().withState(stateName.jaxb)
   def criteria = stateData.criteria
   def version = stateData.criteria.getVersion()

@@ -30,6 +30,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
 
   override def receive = {
     case 'query                     => sender ! query
+    case 'querySegments             => sender ! segments
 
     case SegmentKnown(connectionId) => sender ! rsm.segmentKnown(connectionId)
 
@@ -85,6 +86,10 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
       withLifecycleState(lsm.lifecycleState).
       withDataPlaneStatus(dsm.dataPlaneStatus(version))
   }
+
+  private def segments: Seq[ConnectionData] = rsm.segments.map {
+    case (id, rs) => ConnectionData(id, lsm.childState(id), rs.jaxb, psm.childState(id), dsm.childState(id))
+  }.toSeq
 
   private def messageNotApplicable(message: Message) = Vector(message match {
     case FromRequester(message) => ServiceException(message.correlationId, NsiError.InvalidState.toServiceException("NSA-ID"))

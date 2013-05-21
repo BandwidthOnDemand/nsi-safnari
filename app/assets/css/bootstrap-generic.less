@@ -44,22 +44,22 @@ section>div.content-dense>p
     color: inherit;
 }
 
-.disabled-icon {
-    display: inline-block;
-}
-
 .status-icon {
     display: inline-block;
 }
 
-.disabled-icon [class^="icon-"]:before,
-.disabled-icon [class*=" icon-"]:before {
-    color: gray;
+.disabled-icon {
+    display: inline-block;
+
+    &[class^="icon-"]:before,
+    &[class*=" icon-"]:before {
+        color: gray;
+    }
 }
 
 a:hover [class^="icon-"]:before,
 a:hover [class*=" icon-"]:before {
-    color:#005580;
+    color: #005580;
 }
 
 a[rel="tooltip"]:hover {
@@ -67,7 +67,6 @@ a[rel="tooltip"]:hover {
 }
 
 /* Overwrite for the datepicker + dropdown combo width (otherwise 100%) */
-
 .datepicker.dropdown-menu {
     width: auto;
 }

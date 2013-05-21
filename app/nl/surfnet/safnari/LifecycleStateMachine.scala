@@ -54,4 +54,6 @@ class LifecycleStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
   }
 
   def lifecycleState = new LifecycleStateType().withState(stateName)
+
+  def childState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }

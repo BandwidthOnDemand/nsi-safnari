@@ -3,16 +3,16 @@ package nl.surfnet.safnari
 import org.ogf.schemas.nsi._2013._04.connection.types.DataPlaneStatusType
 import javax.xml.datatype.XMLGregorianCalendar
 
-case class DataPlaneStateMachineData(providers: Map[ConnectionId, ProviderEndPoint], states: Map[ConnectionId, Boolean], timeStamp: Option[XMLGregorianCalendar]) {
+case class DataPlaneStateMachineData(providers: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, Boolean], timeStamp: Option[XMLGregorianCalendar]) {
 
   def initialize(providers: Map[ConnectionId, ProviderEndPoint]) =
     DataPlaneStateMachineData(providers, providers.keys.map(_ -> false).toMap, None)
 
-  def aggregatedProvisionStatus: Boolean = states.values.reduce(_ && _)
+  def aggregatedProvisionStatus: Boolean = childStates.values.reduce(_ && _)
 
   def updateState(connectionId: ConnectionId, state: Boolean, newTimeStamp: XMLGregorianCalendar) = {
     val latestTimeStamp = timeStamp.map(implicitly[Ordering[XMLGregorianCalendar]].max(_, newTimeStamp)).orElse(Some(newTimeStamp))
-    copy(states = states + (connectionId -> state), timeStamp = latestTimeStamp)
+    copy(childStates = childStates + (connectionId -> state), timeStamp = latestTimeStamp)
   }
 }
 
@@ -40,4 +40,6 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
   }
 
   def dataPlaneStatus(version: Int) = new DataPlaneStatusType().withVersion(version).withActive(stateName).withVersionConsistent(true)
+
+  def childState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }

@@ -1,4 +1,4 @@
-@(connections: Seq[org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType])
+@(connections: Seq[(org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType, Seq[nl.surfnet.safnari.ConnectionData])])
 
 @main("Connections", "connections") {
 <section>
@@ -11,21 +11,50 @@
             <table class="table table-bordered table-striped">
                 <thead>
                     <tr>
+                        <th></th>
                         <th>ConnectionId</th>
                         <th>Description</th>
                         <th>LSM</th>
                         <th>RSM</th>
                         <th>PSM</th>
+                        <th>DSM</th>
                     </tr>
                 </thead>
                 <tbody>
                     @for(connection <- connections) {
-                        <tr>
-                            <td>@connection.getConnectionId()</td>
-                            <td>@connection.getDescription()</td>
-                            <td>@connection.getConnectionStates().getLifecycleState().getState()</td>
-                            <td>@connection.getConnectionStates().getReservationState().getState()</td>
-                            <td>@connection.getConnectionStates().getProvisionState().getState()</td>
+                        <tr class="rowdetails">
+                            <td class="center @{if(connection._2.isEmpty) "disabled"}">
+                                @if(connection._2.isEmpty) {
+                                    <i class="disabled-icon icon-plus-sign"></i>
+                                } else {
+                                    <i class="icon-plus-sign"></i>
+                                    <i class="icon-minus-sign"></i>
+                                    <div class="rowdetails-content">
+                                        <table class="table table-bordered table-striped">
+                                            <thead>
+                                              <tr><th>ConnectionId</th><th>LSM</th><th>RSM</th><th>PSM</th><th>DSM</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                @for(segment <- connection._2) {
+                                                    <tr>
+                                                        <td>@segment.connectionId</td>
+                                                        <td>@segment.lifecycleState</td>
+                                                        <td>@segment.reservationState</td>
+                                                        <td>@segment.provisionState</td>
+                                                        <td>@segment.dataPlaneStatus</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            </td>
+                            <td>@connection._1.getConnectionId()</td>
+                            <td>@connection._1.getDescription()</td>
+                            <td>@connection._1.getConnectionStates().getLifecycleState().getState()</td>
+                            <td>@connection._1.getConnectionStates().getReservationState().getState()</td>
+                            <td>@connection._1.getConnectionStates().getProvisionState().getState()</td>
+                            <td>@connection._1.getConnectionStates().getDataPlaneStatus().isActive()</td>
                         </tr>
                     }
                 </tbody>
@@ -33,4 +62,6 @@
         }
     </div>
 </section>
+
 }
+

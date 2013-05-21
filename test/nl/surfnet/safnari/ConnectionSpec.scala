@@ -264,18 +264,19 @@ class ConnectionSpec extends helpers.Specification {
       }
     }
 
-    "initialize the provisioning state machine when reservation is committed" in new fixture {
-      given(InitialMessages ++ Seq(
-        FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
-        FromProvider(ReserveConfirmed(CorrelationId(0, 2), "ConnectionIdA", Criteria))): _*)
+    "be in unknown state when initial reserve" in new fixture {
+      given(InitialMessages: _*)
 
       provisionState.getState() must beEqualTo(ProvisionStateEnumType.UNKNOWN)
+    }
 
-      given(
-        FromRequester(ReserveCommit(CommitCorrelationId, ConnectionId)),
-        FromProvider(ReserveCommitConfirmed(CorrelationId(0, 3), "ConnectionIdA")))
+    "initialize the provisioning state machine when reservation is confirmed" in new fixture {
+      given(InitialMessages :+ FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))): _*)
+
+      when(FromProvider(ReserveConfirmed(CorrelationId(0, 2), "ConnectionIdA", Criteria)))
 
       provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
+
     }
 
     "become provisioning on provision request" in new ReservedConnection with Released {

@@ -73,4 +73,6 @@ class ProvisionStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
   }
 
   def provisionState = new ProvisionStateType().withState(stateName)
+
+  def childState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }
