@@ -5,4 +5,6 @@ abstract class Specification
     extends org.specs2.mutable.Specification
     with org.specs2.execute.PendingUntilFixed
     with org.specs2.time.NoTimeConversions
-    with org.specs2.ScalaCheck
+    with org.specs2.ScalaCheck {
+  def testConfiguration = Map("db.default.url" -> "jdbc:h2:mem:test")
+}

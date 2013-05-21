@@ -30,7 +30,7 @@ import javax.xml.ws.Holder
 class JaxWsClientSpec extends helpers.Specification {
 
   val ServerPort = Helpers.testServerPort
-  val Application = FakeApplication(additionalConfiguration = Map("nsi.base.url" -> s"http://localhost:$ServerPort"))
+  def Application = FakeApplication(additionalConfiguration = testConfiguration ++ Map("nsi.base.url" -> s"http://localhost:$ServerPort"))
 
   "A JAX WS client" should {
 

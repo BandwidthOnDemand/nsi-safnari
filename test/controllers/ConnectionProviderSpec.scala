@@ -20,7 +20,7 @@ class ConnectionProviderSpec extends helpers.Specification {
     withPath(new PathType().withDirectionality(DirectionalityType.BIDIRECTIONAL)))
   val CorrelationId = newCorrelationId
 
-  val Application = FakeApplication(additionalConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
+  def Application = FakeApplication(additionalConfiguration = testConfiguration ++ Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
 
   "Reserve operation" should {
 
