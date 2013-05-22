@@ -4,7 +4,7 @@ import java.net.URI
 import java.util.UUID
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
-case class NsiEnvelope[T](headers: NsiHeaders, body: T) {
+case class NsiEnvelope[+T](headers: NsiHeaders, body: T) {
   def replyTo = headers.replyTo
 }
 

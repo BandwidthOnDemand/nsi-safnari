@@ -13,7 +13,7 @@ import javax.xml.transform.Source
 import org.ogf.schemas.nsi._2011._10.connection._interface.ProvisionConfirmedRequestType
 import play.api.Logger
 
-trait ToXmlDocument[-A] {
+trait ToXmlDocument[A] {
   def asDocument(a: A): Document
 }
 object ToXmlDocument {

@@ -33,7 +33,7 @@ class PceMessageSpec extends helpers.Specification {
       val json = Json.toJson(request)
 
       json \ "correlation-id" must beEqualTo(JsString(correlationId.toString))
-      Json.fromJson[PathComputationRequest](json) must beEqualTo(JsSuccess(request))
+      Json.fromJson[PceRequest](json) must beEqualTo(JsSuccess(request))
     }
 
     "serialize computation failed response to json" in {

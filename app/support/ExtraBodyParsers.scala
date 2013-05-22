@@ -10,8 +10,6 @@ import play.api.libs.iteratee._
 import play.api.libs.iteratee.Input.Empty
 import play.api.mvc._
 import play.api.mvc.BodyParsers.parse.when
-import org.ogf.schemas.nsi._2013._04.connection.types._
-import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
 import scala.util.control.NonFatal
 import javax.xml.validation.SchemaFactory
 import javax.xml.XMLConstants
@@ -52,16 +50,13 @@ object ExtraBodyParsers {
 
   def NsiEndPoint[T <: NsiMessage](parser: BodyParser[NsiEnvelope[T]])(action: NsiEnvelope[T] => Future[NsiAcknowledgement]) = Action(parser) { request =>
     Logger.debug(s"Received: ${request.body.body}")
-    AsyncResult { action(request.body).map { response =>
-      Logger.debug(s"Respond: $response")
-      Results.Ok(NsiEnvelope(request.body.headers.asReply, response))
+    AsyncResult {
+      action(request.body).map { response =>
+        Logger.debug(s"Respond: $response")
+        Results.Ok(NsiEnvelope(request.body.headers.asReply, response))
       }
     }
   }
-
-  def nsiProviderOperation = nsiBodyParser(bodyNameToProviderOperation)
-
-  def nsiRequesterOperation = nsiBodyParser(bodyNameToRequesterOperation)
 
   def soap: BodyParser[SOAPMessage] = soap(BodyParsers.parse.DEFAULT_MAX_TEXT_LENGTH)
 
@@ -70,8 +65,8 @@ object ExtraBodyParsers {
     tolerantSoap(maxLength),
     _ => Results.BadRequest("Expecting " + SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
-  import scala.language.reflectiveCalls
   def tolerantSoap(maxLength: Int): BodyParser[SOAPMessage] = BodyParser("SOAP, maxLength=" + maxLength) { request =>
+    import scala.language.reflectiveCalls
     Traversable.takeUpTo[Array[Byte]](maxLength).apply(Iteratee.consume[Array[Byte]]().mapDone { bytes =>
       Try {
         val message = MessageFactory.newInstance().createMessage(new MimeHeaders, new ByteArrayInputStream(bytes))
@@ -88,43 +83,13 @@ object ExtraBodyParsers {
       }
   }
 
-  private val NsiFrameworkHeaderNamespace = "http://schemas.ogf.org/nsi/2013/04/framework/headers"
-  private val NsiConnectionTypesNamespace = "http://schemas.ogf.org/nsi/2013/04/connection/types"
+  private[support] def nsiProviderOperation = nsiBodyParser(StoredMessage.soapToNsiMessage(StoredMessage.bodyNameToProviderOperation))
 
-  trait NsiRequestMessageFactory[T] {
-    type JaxbMessage
-    def klass: Class[JaxbMessage]
-    def apply(headers: NsiHeaders, body: JaxbMessage): NsiEnvelope[T]
-  }
+  private[support] def nsiRequesterOperation = nsiBodyParser(StoredMessage.soapToNsiMessage(StoredMessage.bodyNameToRequesterOperation))
 
-  def NsiRequestMessageFactory[M, T](f: (CorrelationId, M) => T)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory[T] {
-    override type JaxbMessage = M
-    override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]
-    override def apply(headers: NsiHeaders, body: M): NsiEnvelope[T] = NsiEnvelope(headers, f(headers.correlationId, body))
-  }
-
-  def nsiBodyParser[T <: NsiMessage](elementToFactory: org.w3c.dom.Element => Either[String, NsiRequestMessageFactory[T]]): BodyParser[NsiEnvelope[T]] = soap.flatMap { soapMessage =>
+  private def nsiBodyParser[T <: NsiMessage](soapMessageParser: SOAPMessage => Either[String, NsiEnvelope[T]]): BodyParser[NsiEnvelope[T]] = soap.flatMap { soapMessage =>
     BodyParser { requestHeader =>
-      val unmarshaller = ToXmlDocument.unmarshaller
-
-      val parsedMessage = for {
-        headerNode <- onlyChildElementWithNamespace(NsiFrameworkHeaderNamespace, soapMessage.getSOAPHeader()).right
-        header <- tryEither(unmarshaller.unmarshal(headerNode, classOf[CommonHeaderType]).getValue).right
-        protocolVersion <- tryEither(URI.create(header.getProtocolVersion())).right
-        correlationId <- CorrelationId.fromString(header.getCorrelationId()).toRight("bad correlation id").right
-        replyTo <- tryEither(Option(header.getReplyTo()).map(URI.create)).right
-        bodyNode <- onlyChildElementWithNamespace(NsiConnectionTypesNamespace, soapMessage.getSOAPBody()).right
-        messageFactory <- elementToFactory(bodyNode).right
-        body <- tryEither(unmarshaller.unmarshal(bodyNode, messageFactory.klass).getValue).right
-      } yield {
-        val headers = NsiHeaders(
-          correlationId = correlationId,
-          requesterNSA = header.getRequesterNSA(),
-          providerNSA = header.getProviderNSA(),
-          replyTo = replyTo,
-          protocolVersion = protocolVersion)
-        messageFactory(headers, body)
-      }
+      val parsedMessage = soapMessageParser(soapMessage)
 
       Done(parsedMessage.left.map { error =>
         Logger.warn(s"Failed to parse $soapMessage with $error")
@@ -132,40 +97,4 @@ object ExtraBodyParsers {
       })
     }
   }
-
-  private val MessageProviderFactories = messageFactories(Map(
-    "reserve" -> NsiRequestMessageFactory[ReserveType, NsiProviderOperation](Reserve),
-    "reserveCommit" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => ReserveCommit(correlationId, body.getConnectionId())),
-    "reserveAbort" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => ReserveAbort(correlationId, body.getConnectionId())),
-    "provision" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Provision(correlationId, body.getConnectionId())),
-    "release" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Release(correlationId, body.getConnectionId())),
-    "terminate" -> NsiRequestMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Terminate(correlationId, body.getConnectionId())),
-    "querySummary" -> NsiRequestMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => QuerySummary(correlationId, body.getConnectionId().asScala)),
-    "querySummarySync" -> NsiRequestMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => QuerySummarySync(correlationId, body.getConnectionId().asScala))
-  )) _
-
-  private val MessageRequesterFactories = messageFactories(Map(
-    "reserveConfirmed" -> NsiRequestMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveConfirmed(correlationId, body.getConnectionId(), body.getCriteria().asScala.head)),
-    "reserveCommitConfirmed" -> NsiRequestMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveCommitConfirmed(correlationId, body.getConnectionId)),
-    "provisionConfirmed" -> NsiRequestMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ProvisionConfirmed(correlationId, body.getConnectionId)),
-    "releaseConfirmed" -> NsiRequestMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ReleaseConfirmed(correlationId, body.getConnectionId)),
-    "terminateConfirmed" -> NsiRequestMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => TerminateConfirmed(correlationId, body.getConnectionId)),
-    "dataPlaneStateChange" -> NsiRequestMessageFactory[DataPlaneStateChangeRequestType, NsiRequesterOperation]((correlationId, body) => DataPlaneStateChange(correlationId, body.getConnectionId(), body.getDataPlaneStatus(), body.getTimeStamp()))
-  )) _
-
-  private def messageFactories[T <: NsiMessage](factories: Map[String, NsiRequestMessageFactory[T]])(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[T]] =
-    factories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
-
-  private def bodyNameToProviderOperation(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[NsiProviderOperation]] = MessageProviderFactories(bodyNode)
-
-  private def bodyNameToRequesterOperation(bodyNode: org.w3c.dom.Element): Either[String, NsiRequestMessageFactory[NsiRequesterOperation]] = MessageRequesterFactories(bodyNode)
-
-  private def onlyChildElementWithNamespace(namespaceUri: String, elem: SOAPElement) =
-    elem.getChildElements().asScala.collect {
-      case e: org.w3c.dom.Element if e.getNamespaceURI() == namespaceUri => e
-    }.toList match {
-      case Nil      => Left(s"missing NSI element in '${elem.getLocalName}', expected one")
-      case e :: Nil => Right(e)
-      case _        => Left(s"multiple NSI elements in '${elem.getLocalName}', expected one")
-    }
 }

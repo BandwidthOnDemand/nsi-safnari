@@ -13,7 +13,8 @@ import javax.xml.datatype.DatatypeFactory
 sealed trait PceMessage {
   def correlationId: CorrelationId
 }
-case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, criteria: ReservationConfirmCriteriaType) extends PceMessage
+sealed trait PceRequest extends PceMessage
+case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, criteria: ReservationConfirmCriteriaType) extends PceRequest
 
 sealed trait PceResponse extends PceMessage
 case class PathComputationFailed(correlationId: CorrelationId) extends PceResponse
@@ -94,7 +95,7 @@ object PceMessage {
   }
   implicit val XMLGregorianCalendarWrites: Writes[XMLGregorianCalendar] = Writes { x => JsString(x.toString) }
 
-  implicit val PceRequestFormat: Format[PathComputationRequest] = (
+  implicit val PceRequestFormat: Format[PceRequest] = (
     (__ \ "source-stp").format[StpType] and
     (__ \ "destination-stp").format[StpType] and
     (__ \ "start-time").format[Option[XMLGregorianCalendar]] and

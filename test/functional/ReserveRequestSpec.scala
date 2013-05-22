@@ -39,15 +39,15 @@ class ReserveRequestSpec extends helpers.Specification {
         case NsiEnvelope(headers, reserve: Reserve) =>
           val connectionId = newConnectionId
           headers.replyTo.foreach { replyTo =>
-            WS.url(replyTo.toASCIIString()).post(NsiEnvelope(headers.asReply, ReserveConfirmed(headers.correlationId, connectionId, Injection.invert(reserve.body.getCriteria()).get)))
+            WS.url(replyTo.toASCIIString()).post(NsiEnvelope(headers.asReply, ReserveConfirmed(headers.correlationId, connectionId, Injection.invert(reserve.body.getCriteria()).get): NsiRequesterOperation))
           }
           Future.successful(ReserveResponse(headers.correlationId, connectionId))
       })
       case "/fake/pce" =>
         Some(Action(BodyParsers.parse.json) { request =>
-          val pceRequest = Json.fromJson[PathComputationRequest](request.body)
+          val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
-            case JsSuccess(request, _) =>
+            case JsSuccess(request: PathComputationRequest, _) =>
               val response = PathComputationConfirmed(request.correlationId, ComputedSegment(request.criteria.getPath().getSourceSTP(), request.criteria.getPath().getDestSTP(), ProviderEndPoint("provider-nsa", URI.create(FakeProviderUri), NoAuthentication)) :: Nil)
               WS.url(request.replyTo.toASCIIString()).post(Json.toJson(response))
               Results.Ok

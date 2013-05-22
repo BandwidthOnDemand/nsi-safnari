@@ -8,18 +8,28 @@ import anorm._
 class MessageStoreSpec extends helpers.Specification {
   def Application = FakeApplication(additionalConfiguration = testConfiguration)
 
+  val messageStore = new MessageStore[Either[NsiEnvelope[NsiMessage], PceMessage]]()
+
   "MessageStore" should {
-    "store a message" in new WithApplication(Application) {
-      val message = StoredMessage(newCorrelationId, "test-protocol", "test-message")
-      new MessageStore[StoredMessage]().store(newConnectionId, message) must not(beNull)
+    "store a PCE message" in new WithApplication(Application) {
+      val aggregatedConnectionId = newConnectionId
+      val message = PceMessageSpec.pathComputationRequest
+      messageStore.store(aggregatedConnectionId, Right(message)) must not(beNull)
+
+      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      loaded must haveOneElementLike {
+        case Right(request) => request must beEqualTo(message)
+      }
     }
 
-    "store an PCE message" in new WithApplication(Application) {
-      val message = PceMessageSpec.pathComputationRequest
-      new MessageStore[Either[NsiEnvelope[NsiMessage], PceMessage]]().store(newConnectionId, Right(message)) must not(beNull)
+    "store a NSI message" in new WithApplication(Application) {
+      val aggregatedConnectionId = newConnectionId
+      val message = NsiMessageSpec.initialReserveMessage
+      messageStore.store(aggregatedConnectionId, Left(message)) must not(beNull)
 
-      DB.withConnection { implicit conn =>
-        SQL("SELECT content FROM messages").apply().head[String]("content") must contain(message.correlationId.toString)
+      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      loaded must haveOneElementLike {
+        case Left(request) => request must beEqualTo(message)
       }
     }
   }

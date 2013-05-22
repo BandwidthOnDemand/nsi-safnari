@@ -7,6 +7,7 @@ CREATE TABLE messages (
   aggregated_connection_id UUID NOT NULL,
   correlation_id UUID NOT NULL,
   protocol VARCHAR NOT NULL,
+  type VARCHAR NOT NULL,
   content VARCHAR NOT NULL,
   created_at TIMESTAMP NOT NULL,
   PRIMARY KEY (id)

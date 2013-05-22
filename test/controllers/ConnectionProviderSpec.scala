@@ -11,14 +11,7 @@ import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends helpers.Specification {
-
-  def withEnvelope[T <: NsiMessage](message: T) = NsiEnvelope(NsiHeaders(message.correlationId, "RequesterNSA", "ProviderNSA", None), message)
-  val InitialReserveType = new ReserveType().withCriteria(new ReservationRequestCriteriaType().
-    withSchedule(new ScheduleType()).
-    withBandwidth(100).
-    withServiceAttributes(new TypeValuePairListType()).
-    withPath(new PathType().withDirectionality(DirectionalityType.BIDIRECTIONAL)))
-  val CorrelationId = newCorrelationId
+  import nl.surfnet.safnari.NsiMessageSpec._
 
   def Application = FakeApplication(additionalConfiguration = testConfiguration ++ Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
 
