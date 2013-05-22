@@ -6,8 +6,7 @@ import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types._
 import play.api.data.validation.ValidationError
 
-@org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class PceMessageSpec extends helpers.Specification {
+object PceMessageSpec {
   val sourceStp = new StpType().withNetworkId("network-id").withLocalId("source")
 
   val destStp = new StpType().withNetworkId("network-id").withLocalId("dest")
@@ -17,6 +16,12 @@ class PceMessageSpec extends helpers.Specification {
     withPath(new PathType().withSourceSTP(sourceStp).withDestSTP(destStp))
 
   val correlationId = newCorrelationId
+
+  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), criteria)
+}
+@org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
+class PceMessageSpec extends helpers.Specification {
+  import PceMessageSpec._
 
   "PceMessages" should {
 

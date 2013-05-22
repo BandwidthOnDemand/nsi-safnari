@@ -34,14 +34,7 @@ object ExtraBodyParsers {
 
   implicit def NsiMessageWriteable[T: ToXmlDocument]: Writeable[NsiEnvelope[T]] = Writeable { message =>
     try {
-      val soap = MessageFactory.newInstance().createMessage()
-
-      val header = SOAPFactory.newInstance().createElement(ToXmlDocument[NsiHeaders].asDocument(message.headers).getDocumentElement())
-
-      soap.getSOAPBody().addDocument(ToXmlDocument[T].asDocument(message.body))
-      soap.getSOAPHeader().addChildElement(header)
-      soap.saveChanges()
-
+      val soap = StoredMessage.nsiMessageToSoapMessage(message)
       new ByteArrayOutputStream().tap(soap.writeTo).toByteArray
     } catch {
       case NonFatal(e) =>

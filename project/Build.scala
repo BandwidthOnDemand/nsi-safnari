@@ -9,10 +9,10 @@ object ApplicationBuild extends Build {
 
   val appDependencies = Seq(
     jdbc,
+    anorm,
     "nl.surfnet.bod" % "bod-nsi" % "0.2.1-SNAPSHOT" changing(),
     "org.scala-stm" %% "scala-stm" % "0.7",
     "com.twitter" %% "bijection-core" % "0.3.0",
-    "com.typesafe.slick" %% "slick" % "1.0.1-RC1",
     "com.h2database" % "h2" % "1.3.171",
     "org.scalacheck" %% "scalacheck" % "1.10.1" % "test",
     "com.typesafe.akka" %% "akka-testkit" % "2.1.0" % "test"
