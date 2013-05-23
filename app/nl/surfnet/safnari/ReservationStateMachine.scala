@@ -7,16 +7,16 @@ import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 import scala.collection.JavaConverters._
 
 sealed abstract class ReservationState(val jaxb: ReservationStateEnumType)
-case object InitialReservationState extends ReservationState(ReservationStateEnumType.INITIAL)
+case object InitialReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
 case object FailedReservationState extends ReservationState(ReservationStateEnumType.RESERVE_FAILED)
-case object ReservedReservationState extends ReservationState(ReservationStateEnumType.RESERVED)
+case object ReservedReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
 case object PathComputationState extends ReservationState(ReservationStateEnumType.RESERVE_CHECKING)
 case object CheckingReservationState extends ReservationState(ReservationStateEnumType.RESERVE_CHECKING)
 case object HeldReservationState extends ReservationState(ReservationStateEnumType.RESERVE_HELD)
 case object CommittingReservationState extends ReservationState(ReservationStateEnumType.RESERVE_COMMITTING)
-case object CommitFailedReservationState extends ReservationState(ReservationStateEnumType.RESERVED)
+case object CommitFailedReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
 case object AbortingReservationState extends ReservationState(ReservationStateEnumType.RESERVE_ABORTING)
-case object AbortedReservationState extends ReservationState(ReservationStateEnumType.RESERVED)
+case object AbortedReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
 case object TimeoutReservationState extends ReservationState(ReservationStateEnumType.RESERVE_TIMEOUT)
 
 case class ReservationStateMachineData(

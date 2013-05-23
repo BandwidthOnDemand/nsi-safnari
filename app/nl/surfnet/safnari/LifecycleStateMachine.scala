@@ -8,12 +8,12 @@ import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateType
 case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, LifecycleStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
 
   def initialize(children: Map[ConnectionId, ProviderEndPoint]) = {
-    LifecycleStateMachineData(children, children.keys.map(_ -> INITIAL).toMap)
+    LifecycleStateMachineData(children, children.keys.map(_ -> CREATED).toMap)
   }
 
   def aggregatedLifecycleStatus: LifecycleStateEnumType = {
     if (childStates.values.exists(_ == UNKNOWN)) UNKNOWN
-    else if (childStates.values.forall(_ == INITIAL)) INITIAL
+    else if (childStates.values.forall(_ == CREATED)) CREATED
     else if (childStates.values.exists(_ == TERMINATING)) TERMINATING
     else if (childStates.values.forall(_ == TERMINATED)) TERMINATED
     else throw new IllegalStateException(s"cannot determine aggregated status from ${childStates.values}")
@@ -26,9 +26,9 @@ case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     childStates.getOrElse(connectionId, UNKNOWN) == state
 }
 
-class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, outbound: Message => Unit) extends FiniteStateMachine(INITIAL, new LifecycleStateMachineData(Map.empty, Map.empty)) {
+class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, outbound: Message => Unit) extends FiniteStateMachine(CREATED, new LifecycleStateMachineData(Map.empty, Map.empty)) {
 
-  when(INITIAL) {
+  when(CREATED) {
     case Event(children: Map[_, _], data) =>
       stay using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ProviderEndPoint]))
     case Event(FromRequester(message: Terminate), data) =>
@@ -36,7 +36,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   }
 
   when(TERMINATING) {
-    case Event(FromProvider(message: TerminateConfirmed), data) if data.childHasState(message.connectionId, INITIAL)=>
+    case Event(FromProvider(message: TerminateConfirmed), data) if data.childHasState(message.connectionId, CREATED)=>
       val newData = data.updateChild(message.connectionId, TERMINATED)
       goto(newData.aggregatedLifecycleStatus) using(newData) replying message.ack
   }
@@ -44,7 +44,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   when(TERMINATED)(PartialFunction.empty)
 
   onTransition {
-    case INITIAL -> TERMINATING =>
+    case CREATED -> TERMINATING =>
       stateData.children.foreach {
         case (connectionId, provider) =>
           outbound(ToProvider(Terminate(newNsiHeaders(provider), connectionId), provider))
