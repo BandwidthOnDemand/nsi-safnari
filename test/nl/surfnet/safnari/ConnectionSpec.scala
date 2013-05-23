@@ -240,7 +240,7 @@ class ConnectionSpec extends helpers.Specification {
       when(FromProvider(ReserveCommitConfirmed(Headers.copy(correlationId = CorrelationId(0, 3)), "ConnectionIdA")))
 
       messages must contain(ToRequester(ReserveCommitConfirmed(Headers.copy(correlationId = CommitCorrelationId).asReply, ConnectionId)))
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVED)
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
     }
 
     "reject commit when in initial state" in new fixture {
