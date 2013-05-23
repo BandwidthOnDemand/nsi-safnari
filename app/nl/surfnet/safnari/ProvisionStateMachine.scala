@@ -29,7 +29,7 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   when(UNKNOWN) {
     case Event(children: Map[_, _], data) =>
-      goto(RELEASED) using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ProviderEndPoint]))
+      goto(RELEASED) using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ComputedSegment].provider))
   }
 
   when(RELEASED) {
@@ -74,5 +74,5 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   def provisionState = new ProvisionStateType().withState(stateName)
 
-  def childState(connectionId: ConnectionId) = stateData.childStates(connectionId)
+  def childConnectionState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }

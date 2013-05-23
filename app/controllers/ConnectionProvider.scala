@@ -83,7 +83,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   }
 
   private def queryConnections(connectionIds: Seq[ConnectionId]) = {
-    val cs: Seq[ActorRef] = if (connectionIds.isEmpty) ConnectionManager.all else ConnectionManager.find(connectionIds)
+    val cs = if (connectionIds.isEmpty) ConnectionManager.all else ConnectionManager.find(connectionIds)
     Future.traverse(cs)(c => c ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
   }
 

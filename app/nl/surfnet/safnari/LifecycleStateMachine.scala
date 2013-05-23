@@ -30,7 +30,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   when(CREATED) {
     case Event(children: Map[_, _], data) =>
-      stay using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ProviderEndPoint]))
+      stay using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ComputedSegment].provider))
     case Event(FromRequester(message: Terminate), data) =>
       goto(TERMINATING) using(data.copy(commandHeaders = Some(message.headers))) replying message.ack
   }
@@ -55,5 +55,5 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   def lifecycleState = new LifecycleStateType().withState(stateName)
 
-  def childState(connectionId: ConnectionId) = stateData.childStates(connectionId)
+  def childConnectionState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }

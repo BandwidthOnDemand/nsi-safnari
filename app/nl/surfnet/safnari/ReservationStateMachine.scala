@@ -64,9 +64,8 @@ case class ReservationStateMachineData(
   def childHasState(connectionId: ConnectionId, state: ReservationState) =
     childConnectionStates.getOrElse(connectionId, CheckingReservationState) == state
 
-  def children = connections.map {
-    case (connectionId, correlationId) =>
-      connectionId -> segments(correlationId).provider
+  def children: Map[ConnectionId, ComputedSegment] = connections.map {
+    case (connectionId, correlationId) => connectionId -> segments(correlationId)
   }
 }
 
@@ -193,7 +192,8 @@ class ReservationStateMachine(
   }
 
   def segmentKnown(connectionId: ConnectionId) = stateData.childConnectionStates.contains(connectionId)
-  def segments = stateData.childConnectionStates
+  def childConnectionStates: Map[ConnectionId, ReservationState] = stateData.childConnectionStates
+  def childConnections: Map[ConnectionId, ComputedSegment] = stateData.children
   def reservationState = new ReservationStateType().withState(stateName.jaxb)
   def criteria = stateData.criteria
   def version = stateData.criteria.getVersion()

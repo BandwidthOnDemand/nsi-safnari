@@ -20,7 +20,7 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newNsiHeaders: () => Nsi
 
   when(false) {
     case Event(downstreamConnections: Map[_, _], data) =>
-      stay using data.initialize(downstreamConnections.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ProviderEndPoint]))
+      stay using data.initialize(downstreamConnections.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ComputedSegment].provider))
   }
 
   when(true)(PartialFunction.empty)
@@ -41,5 +41,5 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newNsiHeaders: () => Nsi
 
   def dataPlaneStatus(version: Int) = new DataPlaneStatusType().withVersion(version).withActive(stateName).withVersionConsistent(true)
 
-  def childState(connectionId: ConnectionId) = stateData.childStates(connectionId)
+  def childConnectionState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }

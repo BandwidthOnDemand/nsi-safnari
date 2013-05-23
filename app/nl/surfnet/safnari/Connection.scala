@@ -70,6 +70,17 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
   }
 
   private def query = {
+    val children = rsm.childConnections.zipWithIndex.map {
+      case ((id, segment), order) => new SummaryPathType().
+        withConnectionId(id).
+        withProviderNSA(segment.provider.nsa).
+        withPath(new PathType().
+            withSourceSTP(segment.sourceStp).
+            withDestSTP(segment.destinationStp).
+            withDirectionality(DirectionalityType.BIDIRECTIONAL)).
+        withOrder(order)
+    }
+
     new QuerySummaryResultType().
       withGlobalReservationId(initialReserve.body.getGlobalReservationId()).
       withDescription(initialReserve.body.getDescription()).
@@ -77,7 +88,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
       withCriteria(rsm.criteria).
       withRequesterNSA(requesterNSA).
       withConnectionStates(connectionStates).
-      withChildren(null /*TODO*/ )
+      withChildren(new ChildSummaryListType().withChild(children.toSeq: _*))
   }
 
   def connectionStates: ConnectionStatesType = {
@@ -89,8 +100,8 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
       withDataPlaneStatus(dsm.dataPlaneStatus(version))
   }
 
-  private def segments: Seq[ConnectionData] = rsm.segments.map {
-    case (id, rs) => ConnectionData(id, lsm.childState(id), rs.jaxb, psm.childState(id), dsm.childState(id))
+  private def segments: Seq[ConnectionData] = rsm.childConnectionStates.map {
+    case (id, rs) => ConnectionData(id, lsm.childConnectionState(id), rs.jaxb, psm.childConnectionState(id), dsm.childConnectionState(id))
   }.toSeq
 
   private def messageNotApplicable(message: Message) = Vector(message match {

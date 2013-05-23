@@ -272,6 +272,17 @@ class ConnectionSpec extends helpers.Specification {
       response must beLike {
         case result: QuerySummaryResultType =>
           result.getConnectionId() must beEqualTo(ConnectionId)
+          result.getChildren().getChild() must haveSize(0)
+      }
+    }
+
+    "provide information about connections with children" in new ReservedConnection {
+      given(InitialMessages: _*)
+
+      val response = when('query)
+
+      response must beLike {
+        case result: QuerySummaryResultType => result.getChildren().getChild() must haveSize(1)
       }
     }
 
