@@ -5,7 +5,7 @@ import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateEnumType
 import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateType
 
 
-case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, LifecycleStateEnumType], correlationId: Option[CorrelationId] = None) {
+case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, LifecycleStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
 
   def initialize(children: Map[ConnectionId, ProviderEndPoint]) = {
     LifecycleStateMachineData(children, children.keys.map(_ -> INITIAL).toMap)
@@ -26,19 +26,19 @@ case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     childStates.getOrElse(connectionId, UNKNOWN) == state
 }
 
-class LifecycleStateMachine(connectionId: ConnectionId, newCorrelationId: () => CorrelationId, outbound: Message => Unit) extends FiniteStateMachine(INITIAL, new LifecycleStateMachineData(Map.empty, Map.empty)) {
+class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, outbound: Message => Unit) extends FiniteStateMachine(INITIAL, new LifecycleStateMachineData(Map.empty, Map.empty)) {
 
   when(INITIAL) {
     case Event(children: Map[_, _], data) =>
       stay using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ProviderEndPoint]))
     case Event(FromRequester(message: Terminate), data) =>
-      goto(TERMINATING) using(data.copy(correlationId = Some(message.correlationId))) replying GenericAck(message.correlationId)
+      goto(TERMINATING) using(data.copy(commandHeaders = Some(message.headers))) replying message.ack
   }
 
   when(TERMINATING) {
     case Event(FromProvider(message: TerminateConfirmed), data) if data.childHasState(message.connectionId, INITIAL)=>
       val newData = data.updateChild(message.connectionId, TERMINATED)
-      goto(newData.aggregatedLifecycleStatus) using(newData) replying GenericAck(message.correlationId)
+      goto(newData.aggregatedLifecycleStatus) using(newData) replying message.ack
   }
 
   when(TERMINATED)(PartialFunction.empty)
@@ -47,10 +47,10 @@ class LifecycleStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
     case INITIAL -> TERMINATING =>
       stateData.children.foreach {
         case (connectionId, provider) =>
-          outbound(ToProvider(Terminate(newCorrelationId(), connectionId), provider))
+          outbound(ToProvider(Terminate(newNsiHeaders(provider), connectionId), provider))
       }
     case TERMINATING -> TERMINATED =>
-      outbound(ToRequester(TerminateConfirmed(stateData.correlationId.get, connectionId)))
+      outbound(ToRequester(TerminateConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
   }
 
   def lifecycleState = new LifecycleStateType().withState(stateName)

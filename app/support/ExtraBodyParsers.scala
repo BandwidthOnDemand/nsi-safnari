@@ -28,9 +28,9 @@ import play.api.libs.concurrent.Execution.Implicits._
 object ExtraBodyParsers {
   private val logger = Logger("ExtraBodyParsers")
 
-  implicit def NsiMessageContentType[T: ToXmlDocument]: ContentTypeOf[NsiEnvelope[T]] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+  implicit def NsiMessageContentType[T: ToXmlDocument]: ContentTypeOf[T] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
-  implicit def NsiMessageWriteable[T: ToXmlDocument]: Writeable[NsiEnvelope[T]] = Writeable { message =>
+  implicit def NsiMessageWriteable[T <: NsiMessage: ToXmlDocument]: Writeable[T] = Writeable { message =>
     try {
       val soap = StoredMessage.nsiMessageToSoapMessage(message)
       new ByteArrayOutputStream().tap(soap.writeTo).toByteArray
@@ -42,18 +42,18 @@ object ExtraBodyParsers {
     }
   }
 
-  def NsiProviderEndPoint(action: NsiEnvelope[NsiProviderOperation] => Future[NsiAcknowledgement]): Action[NsiEnvelope[NsiProviderOperation]] =
+  def NsiProviderEndPoint(action: NsiProviderOperation => Future[NsiAcknowledgement]): Action[NsiProviderOperation] =
     NsiEndPoint(nsiProviderOperation)(action)
 
-  def NsiRequesterEndPoint(action: NsiEnvelope[NsiRequesterOperation] => Future[NsiAcknowledgement]): Action[NsiEnvelope[NsiRequesterOperation]] =
+  def NsiRequesterEndPoint(action: NsiRequesterOperation => Future[NsiAcknowledgement]): Action[NsiRequesterOperation] =
     NsiEndPoint(nsiRequesterOperation)(action)
 
-  def NsiEndPoint[T <: NsiMessage](parser: BodyParser[NsiEnvelope[T]])(action: NsiEnvelope[T] => Future[NsiAcknowledgement]) = Action(parser) { request =>
-    Logger.debug(s"Received: ${request.body.body}")
+  def NsiEndPoint[T <: NsiMessage](parser: BodyParser[T])(action: T => Future[NsiAcknowledgement]) = Action(parser) { request =>
+    Logger.debug(s"Received: ${request.body}")
     AsyncResult {
       action(request.body).map { response =>
         Logger.debug(s"Respond: $response")
-        Results.Ok(NsiEnvelope(request.body.headers.asReply, response))
+        Results.Ok(response)
       }
     }
   }
@@ -87,7 +87,7 @@ object ExtraBodyParsers {
 
   private[support] def nsiRequesterOperation = nsiBodyParser(StoredMessage.soapToNsiMessage(StoredMessage.bodyNameToRequesterOperation))
 
-  private def nsiBodyParser[T <: NsiMessage](soapMessageParser: SOAPMessage => Either[String, NsiEnvelope[T]]): BodyParser[NsiEnvelope[T]] = soap.flatMap { soapMessage =>
+  private def nsiBodyParser[T <: NsiMessage](soapMessageParser: SOAPMessage => Either[String, T]): BodyParser[T] = soap.flatMap { soapMessage =>
     BodyParser { requestHeader =>
       val parsedMessage = soapMessageParser(soapMessage)
 

@@ -33,13 +33,13 @@ object StoredMessage {
   trait NsiRequestMessageFactory[T] {
     type JaxbMessage
     def klass: Class[JaxbMessage]
-    def apply(headers: NsiHeaders, body: JaxbMessage): NsiEnvelope[T]
+    def apply(headers: NsiHeaders, body: JaxbMessage): T
   }
 
-  def NsiRequestMessageFactory[M, T](f: (CorrelationId, M) => T)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory[T] {
+  def NsiRequestMessageFactory[M, T](f: (NsiHeaders, M) => T)(implicit manifest: ClassTag[M]) = new NsiRequestMessageFactory[T] {
     override type JaxbMessage = M
     override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]
-    override def apply(headers: NsiHeaders, body: M): NsiEnvelope[T] = NsiEnvelope(headers, f(headers.correlationId, body))
+    override def apply(headers: NsiHeaders, body: M): T = f(headers, body)
   }
 
   def soapToNsiMessage[T <: NsiMessage](elementToFactory: org.w3c.dom.Element => Either[String, NsiRequestMessageFactory[T]])(soapMessage: SOAPMessage) = {
@@ -99,23 +99,23 @@ object StoredMessage {
       case _        => Left(s"multiple NSI elements in '${elem.getLocalName}', expected one")
     }
 
-  def nsiMessageToSoapMessage[T: ToXmlDocument](message: NsiEnvelope[T]): SOAPMessage = {
+  def nsiMessageToSoapMessage[T <: NsiMessage: ToXmlDocument](message: T): SOAPMessage = {
     val soap = MessageFactory.newInstance().createMessage()
 
     val header = SOAPFactory.newInstance().createElement(ToXmlDocument[NsiHeaders].asDocument(message.headers).getDocumentElement())
 
-    soap.getSOAPBody().addDocument(ToXmlDocument[T].asDocument(message.body))
+    soap.getSOAPBody().addDocument(ToXmlDocument[T].asDocument(message))
     soap.getSOAPHeader().addChildElement(header)
     soap.saveChanges()
 
     soap
   }
 
-  val NsiMessageToStoredMessage = Injection.build[NsiEnvelope[NsiMessage], StoredMessage] { message =>
+  val NsiMessageToStoredMessage = Injection.build[NsiMessage, StoredMessage] { message =>
     val (tpe, soap) = message match {
-      case NsiEnvelope(headers, body: NsiAcknowledgement)    => "NsiAcknowledgement" -> nsiMessageToSoapMessage(NsiEnvelope(headers, body))
-      case NsiEnvelope(headers, body: NsiProviderOperation)  => "NsiProviderOperation" -> nsiMessageToSoapMessage(NsiEnvelope(headers, body))
-      case NsiEnvelope(headers, body: NsiRequesterOperation) => "NsiRequesterOperation" -> nsiMessageToSoapMessage(NsiEnvelope(headers, body))
+      case message: NsiAcknowledgement    => "NsiAcknowledgement" -> nsiMessageToSoapMessage(message)
+      case message: NsiProviderOperation  => "NsiProviderOperation" -> nsiMessageToSoapMessage(message)
+      case message: NsiRequesterOperation => "NsiRequesterOperation" -> nsiMessageToSoapMessage(message)
     }
     val content = new ByteArrayOutputStream().tap(soap.writeTo).toString("UTF-8")
     StoredMessage(message.headers.correlationId, "NSIv2", tpe, content)
@@ -143,7 +143,7 @@ object StoredMessage {
     message.asOpt
   }
 
-  implicit val NsiOrPceMessage = Injection.build[Either[NsiEnvelope[NsiMessage], PceMessage], StoredMessage] {
+  implicit val NsiOrPceMessage = Injection.build[Either[NsiMessage, PceMessage], StoredMessage] {
     case Left(nsi)  => NsiMessageToStoredMessage(nsi)
     case Right(pce) => PceMessageToStoredMessage(pce)
   } { stored =>

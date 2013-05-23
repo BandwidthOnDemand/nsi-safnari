@@ -4,16 +4,15 @@ import java.net.URI
 import java.util.UUID
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
-case class NsiEnvelope[+T](headers: NsiHeaders, body: T) {
-  def replyTo = headers.replyTo
-}
-
 case class NsiHeaders(correlationId: CorrelationId, requesterNSA: String, providerNSA: String, replyTo: Option[URI], protocolVersion: URI = URI.create("urn:nsi:2.0:FIXME")) {
   def asReply: NsiHeaders = copy(replyTo = None)
 }
 
 trait NsiMessage {
-  def correlationId: CorrelationId
+  def headers: NsiHeaders
+  def correlationId: CorrelationId = headers.correlationId
+
+  def ack = GenericAck(headers.asReply)
 }
 trait NsiQuery
 trait NsiCommand
@@ -24,6 +23,8 @@ final case class NsiError(id: String, description: String, text: String) {
   def toServiceException(nsaId: String) = new ServiceExceptionType().withErrorId(id).withText(text).withNsaId(nsaId)
 }
 object NsiError {
+  // TODO use errors from [http://code.google.com/p/ogf-nsi-project/wiki/NSIErrorCodes].
+
   val MissingParameter = NsiError("SVC0001", "MISSING_PARAMETER", "Invalid or missing parameter")
   val UnsupportedOperation = NsiError("SVC0002", "UNSUPPORTED_OPERATION", "Parameter provided contains an unsupported value which MUST be processed")
   val AlreadyExists = NsiError("SVC0003", "ALREADY_EXISTS", "Schedule already exists for connectionId")

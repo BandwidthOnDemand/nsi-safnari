@@ -5,29 +5,29 @@ import org.ogf.schemas.nsi._2013._04.connection.types._
 
 sealed trait NsiRequesterOperation extends NsiMessage
 
-case class ReserveConfirmed(correlationId: CorrelationId, connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiRequesterOperation
+case class ReserveConfirmed(headers: NsiHeaders, connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiRequesterOperation
 
-case class ReserveFailed(correlationId: CorrelationId, failed: GenericFailedType) extends NsiRequesterOperation {
+case class ReserveFailed(headers: NsiHeaders, failed: GenericFailedType) extends NsiRequesterOperation {
   def connectionId: ConnectionId = failed.getConnectionId()
 }
-case class ReserveCommitConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
-case class ReserveCommitFailed(correlationId: CorrelationId, failed: GenericFailedType) extends NsiRequesterOperation {
+case class ReserveCommitConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
+case class ReserveCommitFailed(headers: NsiHeaders, failed: GenericFailedType) extends NsiRequesterOperation {
   def connectionId: ConnectionId = failed.getConnectionId()
 }
-case class ReserveAbortConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
-case class ReserveTimeout(correlationId: CorrelationId, timeout: ReserveTimeoutRequestType) extends NsiRequesterOperation {
+case class ReserveAbortConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
+case class ReserveTimeout(headers: NsiHeaders, timeout: ReserveTimeoutRequestType) extends NsiRequesterOperation {
   def connectionId: ConnectionId = timeout.getConnectionId()
 }
 
-case class ProvisionConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
-case class ReleaseConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
-case class TerminateConfirmed(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiRequesterOperation
+case class ProvisionConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
+case class ReleaseConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
+case class TerminateConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
 
-case class QuerySummaryConfirmed(correlationId: CorrelationId, reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
-case class QuerySummaryFailed(correlationId: CorrelationId, failed: QueryFailedType) extends NsiRequesterOperation
-case class QueryRecursiveConfirmed(correlationId: CorrelationId, reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
-case class QueryRecursiveFailed(correlationId: CorrelationId, failed: QueryFailedType) extends NsiRequesterOperation
+case class QuerySummaryConfirmed(headers: NsiHeaders, reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
+case class QuerySummaryFailed(headers: NsiHeaders, failed: QueryFailedType) extends NsiRequesterOperation
+case class QueryRecursiveConfirmed(headers: NsiHeaders, reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
+case class QueryRecursiveFailed(headers: NsiHeaders, failed: QueryFailedType) extends NsiRequesterOperation
 
-case class ErrorEvent(correlationId: CorrelationId, error: ErrorEventType) extends NsiRequesterOperation
-case class DataPlaneStateChange(correlationId: CorrelationId, connectionId: ConnectionId, status: DataPlaneStatusType, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation
-case class MessageDeliveryTimeout(correlationId: CorrelationId, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation
+case class ErrorEvent(headers: NsiHeaders, error: ErrorEventType) extends NsiRequesterOperation
+case class DataPlaneStateChange(headers: NsiHeaders, connectionId: ConnectionId, status: DataPlaneStatusType, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation
+case class MessageDeliveryTimeout(headers: NsiHeaders, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation

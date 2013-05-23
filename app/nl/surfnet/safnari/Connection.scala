@@ -15,11 +15,13 @@ case class ToPce(message: PathComputationRequest)
 
 case class SegmentKnown(segmentId: ConnectionId)
 
-class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Reserve, newCorrelationId: () => CorrelationId, outbound: ActorRef, pceReplyUri: URI) extends Actor {
-  val psm = new ProvisionStateMachine(id, newCorrelationId, outbound ! _)
-  val lsm = new LifecycleStateMachine(id, newCorrelationId, outbound ! _)
-  val dsm = new DataPlaneStateMachine(id, newCorrelationId, outbound ! _)
-  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, outbound ! _, data => {
+class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Reserve, newCorrelationId: () => CorrelationId, outbound: ActorRef, nsiReplyToUri: URI, pceReplyUri: URI) extends Actor {
+  private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), "NSA-ID", provider.nsa, Some(nsiReplyToUri))
+  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), "NSA-ID", requesterNSA, None)
+  val psm = new ProvisionStateMachine(id, newNsiHeaders, outbound ! _)
+  val lsm = new LifecycleStateMachine(id, newNsiHeaders, outbound ! _)
+  val dsm = new DataPlaneStateMachine(id, newNotifyHeaders, outbound ! _)
+  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, outbound ! _, data => {
     psm process data.children
     lsm process data.children
     dsm process data.children
@@ -92,8 +94,8 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
   }.toSeq
 
   private def messageNotApplicable(message: Message) = Vector(message match {
-    case FromRequester(message) => ServiceException(message.correlationId, NsiError.InvalidState.toServiceException("NSA-ID"))
-    case FromProvider(message)  => ServiceException(message.correlationId, NsiError.InvalidState.toServiceException("NSA-ID"))
+    case FromRequester(message) => ServiceException(message.headers.asReply, NsiError.InvalidState.toServiceException("NSA-ID"))
+    case FromProvider(message)  => ServiceException(message.headers.asReply, NsiError.InvalidState.toServiceException("NSA-ID"))
     case FromPce(message)       => 400
   })
 }

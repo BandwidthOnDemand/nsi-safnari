@@ -39,8 +39,8 @@ object ConnectionProvider extends Controller with SoapWebService {
   private def pceReplyUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.pceReply().url}"
 
   def request = NsiProviderEndPoint {
-    case NsiEnvelope(headers, query: NsiQuery)         => handleQuery(query)(replyToClient(headers))
-    case request @ NsiEnvelope(headers, _: NsiCommand) => handleRequest(request)(replyToClient(headers))
+    case query: NsiQuery     => handleQuery(query)(replyToClient(query.headers))
+    case command: NsiCommand => handleRequest(command)(replyToClient(command.headers))
   }
 
   def pceReply = Action(parse.json) { implicit request =>
@@ -56,7 +56,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit = {
     requestHeaders.replyTo.foreach { replyTo =>
       WS.url(replyTo.toASCIIString()).
-        post(NsiEnvelope(requestHeaders.copy(replyTo = None, correlationId = response.correlationId), response)).
+        post(response).
         onComplete {
           case Failure(error) =>
             Logger.info(s"Replying to $replyTo: $error", error)
@@ -71,23 +71,23 @@ object ConnectionProvider extends Controller with SoapWebService {
       val connectionStates = queryConnections(q.connectionIds)
       connectionStates.onSuccess {
         case reservations =>
-          replyTo(QuerySummaryConfirmed(q.correlationId, reservations))
+          replyTo(QuerySummaryConfirmed(q.headers.asReply, reservations))
       }
-      Future.successful(GenericAck(q.correlationId))
+      Future.successful(GenericAck(q.headers.asReply))
     case q: QuerySummarySync =>
       val connectionStates = queryConnections(q.connectionIds)
       connectionStates map { states =>
-        QuerySummarySyncConfirmed(q.correlationId, states)
+        QuerySummarySyncConfirmed(q.headers.asReply, states)
       }
     case q => ???
   }
 
   private def queryConnections(connectionIds: Seq[ConnectionId]) = {
-    val cs: Seq[ActorRef] = if(connectionIds.isEmpty) ConnectionManager.all else ConnectionManager.find(connectionIds)
+    val cs: Seq[ActorRef] = if (connectionIds.isEmpty) ConnectionManager.all else ConnectionManager.find(connectionIds)
     Future.traverse(cs)(c => c ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
   }
 
-  private[controllers] def handleRequest(request: NsiEnvelope[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
+  private[controllers] def handleRequest(request: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
     findOrCreateConnection(request)(replyTo) match {
       case Left(connectionId) =>
         val exception = new ServiceExceptionType()
@@ -95,20 +95,20 @@ object ConnectionProvider extends Controller with SoapWebService {
           .withErrorId("UNKNOWN") // TODO
           .withText(f"Unknown connection ${connectionId}")
           .withVariables(null) // TODO
-        Future.successful(ServiceException(request.body.correlationId, exception))
+        Future.successful(ServiceException(request.headers.asReply, exception))
       case Right(connectionActor) =>
-        handleProviderOperation(request.body)(replyTo)(connectionActor)
+        handleProviderOperation(request)(replyTo)(connectionActor)
     }
   }
 
   private val uuidGenerator = Uuid.randomUuidGenerator()
 
-  private def findOrCreateConnection(request: NsiEnvelope[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Either[ConnectionId, ActorRef] = (request.body, request.body.optionalConnectionId) match {
+  private def findOrCreateConnection(request: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Either[ConnectionId, ActorRef] = (request, request.optionalConnectionId) match {
     case (_, Some(connectionId)) =>
       ConnectionManager.get(connectionId).toRight(connectionId)
     case (initialReserve: Reserve, None) =>
       val connectionId = newConnectionId
-      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, initialReserve, () => CorrelationId.fromUuid(uuidGenerator()), outboundActor, URI.create(pceReplyUrl))))
+      val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, request.headers.requesterNSA, initialReserve, () => CorrelationId.fromUuid(uuidGenerator()), outboundActor, URI.create(ConnectionRequester.serviceUrl), URI.create(pceReplyUrl))))
       ConnectionManager.add(connectionId, connectionActor)
       notificationContinuations(connectionId) = replyTo
       Right(connectionActor)
@@ -154,9 +154,9 @@ object ConnectionProvider extends Controller with SoapWebService {
   class DummyNsiRequesterActor extends Actor {
     def receive = {
       case ToProvider(reserve: Reserve, _) =>
-        sender ! FromProvider(ReserveConfirmed(reserve.correlationId, newConnectionId, Injection.invert(reserve.body.getCriteria()).get))
+        sender ! FromProvider(ReserveConfirmed(reserve.headers.asReply, newConnectionId, Injection.invert(reserve.body.getCriteria()).get))
       case ToProvider(commit: ReserveCommit, _) =>
-        sender ! FromProvider(ReserveCommitConfirmed(commit.correlationId, commit.connectionId))
+        sender ! FromProvider(ReserveCommitConfirmed(commit.headers.asReply, commit.connectionId))
     }
   }
 
@@ -168,12 +168,6 @@ object ConnectionProvider extends Controller with SoapWebService {
           case reply => connection ! FromProvider(reply)
         }
 
-        val headers = NsiHeaders(
-          message.correlationId,
-          requesterNsa,
-          provider.nsa,
-          Some(requesterUrl))
-
         var request = WS.url(provider.url.toASCIIString())
 
         request = provider.authentication match {
@@ -182,7 +176,7 @@ object ConnectionProvider extends Controller with SoapWebService {
           case _                                       => request
         }
 
-        request.post(NsiEnvelope(headers, message))
+        request.post(message)
     }
   }
 

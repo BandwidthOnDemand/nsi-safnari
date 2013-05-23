@@ -8,7 +8,7 @@ import anorm._
 class MessageStoreSpec extends helpers.Specification {
   def Application = FakeApplication(additionalConfiguration = testConfiguration)
 
-  val messageStore = new MessageStore[Either[NsiEnvelope[NsiMessage], PceMessage]]()
+  val messageStore = new MessageStore[Either[NsiMessage, PceMessage]]()
 
   "MessageStore" should {
     "store a PCE message" in new WithApplication(Application) {

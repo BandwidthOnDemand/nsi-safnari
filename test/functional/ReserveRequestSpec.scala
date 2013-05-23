@@ -28,20 +28,23 @@ class ReserveRequestSpec extends helpers.Specification {
   object Global extends play.api.GlobalSettings {
     override def onRouteRequest(request: RequestHeader): Option[Handler] = request.path match {
       case "/fake/requester" => Some(NsiRequesterEndPoint {
-        case NsiEnvelope(headers, confirm: ReserveConfirmed) =>
+        case confirm: ReserveConfirmed =>
           reserveConfirmed.success(confirm)
-          Future.successful(GenericAck(headers.correlationId))
+          Future.successful(GenericAck(confirm.headers.asReply))
         case response =>
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
-          Future.successful(ServiceException(response.headers.correlationId, new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response")))
+          Future.successful(ServiceException(response.headers.asReply, new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response")))
       })
       case "/fake/provider" => Some(NsiProviderEndPoint {
-        case NsiEnvelope(headers, reserve: Reserve) =>
+        case reserve: Reserve =>
           val connectionId = newConnectionId
-          headers.replyTo.foreach { replyTo =>
-            WS.url(replyTo.toASCIIString()).post(NsiEnvelope(headers.asReply, ReserveConfirmed(headers.correlationId, connectionId, Injection.invert(reserve.body.getCriteria()).get): NsiRequesterOperation))
+          reserve.headers.replyTo.foreach { replyTo =>
+            WS.url(replyTo.toASCIIString()).post(ReserveConfirmed(reserve.headers.asReply, connectionId, Injection.invert(reserve.body.getCriteria()).get): NsiRequesterOperation)
           }
-          Future.successful(ReserveResponse(headers.correlationId, connectionId))
+          Future.successful(ReserveResponse(reserve.headers.asReply, connectionId))
+        case wtf =>
+          wtf.pp
+          ???
       })
       case "/fake/pce" =>
         Some(Action(BodyParsers.parse.json) { request =>

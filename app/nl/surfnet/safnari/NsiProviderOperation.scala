@@ -8,27 +8,27 @@ sealed trait NsiProviderOperation extends NsiMessage {
   def optionalConnectionId: Option[ConnectionId] = None
 }
 
-case class Reserve(correlationId: CorrelationId, body: ReserveType) extends NsiProviderOperation with NsiCommand {
+case class Reserve(headers: NsiHeaders, body: ReserveType) extends NsiProviderOperation with NsiCommand {
   override def optionalConnectionId: Option[ConnectionId] = Option(body.getConnectionId())
 }
-case class ReserveCommit(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
+case class ReserveCommit(headers: NsiHeaders, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
   override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
 }
-case class ReserveAbort(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
-  override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
-}
-
-case class Provision(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
-  override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
-}
-case class Release(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
+case class ReserveAbort(headers: NsiHeaders, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
   override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
 }
 
-case class Terminate(correlationId: CorrelationId, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
+case class Provision(headers: NsiHeaders, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
+  override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
+}
+case class Release(headers: NsiHeaders, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
   override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
 }
 
-case class QuerySummary(correlationId: CorrelationId, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery
-case class QuerySummarySync(correlationId: CorrelationId, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery
-case class QueryRecursive(correlationId: CorrelationId, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery
+case class Terminate(headers: NsiHeaders, connectionId: ConnectionId) extends NsiProviderOperation with NsiCommand {
+  override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
+}
+
+case class QuerySummary(headers: NsiHeaders, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery
+case class QuerySummarySync(headers: NsiHeaders, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery
+case class QueryRecursive(headers: NsiHeaders, connectionIds: Seq[ConnectionId]) extends NsiProviderOperation with NsiQuery

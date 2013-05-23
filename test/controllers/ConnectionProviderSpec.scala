@@ -19,12 +19,12 @@ class ConnectionProviderSpec extends helpers.Specification {
 
     "return the connection id and confirm the reservation" in new WithApplication(Application) {
       val requesterOperation: Promise[NsiRequesterOperation] = Promise()
-      val response = await(ConnectionProvider.handleRequest(withEnvelope(Reserve(CorrelationId, InitialReserveType))) { requesterOperation.success(_) })
+      val response = await(ConnectionProvider.handleRequest(initialReserveMessage) { requesterOperation.success(_) })
 
       response must beAnInstanceOf[ReserveResponse]
       response must beLike {
-        case ReserveResponse(correlationId, connectionId) =>
-          correlationId must beEqualTo(CorrelationId)
+        case ReserveResponse(headers, connectionId) =>
+          headers.correlationId must beEqualTo(CorrelationId)
           connectionId must not(beEmpty)
       }
 
@@ -33,7 +33,7 @@ class ConnectionProviderSpec extends helpers.Specification {
           op.correlationId must beEqualTo(CorrelationId)
 
           val queryResult = Promise[NsiRequesterOperation]
-          await(ConnectionProvider.handleQuery(QuerySummary(newCorrelationId, Seq(op.connectionId))) { queryResult.success(_) })
+          await(ConnectionProvider.handleQuery(QuerySummary(headers(newCorrelationId), Seq(op.connectionId))) { queryResult.success(_) })
 
           await(queryResult.future) must beLike {
             case QuerySummaryConfirmed(_, Seq(reservation: QuerySummaryResultType)) =>

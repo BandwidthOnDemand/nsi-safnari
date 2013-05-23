@@ -16,7 +16,7 @@ case class DataPlaneStateMachineData(providers: Map[ConnectionId, ProviderEndPoi
   }
 }
 
-class DataPlaneStateMachine(connectionId: ConnectionId, newCorrelationId: () => CorrelationId, outbound: Message => Unit) extends FiniteStateMachine(false, DataPlaneStateMachineData(Map.empty, Map.empty, None)) {
+class DataPlaneStateMachine(connectionId: ConnectionId, newNsiHeaders: () => NsiHeaders, outbound: Message => Unit) extends FiniteStateMachine(false, DataPlaneStateMachineData(Map.empty, Map.empty, None)) {
 
   when(false) {
     case Event(downstreamConnections: Map[_, _], data) =>
@@ -28,13 +28,13 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newCorrelationId: () => 
   whenUnhandled {
     case Event(FromProvider(message: DataPlaneStateChange), data) =>
       val newData = data.updateState(message.connectionId, message.status.isActive(), message.timeStamp)
-      goto(newData.aggregatedProvisionStatus) using newData replying GenericAck(message.correlationId)
+      goto(newData.aggregatedProvisionStatus) using newData replying GenericAck(message.headers.asReply)
   }
 
   onTransition {
     case false -> true | true -> false =>
       outbound(ToRequester(DataPlaneStateChange(
-        newCorrelationId(),
+        newNsiHeaders(),
         connectionId,
         new DataPlaneStatusType().withVersion(0).withActive(nextStateName).withVersionConsistent(true), nextStateData.timeStamp.get)))
   }

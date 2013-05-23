@@ -16,16 +16,16 @@ object ConnectionRequester extends Controller with SoapWebService {
   def expectReplyFor(correlationId: CorrelationId): Future[NsiRequesterOperation] = continuations.register(correlationId)
 
   def request = NsiRequesterEndPoint {
-    case NsiEnvelope(headers, notification: DataPlaneStateChange) =>
+    case notification: DataPlaneStateChange =>
       ConnectionManager.findBySegment(notification.connectionId).map {
-        _.fold[NsiAcknowledgement](ServiceException(headers.correlationId, null)) { c =>
+        _.fold[NsiAcknowledgement](ServiceException(notification.headers.asReply, null)) { c =>
           c ! FromProvider(notification)
-          GenericAck(headers.correlationId)
+          GenericAck(notification.headers.asReply)
         }
       }
-    case NsiEnvelope(headers, response) =>
-      continuations.replyReceived(headers.correlationId, response)
-      Future.successful(GenericAck(headers.correlationId))
+    case response =>
+      continuations.replyReceived(response.correlationId, response)
+      Future.successful(GenericAck(response.headers.asReply))
   }
 
   private val continuations = new Continuations[NsiRequesterOperation]()
