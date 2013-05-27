@@ -28,24 +28,20 @@ import com.ning.http.client.Realm.AuthScheme
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
 
-  @volatile private var replaying = true
-
-  private val messageStore = new MessageStore[Message]()
   private val continuations = new Continuations[NsiRequesterOperation]()
-  private val notificationContinuations = TMap.empty[ConnectionId, NsiRequesterOperation => Unit].single
   private val pceContinuations = new Continuations[PceResponse]()
 
-  Await.ready(Future.sequence(for {
-    (connectionId, messages @ (FromRequester(initialReserve: Reserve) +: _)) <- messageStore.loadEverything()
-    connection = createConnection(connectionId, initialReserve)(replyToClient(initialReserve.headers))
-    message <- messages
-  } yield {
-    message.getClass.getName.pp("Replaying message")
-    connection ? message
-  }), Duration.Inf)
+  def connectionFactory(connectionId: ConnectionId, initialReserve: Reserve)(messageCallback: (ActorRef, Message, ActorRef) => Unit): ActorRef = {
+    val outbound = outboundActor(initialReserve)
+    val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
-  replaying = false
-  "Replay completed".pp
+    Akka.system.actorOf(Props(new ConnectionActor(connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), (message, sender) => {
+      messageCallback(sender, message, outbound)
+    }, URI.create(ConnectionRequester.serviceUrl), URI.create(ConnectionProvider.pceReplyUrl))))
+  }
+
+  val connectionManager = new ConnectionManager(connectionFactory)
+  connectionManager.restore()
 
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
@@ -98,12 +94,12 @@ object ConnectionProvider extends Controller with SoapWebService {
   }
 
   private def queryConnections(connectionIds: Seq[ConnectionId]) = {
-    val cs = if (connectionIds.isEmpty) ConnectionManager.all else ConnectionManager.find(connectionIds)
+    val cs = if (connectionIds.isEmpty) connectionManager.all else connectionManager.find(connectionIds)
     Future.traverse(cs)(c => c ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
   }
 
   private[controllers] def handleRequest(request: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
-    findOrCreateConnection(request)(replyTo) match {
+    connectionManager.findOrCreateConnection(request) match {
       case (connectionId, None) =>
         val exception = new ServiceExceptionType()
           .withNsaId("MYNSAID") // TODO
@@ -116,19 +112,6 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
   }
 
-  private val uuidGenerator = Uuid.randomUuidGenerator()
-
-  private def findOrCreateConnection(request: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): (ConnectionId, Option[ActorRef]) = (request, request.optionalConnectionId) match {
-    case (_, Some(connectionId)) =>
-      (connectionId, ConnectionManager.get(connectionId))
-    case (initialReserve: Reserve, None) =>
-      val connectionId = newConnectionId
-      val connection = createConnection(connectionId, initialReserve)(replyTo)
-      (connectionId, Some(connection))
-    case _ =>
-      sys.error("illegal initial message")
-  }
-
   private def handleProviderOperation(message: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit)(connection: ActorRef): Future[NsiAcknowledgement] = {
     continuations.register(message.correlationId).onSuccess {
       case reply => replyTo(reply)
@@ -136,7 +119,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     connection ? FromRequester(message) map (_.asInstanceOf[NsiAcknowledgement])
   }
 
-  private def outboundActor = {
+  def outboundActor(initialReserve: Reserve) = {
     val pceRequester = {
       val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
       current.configuration.getString("pce.actor") match {
@@ -152,17 +135,20 @@ object ConnectionProvider extends Controller with SoapWebService {
       }
     }
 
-    Akka.system.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester)))
+    Akka.system.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester, replyToClient(initialReserve.headers))))
   }
 
-  class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef) extends Actor {
+  class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiNotification => Unit) extends Actor {
     def receive = {
-      case pceRequest: ToPce                         => pceRequester forward pceRequest
-      case nsiRequest: ToProvider                    => nsiRequester forward nsiRequest
-      case ToRequester(notify: DataPlaneStateChange) => handleNotification(notify)
-      case ToRequester(response)                     => handleResponse(response)
+      case pceRequest: ToPce                     => pceRequester forward pceRequest
+      case nsiRequest: ToProvider                => nsiRequester forward nsiRequest
+      case ToRequester(message: NsiNotification) => notify(message)
+      case ToRequester(response)                 => handleResponse(response.pp("handle response"))
     }
   }
+
+  private[controllers] def handleResponse(message: NsiRequesterOperation): Unit =
+    continuations.replyReceived(message.correlationId, message)
 
   class DummyNsiRequesterActor extends Actor {
     def receive = {
@@ -223,36 +209,4 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
   }
 
-  private def handleNotification(notify: DataPlaneStateChange): Unit =
-    notificationContinuations(notify.connectionId)(notify)
-
-  private[controllers] def handleResponse(message: NsiRequesterOperation): Unit =
-    continuations.replyReceived(message.correlationId, message)
-
-  private def createConnection(connectionId: ConnectionId, initialReserve: Reserve)(replyTo: NsiRequesterOperation => Unit): ActorRef = {
-    val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
-    val outbound = outboundActor
-    val connectionActor = Akka.system.actorOf(Props(new ConnectionActor(connectionId, initialReserve.headers.requesterNSA, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), (message, sender) => {
-      if (replaying) message.pp("Dropped in replay mode")
-      else outbound.!(message)(sender)
-    }, URI.create(ConnectionRequester.serviceUrl), URI.create(pceReplyUrl))))
-    val storingActor = Akka.system.actorOf(Props(new Actor {
-      override def receive = {
-        case message =>
-          val store = message match {
-            case message: FromRequester => Some(message)
-            case message: FromProvider  => Some(message)
-            case message: FromPce       => Some(message)
-            case message =>
-              message.pp("Not persisted")
-              None
-          }
-          store foreach { messageStore.store(connectionId, _) }
-          connectionActor forward message
-      }
-    }))
-    ConnectionManager.add(connectionId, storingActor)
-    notificationContinuations(connectionId) = replyTo
-    storingActor
-  }
 }

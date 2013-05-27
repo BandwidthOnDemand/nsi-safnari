@@ -4,6 +4,9 @@ import javax.xml.datatype.XMLGregorianCalendar
 import org.ogf.schemas.nsi._2013._04.connection.types._
 
 sealed trait NsiRequesterOperation extends NsiMessage
+sealed trait NsiNotification extends NsiRequesterOperation {
+  def connectionId: ConnectionId
+}
 
 case class ReserveConfirmed(headers: NsiHeaders, connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiRequesterOperation
 
@@ -28,6 +31,9 @@ case class QuerySummaryFailed(headers: NsiHeaders, failed: QueryFailedType) exte
 case class QueryRecursiveConfirmed(headers: NsiHeaders, reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
 case class QueryRecursiveFailed(headers: NsiHeaders, failed: QueryFailedType) extends NsiRequesterOperation
 
-case class ErrorEvent(headers: NsiHeaders, error: ErrorEventType) extends NsiRequesterOperation
-case class DataPlaneStateChange(headers: NsiHeaders, connectionId: ConnectionId, status: DataPlaneStatusType, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation
+case class ErrorEvent(headers: NsiHeaders, error: ErrorEventType) extends NsiNotification {
+  override def connectionId = error.getConnectionId()
+}
+case class DataPlaneStateChange(headers: NsiHeaders, connectionId: ConnectionId, status: DataPlaneStatusType, timeStamp: XMLGregorianCalendar) extends NsiNotification
+
 case class MessageDeliveryTimeout(headers: NsiHeaders, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation

@@ -16,7 +16,8 @@ case class ToPce(message: PceRequest) extends Message
 
 case class SegmentKnown(segmentId: ConnectionId)
 
-class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Reserve, newCorrelationId: () => CorrelationId, outbound: (Message, ActorRef) => Unit, nsiReplyToUri: URI, pceReplyUri: URI) extends Actor {
+class ConnectionActor(id: ConnectionId, initialReserve: Reserve, newCorrelationId: () => CorrelationId, outbound: (Message, ActorRef) => Unit, nsiReplyToUri: URI, pceReplyUri: URI) extends Actor {
+  private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), "NSA-ID", provider.nsa, Some(nsiReplyToUri))
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), "NSA-ID", requesterNSA, None)
   val psm = new ProvisionStateMachine(id, newNsiHeaders, message => outbound(message, self))

@@ -17,7 +17,7 @@ object ConnectionRequester extends Controller with SoapWebService {
 
   def request = NsiRequesterEndPoint {
     case notification: DataPlaneStateChange =>
-      ConnectionManager.findBySegment(notification.connectionId).map {
+      ConnectionProvider.connectionManager.findBySegment(notification.connectionId).map {
         _.fold[NsiAcknowledgement](ServiceException(notification.headers.asReply, null)) { c =>
           c ! FromProvider(notification)
           GenericAck(notification.headers.asReply)

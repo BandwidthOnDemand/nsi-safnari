@@ -52,7 +52,7 @@ class ConnectionSpec extends helpers.Specification {
 
     var messages: Seq[Message] = Nil
 
-    val connection = TestActorRef(new ConnectionActor(ConnectionId, "RequesterNSA", InitialReserve, () => CorrelationId.fromUuid(mockUuidGenerator()), (message, sender) => messages :+= message, NsiReplyToUri, PceReplyToUri))
+    val connection = TestActorRef(new ConnectionActor(ConnectionId, InitialReserve, () => CorrelationId.fromUuid(mockUuidGenerator()), (message, sender) => messages :+= message, NsiReplyToUri, PceReplyToUri))
 
     def given(messages: Message*): Unit = messages.foreach(m => connection ! m)
 
