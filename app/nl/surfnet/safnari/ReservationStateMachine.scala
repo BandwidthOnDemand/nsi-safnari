@@ -164,12 +164,12 @@ class ReservationStateMachine(
           outbound(ToProvider(Reserve(newNsiHeaders(segment.provider).copy(correlationId = correlationId), reserveType), segment.provider))
       }
     case PathComputationState -> FailedReservationState =>
-      outbound(ToRequester(ReserveFailed(nextStateData.commandReplyHeaders, failed(NsiError.PathComputationNoPath))))
+      respond(ReserveFailed(_, failed(NsiError.PathComputationNoPath)))
     case CheckingReservationState -> FailedReservationState =>
-      outbound(ToRequester(ReserveFailed(nextStateData.commandReplyHeaders, failed(NsiError.ChildError).tap(_.getServiceException().withChildException(nextStateData.childExceptions.values.toSeq.asJava)))))
+      respond(ReserveFailed(_, failed(NsiError.ChildError).tap(_.getServiceException().withChildException(nextStateData.childExceptions.values.toSeq.asJava))))
     case CheckingReservationState -> HeldReservationState =>
       reservationHeld(nextStateData)
-      outbound(ToRequester(ReserveConfirmed(nextStateData.commandReplyHeaders, id, nextStateData.criteria)))
+      respond(ReserveConfirmed(_, id, nextStateData.criteria))
     case HeldReservationState -> CommittingReservationState =>
       nextStateData.connections.foreach {
         case (connectionId, correlationId) =>
@@ -183,9 +183,9 @@ class ReservationStateMachine(
           outbound(ToProvider(ReserveAbort(newNsiHeaders(seg.provider), connectionId), seg.provider))
       }
     case CommittingReservationState -> ReservedReservationState =>
-      outbound(ToRequester(ReserveCommitConfirmed(nextStateData.commandReplyHeaders, id)))
+      respond(ReserveCommitConfirmed(_, id))
     case CommittingReservationState -> CommitFailedReservationState =>
-      outbound(ToRequester(ReserveCommitFailed(nextStateData.commandReplyHeaders, failed(NsiError.InternalError).tap(_.getServiceException().withChildException(stateData.childExceptions.values.toSeq.asJava)))))
+      respond(ReserveCommitFailed(_, failed(NsiError.InternalError).tap(_.getServiceException().withChildException(stateData.childExceptions.values.toSeq.asJava))))
     case ReservedReservationState -> CheckingReservationState => ???
     case FailedReservationState -> AbortingReservationState   => ???
     case AbortingReservationState -> ReservedReservationState => ???
@@ -197,4 +197,6 @@ class ReservationStateMachine(
   def reservationState = stateName.jaxb
   def criteria = stateData.criteria
   def version = stateData.criteria.getVersion()
+
+  private def respond(f: NsiHeaders => NsiRequesterOperation): Unit = outbound(ToRequester(f(nextStateData.commandReplyHeaders)))
 }
