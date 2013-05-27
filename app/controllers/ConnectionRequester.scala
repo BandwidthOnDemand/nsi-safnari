@@ -1,11 +1,19 @@
 package controllers
 
 import scala.concurrent.Future
-
 import nl.surfnet.safnari._
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
+import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc.Controller
 import support.ExtraBodyParsers.NsiRequesterEndPoint
+import akka.actor.Actor
+import java.net.URI
+import play.api.libs.ws.WS
+import com.twitter.bijection.Injection
+import com.ning.http.client.Realm.AuthScheme
+import support.ExtraBodyParsers._
+import play.api.Play.current
+import play.api.libs.concurrent.Akka
+import akka.actor.Props
 
 object ConnectionRequester extends Controller with SoapWebService {
 
@@ -28,6 +36,43 @@ object ConnectionRequester extends Controller with SoapWebService {
       Future.successful(GenericAck(response.headers.asReply))
   }
 
+  def nsiRequester = {
+    val requesterNsa = current.configuration.getString("safnari.requester.nsa").getOrElse(sys.error("safnari.requester.nsa configuration property is not set"))
+    current.configuration.getString("nsi.actor") match {
+      case None | Some("dummy") => Akka.system.actorOf(Props[DummyNsiRequesterActor])
+      case _                    => Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(ConnectionRequester.serviceUrl))))
+    }
+  }
+
   private val continuations = new Continuations[NsiRequesterOperation]()
+
+  class DummyNsiRequesterActor extends Actor {
+    def receive = {
+      case ToProvider(reserve: Reserve, _) =>
+        sender ! FromProvider(ReserveConfirmed(reserve.headers.asReply, newConnectionId, Injection.invert(reserve.body.getCriteria()).get))
+      case ToProvider(commit: ReserveCommit, _) =>
+        sender ! FromProvider(ReserveCommitConfirmed(commit.headers.asReply, commit.connectionId))
+    }
+  }
+
+  class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
+    def receive = {
+      case ToProvider(message: NsiProviderOperation, provider) =>
+        val connection = sender
+        ConnectionRequester.expectReplyFor(message.correlationId).onSuccess {
+          case reply => connection ! FromProvider(reply)
+        }
+
+        var request = WS.url(provider.url.toASCIIString())
+
+        request = provider.authentication match {
+          case OAuthAuthentication(token)              => request.withHeaders("Authorization" -> s"bearer $token")
+          case BasicAuthentication(username, password) => request.withAuth(username, password, AuthScheme.BASIC)
+          case _                                       => request
+        }
+
+        request.post(message)
+    }
+  }
 
 }

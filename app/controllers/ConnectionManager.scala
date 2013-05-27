@@ -1,20 +1,12 @@
 package controllers
 
-import nl.surfnet.safnari._
-import scala.concurrent.stm.TMap
-import akka.actor.ActorRef
+import akka.actor._
 import akka.pattern.ask
-import nl.surfnet.safnari.SegmentKnown
 import akka.util.Timeout
-import scala.concurrent.duration._
-import play.api.libs.concurrent.Execution.Implicits._
-import scala.concurrent.Await
-import scala.concurrent.Future
-import akka.actor.Props
-import java.net.URI
-import akka.actor.Actor
-import play.api.libs.concurrent.Akka
-import play.api.Play.current
+import nl.surfnet.safnari._
+import scala.concurrent._
+import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.stm._
 
 class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => ((ActorRef, Message, ActorRef) => Unit) => ActorRef) {
   implicit val timeout = Timeout(2.seconds)
@@ -27,14 +19,14 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => ((ActorRef
 
   def find(connectionIds: Seq[String]): Seq[ActorRef] = connections.single.filterKeys(connectionIds.contains).values.toSeq
 
-  def findBySegment(connectionId: ConnectionId): Future[Option[ActorRef]] = {
+  def findBySegment(connectionId: ConnectionId)(implicit executionContext: ExecutionContext): Future[Option[ActorRef]] = {
     val knowsAboutSegment = connections.single.values.map(c => c ? SegmentKnown(connectionId) map (c -> _.asInstanceOf[Boolean]))
     Future.find(knowsAboutSegment)(_._2) map (_.map(_._1))
   }
 
   def all: Seq[ActorRef] = connections.single.values.toSeq
 
-  def restore() {
+  def restore(implicit actorSystem: ActorSystem, executionContext: ExecutionContext) {
     replaying = true
     Await.ready(Future.sequence(for {
       (connectionId, messages @ (FromRequester(initialReserve: Reserve) +: _)) <- messageStore.loadEverything()
@@ -52,7 +44,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => ((ActorRef
   private val messageStore = new MessageStore[Message]()
   @volatile private var replaying = false
 
-  def findOrCreateConnection(request: NsiProviderOperation): (ConnectionId, Option[ActorRef]) = (request, request.optionalConnectionId) match {
+  def findOrCreateConnection(request: NsiProviderOperation)(implicit actorSystem: ActorSystem): (ConnectionId, Option[ActorRef]) = (request, request.optionalConnectionId) match {
     case (_, Some(connectionId)) =>
       (connectionId, get(connectionId))
     case (initialReserve: Reserve, None) =>
@@ -63,13 +55,13 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => ((ActorRef
       sys.error("illegal initial message")
   }
 
-  private def createConnection(connectionId: ConnectionId, initialReserve: Reserve): ActorRef = {
+  private def createConnection(connectionId: ConnectionId, initialReserve: Reserve)(implicit actorSystem: ActorSystem): ActorRef = {
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
     val connectionActor = connectionFactory(connectionId, initialReserve) { (sender, message, outbound) =>
       if (replaying) message.pp("Dropped in replay mode")
       else outbound.!(message)(sender)
     }
-    val storingActor = Akka.system.actorOf(Props(new Actor {
+    val storingActor = actorSystem.actorOf(Props(new Actor {
       override def receive = {
         case message =>
           val store = message match {
