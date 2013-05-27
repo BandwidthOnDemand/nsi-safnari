@@ -6,22 +6,23 @@ import org.ogf.schemas.nsi._2013._04.connection.types._
 import java.net.URI
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
-case class FromRequester(message: NsiProviderOperation)
-case class ToRequester(message: NsiRequesterOperation)
-case class FromProvider(message: NsiRequesterOperation)
-case class ToProvider(message: NsiProviderOperation, provider: ProviderEndPoint)
-case class FromPce(message: PceResponse)
-case class ToPce(message: PathComputationRequest)
+sealed trait Message
+case class FromRequester(message: NsiProviderOperation) extends Message
+case class ToRequester(message: NsiRequesterOperation) extends Message
+case class FromProvider(message: NsiRequesterOperation) extends Message
+case class ToProvider(message: NsiProviderOperation, provider: ProviderEndPoint) extends Message
+case class FromPce(message: PceResponse) extends Message
+case class ToPce(message: PceRequest) extends Message
 
 case class SegmentKnown(segmentId: ConnectionId)
 
-class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Reserve, newCorrelationId: () => CorrelationId, outbound: ActorRef, nsiReplyToUri: URI, pceReplyUri: URI) extends Actor {
+class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Reserve, newCorrelationId: () => CorrelationId, outbound: (Message, ActorRef) => Unit, nsiReplyToUri: URI, pceReplyUri: URI) extends Actor {
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), "NSA-ID", provider.nsa, Some(nsiReplyToUri))
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), "NSA-ID", requesterNSA, None)
-  val psm = new ProvisionStateMachine(id, newNsiHeaders, outbound ! _)
-  val lsm = new LifecycleStateMachine(id, newNsiHeaders, outbound ! _)
-  val dsm = new DataPlaneStateMachine(id, newNotifyHeaders, outbound ! _)
-  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, outbound ! _, data => {
+  val psm = new ProvisionStateMachine(id, newNsiHeaders, message => outbound(message, self))
+  val lsm = new LifecycleStateMachine(id, newNsiHeaders, message => outbound(message, self))
+  val dsm = new DataPlaneStateMachine(id, newNotifyHeaders, message => outbound(message, self))
+  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, message => outbound(message, self), data => {
     psm process data.children
     lsm process data.children
     dsm process data.children
@@ -104,7 +105,7 @@ class ConnectionActor(id: ConnectionId, requesterNSA: String, initialReserve: Re
     case (id, rs) => ConnectionData(id, lsm.childConnectionState(id), rs.jaxb, psm.childConnectionState(id), dsm.childConnectionState(id))
   }.toSeq
 
-  private def messageNotApplicable(message: Message) = Vector(message match {
+  private def messageNotApplicable(message: Any) = Vector(message match {
     case FromRequester(message) => ServiceException(message.headers.asReply, NsiError.InvalidState.toServiceException("NSA-ID"))
     case FromProvider(message)  => ServiceException(message.headers.asReply, NsiError.InvalidState.toServiceException("NSA-ID"))
     case FromPce(message)       => 400

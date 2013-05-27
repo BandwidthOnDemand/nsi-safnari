@@ -8,28 +8,28 @@ import anorm._
 class MessageStoreSpec extends helpers.Specification {
   def Application = FakeApplication(additionalConfiguration = testConfiguration)
 
-  val messageStore = new MessageStore[Either[NsiMessage, PceMessage]]()
+  val messageStore = new MessageStore[Message]()
 
   "MessageStore" should {
     "store a PCE message" in new WithApplication(Application) {
       val aggregatedConnectionId = newConnectionId
       val message = PceMessageSpec.pathComputationRequest
-      messageStore.store(aggregatedConnectionId, Right(message)) must not(beNull)
+      messageStore.store(aggregatedConnectionId, ToPce(message)) must not(beNull)
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
       loaded must haveOneElementLike {
-        case Right(request) => request must beEqualTo(message)
+        case ToPce(request) => request must beEqualTo(message)
       }
     }
 
     "store a NSI message" in new WithApplication(Application) {
       val aggregatedConnectionId = newConnectionId
       val message = NsiMessageSpec.initialReserveMessage
-      messageStore.store(aggregatedConnectionId, Left(message)) must not(beNull)
+      messageStore.store(aggregatedConnectionId, FromRequester(message)) must not(beNull)
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
       loaded must haveOneElementLike {
-        case Left(request) => request must beEqualTo(message)
+        case FromRequester(request) => request must beEqualTo(message)
       }
     }
   }

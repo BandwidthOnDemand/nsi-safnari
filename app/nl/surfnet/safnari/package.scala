@@ -14,7 +14,6 @@ import javax.xml.datatype.XMLGregorianCalendar
 import javax.xml.datatype.DatatypeFactory
 
 package object safnari {
-  type Message = Any
   type ConnectionId = String
 
   private val UuidGenerator = Uuid.randomUuidGenerator

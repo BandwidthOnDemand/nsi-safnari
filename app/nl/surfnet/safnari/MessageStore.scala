@@ -143,13 +143,23 @@ object StoredMessage {
     message.asOpt
   }
 
-  implicit val NsiOrPceMessage = Injection.build[Either[NsiMessage, PceMessage], StoredMessage] {
-    case Left(nsi)  => NsiMessageToStoredMessage(nsi)
-    case Right(pce) => PceMessageToStoredMessage(pce)
+  implicit val MessageToStoredMessage = Injection.build[Message, StoredMessage] {
+    case FromRequester(nsi) => NsiMessageToStoredMessage(nsi)
+    case FromProvider(nsi)  => NsiMessageToStoredMessage(nsi)
+    case FromPce(pce)       => PceMessageToStoredMessage(pce)
+    case ToPce(pce)         => PceMessageToStoredMessage(pce)
   } { stored =>
     stored.protocol match {
-      case "NSIv2" => NsiMessageToStoredMessage.invert(stored).map(Left(_))
-      case "PCEv1" => PceMessageToStoredMessage.invert(stored).map(Right(_))
+      case "NSIv2" => NsiMessageToStoredMessage.invert(stored) map {
+        case message: NsiProviderOperation  => FromRequester(message)
+        case message: NsiRequesterOperation => FromProvider(message)
+        case _                              => ???
+      }
+      case "PCEv1" => PceMessageToStoredMessage.invert(stored).map {
+        case message: PceResponse => FromPce(message)
+        case message: PceRequest  => ToPce(message)
+        case _                    => ???
+      }
     }
   }
 }
@@ -185,9 +195,27 @@ class MessageStore[T]()(implicit writer: Injection[T, StoredMessage]) {
           FROM messages
          WHERE aggregated_connection_id = {aggregated_connection_id}
          ORDER BY id ASC""").on(
-      'aggregated_connection_id -> aggregatedConnectionId).as(
-        (get[UUID]("correlation_id") ~ str("protocol") ~ str("type") ~ str("content") ~ get[java.util.Date]("created_at")).*).map {
-          case correlationId ~ protocol ~ tpe ~ content ~ createdAt => StoredMessage(CorrelationId.fromUuid(correlationId), protocol, tpe, content, new Instant(createdAt.getTime()))
-        }.flatMap(writer.invert) // FIXME error handling
+      'aggregated_connection_id -> aggregatedConnectionId).as(messageParser.*).flatMap(writer.invert) // FIXME error handling
   }
+
+  def loadEverything(): Seq[(ConnectionId, Seq[T])] = DB.withConnection { implicit connection =>
+    SQL("""
+        SELECT aggregated_connection_id, correlation_id, protocol, type, content, created_at
+          FROM messages
+         ORDER BY aggregated_connection_id ASC, id ASC""").as(
+      (str("aggregated_connection_id") ~ messageParser).*).groupBy {
+        case connectionId ~ _ => connectionId
+      }.map {
+        case (connectionId, messages) =>
+          connectionId -> messages.flatMap {
+            case _ ~ message => writer.invert(message)
+          }
+      }(collection.breakOut)
+
+  }
+
+  private def messageParser =
+    (get[UUID]("correlation_id") ~ str("protocol") ~ str("type") ~ str("content") ~ get[java.util.Date]("created_at")).map {
+      case correlationId ~ protocol ~ tpe ~ content ~ createdAt => StoredMessage(CorrelationId.fromUuid(correlationId), protocol, tpe, content, new Instant(createdAt.getTime()))
+    }
 }
