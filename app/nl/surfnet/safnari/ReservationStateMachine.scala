@@ -194,7 +194,7 @@ class ReservationStateMachine(
   def segmentKnown(connectionId: ConnectionId) = stateData.childConnectionStates.contains(connectionId)
   def childConnectionStates: Map[ConnectionId, ReservationState] = stateData.childConnectionStates
   def childConnections: Map[ConnectionId, ComputedSegment] = stateData.children
-  def reservationState = new ReservationStateType().withState(stateName.jaxb)
+  def reservationState = stateName.jaxb
   def criteria = stateData.criteria
   def version = stateData.criteria.getVersion()
 }

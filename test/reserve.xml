@@ -23,7 +23,7 @@
             </serviceAttributes>
             <path>
                <directionality>Bidirectional</directionality>
-               <symmetric>true</symmetric>
+               <symmetricPath>true</symmetricPath>
                <sourceSTP>
                   <networkId></networkId>
                   <localId></localId>

@@ -69,7 +69,7 @@ class ConnectionSpec extends helpers.Specification {
       result.asInstanceOf[QuerySummaryResultType]
     }
 
-    def reservationState = connectionData.getConnectionStates().getReservationState().getState()
+    def reservationState = connectionData.getConnectionStates().getReservationState()
     def provisionState = connectionData.getConnectionStates().getProvisionState()
     def lifecycleState = connectionData.getConnectionStates().getLifecycleState()
     def dataPlaneStatus = connectionData.getConnectionStates().getDataPlaneStatus()
@@ -286,10 +286,10 @@ class ConnectionSpec extends helpers.Specification {
       }
     }
 
-    "be in unknown state when initial reserve" in new fixture {
+    "be in released state when initial reserve" in new fixture {
       given(InitialMessages: _*)
 
-      provisionState.getState() must beEqualTo(ProvisionStateEnumType.UNKNOWN)
+      provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
     }
 
     "initialize the provisioning state machine when reservation is confirmed" in new fixture {
@@ -297,7 +297,7 @@ class ConnectionSpec extends helpers.Specification {
 
       when(FromProvider(ReserveConfirmed(Headers.copy(correlationId = CorrelationId(0, 2)), "ConnectionIdA", Criteria)))
 
-      provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
+      provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
 
     }
 
@@ -317,7 +317,7 @@ class ConnectionSpec extends helpers.Specification {
 
       when(FromProvider(ProvisionConfirmed(Headers.copy(correlationId = CorrelationId(0, 4)), "ConnectionIdA")))
 
-      provisionState.getState() must beEqualTo(ProvisionStateEnumType.PROVISIONED)
+      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
       messages must contain(ToRequester(ProvisionConfirmed(Headers.copy(correlationId = ProvisionCorrelationId).asReply, ConnectionId)))
     }
 
@@ -326,7 +326,7 @@ class ConnectionSpec extends helpers.Specification {
 
       val ack = when(FromRequester(Release(Headers.copy(correlationId = ReleaseCorrelationId), ConnectionId)))
 
-      provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASING)
+      provisionState must beEqualTo(ProvisionStateEnumType.RELEASING)
       ack must beEqualTo(GenericAck(Headers.copy(correlationId = ReleaseCorrelationId).asReply))
       messages must contain(ToProvider(Release(toProviderHeaders(A.provider, CorrelationId(0, 6)), "ConnectionIdA"), A.provider))
     }
@@ -338,7 +338,7 @@ class ConnectionSpec extends helpers.Specification {
 
       val ack = when(FromProvider(ReleaseConfirmed(Headers.copy(correlationId = CorrelationId(0, 5)), "ConnectionIdA")))
 
-      provisionState.getState() must beEqualTo(ProvisionStateEnumType.RELEASED)
+      provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
       ack must beEqualTo(GenericAck(Headers.copy(correlationId = CorrelationId(0, 5)).asReply))
       messages must contain(ToRequester(ReleaseConfirmed(Headers.copy(correlationId = ReleaseCorrelationId).asReply, ConnectionId)))
     }
@@ -366,7 +366,7 @@ class ConnectionSpec extends helpers.Specification {
 
       val ack = when(FromRequester(Terminate(Headers.copy(correlationId = TerminateCorrelationId), ConnectionId)))
 
-      lifecycleState.getState() must beEqualTo(LifecycleStateEnumType.TERMINATING)
+      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
       ack must beEqualTo(GenericAck(Headers.copy(correlationId = TerminateCorrelationId).asReply))
       messages must contain(ToProvider(Terminate(toProviderHeaders(A.provider, CorrelationId(0, 5)), "ConnectionIdA"), A.provider))
     }
@@ -378,7 +378,7 @@ class ConnectionSpec extends helpers.Specification {
 
       when(FromProvider(TerminateConfirmed(Headers.copy(correlationId = CorrelationId(0, 4)), "ConnectionIdA")))
 
-      lifecycleState.getState() must beEqualTo(LifecycleStateEnumType.TERMINATED)
+      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
       messages must contain(ToRequester(TerminateConfirmed(Headers.copy(correlationId = TerminateCorrelationId).asReply, ConnectionId)))
     }
 

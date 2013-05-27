@@ -2,7 +2,6 @@ package nl.surfnet.safnari
 
 import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateEnumType
 import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateEnumType._
-import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateType
 
 case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, ProvisionStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
 
@@ -10,8 +9,7 @@ case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     ProvisionStateMachineData(children, children.keys.map(_ -> RELEASED).toMap)
 
   def aggregatedProvisionStatus: ProvisionStateEnumType =
-    if (childStates.values.exists(_ == UNKNOWN)) UNKNOWN
-    else if (childStates.values.exists(_ == RELEASING)) RELEASING
+    if (childStates.values.exists(_ == RELEASING)) RELEASING
     else if (childStates.values.forall(_ == RELEASED)) RELEASED
     else if (childStates.values.exists(_ == PROVISIONING)) PROVISIONING
     else if (childStates.values.forall(_ == PROVISIONED)) PROVISIONED
@@ -21,18 +19,15 @@ case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     copy(childStates = childStates.updated(connectionId, state))
 
   def childHasState(connectionId: ConnectionId, state: ProvisionStateEnumType) =
-    childStates.getOrElse(connectionId, UNKNOWN) == state
+    childStates.getOrElse(connectionId, RELEASED) == state
 }
 
 class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, outbound: Message => Unit)
-  extends FiniteStateMachine[ProvisionStateEnumType, ProvisionStateMachineData](UNKNOWN, ProvisionStateMachineData(Map.empty, Map.empty)) {
-
-  when(UNKNOWN) {
-    case Event(children: Map[_, _], data) =>
-      goto(RELEASED) using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ComputedSegment].provider))
-  }
+  extends FiniteStateMachine[ProvisionStateEnumType, ProvisionStateMachineData](RELEASED, ProvisionStateMachineData(Map.empty, Map.empty)) {
 
   when(RELEASED) {
+    case Event(children: Map[_, _], data) =>
+      goto(RELEASED) using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ComputedSegment].provider))
     case Event(FromRequester(message: Provision), data) =>
       goto(PROVISIONING) using data.copy(commandHeaders = Some(message.headers)) replying GenericAck(message.headers.asReply)
   }
@@ -72,7 +67,7 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
       outbound(ToRequester(ProvisionConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
   }
 
-  def provisionState = new ProvisionStateType().withState(stateName)
+  def provisionState = stateName
 
   def childConnectionState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }

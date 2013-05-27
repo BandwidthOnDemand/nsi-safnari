@@ -2,7 +2,6 @@ package nl.surfnet.safnari
 
 import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateEnumType._
 import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateEnumType
-import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateType
 
 
 case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, LifecycleStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
@@ -12,8 +11,7 @@ case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoin
   }
 
   def aggregatedLifecycleStatus: LifecycleStateEnumType = {
-    if (childStates.values.exists(_ == UNKNOWN)) UNKNOWN
-    else if (childStates.values.forall(_ == CREATED)) CREATED
+    if (childStates.values.forall(_ == CREATED)) CREATED
     else if (childStates.values.exists(_ == TERMINATING)) TERMINATING
     else if (childStates.values.forall(_ == TERMINATED)) TERMINATED
     else throw new IllegalStateException(s"cannot determine aggregated status from ${childStates.values}")
@@ -23,7 +21,7 @@ case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     copy(childStates = childStates.updated(connectionId, state))
 
   def childHasState(connectionId: ConnectionId, state: LifecycleStateEnumType) =
-    childStates.getOrElse(connectionId, UNKNOWN) == state
+    childStates.getOrElse(connectionId, CREATED) == state
 }
 
 class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, outbound: Message => Unit) extends FiniteStateMachine(CREATED, new LifecycleStateMachineData(Map.empty, Map.empty)) {
@@ -53,7 +51,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
       outbound(ToRequester(TerminateConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
   }
 
-  def lifecycleState = new LifecycleStateType().withState(stateName)
+  def lifecycleState = stateName
 
   def childConnectionState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }
