@@ -147,22 +147,24 @@ object StoredMessage {
   implicit val ToPceFormat = Json.format[ToPce]
 
   implicit val MessageToStoredMessage = Injection.build[Message, StoredMessage] {
-    case message @ FromRequester(nsi) => StoredMessage(nsi.headers.correlationId, "NSIv2", "FromRequester", Json.stringify(Json.toJson(message)))
-    case message @ ToRequester(nsi)   => StoredMessage(nsi.headers.correlationId, "NSIv2", "ToRequester", Json.stringify(Json.toJson(message)))
-    case message @ FromProvider(nsi)  => StoredMessage(nsi.headers.correlationId, "NSIv2", "FromProvider", Json.stringify(Json.toJson(message)))
-    case message @ ToProvider(nsi, _) => StoredMessage(nsi.headers.correlationId, "NSIv2", "ToProvider", Json.stringify(Json.toJson(message)))
-    case message @ FromPce(pce)       => StoredMessage(pce.correlationId, "PCEv1", "FromPce", Json.stringify(Json.toJson(message)))
-    case message @ ToPce(pce)         => StoredMessage(pce.correlationId, "PCEv1", "ToPce", Json.stringify(Json.toJson(message)))
+    case message @ FromRequester(nsi) => StoredMessage(nsi.headers.correlationId, "NSIv2", "FromRequester", Json.toJson(message).toString)
+    case message @ ToRequester(nsi)   => StoredMessage(nsi.headers.correlationId, "NSIv2", "ToRequester", Json.toJson(message).toString)
+    case message @ FromProvider(nsi)  => StoredMessage(nsi.headers.correlationId, "NSIv2", "FromProvider", Json.toJson(message).toString)
+    case message @ ToProvider(nsi, _) => StoredMessage(nsi.headers.correlationId, "NSIv2", "ToProvider", Json.toJson(message).toString)
+    case message @ FromPce(pce)       => StoredMessage(pce.correlationId, "PCEv1", "FromPce", Json.toJson(message).toString)
+    case message @ ToPce(pce)         => StoredMessage(pce.correlationId, "PCEv1", "ToPce", Json.toJson(message).toString)
   } { stored =>
     stored.tpe match {
-      case "FromRequester" => Json.fromJson[FromRequester](Json.parse(stored.content)).asOpt
-      case "ToRequester"   => Json.fromJson[ToRequester](Json.parse(stored.content)).asOpt
-      case "FromProvider"  => Json.fromJson[FromProvider](Json.parse(stored.content)).asOpt
-      case "ToProvider"    => Json.fromJson[ToProvider](Json.parse(stored.content)).asOpt
-      case "FromPce"       => Json.fromJson[FromPce](Json.parse(stored.content)).asOpt
-      case "ToPce"         => Json.fromJson[ToPce](Json.parse(stored.content)).asOpt
+      case "FromRequester" => parseJson[FromRequester](stored.content)
+      case "ToRequester"   => parseJson[ToRequester](stored.content)
+      case "FromProvider"  => parseJson[FromProvider](stored.content)
+      case "ToProvider"    => parseJson[ToProvider](stored.content)
+      case "FromPce"       => parseJson[FromPce](stored.content)
+      case "ToPce"         => parseJson[ToPce](stored.content)
     }
   }
+
+  private def parseJson[T](json: String)(implicit reads: Reads[T]): Option[T] = Json.parse(json).validate[T].asOpt
 
 }
 

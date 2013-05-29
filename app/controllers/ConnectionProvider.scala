@@ -43,18 +43,13 @@ object ConnectionProvider extends Controller with SoapWebService {
     case command: NsiCommand => handleRequest(command)(replyToClient(command.headers))
   }
 
-  private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit = {
+  private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
     requestHeaders.replyTo.foreach { replyTo =>
-      WS.url(replyTo.toASCIIString()).
-        post(response).
-        onComplete {
-          case Failure(error) =>
-            Logger.info(s"Replying to $replyTo: $error", error)
-          case Success(acknowledgement) =>
-            Logger.debug(s"Replying $response to $replyTo")
-        }
+      WS.url(replyTo.toASCIIString()).post(response).onComplete {
+        case Failure(error)           => Logger.info(s"Replying to $replyTo: $error", error)
+        case Success(acknowledgement) => Logger.debug(s"Replying $response to $replyTo")
+      }
     }
-  }
 
   private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = message match {
     case q: QuerySummary =>
@@ -77,9 +72,9 @@ object ConnectionProvider extends Controller with SoapWebService {
     Future.traverse(cs)(c => c ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
   }
 
-  private[controllers] def handleRequest(request: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
+  private[controllers] def handleRequest(request: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
     connectionManager.findOrCreateConnection(request) match {
-      case (connectionId, None) =>
+      case (_, None) =>
         Future.successful(ServiceException(request.headers.asReply, NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
       case (connectionId, Some(connectionActor)) =>
         requesterContinuations.register(request.correlationId).onSuccess {
@@ -87,7 +82,6 @@ object ConnectionProvider extends Controller with SoapWebService {
         }
         (connectionActor ? FromRequester(request)).mapTo[NsiAcknowledgement]
     }
-  }
 
   def outboundActor(initialReserve: Reserve) =
     Akka.system.actorOf(Props(new OutboundRoutingActor(ConnectionRequester.nsiRequester, PathComputationEngine.pceRequester, replyToClient(initialReserve.headers))))
