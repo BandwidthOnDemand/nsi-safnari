@@ -67,15 +67,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
 
         case message: InboundMessage =>
           if (!replaying) {
-            val store = message match {
-              case message: FromRequester => Some(message)
-              case message: FromProvider  => Some(message)
-              case message: FromPce       => Some(message)
-              case message =>
-                message.pp("Not persisted")
-                None
-            }
-            store foreach { messageStore.store(connectionId, _) }
+            messageStore.store(connectionId, message)
           }
 
           val output = connection.process(message)
