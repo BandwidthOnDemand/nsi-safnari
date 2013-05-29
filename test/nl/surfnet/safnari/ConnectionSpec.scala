@@ -2,14 +2,8 @@ package nl.surfnet.safnari
 
 import java.util.UUID
 import java.net.URI
-import scala.concurrent.duration._
-import akka.testkit._
-import akka.actor._
-import akka.pattern.ask
-import akka.util.Timeout
 import scala.collection.JavaConverters._
-import scala.concurrent.Await
-import org.specs2.mutable.After
+import org.specs2.specification.Scope
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 import javax.xml.datatype.DatatypeFactory
@@ -18,16 +12,7 @@ import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionSpec extends helpers.Specification {
 
-  trait fixture extends After {
-
-    implicit val system = ActorSystem("test-" + UUID.randomUUID().toString)
-    implicit val timeout = Timeout(2.seconds)
-
-    override def after = {
-      t
-      system.shutdown
-      system.awaitTermination
-    }
+  trait fixture extends Scope {
 
     val Criteria = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType())
     val InitialReserveType = new ReserveType().withCriteria(Criteria)
@@ -52,20 +37,16 @@ class ConnectionSpec extends helpers.Specification {
 
     var messages: Seq[Message] = Nil
 
-    val connection = TestActorRef(new ConnectionActor(ConnectionId, InitialReserve, () => CorrelationId.fromUuid(mockUuidGenerator()), (message, sender) => messages :+= message, NsiReplyToUri, PceReplyToUri))
+    val connection = new ConnectionEntity(ConnectionId, InitialReserve, () => CorrelationId.fromUuid(mockUuidGenerator()), NsiReplyToUri, PceReplyToUri)
 
-    def given(messages: Message*): Unit = messages.foreach(m => connection ! m)
+    def given(messages: InboundMessage*): Unit = messages.foreach(connection.process)
 
-    def when(message: Any): Any = {
+    def when(message: InboundMessage): Option[Seq[Message]] = {
       messages = Nil
-      Await.result(connection ? message, Duration.Inf)
+      connection.process(message).tap(_.foreach(messages = _))
     }
 
-    def connectionData = {
-      val result = Await.result(connection ? 'query, Duration.Inf)
-      result must beAnInstanceOf[QuerySummaryResultType]
-      result.asInstanceOf[QuerySummaryResultType]
-    }
+    def connectionData = connection.query
 
     def reservationState = connectionData.getConnectionStates().getReservationState()
     def provisionState = connectionData.getConnectionStates().getProvisionState()
@@ -93,12 +74,6 @@ class ConnectionSpec extends helpers.Specification {
   }
 
   "A connection" should {
-    "send a reserve response when reserve is requested" in new fixture {
-      val ack = when(FromRequester(Reserve(Headers.copy(correlationId = ReserveCorrelationId), InitialReserveType)))
-
-      ack.asInstanceOf[ReserveResponse].correlationId must beEqualTo(ReserveCorrelationId)
-    }
-
     "send a path computation request when reserve is received" in new fixture {
       when(FromRequester(Reserve(Headers.copy(correlationId = ReserveCorrelationId), InitialReserveType)))
 
@@ -232,7 +207,6 @@ class ConnectionSpec extends helpers.Specification {
       given(InitialMessages ++ Seq(
         FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
         FromProvider(ReserveConfirmed(Headers.copy(correlationId = CorrelationId(0, 2)), "ConnectionIdA", Criteria)),
-        //ToRequester(ReserveConfirmed(CorrelationId(0, 0), ConnectionId, Criteria)),
         FromRequester(ReserveCommit(Headers.copy(correlationId = CommitCorrelationId), ConnectionId))): _*)
 
       when(FromProvider(ReserveCommitConfirmed(Headers.copy(correlationId = CorrelationId(0, 3)), "ConnectionIdA")))
@@ -244,11 +218,7 @@ class ConnectionSpec extends helpers.Specification {
     "reject commit when in initial state" in new fixture {
       val ack = when(FromRequester(ReserveCommit(Headers.copy(correlationId = CommitCorrelationId), ConnectionId)))
 
-      ack must beLike {
-        case ServiceException(headers, exception) =>
-          headers must beEqualTo(Headers.copy(correlationId = CommitCorrelationId).asReply)
-          exception.getErrorId() must beEqualTo(NsiError.InvalidState.id)
-      }
+      ack must beNone
     }
 
     "be in aborting state when reserve abort is received" in new fixture {
@@ -265,23 +235,18 @@ class ConnectionSpec extends helpers.Specification {
     "provide information about connections" in new fixture {
       given(InitialMessages: _*)
 
-      val response = when('query)
+      val result = connection.query
 
-      response must beLike {
-        case result: QuerySummaryResultType =>
-          result.getConnectionId() must beEqualTo(ConnectionId)
-          result.getChildren().getChild() must haveSize(0)
-      }
+      result.getConnectionId() must beEqualTo(ConnectionId)
+      result.getChildren().getChild() must haveSize(0)
     }
 
     "provide information about connections with children" in new ReservedConnection {
       given(InitialMessages: _*)
 
-      val response = when('query)
+      val result = connection.query
 
-      response must beLike {
-        case result: QuerySummaryResultType => result.getChildren().getChild() must haveSize(1)
-      }
+      result.getChildren().getChild() must haveSize(1)
     }
 
     "be in released state when initial reserve" in new fixture {
@@ -296,15 +261,13 @@ class ConnectionSpec extends helpers.Specification {
       when(FromProvider(ReserveConfirmed(Headers.copy(correlationId = CorrelationId(0, 2)), "ConnectionIdA", Criteria)))
 
       provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
-
     }
 
     "become provisioning on provision request" in new ReservedConnection with Released {
       val ProvisionCorrelationId = newCorrelationId
 
-      val ack = when(FromRequester(Provision(Headers.copy(correlationId = ProvisionCorrelationId), ConnectionId)))
+      when(FromRequester(Provision(Headers.copy(correlationId = ProvisionCorrelationId), ConnectionId)))
 
-      ack must beEqualTo(GenericAck(Headers.copy(correlationId = ProvisionCorrelationId).asReply))
       messages must contain(ToProvider(Provision(toProviderHeaders(A.provider, CorrelationId(0, 5)), "ConnectionIdA"), A.provider))
     }
 
@@ -322,10 +285,9 @@ class ConnectionSpec extends helpers.Specification {
     "become releasing on release request" in new ReservedConnection with Provisioned {
       val ReleaseCorrelationId = newCorrelationId
 
-      val ack = when(FromRequester(Release(Headers.copy(correlationId = ReleaseCorrelationId), ConnectionId)))
+      when(FromRequester(Release(Headers.copy(correlationId = ReleaseCorrelationId), ConnectionId)))
 
       provisionState must beEqualTo(ProvisionStateEnumType.RELEASING)
-      ack must beEqualTo(GenericAck(Headers.copy(correlationId = ReleaseCorrelationId).asReply))
       messages must contain(ToProvider(Release(toProviderHeaders(A.provider, CorrelationId(0, 6)), "ConnectionIdA"), A.provider))
     }
 
@@ -334,38 +296,30 @@ class ConnectionSpec extends helpers.Specification {
 
       given(FromRequester(Release(Headers.copy(correlationId = ReleaseCorrelationId), ConnectionId)))
 
-      val ack = when(FromProvider(ReleaseConfirmed(Headers.copy(correlationId = CorrelationId(0, 5)), "ConnectionIdA")))
+      when(FromProvider(ReleaseConfirmed(Headers.copy(correlationId = CorrelationId(0, 5)), "ConnectionIdA")))
 
       provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
-      ack must beEqualTo(GenericAck(Headers.copy(correlationId = CorrelationId(0, 5)).asReply))
       messages must contain(ToRequester(ReleaseConfirmed(Headers.copy(correlationId = ReleaseCorrelationId).asReply, ConnectionId)))
     }
 
     "reject release request when released" in new ReservedConnection with Released {
       val ack = when(FromRequester(Release(Headers.copy(correlationId = newCorrelationId), ConnectionId)))
 
-      ack must beLike {
-        case ServiceException(_, exception) =>
-          exception.getErrorId() must beEqualTo(NsiError.InvalidState.id)
-      }
+      ack must beNone
     }
 
     "reject provision request when provisioned" in new ReservedConnection with Provisioned {
       val ack = when(FromRequester(Provision(Headers.copy(correlationId = newCorrelationId), ConnectionId)))
 
-      ack must beLike {
-        case ServiceException(_, exception) =>
-          exception.getErrorId() must beEqualTo(NsiError.InvalidState.id)
-      }
+      ack must beNone
     }
 
     "become terminating on terminate request" in new ReservedConnection {
       val TerminateCorrelationId = newCorrelationId
 
-      val ack = when(FromRequester(Terminate(Headers.copy(correlationId = TerminateCorrelationId), ConnectionId)))
+      when(FromRequester(Terminate(Headers.copy(correlationId = TerminateCorrelationId), ConnectionId)))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-      ack must beEqualTo(GenericAck(Headers.copy(correlationId = TerminateCorrelationId).asReply))
       messages must contain(ToProvider(Terminate(toProviderHeaders(A.provider, CorrelationId(0, 5)), "ConnectionIdA"), A.provider))
     }
 

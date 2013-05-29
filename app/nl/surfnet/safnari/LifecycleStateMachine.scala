@@ -3,12 +3,7 @@ package nl.surfnet.safnari
 import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateEnumType._
 import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateEnumType
 
-
 case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, LifecycleStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
-
-  def initialize(children: Map[ConnectionId, ProviderEndPoint]) = {
-    LifecycleStateMachineData(children, children.keys.map(_ -> CREATED).toMap)
-  }
 
   def aggregatedLifecycleStatus: LifecycleStateEnumType = {
     if (childStates.values.forall(_ == CREATED)) CREATED
@@ -24,19 +19,18 @@ case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     childStates.getOrElse(connectionId, CREATED) == state
 }
 
-class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders) extends FiniteStateMachine(CREATED, new LifecycleStateMachineData(Map.empty, Map.empty)) {
+class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, children: Map[ConnectionId, ProviderEndPoint])
+  extends FiniteStateMachine[LifecycleStateEnumType, LifecycleStateMachineData, InboundMessage, OutboundMessage](CREATED, new LifecycleStateMachineData(children, children.map(_._1 -> CREATED))) {
 
   when(CREATED) {
-    case Event(children: Map[_, _], data) =>
-      stay using data.initialize(children.map(p => p._1.asInstanceOf[ConnectionId] -> p._2.asInstanceOf[ComputedSegment].provider))
     case Event(FromRequester(message: Terminate), data) =>
-      goto(TERMINATING) using(data.copy(commandHeaders = Some(message.headers))) replying message.ack
+      goto(TERMINATING) using (data.copy(commandHeaders = Some(message.headers)))
   }
 
   when(TERMINATING) {
-    case Event(FromProvider(message: TerminateConfirmed), data) if data.childHasState(message.connectionId, CREATED)=>
+    case Event(FromProvider(message: TerminateConfirmed), data) if data.childHasState(message.connectionId, CREATED) =>
       val newData = data.updateChild(message.connectionId, TERMINATED)
-      goto(newData.aggregatedLifecycleStatus) using(newData) replying message.ack
+      goto(newData.aggregatedLifecycleStatus) using (newData)
   }
 
   when(TERMINATED)(PartialFunction.empty)

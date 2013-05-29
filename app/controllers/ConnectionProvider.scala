@@ -15,7 +15,7 @@ import play.api.libs.ws.WS
 import play.api.mvc._
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
 
 object ConnectionProvider extends Controller with SoapWebService {
@@ -25,13 +25,11 @@ object ConnectionProvider extends Controller with SoapWebService {
   private val requesterContinuations = new Continuations[NsiRequesterOperation]()
   private val pceContinuations = new Continuations[PceResponse]()
 
-  def connectionFactory(connectionId: ConnectionId, initialReserve: Reserve)(messageCallback: (ActorRef, Message, ActorRef) => Unit): ActorRef = {
+  def connectionFactory(connectionId: ConnectionId, initialReserve: Reserve): (ActorRef, ConnectionEntity) = {
     val outbound = outboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
-    Akka.system.actorOf(Props(new ConnectionActor(connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), (message, sender) => {
-      messageCallback(sender, message, outbound)
-    }, URI.create(ConnectionRequester.serviceUrl), URI.create(PathComputationEngine.pceReplyUrl))))
+    (outbound, new ConnectionEntity(connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), URI.create(ConnectionRequester.serviceUrl), URI.create(PathComputationEngine.pceReplyUrl)))
   }
 
   val connectionManager = new ConnectionManager(connectionFactory)

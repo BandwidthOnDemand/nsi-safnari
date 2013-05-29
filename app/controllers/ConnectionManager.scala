@@ -5,10 +5,10 @@ import akka.pattern.ask
 import akka.util.Timeout
 import nl.surfnet.safnari._
 import scala.concurrent._
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.{ Duration, DurationInt }
 import scala.concurrent.stm._
 
-class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => ((ActorRef, Message, ActorRef) => Unit) => ActorRef) {
+class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef, ConnectionEntity)) {
   implicit val timeout = Timeout(2.seconds)
 
   private val connections = TMap.empty[ConnectionId, ActorRef]
@@ -56,24 +56,48 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => ((ActorRef
   }
 
   private def createConnection(connectionId: ConnectionId, initialReserve: Reserve)(implicit actorSystem: ActorSystem): ActorRef = {
-    val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
-    val connectionActor = connectionFactory(connectionId, initialReserve) { (sender, message, outbound) =>
-      if (replaying) message.pp("Dropped in replay mode")
-      else outbound.!(message)(sender)
-    }
+    val (outbound, connection) = connectionFactory(connectionId, initialReserve)
+
     val storingActor = actorSystem.actorOf(Props(new Actor {
       override def receive = {
-        case message =>
-          val store = message match {
-            case message: FromRequester => Some(message)
-            case message: FromProvider  => Some(message)
-            case message: FromPce       => Some(message)
-            case message =>
-              message.pp("Not persisted")
-              None
+        case 'query                     => sender ! connection.query
+        case 'querySegments             => sender ! connection.segments
+
+        case SegmentKnown(connectionId) => sender ! connection.rsm.segmentKnown(connectionId)
+
+        case message: InboundMessage =>
+          if (!replaying) {
+            val store = message match {
+              case message: FromRequester => Some(message)
+              case message: FromProvider  => Some(message)
+              case message: FromPce       => Some(message)
+              case message =>
+                message.pp("Not persisted")
+                None
+            }
+            store foreach { messageStore.store(connectionId, _) }
           }
-          store foreach { messageStore.store(connectionId, _) }
-          connectionActor forward message
+
+          val output = connection.process(message)
+
+          output match {
+            case None =>
+              sender ! messageNotApplicable(message)
+            case Some(messages) =>
+              if (!replaying) messages.foreach(outbound ! _)
+              message match {
+                case FromRequester(reserve: Reserve) => sender ! ReserveResponse(reserve.headers.asReply, connectionId)
+                case FromRequester(request)          => sender ! request.ack
+                case FromProvider(request)           => sender ! request.ack
+                case FromPce(request)                => sender ! 200
+              }
+          }
+      }
+
+      private def messageNotApplicable(message: InboundMessage) = message match {
+        case FromRequester(message) => ServiceException(message.headers.asReply, NsiError.InvalidState.toServiceException("NSA-ID"))
+        case FromProvider(message)  => ServiceException(message.headers.asReply, NsiError.InvalidState.toServiceException("NSA-ID"))
+        case FromPce(message)       => 400
       }
     }))
     add(connectionId, storingActor)

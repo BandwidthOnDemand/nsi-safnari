@@ -4,13 +4,13 @@ package nl.surfnet.safnari
  * Simplified re-implementation of Akka's finite state machine [[akka.actor.FSM]]
  * DSL, without the dependencies on actors.
  */
-abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D) {
+abstract class FiniteStateMachine[S, D, I, O](initialStateName: S, initialStateData: D) {
 
   /**
    * Process the given message. Returns `None` if the FSM did not handle the
    * message. Otherwise the replies (if any) are returned.
    */
-  def process(message: Any): Option[Seq[Any]] = {
+  def process(message: I): Option[Seq[O]] = {
     val nextState = _handlers(stateName).orElse(_unhandled).lift.apply(Event(message, _stateData))
     nextState map { nextState =>
       _nextStateName = nextState.name
@@ -18,7 +18,7 @@ abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D
       val output = _transitionHandler.applyOrElse((_stateName, _nextStateName), (_: (S, S)) => Vector.empty)
       _stateName = _nextStateName
       _stateData = _nextStateData
-      nextState.replies ++ output
+      output
     }
   }
 
@@ -27,11 +27,10 @@ abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D
    * name, the state data, and replies accumulated while processing the last
    * message.
    */
-  protected[this] case class State(name: S, data: D, replies: Seq[Any] = Vector.empty) {
+  protected[this] case class State(name: S, data: D) {
     def using(nextData: D) = copy(data = nextData)
-    def replying(reply: Any) = copy(replies = replies :+ reply)
   }
-  protected[this] case class Event(message: Any, data: D)
+  protected[this] case class Event(message: I, data: D)
 
   protected[this] def stateName = _stateName
   protected[this] def stateData = _stateData
@@ -40,7 +39,7 @@ abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D
   protected[this] def nextStateData = _nextStateData
 
   protected[this]type EventHandler = PartialFunction[Event, State]
-  protected[this]type TransitionHandler = PartialFunction[(S, S), Seq[Any]]
+  protected[this]type TransitionHandler = PartialFunction[(S, S), Seq[O]]
 
   protected[this] def when(stateName: S)(handler: EventHandler) {
     require(!_handlers.contains(stateName), s"handler for state $stateName is already defined")

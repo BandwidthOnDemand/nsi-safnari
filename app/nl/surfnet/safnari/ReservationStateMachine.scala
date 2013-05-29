@@ -76,7 +76,7 @@ class ReservationStateMachine(
   newCorrelationId: () => CorrelationId,
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
   failed: NsiError => GenericFailedType)
-  extends FiniteStateMachine[ReservationState, ReservationStateMachineData](
+  extends FiniteStateMachine[ReservationState, ReservationStateMachineData, InboundMessage, OutboundMessage](
     InitialReservationState,
     ReservationStateMachineData(
       initialReserve.headers.asReply,
@@ -86,15 +86,15 @@ class ReservationStateMachine(
 
   when(InitialReservationState) {
     case Event(FromRequester(message: Reserve), _) =>
-      goto(PathComputationState) replying ReserveResponse(message.headers.asReply, id)
+      goto(PathComputationState)
   }
 
   when(PathComputationState) {
     case Event(FromPce(message: PathComputationConfirmed), data) =>
       val segments = message.segments.map(newCorrelationId() -> _)
-      goto(CheckingReservationState) using data.copy(segments = segments.toMap) replying 200
+      goto(CheckingReservationState) using data.copy(segments = segments.toMap)
     case Event(FromPce(message: PathComputationFailed), _) =>
-      goto(FailedReservationState) replying 200
+      goto(FailedReservationState)
   }
 
   when(CheckingReservationState) {
@@ -102,36 +102,36 @@ class ReservationStateMachine(
       val newData = data
         .receivedConnectionId(message.correlationId, message.connectionId)
         .updateChild(message.connectionId, HeldReservationState)
-      goto(newData.aggregatedReservationState) using newData replying message.ack
+      goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(message: ReserveFailed), data) if data.childHasState(message.connectionId, CheckingReservationState) =>
       val newData = data
         .receivedConnectionId(message.correlationId, message.connectionId)
         .updateChild(message.connectionId, FailedReservationState, Some(message.failed.getServiceException()))
-      goto(newData.aggregatedReservationState) using newData replying message.ack
+      goto(newData.aggregatedReservationState) using newData
   }
 
   when(HeldReservationState) {
     case Event(FromRequester(message: ReserveCommit), data) =>
       val newData = data.startProcessingNewCommand(message.headers, CommittingReservationState)
-      goto(CommittingReservationState) using newData replying message.ack
+      goto(CommittingReservationState) using newData
     case Event(FromRequester(message: ReserveAbort), data) =>
       val newData = data.startProcessingNewCommand(message.headers, AbortingReservationState)
-      goto(AbortingReservationState) using newData replying message.ack
+      goto(AbortingReservationState) using newData
   }
 
   when(CommittingReservationState) {
     case Event(FromProvider(message: ReserveCommitConfirmed), data) if data.childHasState(message.connectionId, CommittingReservationState) =>
       val newData = data.updateChild(message.connectionId, ReservedReservationState)
-      goto(newData.aggregatedReservationState) using newData replying message.ack
+      goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(message: ReserveCommitFailed), data) if data.childHasState(message.connectionId, CommittingReservationState) =>
       val newData = data.updateChild(message.connectionId, CommitFailedReservationState, Some(message.failed.getServiceException()))
-      goto(newData.aggregatedReservationState) using newData replying message.ack
+      goto(newData.aggregatedReservationState) using newData
   }
 
   when(AbortingReservationState) {
     case Event(FromProvider(message: ReserveAbortConfirmed), data) if data.childHasState(message.connectionId, AbortingReservationState) =>
       val newData = data.updateChild(message.connectionId, AbortedReservationState)
-      goto(newData.aggregatedReservationState) replying message.ack
+      goto(newData.aggregatedReservationState)
   }
 
   when(ReservedReservationState)(PartialFunction.empty)
