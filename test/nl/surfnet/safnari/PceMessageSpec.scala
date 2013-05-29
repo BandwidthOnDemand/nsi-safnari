@@ -18,7 +18,12 @@ object PceMessageSpec {
   val correlationId = newCorrelationId
 
   val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), criteria)
+
+  val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication)
+  val computedSegment = ComputedSegment(sourceStp, destStp, providerEndPoint)
+  val pathComputationResponse = PathComputationConfirmed(correlationId, Seq(computedSegment))
 }
+
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PceMessageSpec extends helpers.Specification {
   import PceMessageSpec._
@@ -46,7 +51,7 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "serialize computation confirmed response to json" in {
-      val response = PathComputationConfirmed(correlationId, List(ComputedSegment(sourceStp, destStp, ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication))))
+      val response = PathComputationConfirmed(correlationId, List(ComputedSegment(sourceStp, destStp, providerEndPoint)))
 
       val json = Json.toJson(response)
 
@@ -59,12 +64,21 @@ class PceMessageSpec extends helpers.Specification {
         case JsError(errors) =>
           errors must contain((JsPath \ "method") -> Seq(ValidationError("bad.authentication.method", "foo")))
       }
+
       Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"basic"}""")) must beLike {
         case JsError(errors) =>
           errors must contain((JsPath \ "username") -> Seq(ValidationError("validate.error.missing-path")))
       }
+
       Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"oauth2", "token":"oath2-token"}""")) must beEqualTo(JsSuccess(OAuthAuthentication("oath2-token")))
+
       Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"basic", "username":"user", "password":"pwd"}""")) must beEqualTo(JsSuccess(BasicAuthentication("user", "pwd")))
     }
+
+    "deserialize provider end point" in {
+      Json.fromJson[ProviderEndPoint](Json.parse("""{"nsa":"urn:nsa:surfnet.nl", "provider-url":"http://localhost", "auth":{"method":"none"}}""")) must beEqualTo(
+        JsSuccess(ProviderEndPoint("urn:nsa:surfnet.nl", URI.create("http://localhost"), NoAuthentication)))
+    }
+
   }
 }

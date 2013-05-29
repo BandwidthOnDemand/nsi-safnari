@@ -1,6 +1,7 @@
 package nl.surfnet.safnari
 
-import play.api.libs.json.Format
+import play.api.libs.json._
+import play.api.libs.functional.syntax._
 import org.joda.time.DateTimeUtils
 import anorm._
 import anorm.SqlParser._
@@ -13,15 +14,14 @@ import com.twitter.bijection.Injection
 import org.joda.time.Instant
 import javax.xml.soap._
 import java.io.ByteArrayOutputStream
-import play.api.libs.json.Json
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
 import scala.reflect.ClassTag
 import scala.collection.JavaConverters._
 import java.net.URI
 import java.io.ByteArrayInputStream
-import play.api.libs.json.Reads
 import java.util.UUID
+import scala.util.Try
 
 case class StoredMessage(correlationId: CorrelationId, protocol: String, tpe: String, content: String, createdAt: Instant = new Instant())
 
@@ -111,57 +111,59 @@ object StoredMessage {
     soap
   }
 
-  val NsiMessageToStoredMessage = Injection.build[NsiMessage, StoredMessage] { message =>
-    val (tpe, soap) = message match {
-      case message: NsiAcknowledgement    => "NsiAcknowledgement" -> nsiMessageToSoapMessage(message)
-      case message: NsiProviderOperation  => "NsiProviderOperation" -> nsiMessageToSoapMessage(message)
-      case message: NsiRequesterOperation => "NsiRequesterOperation" -> nsiMessageToSoapMessage(message)
+  def injectionToFormat[A, B: Format](injection: Injection[A, B]): Format[A] = new Format[A] {
+    override def reads(js: JsValue): JsResult[A] = Json.fromJson[B](js).flatMap { b =>
+      injection.invert(b).map(JsSuccess(_)).getOrElse(JsError("bad"))
     }
-    val content = new ByteArrayOutputStream().tap(soap.writeTo).toString("UTF-8")
-    StoredMessage(message.headers.correlationId, "NSIv2", tpe, content)
-  } { stored =>
-    val soap = MessageFactory.newInstance().createMessage(new MimeHeaders, new ByteArrayInputStream(stored.content.getBytes(Codec.UTF8.charSet)))
-    val parser = stored.tpe match {
-      case "NsiAcknowledgement"    => ???
-      case "NsiProviderOperation"  => soapToNsiMessage(bodyNameToProviderOperation)(_)
-      case "NsiRequesterOperation" => soapToNsiMessage(bodyNameToRequesterOperation)(_)
-    }
-    parser(soap).right.toOption
+    override def writes(a: A): JsValue = Json.toJson(injection(a))
   }
 
-  val PceMessageToStoredMessage = Injection.build[PceMessage, StoredMessage] { message =>
-    val (tpe, content) = message match {
-      case request: PceRequest   => "PceRequest" -> Json.stringify(Json.toJson(request))
-      case response: PceResponse => "PceResponse" -> Json.stringify(Json.toJson(response))
-    }
-    StoredMessage(message.correlationId, "PCEv1", tpe, content)
-  } { stored =>
-    val message = stored.tpe match {
-      case "PceRequest"  => Json.fromJson[PceRequest](Json.parse(stored.content))
-      case "PceResponse" => Json.fromJson[PceResponse](Json.parse(stored.content))
-    }
-    message.asOpt
+  implicit val NsiProviderOperationToSoapMessage = Injection.build[NsiProviderOperation, SOAPMessage] { operation =>
+    nsiMessageToSoapMessage(operation)
+  } { soapToNsiMessage(bodyNameToProviderOperation)(_).right.toOption }
+
+  implicit val NsiRequesterOperationToSoapMessage = Injection.build[NsiRequesterOperation, SOAPMessage] { operation =>
+    nsiMessageToSoapMessage(operation)
+  } { soapToNsiMessage(bodyNameToRequesterOperation)(_).right.toOption }
+
+  implicit val SoapMessageToString = Injection.build[SOAPMessage, String] { soap =>
+    new ByteArrayOutputStream().tap(soap.writeTo).toString("UTF-8")
+  } { string =>
+    Try {
+      MessageFactory.newInstance().createMessage(new MimeHeaders, new ByteArrayInputStream(string.getBytes(Codec.UTF8.charSet)))
+    }.toOption
   }
+
+  implicit val NsiProviderOperationFormat: Format[NsiProviderOperation] = injectionToFormat(NsiProviderOperationToSoapMessage.andThen(SoapMessageToString))
+  implicit val NsiRequesterOperationFormat: Format[NsiRequesterOperation] = injectionToFormat(NsiRequesterOperationToSoapMessage.andThen(SoapMessageToString))
+
+  import PceMessage.ProviderEndPointFormat
+
+  implicit val FromRequesterFormat = Json.format[FromRequester]
+  implicit val ToRequesterFormat = Json.format[ToRequester]
+  implicit val FromProviderFormat = Json.format[FromProvider]
+  implicit val ToProviderFormat = Json.format[ToProvider]
+  implicit val FromPceFormat = Json.format[FromPce]
+  implicit val ToPceFormat = Json.format[ToPce]
 
   implicit val MessageToStoredMessage = Injection.build[Message, StoredMessage] {
-    case FromRequester(nsi) => NsiMessageToStoredMessage(nsi)
-    case FromProvider(nsi)  => NsiMessageToStoredMessage(nsi)
-    case FromPce(pce)       => PceMessageToStoredMessage(pce)
-    case ToPce(pce)         => PceMessageToStoredMessage(pce)
+    case message @ FromRequester(nsi) => StoredMessage(nsi.headers.correlationId, "NSIv2", "FromRequester", Json.stringify(Json.toJson(message)))
+    case message @ ToRequester(nsi)   => StoredMessage(nsi.headers.correlationId, "NSIv2", "ToRequester", Json.stringify(Json.toJson(message)))
+    case message @ FromProvider(nsi)  => StoredMessage(nsi.headers.correlationId, "NSIv2", "FromProvider", Json.stringify(Json.toJson(message)))
+    case message @ ToProvider(nsi, _) => StoredMessage(nsi.headers.correlationId, "NSIv2", "ToProvider", Json.stringify(Json.toJson(message)))
+    case message @ FromPce(pce)       => StoredMessage(pce.correlationId, "PCEv1", "FromPce", Json.stringify(Json.toJson(message)))
+    case message @ ToPce(pce)         => StoredMessage(pce.correlationId, "PCEv1", "ToPce", Json.stringify(Json.toJson(message)))
   } { stored =>
-    stored.protocol match {
-      case "NSIv2" => NsiMessageToStoredMessage.invert(stored) map {
-        case message: NsiProviderOperation  => FromRequester(message)
-        case message: NsiRequesterOperation => FromProvider(message)
-        case _                              => ???
-      }
-      case "PCEv1" => PceMessageToStoredMessage.invert(stored).map {
-        case message: PceResponse => FromPce(message)
-        case message: PceRequest  => ToPce(message)
-        case _                    => ???
-      }
+    stored.tpe match {
+      case "FromRequester" => Json.fromJson[FromRequester](Json.parse(stored.content)).asOpt
+      case "ToRequester"   => Json.fromJson[ToRequester](Json.parse(stored.content)).asOpt
+      case "FromProvider"  => Json.fromJson[FromProvider](Json.parse(stored.content)).asOpt
+      case "ToProvider"    => Json.fromJson[ToProvider](Json.parse(stored.content)).asOpt
+      case "FromPce"       => Json.fromJson[FromPce](Json.parse(stored.content)).asOpt
+      case "ToPce"         => Json.fromJson[ToPce](Json.parse(stored.content)).asOpt
     }
   }
+
 }
 
 class MessageStore[T]()(implicit writer: Injection[T, StoredMessage]) {

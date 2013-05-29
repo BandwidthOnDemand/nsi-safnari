@@ -6,16 +6,6 @@ import org.ogf.schemas.nsi._2013._04.connection.types._
 import java.net.URI
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
-sealed trait Message
-sealed trait InboundMessage extends Message
-sealed trait OutboundMessage extends Message
-case class FromRequester(message: NsiProviderOperation) extends InboundMessage
-case class ToRequester(message: NsiRequesterOperation) extends OutboundMessage
-case class FromProvider(message: NsiRequesterOperation) extends InboundMessage
-case class ToProvider(message: NsiProviderOperation, provider: ProviderEndPoint) extends OutboundMessage
-case class FromPce(message: PceResponse) extends InboundMessage
-case class ToPce(message: PceRequest) extends OutboundMessage
-
 case class SegmentKnown(segmentId: ConnectionId)
 
 class ConnectionEntity(id: ConnectionId, initialReserve: Reserve, newCorrelationId: () => CorrelationId, nsiReplyToUri: URI, pceReplyUri: URI) {

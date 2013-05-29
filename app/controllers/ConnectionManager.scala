@@ -7,11 +7,14 @@ import nl.surfnet.safnari._
 import scala.concurrent._
 import scala.concurrent.duration.{ Duration, DurationInt }
 import scala.concurrent.stm._
+import play.Logger
 
 class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef, ConnectionEntity)) {
   implicit val timeout = Timeout(2.seconds)
 
   private val connections = TMap.empty[ConnectionId, ActorRef]
+  private val messageStore = new MessageStore[Message]()
+  @volatile private var replaying = false
 
   def add(connectionId: ConnectionId, connection: ActorRef) = connections.single(connectionId) = connection
 
@@ -33,16 +36,13 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
       connection = createConnection(connectionId, initialReserve)
       message <- messages
     } yield {
-      message.getClass.getName.pp("Replaying message")
+      Logger.info(s"Replaying message: ${message.getClass.getName}")
       connection ? message
     }), Duration.Inf)
 
     replaying = false
-    "Replay completed".pp
+    Logger.info("Replay completed")
   }
-
-  private val messageStore = new MessageStore[Message]()
-  @volatile private var replaying = false
 
   def findOrCreateConnection(request: NsiProviderOperation)(implicit actorSystem: ActorSystem): (ConnectionId, Option[ActorRef]) = (request, request.optionalConnectionId) match {
     case (_, Some(connectionId)) =>

@@ -69,12 +69,15 @@ object PceMessage {
     case OAuthAuthentication(token)              => Json.obj("method" -> "oauth2", "token" -> token)
   }
 
+  implicit val ProviderEndPointFormat: OFormat[ProviderEndPoint] = (
+    (__ \ "nsa").format[String] and
+    (__ \ "provider-url").format[URI] and
+    (__ \ "auth").format[ProviderAuthentication])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply))
+
   implicit val ComputedSegmentFormat: Format[ComputedSegment] = (
     (__ \ "source-stp").format[StpType] and
     (__ \ "destination-stp").format[StpType] and
-    ((__ \ "nsa").format[String] and
-      (__ \ "provider-url").format[URI] and
-      (__ \ "auth").format[ProviderAuthentication])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply)))(ComputedSegment.apply, unlift(ComputedSegment.unapply))
+    ProviderEndPointFormat)(ComputedSegment.apply, unlift(ComputedSegment.unapply))
 
   implicit val PceResponseFormat: Format[PceResponse] = (
     (__ \ "correlation-id").format[CorrelationId] and
