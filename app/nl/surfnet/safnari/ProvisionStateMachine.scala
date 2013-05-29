@@ -22,7 +22,7 @@ case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     childStates.getOrElse(connectionId, RELEASED) == state
 }
 
-class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, outbound: Message => Unit)
+class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders)
   extends FiniteStateMachine[ProvisionStateEnumType, ProvisionStateMachineData](RELEASED, ProvisionStateMachineData(Map.empty, Map.empty)) {
 
   when(RELEASED) {
@@ -52,19 +52,19 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   onTransition {
     case RELEASED -> PROVISIONING =>
-      stateData.children.foreach {
+      stateData.children.map {
         case (connectionId, provider) =>
-          outbound(ToProvider(Provision(newNsiHeaders(provider), connectionId), provider))
-      }
+          ToProvider(Provision(newNsiHeaders(provider), connectionId), provider)
+      }.toVector
     case PROVISIONED -> RELEASING =>
-      stateData.children.foreach {
+      stateData.children.map {
         case (connectionId, provider) =>
-          outbound(ToProvider(Release(newNsiHeaders(provider), connectionId), provider))
-      }
+          ToProvider(Release(newNsiHeaders(provider), connectionId), provider)
+      }.toVector
     case RELEASING -> RELEASED =>
-      outbound(ToRequester(ReleaseConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
+      Seq(ToRequester(ReleaseConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
     case PROVISIONING -> PROVISIONED =>
-      outbound(ToRequester(ProvisionConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
+      Seq(ToRequester(ProvisionConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
   }
 
   def provisionState = stateName

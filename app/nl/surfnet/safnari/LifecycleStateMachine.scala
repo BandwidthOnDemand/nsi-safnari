@@ -24,7 +24,7 @@ case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     childStates.getOrElse(connectionId, CREATED) == state
 }
 
-class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, outbound: Message => Unit) extends FiniteStateMachine(CREATED, new LifecycleStateMachineData(Map.empty, Map.empty)) {
+class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders) extends FiniteStateMachine(CREATED, new LifecycleStateMachineData(Map.empty, Map.empty)) {
 
   when(CREATED) {
     case Event(children: Map[_, _], data) =>
@@ -43,12 +43,12 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   onTransition {
     case CREATED -> TERMINATING =>
-      stateData.children.foreach {
+      stateData.children.map {
         case (connectionId, provider) =>
-          outbound(ToProvider(Terminate(newNsiHeaders(provider), connectionId), provider))
-      }
+          ToProvider(Terminate(newNsiHeaders(provider), connectionId), provider)
+      }.toVector
     case TERMINATING -> TERMINATED =>
-      outbound(ToRequester(TerminateConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
+      Seq(ToRequester(TerminateConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
   }
 
   def lifecycleState = stateName

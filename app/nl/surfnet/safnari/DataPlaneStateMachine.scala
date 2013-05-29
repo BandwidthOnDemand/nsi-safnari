@@ -16,7 +16,7 @@ case class DataPlaneStateMachineData(providers: Map[ConnectionId, ProviderEndPoi
   }
 }
 
-class DataPlaneStateMachine(connectionId: ConnectionId, newNsiHeaders: () => NsiHeaders, outbound: Message => Unit) extends FiniteStateMachine(false, DataPlaneStateMachineData(Map.empty, Map.empty, None)) {
+class DataPlaneStateMachine(connectionId: ConnectionId, newNsiHeaders: () => NsiHeaders) extends FiniteStateMachine(false, DataPlaneStateMachineData(Map.empty, Map.empty, None)) {
 
   when(false) {
     case Event(downstreamConnections: Map[_, _], data) =>
@@ -33,7 +33,7 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newNsiHeaders: () => Nsi
 
   onTransition {
     case false -> true | true -> false =>
-      outbound(ToRequester(DataPlaneStateChange(
+      Seq(ToRequester(DataPlaneStateChange(
         newNsiHeaders(),
         connectionId,
         new DataPlaneStatusType().withVersion(0).withActive(nextStateName).withVersionConsistent(true), nextStateData.timeStamp.get)))

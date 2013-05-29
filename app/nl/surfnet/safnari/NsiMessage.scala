@@ -14,8 +14,6 @@ trait NsiMessage {
 
   def ack = GenericAck(headers.asReply)
 }
-trait NsiQuery
-trait NsiCommand
 
 final case class NsiError(id: String, description: String, text: String) {
   override def toString = s"$id: $description: $text"

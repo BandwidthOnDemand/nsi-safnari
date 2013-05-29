@@ -15,10 +15,10 @@ abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D
     nextState map { nextState =>
       _nextStateName = nextState.name
       _nextStateData = nextState.data
-      _transitionHandler.applyOrElse((_stateName, _nextStateName), (_: (S, S)) => ())
+      val output = _transitionHandler.applyOrElse((_stateName, _nextStateName), (_: (S, S)) => Vector.empty)
       _stateName = _nextStateName
       _stateData = _nextStateData
-      nextState.replies
+      nextState.replies ++ output
     }
   }
 
@@ -40,7 +40,7 @@ abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D
   protected[this] def nextStateData = _nextStateData
 
   protected[this]type EventHandler = PartialFunction[Event, State]
-  protected[this]type TransitionHandler = PartialFunction[(S, S), Unit]
+  protected[this]type TransitionHandler = PartialFunction[(S, S), Seq[Any]]
 
   protected[this] def when(stateName: S)(handler: EventHandler) {
     require(!_handlers.contains(stateName), s"handler for state $stateName is already defined")
@@ -74,5 +74,5 @@ abstract class FiniteStateMachine[S, D](initialStateName: S, initialStateData: D
 
   private var _handlers: Map[S, EventHandler] = Map.empty
   private var _unhandled: EventHandler = PartialFunction.empty
-  private var _transitionHandler: TransitionHandler = { case _ => () }
+  private var _transitionHandler: TransitionHandler = { case _ => Vector.empty }
 }

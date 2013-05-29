@@ -7,6 +7,8 @@ import org.ogf.schemas.nsi._2013._04.connection.types.ReserveType
 sealed trait NsiProviderOperation extends NsiMessage {
   def optionalConnectionId: Option[ConnectionId] = None
 }
+sealed trait NsiQuery
+sealed trait NsiCommand
 
 case class Reserve(headers: NsiHeaders, body: ReserveType) extends NsiProviderOperation with NsiCommand {
   override def optionalConnectionId: Option[ConnectionId] = Option(body.getConnectionId())

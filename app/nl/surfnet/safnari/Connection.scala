@@ -20,14 +20,10 @@ class ConnectionActor(id: ConnectionId, initialReserve: Reserve, newCorrelationI
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), "NSA-ID", provider.nsa, Some(nsiReplyToUri))
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), "NSA-ID", requesterNSA, None)
-  val psm = new ProvisionStateMachine(id, newNsiHeaders, message => outbound(message, self))
-  val lsm = new LifecycleStateMachine(id, newNsiHeaders, message => outbound(message, self))
-  val dsm = new DataPlaneStateMachine(id, newNotifyHeaders, message => outbound(message, self))
-  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, message => outbound(message, self), data => {
-    psm process data.children
-    lsm process data.children
-    dsm process data.children
-  }, error => {
+  val psm = new ProvisionStateMachine(id, newNsiHeaders)
+  val lsm = new LifecycleStateMachine(id, newNsiHeaders)
+  val dsm = new DataPlaneStateMachine(id, newNotifyHeaders)
+  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
     new GenericFailedType().withConnectionId(id).withConnectionStates(connectionStates).
       withServiceException(new ServiceExceptionType().withErrorId(error.id).withText(error.text).withNsaId("NSA-ID"))
   })
@@ -38,7 +34,7 @@ class ConnectionActor(id: ConnectionId, initialReserve: Reserve, newCorrelationI
 
     case SegmentKnown(connectionId) => sender ! rsm.segmentKnown(connectionId)
 
-    case message =>
+    case message: Message =>
       val stateMachine: FiniteStateMachine[_, _] = message match {
         // RSM messages
         case FromRequester(_: Reserve)               => rsm
@@ -65,10 +61,24 @@ class ConnectionActor(id: ConnectionId, initialReserve: Reserve, newCorrelationI
         // LSM messages
         case FromRequester(_: Terminate)             => lsm
         case FromProvider(_: TerminateConfirmed)     => lsm
+
+        case FromRequester(_: QuerySummary | _: QuerySummarySync | _: QueryRecursive) =>
+          ???
       }
 
       val replies = stateMachine.process(message).getOrElse(messageNotApplicable(message))
-      replies foreach (sender ! _)
+      replies.collectFirst {
+        case ToRequester(confirmed: ReserveConfirmed) => rsm.childConnections
+      }.foreach { children =>
+        psm process children
+        lsm process children
+        dsm process children
+      }
+      replies foreach {
+        case message: Message        => outbound(message, self)
+        case ack: NsiAcknowledgement => sender ! ack
+        case status: Int             => sender ! status
+      }
   }
 
   private def query = {
@@ -77,9 +87,9 @@ class ConnectionActor(id: ConnectionId, initialReserve: Reserve, newCorrelationI
         withConnectionId(id).
         withProviderNSA(segment.provider.nsa).
         withPath(new PathType().
-            withSourceSTP(segment.sourceStp).
-            withDestSTP(segment.destinationStp).
-            withDirectionality(DirectionalityType.BIDIRECTIONAL)).
+          withSourceSTP(segment.sourceStp).
+          withDestSTP(segment.destinationStp).
+          withDirectionality(DirectionalityType.BIDIRECTIONAL)).
         withOrder(order)
     }
 

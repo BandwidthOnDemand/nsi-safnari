@@ -75,8 +75,6 @@ class ReservationStateMachine(
   pceReplyUri: URI,
   newCorrelationId: () => CorrelationId,
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
-  outbound: Message => Unit,
-  reservationHeld: ReservationStateMachineData => Unit,
   failed: NsiError => GenericFailedType)
   extends FiniteStateMachine[ReservationState, ReservationStateMachineData](
     InitialReservationState,
@@ -143,11 +141,11 @@ class ReservationStateMachine(
 
   onTransition {
     case InitialReservationState -> PathComputationState =>
-      outbound(ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, nextStateData.criteria)))
+      Seq(ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, nextStateData.criteria)))
 
     case PathComputationState -> CheckingReservationState =>
       val data = nextStateData
-      data.segments.foreach {
+      data.segments.map {
         case (correlationId, segment) =>
           val criteria = new ReservationRequestCriteriaType().
             withBandwidth(data.criteria.getBandwidth()).
@@ -161,27 +159,26 @@ class ReservationStateMachine(
             withDescription(data.description.orNull).
             withCriteria(criteria)
 
-          outbound(ToProvider(Reserve(newNsiHeaders(segment.provider).copy(correlationId = correlationId), reserveType), segment.provider))
-      }
+          ToProvider(Reserve(newNsiHeaders(segment.provider).copy(correlationId = correlationId), reserveType), segment.provider)
+      }.toVector
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(_, failed(NsiError.PathComputationNoPath)))
     case CheckingReservationState -> FailedReservationState =>
       respond(ReserveFailed(_, failed(NsiError.ChildError).tap(_.getServiceException().withChildException(nextStateData.childExceptions.values.toSeq.asJava))))
     case CheckingReservationState -> HeldReservationState =>
-      reservationHeld(nextStateData)
       respond(ReserveConfirmed(_, id, nextStateData.criteria))
     case HeldReservationState -> CommittingReservationState =>
-      nextStateData.connections.foreach {
+      nextStateData.connections.map {
         case (connectionId, correlationId) =>
           val seg = nextStateData.segments(correlationId)
-          outbound(ToProvider(ReserveCommit(newNsiHeaders(seg.provider), connectionId), seg.provider))
-      }
+          ToProvider(ReserveCommit(newNsiHeaders(seg.provider), connectionId), seg.provider)
+      }.toVector
     case HeldReservationState -> AbortingReservationState =>
-      nextStateData.connections.foreach {
+      nextStateData.connections.map {
         case (connectionId, correlationId) =>
           val seg = nextStateData.segments(correlationId)
-          outbound(ToProvider(ReserveAbort(newNsiHeaders(seg.provider), connectionId), seg.provider))
-      }
+          ToProvider(ReserveAbort(newNsiHeaders(seg.provider), connectionId), seg.provider)
+      }.toVector
     case CommittingReservationState -> ReservedReservationState =>
       respond(ReserveCommitConfirmed(_, id))
     case CommittingReservationState -> CommitFailedReservationState =>
@@ -198,5 +195,5 @@ class ReservationStateMachine(
   def criteria = stateData.criteria
   def version = stateData.criteria.getVersion()
 
-  private def respond(f: NsiHeaders => NsiRequesterOperation): Unit = outbound(ToRequester(f(nextStateData.commandReplyHeaders)))
+  private def respond(f: NsiHeaders => NsiRequesterOperation) = Seq(ToRequester(f(nextStateData.commandReplyHeaders)))
 }
