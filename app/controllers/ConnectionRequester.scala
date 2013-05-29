@@ -37,7 +37,7 @@ object ConnectionRequester extends Controller with SoapWebService {
   }
 
   def nsiRequester = {
-    val requesterNsa = current.configuration.getString("safnari.requester.nsa").getOrElse(sys.error("safnari.requester.nsa configuration property is not set"))
+    val requesterNsa = Configuration.Nsa
     current.configuration.getString("nsi.actor") match {
       case None | Some("dummy") => Akka.system.actorOf(Props[DummyNsiRequesterActor])
       case _                    => Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(ConnectionRequester.serviceUrl))))

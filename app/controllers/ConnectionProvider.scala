@@ -80,12 +80,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   private[controllers] def handleRequest(request: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
     connectionManager.findOrCreateConnection(request) match {
       case (connectionId, None) =>
-        val exception = new ServiceExceptionType()
-          .withNsaId("MYNSAID") // TODO
-          .withErrorId("UNKNOWN") // TODO
-          .withText(f"Unknown connection ${connectionId}")
-          .withVariables(null) // TODO
-        Future.successful(ServiceException(request.headers.asReply, exception))
+        Future.successful(ServiceException(request.headers.asReply, NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
       case (connectionId, Some(connectionActor)) =>
         requesterContinuations.register(request.correlationId).onSuccess {
           case reply => replyTo(reply)
