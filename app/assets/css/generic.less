@@ -2,18 +2,13 @@
 @import "mixins.less";
 
 body {
-    font-family: Arial, sans-serif; /* Bootstrap default is Helvetica (Neue) */
+    font-family: Arial, sans-serif;
+    font-size: 13px;
 }
 
-.small {
-    font-size: 11px;
-}
+.small { font-size: 11px; }
 
-thead {
-    background-color: @grayDark;
-}
-
-/* header */
+thead { background-color: @grayDark; }
 
 header {
     position: relative;
@@ -31,11 +26,8 @@ header {
         left: 0;
         width: 50%;
         height: 100%;
-    }
-
-    a,
-    a:hover {
         color: transparent;
+        &:hover { color: transparent; }
     }
 }
 
@@ -112,23 +104,16 @@ h3 {
 .tasks {
     margin: 0;
     list-style: none;
+    li {
+        margin-bottom: 1.5em;
+        a {
+            width: 160px;
+            text-align: left;
+        }
+    }
 }
 
-.tasks li {
-    margin-bottom: 1.5em;
-}
+.actions .btn + a { margin-left: 15px; }
 
-.tasks li a {
-    width: 160px;
-    text-align: left;
-}
+#csrf-token { display: none; }
 
-/* Misc. */
-
-.actions .btn + a {
-    margin-left: 15px;
-}
-
-#csrf-token {
-    display: none;
-}

@@ -34,7 +34,6 @@
     }
 }
 
-/* table column/cell layout */
 .table {
     margin-bottom: 10px;
 
@@ -83,18 +82,14 @@
         .rowdetails-content {
             display: none;
             position: absolute;
-            margin: 10px 16px 10px 38px;
-            width: 88%;
-            background-color: #ecf8fa;
-            border: 1px solid #85cadd;
+            margin: 10px 16px 10px 25px;
+            width: 90%;
+            background-color: @blueSurfLighter;
+            border: 1px solid @blueSurfLight;
             .box-shadow(2px 2px 5px #bfbfbf);
 
-            dt:after {
-                content: ":";
-            }
-            dd {
-                text-align: left;
-            }
+            dt:after { content: ":"; }
+            dd { text-align: left; }
             &:before {
                 content: "";
                 position: absolute;
@@ -105,22 +100,15 @@
                 border-left: 1px solid #85cadd;
                 border-bottom: 1px solid #85cadd;
             }
-            .table {
-                margin-bottom: 0;
-            }
+            .table { margin-bottom: 0; }
         }
 
-        th[colspan] {
-            padding-bottom: 3px;
-        }
+        th[colspan] { padding-bottom: 3px; }
 
-        .subheader {
-            padding-top: 0;
-        }
+        .subheader { padding-top: 0; }
     }
 }
 
-/* sortable table */
 th.sortable {
     padding: 0;
 
@@ -136,28 +124,15 @@ th.sortable {
         float: right;
         visibility: hidden;
     }
-    &:hover i {
-        visibility: visible;
-    }
+    &:hover i { visibility: visible; }
     &.headerSortDown i,
     &.headerSortUp i {
         visibility: visible;
     }
 }
 
-th.sortable.headerSortDown i:before {
-    content: "\f078";
-}
-
-th.sortable.headerSortUp i:before {
-    content: "\f077";
-}
-
-th.sortable.headerSortDown:hover i:before {
-    content: "\f077";
-}
-
-th.sortable.headerSortUp:hover i:before {
-    content: "\f078";
-}
+th.sortable.headerSortDown i:before { content: "\f078"; }
+th.sortable.headerSortUp i:before { content: "\f077"; }
+th.sortable.headerSortDown:hover i:before { content: "\f077"; }
+th.sortable.headerSortUp:hover i:before { content: "\f078"; }
 

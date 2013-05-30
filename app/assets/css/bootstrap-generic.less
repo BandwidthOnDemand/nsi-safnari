@@ -15,7 +15,7 @@
 
 /* icons */
 
-section>div.content-dense>p
+section > div.content-dense > p
 [class^="icon-"]:before,
 [class*=" icon-"]:before {
   color: #666;
@@ -24,7 +24,7 @@ section>div.content-dense>p
 [class^="icon-"]:before,
 [class*=" icon-"]:before {
     font-size: 16px;
-    color: #0381a4;
+    color: @blueSurfDark;
 }
 
 .icon-ok:before {
@@ -62,11 +62,8 @@ a:hover [class*=" icon-"]:before {
     color: #005580;
 }
 
-a[rel="tooltip"]:hover {
-    text-decoration: none;
-}
+a[rel="tooltip"]:hover { text-decoration: none; }
 
 /* Overwrite for the datepicker + dropdown combo width (otherwise 100%) */
-.datepicker.dropdown-menu {
-    width: auto;
-}
+.datepicker.dropdown-menu { width: auto; }
+
