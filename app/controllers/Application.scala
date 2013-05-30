@@ -25,7 +25,9 @@ object Application extends Controller {
   def connections = Action {
     Async {
       Future.traverse(ConnectionProvider.connectionManager.all) { c =>
-        (c ? 'query).map (_.asInstanceOf[QuerySummaryResultType]).flatMap(summary => c ? 'querySegments map (segs => (summary -> segs.asInstanceOf[Seq[ConnectionData]])))
+        (c ? 'query).mapTo[QuerySummaryResultType].flatMap { summary =>
+          (c ? 'querySegments).mapTo[Seq[ConnectionData]] map (summary -> _)
+        }
       }.map { cs =>
         Ok(views.html.connections(cs))
       }

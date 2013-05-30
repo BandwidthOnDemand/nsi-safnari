@@ -13,6 +13,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
   implicit val timeout = Timeout(2.seconds)
 
   private val connections = TMap.empty[ConnectionId, ActorRef]
+  private val childConnections = TMap.empty[ConnectionId, ActorRef]
   private val messageStore = new MessageStore[Message]()
 
   def add(connectionId: ConnectionId, connection: ActorRef) = connections.single(connectionId) = connection
@@ -21,10 +22,11 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
 
   def find(connectionIds: Seq[String]): Seq[ActorRef] = connections.single.filterKeys(connectionIds.contains).values.toSeq
 
-  def findBySegment(connectionId: ConnectionId)(implicit executionContext: ExecutionContext): Future[Option[ActorRef]] = {
-    val knowsAboutSegment = connections.single.values.map(c => c ? SegmentKnown(connectionId) map (c -> _.asInstanceOf[Boolean]))
-    Future.find(knowsAboutSegment)(_._2) map (_.map(_._1))
+  private def addChildConnectionId(connection: ActorRef, childConnectionId: ConnectionId) {
+    childConnections.single(childConnectionId) = connection
   }
+
+  def findByChildConnectionId(connectionId: ConnectionId): Option[ActorRef] = childConnections.single.get(connectionId)
 
   def all: Seq[ActorRef] = connections.single.values.toSeq
 
@@ -59,16 +61,12 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
     storingActor
   }
 
-  private case class SegmentKnown(segmentId: ConnectionId)
-
   private case class Replay(messages: Seq[Message])
 
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
     override def receive = {
-      case 'query                     => sender ! connection.query
-      case 'querySegments             => sender ! connection.segments
-
-      case SegmentKnown(connectionId) => sender ! connection.rsm.segmentKnown(connectionId)
+      case 'query         => sender ! connection.query
+      case 'querySegments => sender ! connection.segments
 
       case inbound: InboundMessage =>
         val result = connection.process(inbound)
@@ -78,6 +76,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
             messageNotApplicable(inbound)
           case Some(outbound) =>
             messageStore.storeAll(connection.id, inbound +: outbound)
+            updateChildConnection(inbound)
 
             outbound.foreach(output ! _)
 
@@ -95,12 +94,19 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
         Logger.info(s"Replaying ${messages.size} messages for connection ${connection.id}")
         messages.foreach {
           case message: InboundMessage =>
+            updateChildConnection(message)
             connection.process(message).getOrElse {
               Logger.warn(s"Connection ${connection.id} failed to replay message $message")
             }
           case message: OutboundMessage =>
           // Ignore.
         }
+    }
+
+    private def updateChildConnection(message: InboundMessage): Unit = message match {
+      case FromProvider(ReserveConfirmed(_, connectionId, _)) => addChildConnectionId(self, connectionId)
+      case FromProvider(ReserveFailed(_, body))               => addChildConnectionId(self, body.getConnectionId)
+      case _ =>
     }
 
     private def messageNotApplicable(message: InboundMessage) = message match {

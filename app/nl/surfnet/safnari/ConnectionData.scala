@@ -6,7 +6,8 @@ import org.ogf.schemas.nsi._2013._04.connection.types.ReservationStateEnumType
 
 case class ConnectionData(
     connectionId: ConnectionId,
-    lifecycleState: LifecycleStateEnumType,
+    providerNsa: String,
     reservationState: ReservationStateEnumType,
+    lifecycleState: LifecycleStateEnumType,
     provisionState: ProvisionStateEnumType,
     dataPlaneStatus: Boolean)

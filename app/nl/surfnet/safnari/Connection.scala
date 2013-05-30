@@ -12,8 +12,13 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), aggregatorNsa, requesterNSA, None)
 
   val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
-    new GenericFailedType().withConnectionId(id).withConnectionStates(connectionStates).
-      withServiceException(new ServiceExceptionType().withErrorId(error.id).withText(error.text).withNsaId(aggregatorNsa))
+    new GenericFailedType().
+      withConnectionId(id).
+      withConnectionStates(connectionStates).
+      withServiceException(new ServiceExceptionType().
+        withErrorId(error.id).
+        withText(error.text).
+        withNsaId(aggregatorNsa))
   })
 
   private var otherStateMachines: Option[(ProvisionStateMachine, LifecycleStateMachine, DataPlaneStateMachine)] = None
@@ -56,7 +61,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
   }
 
   private def applyMessageToStateMachine(stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage], message: InboundMessage): Option[Seq[OutboundMessage]] = {
-    val output = stateMachine.process(message) //.getOrElse(messageNotApplicable(message))
+    val output = stateMachine.process(message)
 
     output.foreach { messages =>
       messages.collectFirst {
@@ -103,10 +108,12 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
       withDataPlaneStatus(dsm.map(_.dataPlaneStatus(version)).getOrElse(new DataPlaneStatusType()))
   }
 
-  def segments: Seq[ConnectionData] = rsm.childConnectionStates.map {
-    case (id, rs) => ConnectionData(id,
+  def segments: Seq[ConnectionData] = rsm.childConnections.map {
+    case (id, segment) => ConnectionData(
+      id,
+      segment.provider.nsa,
+      rsm.childConnectionState(id),
       lsm.map(_.childConnectionState(id)).getOrElse(LifecycleStateEnumType.CREATED),
-      rs.jaxb,
       psm.map(_.childConnectionState(id)).getOrElse(ProvisionStateEnumType.RELEASED),
       dsm.map(_.childConnectionState(id)).getOrElse(false))
   }.toSeq

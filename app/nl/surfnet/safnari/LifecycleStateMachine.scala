@@ -3,20 +3,20 @@ package nl.surfnet.safnari
 import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateEnumType._
 import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateEnumType
 
-case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, LifecycleStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
+case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childConnectionStates: Map[ConnectionId, LifecycleStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
 
   def aggregatedLifecycleStatus: LifecycleStateEnumType = {
-    if (childStates.values.forall(_ == CREATED)) CREATED
-    else if (childStates.values.exists(_ == TERMINATING)) TERMINATING
-    else if (childStates.values.forall(_ == TERMINATED)) TERMINATED
-    else throw new IllegalStateException(s"cannot determine aggregated status from ${childStates.values}")
+    if (childConnectionStates.values.forall(_ == CREATED)) CREATED
+    else if (childConnectionStates.values.exists(_ == TERMINATING)) TERMINATING
+    else if (childConnectionStates.values.forall(_ == TERMINATED)) TERMINATED
+    else throw new IllegalStateException(s"cannot determine aggregated status from ${childConnectionStates.values}")
   }
 
   def updateChild(connectionId: ConnectionId, state: LifecycleStateEnumType) =
-    copy(childStates = childStates.updated(connectionId, state))
+    copy(childConnectionStates = childConnectionStates.updated(connectionId, state))
 
   def childHasState(connectionId: ConnectionId, state: LifecycleStateEnumType) =
-    childStates.getOrElse(connectionId, CREATED) == state
+    childConnectionStates.getOrElse(connectionId, CREATED) == state
 }
 
 class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, children: Map[ConnectionId, ProviderEndPoint])
@@ -46,6 +46,5 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   }
 
   def lifecycleState = stateName
-
-  def childConnectionState(connectionId: ConnectionId) = stateData.childStates(connectionId)
+  def childConnectionState(connectionId: ConnectionId) = stateData.childConnectionStates(connectionId)
 }

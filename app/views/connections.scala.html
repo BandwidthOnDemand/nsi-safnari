@@ -32,12 +32,20 @@
                                     <div class="rowdetails-content">
                                         <table class="table table-bordered table-striped">
                                             <thead>
-                                              <tr><th>ConnectionId</th><th>LSM</th><th>RSM</th><th>PSM</th><th>DSM</th></tr>
+                                                <tr>
+                                                    <th>ConnectionId</th>
+                                                    <th>NSA</th>
+                                                    <th>LSM</th>
+                                                    <th>RSM</th>
+                                                    <th>PSM</th>
+                                                    <th>DSM</th>
+                                                </tr>
                                             </thead>
                                             <tbody>
                                                 @for(segment <- connection._2) {
                                                     <tr>
                                                         <td>@segment.connectionId</td>
+                                                        <td>@segment.providerNsa</td>
                                                         <td>@segment.lifecycleState</td>
                                                         <td>@segment.reservationState</td>
                                                         <td>@segment.provisionState</td>
