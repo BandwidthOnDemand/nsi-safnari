@@ -193,6 +193,10 @@ class MessageStore[T]()(implicit writer: Injection[T, StoredMessage]) {
       'created_at -> new java.sql.Timestamp(stored.createdAt.getMillis())).executeInsert()
   }
 
+  def storeAll(aggregatedConnectionId: ConnectionId, messages: Seq[T]) = DB.withTransaction { implicit connection =>
+    messages.foreach(store(aggregatedConnectionId, _))
+  }
+
   def loadAll(aggregatedConnectionId: ConnectionId): Seq[T] = DB.withConnection { implicit connection =>
     SQL("""
         SELECT correlation_id, protocol, type, content, created_at

@@ -6,9 +6,7 @@ import org.ogf.schemas.nsi._2013._04.connection.types._
 import java.net.URI
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
-case class SegmentKnown(segmentId: ConnectionId)
-
-class ConnectionEntity(id: ConnectionId, initialReserve: Reserve, newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
+class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri))
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), aggregatorNsa, requesterNSA, None)
