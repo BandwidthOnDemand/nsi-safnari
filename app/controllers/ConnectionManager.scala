@@ -61,7 +61,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
     storingActor
   }
 
-  private case class Replay(messages: Seq[Message])
+  private[controllers] case class Replay(messages: Seq[Message])
 
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
     override def receive = {
@@ -101,6 +101,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
           case message: OutboundMessage =>
           // Ignore.
         }
+        sender ! (())
     }
 
     private def updateChildConnection(message: InboundMessage): Unit = message match {

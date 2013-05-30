@@ -17,4 +17,6 @@ object NsiMessageSpec {
   val CorrelationId = newCorrelationId
 
   def initialReserveMessage = Reserve(headers(CorrelationId), InitialReserveType)
+
+  val reserveConfirmed = ReserveConfirmed(headers(CorrelationId), "ConnectionIdA", ConfirmCriteria)
 }
