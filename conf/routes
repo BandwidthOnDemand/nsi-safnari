@@ -4,7 +4,7 @@
 
 # Home page
 GET    /                                    controllers.Application.index
-GET    /connections                         controllers.Application.connections
+GET    /connections                         controllers.Application.connections(page: Int ?= 1)
 
 POST   /nsi-v2/ConnectionServiceProvider    controllers.ConnectionProvider.request
 GET    /nsi-v2/ConnectionServiceProvider    controllers.ConnectionProvider.wsdl(wsdl: String)

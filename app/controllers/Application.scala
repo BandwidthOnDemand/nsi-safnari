@@ -22,7 +22,7 @@ object Application extends Controller {
     Ok(views.html.index())
   }
 
-  def connections = Action {
+  def connections(page: Int) = Action {
     Async {
       Future.traverse(ConnectionProvider.connectionManager.all) { c =>
         (c ? 'query).mapTo[QuerySummaryResultType].flatMap { summary =>

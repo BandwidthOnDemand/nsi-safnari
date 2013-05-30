@@ -21,15 +21,41 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @for(connection <- connections) {
+                    @for((connection, segments) <- connections) {
                         <tr class="rowdetails">
-                            <td class="center @{if(connection._2.isEmpty) "disabled"}">
-                                @if(connection._2.isEmpty) {
-                                    <i class="disabled-icon icon-plus-sign"></i>
-                                } else {
-                                    <i class="icon-plus-sign"></i>
-                                    <i class="icon-minus-sign"></i>
-                                    <div class="rowdetails-content">
+                            <td class="center">
+                                <i class="icon-plus-sign"></i>
+                                <i class="icon-minus-sign"></i>
+                                <div class="rowdetails-content">
+                                    <div class="row-fluid">
+                                        <div class="span6">
+                                            <dl class="dl-horizontal">
+                                                <dt>Start</dt>
+                                                <dd>@nullable(connection.getCriteria().head.getSchedule().getStartTime())</dd>
+                                                <dt>Source</dt>
+                                                <dd>@stp(connection.getCriteria().head.getPath().getSourceSTP())</dd>
+                                                <dt>Bandwidth</dt>
+                                                <dd>@connection.getCriteria().head.getBandwidth()</dd>
+                                                <dt>Global id</dt>
+                                                <dd>@nullable(connection.getGlobalReservationId())</dd>
+                                            </dl>
+                                        </div>
+                                        <div class="span6">
+                                            <dl class="dl-horizontal">
+                                                <dt>End</dt>
+                                                <dd>@nullable(connection.getCriteria().head.getSchedule().getEndTime())</dd>
+                                                <dt>Destination</dt>
+                                                <dd>@stp(connection.getCriteria().head.getPath().getDestSTP())</dd>
+                                                <dt>Version</dt>
+                                                <dd>@connection.getCriteria().head.getVersion()</dd>
+                                                <dt>Requester</dt>
+                                                <dd>@connection.getRequesterNSA()</dd>
+                                            </dl>
+                                        </div>
+                                    </div>
+                                    @if(segments.isEmpty) {
+                                        <strong>No Child Connections</strong>
+                                    } else {
                                         <table class="table table-bordered table-striped">
                                             <thead>
                                                 <tr>
@@ -42,7 +68,7 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                @for(segment <- connection._2) {
+                                                @for(segment <- segments) {
                                                     <tr>
                                                         <td>@segment.connectionId</td>
                                                         <td>@segment.providerNsa</td>
@@ -54,15 +80,15 @@
                                                 }
                                             </tbody>
                                         </table>
-                                    </div>
-                                }
+                                    }
+                                </div>
                             </td>
-                            <td>@connection._1.getConnectionId()</td>
-                            <td>@connection._1.getDescription()</td>
-                            <td>@connection._1.getConnectionStates().getLifecycleState()</td>
-                            <td>@connection._1.getConnectionStates().getReservationState()</td>
-                            <td>@connection._1.getConnectionStates().getProvisionState()</td>
-                            <td>@connection._1.getConnectionStates().getDataPlaneStatus().isActive()</td>
+                            <td>@connection.getConnectionId()</td>
+                            <td>@connection.getDescription()</td>
+                            <td>@connection.getConnectionStates().getLifecycleState()</td>
+                            <td>@connection.getConnectionStates().getReservationState()</td>
+                            <td>@connection.getConnectionStates().getProvisionState()</td>
+                            <td>@connection.getConnectionStates().getDataPlaneStatus().isActive()</td>
                         </tr>
                     }
                 </tbody>
@@ -73,3 +99,9 @@
 
 }
 
+@stp(stp: org.ogf.schemas.nsi._2013._04.connection.types.StpType) = {
+    @stp.getLocalId() @@ @stp.getNetworkId()
+}
+@nullable(field: Any) = @{
+    if (field == null) "-" else field
+}

@@ -15,10 +15,7 @@
         .border-radius(0);
     }
 
-    th,
-    td {
-        border-left: 1px solid @grayDarker;
-    }
+    th, td { border-left: 1px solid @grayDarker; }
 }
 
 .table-striped {
@@ -51,45 +48,41 @@
         margin: 0 5px;
     }
 
-    th.sortable {
-        cursor: pointer;
-    }
+    th.sortable { cursor: pointer; }
 
     .rowdetails {
         position: relative;
 
         td:first-child {
             cursor: pointer;
-            &.disabled {
-                cursor: default;
-            }
+            &.disabled { cursor: default; }
         }
-        .icon-minus-sign {
-            display: none;
-        }
+        .icon-minus-sign { display: none; }
         &.expanded {
-            .icon-minus-sign {
-                display: inline;
-            }
-            .icon-plus-sign {
-                display: none;
-            }
-            .rowdetails-content {
-                display: block;
-            }
+            .icon-minus-sign { display: inline; }
+            .icon-plus-sign { display: none; }
+            .rowdetails-content { display: block; }
         }
 
         .rowdetails-content {
             display: none;
             position: absolute;
-            margin: 10px 16px 10px 25px;
-            width: 90%;
+            margin: 10px 16px 10px 20px;
+            width: 91%;
             background-color: @blueSurfLighter;
             border: 1px solid @blueSurfLight;
             .box-shadow(2px 2px 5px #bfbfbf);
+            padding: 3px;
 
-            dt:after { content: ":"; }
-            dd { text-align: left; }
+            dl { margin: 0 0 10px 0; }
+            dt {
+                width: 110px;
+                &:after { content: ":"; }
+            }
+            dd {
+                text-align: left;
+                margin-left: 120px;
+            }
             &:before {
                 content: "";
                 position: absolute;
@@ -100,7 +93,7 @@
                 border-left: 1px solid #85cadd;
                 border-bottom: 1px solid #85cadd;
             }
-            .table { margin-bottom: 0; }
+            .table { margin: 0; }
         }
 
         th[colspan] { padding-bottom: 3px; }
