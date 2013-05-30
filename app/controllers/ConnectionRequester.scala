@@ -26,9 +26,7 @@ object ConnectionRequester extends Controller with SoapWebService {
   def request = NsiRequesterEndPoint {
     case notification: DataPlaneStateChange =>
       val connection = ConnectionProvider.connectionManager.findByChildConnectionId(notification.connectionId)
-      connection foreach { conn =>
-        conn ! FromProvider(notification)
-      }
+      connection foreach { _ ! FromProvider(notification) }
       val reply = connection map (_ => GenericAck(notification.headers.asReply)) getOrElse ServiceException(notification.headers.asReply, NsiError.DoesNotExist.toServiceException(Configuration.Nsa))
       Future.successful(reply)
     case response =>

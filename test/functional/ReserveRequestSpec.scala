@@ -66,7 +66,7 @@ class ReserveRequestSpec extends helpers.Specification {
   val FakePceUri = s"http://localhost:$ServerPort/fake/pce"
   val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
   val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"
-  val Application = FakeApplication(additionalConfiguration = Map(
+  val Application = FakeApplication(additionalConfiguration = testConfiguration ++ Map(
     "nsi.actor" -> "real",
     "pce.actor" -> "real",
     "pce.endpoint" -> FakePceUri,
