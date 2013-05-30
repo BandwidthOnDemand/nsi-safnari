@@ -8,14 +8,14 @@ import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
 case class SegmentKnown(segmentId: ConnectionId)
 
-class ConnectionEntity(id: ConnectionId, initialReserve: Reserve, newCorrelationId: () => CorrelationId, nsiReplyToUri: URI, pceReplyUri: URI) {
+class ConnectionEntity(id: ConnectionId, initialReserve: Reserve, newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
-  private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), "NSA-ID", provider.nsa, Some(nsiReplyToUri))
-  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), "NSA-ID", requesterNSA, None)
+  private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri))
+  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), aggregatorNsa, requesterNSA, None)
 
   val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
     new GenericFailedType().withConnectionId(id).withConnectionStates(connectionStates).
-      withServiceException(new ServiceExceptionType().withErrorId(error.id).withText(error.text).withNsaId("NSA-ID"))
+      withServiceException(new ServiceExceptionType().withErrorId(error.id).withText(error.text).withNsaId(aggregatorNsa))
   })
 
   private var otherStateMachines: Option[(ProvisionStateMachine, LifecycleStateMachine, DataPlaneStateMachine)] = None

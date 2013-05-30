@@ -31,16 +31,16 @@ class ConnectionSpec extends helpers.Specification {
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     val NsiReplyToUri = URI.create("http://example.com/nsi/requester")
     val PceReplyToUri = URI.create("http://example.com/pce/reply")
+    val AggregatorNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
 
-    def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(correlationId, "NSA-ID", provider.nsa, Some(NsiReplyToUri))
-    def toRequesterHeaders(correlationId: CorrelationId) = NsiHeaders(correlationId, "NSA-ID", "RequesterNSA", None)
+    def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, provider.nsa, Some(NsiReplyToUri))
+    def toRequesterHeaders(correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, "RequesterNSA", None)
 
-    var messages: Seq[Message] = Nil
-
-    val connection = new ConnectionEntity(ConnectionId, InitialReserve, () => CorrelationId.fromUuid(mockUuidGenerator()), NsiReplyToUri, PceReplyToUri)
+    val connection = new ConnectionEntity(ConnectionId, InitialReserve, () => CorrelationId.fromUuid(mockUuidGenerator()), AggregatorNsa, NsiReplyToUri, PceReplyToUri)
 
     def given(messages: InboundMessage*): Unit = messages.foreach(connection.process)
 
+    var messages: Seq[Message] = Nil
     def when(message: InboundMessage): Option[Seq[Message]] = {
       messages = Nil
       connection.process(message).tap(_.foreach(messages = _))
