@@ -1,7 +1,5 @@
 package nl.surfnet.safnari
 
-import java.net.URI
-import java.util.UUID
 import org.ogf.schemas.nsi._2013._04.connection.types.ReserveType
 
 sealed trait NsiProviderOperation extends NsiMessage {

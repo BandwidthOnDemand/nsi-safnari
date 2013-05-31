@@ -5,6 +5,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import java.net.URI
 import nl.surfnet.safnari._
+import nl.surfnet.safnari.NsiSoapConversions._
 import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 import play.api._

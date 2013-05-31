@@ -1,6 +1,5 @@
 package nl.surfnet.safnari
 
-import com.twitter.bijection.Injection
 import java.net.URI
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
@@ -82,7 +81,7 @@ class ReservationStateMachine(
       initialReserve.headers.asReply,
       Option(initialReserve.body.getGlobalReservationId()),
       Option(initialReserve.body.getDescription()),
-      Injection.invert(initialReserve.body.getCriteria()).getOrElse(sys.error("Bad initial reservation criteria")))) {
+      Conversion.invert(initialReserve.body.getCriteria()).fold(error => sys.error(s"Bad initial reservation criteria: $error"), identity))) {
 
   when(InitialReservationState) {
     case Event(FromRequester(message: Reserve), _) =>

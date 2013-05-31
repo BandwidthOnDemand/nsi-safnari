@@ -2,13 +2,13 @@ package controllers
 
 import scala.concurrent.Future
 import nl.surfnet.safnari._
+import nl.surfnet.safnari.NsiSoapConversions._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc.Controller
 import support.ExtraBodyParsers.NsiRequesterEndPoint
 import akka.actor.Actor
 import java.net.URI
 import play.api.libs.ws.WS
-import com.twitter.bijection.Injection
 import com.ning.http.client.Realm.AuthScheme
 import support.ExtraBodyParsers._
 import play.api.Play.current
@@ -47,7 +47,7 @@ object ConnectionRequester extends Controller with SoapWebService {
   class DummyNsiRequesterActor extends Actor {
     def receive = {
       case ToProvider(reserve: Reserve, _) =>
-        sender ! FromProvider(ReserveConfirmed(reserve.headers.asReply, newConnectionId, Injection.invert(reserve.body.getCriteria()).get))
+        sender ! FromProvider(ReserveConfirmed(reserve.headers.asReply, newConnectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
       case ToProvider(commit: ReserveCommit, _) =>
         sender ! FromProvider(ReserveCommitConfirmed(commit.headers.asReply, commit.connectionId))
     }

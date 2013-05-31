@@ -1,17 +1,11 @@
 package nl.surfnet
 
 import java.net.URI
-import scala.util.Try
-import scala.util.Failure
-import scala.util.Success
-import org.ogf.schemas.nsi._2013._04.connection.types.ReservationRequestCriteriaType
-import org.ogf.schemas.nsi._2013._04.connection.types.ReservationConfirmCriteriaType
-import com.twitter.bijection.AbstractInjection
-import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
-import scala.concurrent.Future
-import java.util.UUID
 import javax.xml.datatype.XMLGregorianCalendar
-import javax.xml.datatype.DatatypeFactory
+import nl.surfnet.safnari.{Conversion, CorrelationId, Uuid}
+import org.ogf.schemas.nsi._2013._04.connection.types.{ReservationConfirmCriteriaType, ReservationRequestCriteriaType}
+import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
+import scala.util.{Failure, Success, Try}
 
 package object safnari {
   type ConnectionId = String
@@ -43,33 +37,30 @@ package object safnari {
 
   def tryEither[A](f: => A): Either[String, A] = Try(f).toEither.left.map(_.toString)
 
-  implicit val ReservationCriteriaInjection = new AbstractInjection[ReservationConfirmCriteriaType, ReservationRequestCriteriaType] {
-    override def apply(a: ReservationConfirmCriteriaType) =
-      new ReservationRequestCriteriaType().
-        withSchedule(a.getSchedule()).
-        withBandwidth(a.getBandwidth()).
-        withServiceAttributes(a.getServiceAttributes()).
-        withPath(a.getPath()).
-        withVersion(a.getVersion())
-
-    override def invert(b: ReservationRequestCriteriaType) =
-      for {
-        schedule <- Option(b.getSchedule())
-        bandwidth <- Option(b.getBandwidth())
-        serviceAttributes = Option(b.getServiceAttributes()).getOrElse(new TypeValuePairListType())
-        path <- Option(b.getPath())
-      } yield {
-        new ReservationConfirmCriteriaType().
-          withSchedule(schedule).
-          withBandwidth(bandwidth).
-          withServiceAttributes(serviceAttributes).
-          withPath(path).
-          withVersion(if (b.getVersion() == null) 0 else b.getVersion())
-      }
-  }
-
   implicit object XmlGregorianCalendarOrdering extends Ordering[XMLGregorianCalendar] {
     def compare(x: XMLGregorianCalendar, y: XMLGregorianCalendar): Int = x compare y
   }
 
+  implicit val ReservationCriteriaConversion = Conversion.build[ReservationConfirmCriteriaType, ReservationRequestCriteriaType] { a =>
+    Right(new ReservationRequestCriteriaType().
+      withSchedule(a.getSchedule()).
+      withBandwidth(a.getBandwidth()).
+      withServiceAttributes(a.getServiceAttributes()).
+      withPath(a.getPath()).
+      withVersion(a.getVersion()))
+  } { b =>
+    (for {
+      schedule <- Option(b.getSchedule())
+      bandwidth <- Option(b.getBandwidth())
+      serviceAttributes = Option(b.getServiceAttributes()).getOrElse(new TypeValuePairListType())
+      path <- Option(b.getPath())
+    } yield {
+      new ReservationConfirmCriteriaType().
+        withSchedule(schedule).
+        withBandwidth(bandwidth).
+        withServiceAttributes(serviceAttributes).
+        withPath(path).
+        withVersion(if (b.getVersion() == null) 0 else b.getVersion())
+    }).toRight("cannot convert request criteria to confirm criteria. Missing fields?")
+  }
 }

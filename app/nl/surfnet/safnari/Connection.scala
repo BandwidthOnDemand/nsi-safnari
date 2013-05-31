@@ -1,9 +1,8 @@
 package nl.surfnet.safnari
 
 import akka.actor._
-import com.twitter.bijection.Injection
-import org.ogf.schemas.nsi._2013._04.connection.types._
 import java.net.URI
+import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
 class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {

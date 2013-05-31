@@ -2,7 +2,6 @@ package nl.surfnet.safnari
 
 import org.ogf.schemas.nsi._2013._04.connection.types._
 import org.ogf.schemas.nsi._2013._04.framework.types._
-import com.twitter.bijection.Injection
 
 object NsiMessageSpec {
   def headers(correlationId: CorrelationId) = NsiHeaders(correlationId, "RequesterNSA", "ProviderNSA", None)
@@ -11,7 +10,7 @@ object NsiMessageSpec {
     withBandwidth(100).
     withServiceAttributes(new TypeValuePairListType()).
     withPath(new PathType().withDirectionality(DirectionalityType.BIDIRECTIONAL).withSourceSTP(new StpType().withNetworkId("networkId").withLocalId("source-localId")).withDestSTP(new StpType().withNetworkId("networkId").withLocalId("dest-localId")))
-  val ConfirmCriteria = Injection.invert(Criteria).get
+  val ConfirmCriteria = Conversion.invert(Criteria).right.get
 
   def InitialReserveType = new ReserveType().withCriteria(Criteria)
   val CorrelationId = newCorrelationId

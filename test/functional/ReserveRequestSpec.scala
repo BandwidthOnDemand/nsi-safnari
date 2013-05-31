@@ -13,11 +13,11 @@ import org.ogf.schemas.nsi._2013._04.connection.provider.ConnectionServiceProvid
 import support.ExtraBodyParsers
 import scala.concurrent._
 import nl.surfnet.safnari._
+import nl.surfnet.safnari.NsiSoapConversions._
 import play.api.libs.concurrent.Execution
 import play.api.libs.ws.WS
 import play.api.libs.json._
 import java.net.URI
-import com.twitter.bijection.Injection
 import support.ExtraBodyParsers._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
@@ -39,7 +39,7 @@ class ReserveRequestSpec extends helpers.Specification {
         case reserve: Reserve =>
           val connectionId = newConnectionId
           reserve.headers.replyTo.foreach { replyTo =>
-            WS.url(replyTo.toASCIIString()).post(ReserveConfirmed(reserve.headers.asReply, connectionId, Injection.invert(reserve.body.getCriteria()).get): NsiRequesterOperation)
+            WS.url(replyTo.toASCIIString()).post(ReserveConfirmed(reserve.headers.asReply, connectionId, Conversion.invert(reserve.body.getCriteria()).right.get): NsiRequesterOperation)
           }
           Future.successful(ReserveResponse(reserve.headers.asReply, connectionId))
         case wtf =>

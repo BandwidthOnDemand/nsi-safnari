@@ -20,6 +20,7 @@ import java.net.URI
 import play.api.Logger
 import scala.collection.JavaConverters._
 import nl.surfnet.safnari._
+import nl.surfnet.safnari.NsiSoapConversions._
 import scala.reflect.ClassTag
 import scala.concurrent.Future
 import play.api.mvc.AsyncResult
@@ -28,18 +29,14 @@ import play.api.libs.concurrent.Execution.Implicits._
 object ExtraBodyParsers {
   private val logger = Logger("ExtraBodyParsers")
 
-  implicit def NsiMessageContentType[T: ToXmlDocument]: ContentTypeOf[T] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+  implicit def NsiMessageContentType[T](implicit conversion: Conversion[T, SOAPMessage]): ContentTypeOf[T] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
-  implicit def NsiMessageWriteable[T <: NsiMessage: ToXmlDocument]: Writeable[T] = Writeable { message =>
-    try {
-      val soap = StoredMessage.nsiMessageToSoapMessage(message)
-      new ByteArrayOutputStream().tap(soap.writeTo).toByteArray
-    } catch {
-      case NonFatal(e) =>
-        // Exceptions from writeable are swallowed by Play, so log these here.
-        logger.error(f"error writing SOAP message: $e", e)
-        throw e
-    }
+  implicit def NsiMessageWriteable[T](implicit conversion: Conversion[T, SOAPMessage]): Writeable[T] = Writeable { message =>
+    conversion.andThen(Conversion[SOAPMessage, Array[Byte]])(message).fold({ error =>
+      // Exceptions from writeable are swallowed by Play, so log these here.
+      logger.error(error)
+      throw new java.io.IOException(error)
+    }, bytes => bytes)
   }
 
   def NsiProviderEndPoint(action: NsiProviderOperation => Future[NsiAcknowledgement]): Action[NsiProviderOperation] =
@@ -83,13 +80,13 @@ object ExtraBodyParsers {
       }
   }
 
-  private[support] def nsiProviderOperation = nsiBodyParser(StoredMessage.soapToNsiMessage(StoredMessage.bodyNameToProviderOperation))
+  private[support] def nsiProviderOperation = nsiBodyParser[NsiProviderOperation]
 
-  private[support] def nsiRequesterOperation = nsiBodyParser(StoredMessage.soapToNsiMessage(StoredMessage.bodyNameToRequesterOperation))
+  private[support] def nsiRequesterOperation = nsiBodyParser[NsiRequesterOperation]
 
-  private def nsiBodyParser[T <: NsiMessage](soapMessageParser: SOAPMessage => Either[String, T]): BodyParser[T] = soap.flatMap { soapMessage =>
+  private def nsiBodyParser[T](implicit conversion: Conversion[T, SOAPMessage]): BodyParser[T] = soap.flatMap { soapMessage =>
     BodyParser { requestHeader =>
-      val parsedMessage = soapMessageParser(soapMessage)
+      val parsedMessage = conversion.invert(soapMessage)
 
       Done(parsedMessage.left.map { error =>
         Logger.warn(s"Failed to parse $soapMessage with $error")

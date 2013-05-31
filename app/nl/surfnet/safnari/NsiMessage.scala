@@ -1,7 +1,6 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import java.util.UUID
 import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
 
 case class NsiHeaders(correlationId: CorrelationId, requesterNSA: String, providerNSA: String, replyTo: Option[URI], protocolVersion: URI = URI.create("urn:nsi:2.0:FIXME")) {
@@ -14,7 +13,6 @@ trait NsiMessage {
 
   def ack = GenericAck(headers.asReply)
 }
-
 final case class NsiError(id: String, description: String, text: String) {
   override def toString = s"$id: $description: $text"
 
