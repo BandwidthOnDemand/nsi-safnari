@@ -88,14 +88,19 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
         withOrder(order)
     }
 
+    val criteria = rsm.criteria
     new QuerySummaryResultType().
       withGlobalReservationId(initialReserve.body.getGlobalReservationId()).
       withDescription(initialReserve.body.getDescription()).
       withConnectionId(id).
-      withCriteria(rsm.criteria).
+      withCriteria(new QuerySummaryResultCriteriaType().
+        withBandwidth(criteria.getBandwidth()).
+        withPath(criteria.getPath).
+        withServiceAttributes(criteria.getServiceAttributes()).
+        withSchedule(criteria.getSchedule()).
+        withChildren(new ChildSummaryListType().withChild(children.toSeq: _*))).
       withRequesterNSA(requesterNSA).
-      withConnectionStates(connectionStates).
-      withChildren(new ChildSummaryListType().withChild(children.toSeq: _*))
+      withConnectionStates(connectionStates)
   }
 
   def connectionStates: ConnectionStatesType = {

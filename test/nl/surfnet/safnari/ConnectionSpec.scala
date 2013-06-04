@@ -237,7 +237,7 @@ class ConnectionSpec extends helpers.Specification {
       val result = connection.query
 
       result.getConnectionId() must beEqualTo(ConnectionId)
-      result.getChildren().getChild() must haveSize(0)
+      result.getCriteria().get(0).getChildren().getChild() must haveSize(0)
     }
 
     "provide information about connections with children" in new ReservedConnection {
@@ -245,7 +245,7 @@ class ConnectionSpec extends helpers.Specification {
 
       val result = connection.query
 
-      result.getChildren().getChild() must haveSize(1)
+      result.getCriteria().get(0).getChildren().getChild() must haveSize(1)
     }
 
     "be in released state when initial reserve" in new fixture {
