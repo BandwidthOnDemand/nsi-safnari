@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions
 import nl.surfnet.safnari.NsiRequesterOperation
 import nl.surfnet.safnari.Reserve
+import nl.surfnet.safnari.NsiSoapConversions.NsiXmlDocumentConversion
 import nl.surfnet.safnari.ReserveConfirmed
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
@@ -28,25 +29,25 @@ class ExtraBodyParsersSpec extends helpers.Specification {
 
     "give BadRequest when wrong content-type is set" in {
       val request = FakeRequest().withHeaders(CONTENT_TYPE -> "text/html")
-      val result = await(soap.apply(request).run)
+      val result = await(soap(NsiXmlDocumentConversion).apply(request).run)
 
       result must beLeft.like { case result => status(result) must beEqualTo(400) }
     }
 
     "give BadRequest when the soap message is not valid" in {
-      val result = await(Enumerator("<nonSoap></nonSoap>".getBytes) |>>> soap.apply(FakeSoapRequest()))
+      val result = await(Enumerator("<nonSoap></nonSoap>".getBytes) |>>> soap(NsiXmlDocumentConversion).apply(FakeSoapRequest()))
 
       result must beLeft.like { case result => status(result) must beEqualTo(400) }
     }
 
     "give EntityToLarge when the input is to large" in {
-      val result = await(Enumerator("<test></test>".getBytes) |>>> soap(10).apply(FakeSoapRequest()))
+      val result = await(Enumerator("<test></test>".getBytes) |>>> soap(NsiXmlDocumentConversion, 10).apply(FakeSoapRequest()))
 
       result must beLeft.like { case result => status(result) must beEqualTo(413) }
     }
 
     "give a SOAP message for a valid request" in {
-      val result = await(Enumerator.fromFile(new File("test/reserve.xml")) |>>> soap.apply(FakeSoapRequest()))
+      val result = await(Enumerator.fromFile(new File("test/reserve.xml")) |>>> soap(NsiXmlDocumentConversion).apply(FakeSoapRequest()))
 
       result must beRight
     }
@@ -76,7 +77,7 @@ class ExtraBodyParsersSpec extends helpers.Specification {
       result must beLeft.like {
         case result =>
           status(result) must beEqualTo(400)
-          contentAsString(result) must beEqualTo("missing NSI element in 'Header', expected exactly one")
+          contentAsString(result) must beEqualTo("missing element in 'Header', expected exactly one")
       }
     }
 
@@ -86,7 +87,7 @@ class ExtraBodyParsersSpec extends helpers.Specification {
       result must beLeft.like {
         case result =>
           status(result) must beEqualTo(400)
-          contentAsString(result) must beEqualTo("multiple NSI elements in 'Header', expected exactly one")
+          contentAsString(result) must beEqualTo("multiple elements in 'Header', expected exactly one")
       }
     }
 

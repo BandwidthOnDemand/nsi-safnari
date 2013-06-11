@@ -2,7 +2,6 @@ package support
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream }
 import javax.xml.bind.{ JAXBContext, Unmarshaller }
-import javax.xml.soap._
 import scala.collection.JavaConverters.asScalaIteratorConverter
 import scala.util.{ Failure, Success, Try }
 import play.api.http.{ ContentTypeOf, Writeable }
@@ -25,14 +24,16 @@ import scala.reflect.ClassTag
 import scala.concurrent.Future
 import play.api.mvc.AsyncResult
 import play.api.libs.concurrent.Execution.Implicits._
+import org.w3c.dom.Document
+import javax.xml.soap.SOAPConstants
 
 object ExtraBodyParsers {
   private val logger = Logger("ExtraBodyParsers")
 
-  implicit def NsiMessageContentType[T](implicit conversion: Conversion[T, SOAPMessage]): ContentTypeOf[T] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+  implicit def NsiMessageContentType[T <: NsiMessage](implicit conversion: Conversion[T, Document]): ContentTypeOf[T] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
-  implicit def NsiMessageWriteable[T](implicit conversion: Conversion[T, SOAPMessage]): Writeable[T] = Writeable { message =>
-    conversion.andThen(Conversion[SOAPMessage, Array[Byte]])(message).fold({ error =>
+  implicit def NsiMessageWriteable[T <: NsiMessage](implicit conversion: Conversion[T, Document]): Writeable[T] = Writeable { message =>
+    conversion.andThen(NsiXmlDocumentConversion)(message).fold({ error =>
       // Exceptions from writeable are swallowed by Play, so log these here.
       logger.error(error)
       throw new java.io.IOException(error)
@@ -55,27 +56,21 @@ object ExtraBodyParsers {
     }
   }
 
-  def soap: BodyParser[SOAPMessage] = soap(BodyParsers.parse.DEFAULT_MAX_TEXT_LENGTH)
-
-  def soap(maxLength: Int): BodyParser[SOAPMessage] = when(
+  def soap(parser: Conversion[Document, Array[Byte]], maxLength: Int = BodyParsers.parse.DEFAULT_MAX_TEXT_LENGTH): BodyParser[Document] = when(
     _.contentType.exists(_ == SOAPConstants.SOAP_1_1_CONTENT_TYPE),
-    tolerantSoap(maxLength),
+    tolerantSoap(parser: Conversion[Document, Array[Byte]], maxLength),
     _ => Results.BadRequest("Expecting " + SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
-  def tolerantSoap(maxLength: Int): BodyParser[SOAPMessage] = BodyParser("SOAP, maxLength=" + maxLength) { request =>
+  def tolerantSoap(parser: Conversion[Document, Array[Byte]], maxLength: Int): BodyParser[Document] = BodyParser("SOAP, maxLength=" + maxLength) { request =>
     import scala.language.reflectiveCalls
-    Traversable.takeUpTo[Array[Byte]](maxLength).apply(Iteratee.consume[Array[Byte]]().mapDone { bytes =>
-      Try {
-        val message = MessageFactory.newInstance().createMessage(new MimeHeaders, new ByteArrayInputStream(bytes))
-        message.getSOAPBody() // Force parsing of the SOAP message, may throw SOAP exception.
-        message
-      }
-    }).flatMap(Iteratee.eofOrElse(Results.EntityTooLarge))
+    Traversable.takeUpTo[Array[Byte]](maxLength)
+      .apply(Iteratee.consume[Array[Byte]]().mapDone(parser.invert.apply))
+      .flatMap(Iteratee.eofOrElse(Results.EntityTooLarge))
       .flatMap {
         case Left(b) => Done(Left(b), Empty)
         case Right(it) => it.flatMap {
-          case Failure(exception) => Done(Left(Results.BadRequest), Empty)
-          case Success(xml)       => Done(Right(xml), Empty)
+          case Left(error) => Done(Left(Results.BadRequest(error)), Empty)
+          case Right(xml)  => Done(Right(xml), Empty)
         }
       }
   }
@@ -84,7 +79,7 @@ object ExtraBodyParsers {
 
   private[support] def nsiRequesterOperation = nsiBodyParser[NsiRequesterOperation]
 
-  private def nsiBodyParser[T](implicit conversion: Conversion[T, SOAPMessage]): BodyParser[T] = soap.flatMap { soapMessage =>
+  private def nsiBodyParser[T <: NsiMessage](implicit conversion: Conversion[T, Document]): BodyParser[T] = soap(NsiXmlDocumentConversion).flatMap { soapMessage =>
     BodyParser { requestHeader =>
       val parsedMessage = conversion.invert(soapMessage)
 

@@ -5,7 +5,7 @@
    <soapenv:Body>
       <type:reserve>
          <description>My first reservation</description>
-         <criteria version="">
+         <criteria>
             <schedule>
                <startTime>2013-04-03T12:15:29.731+02:00</startTime>
                <endTime>2013-04-03T12:25:29.798+02:00</endTime>
@@ -15,7 +15,6 @@
             </serviceAttributes>
             <path>
                <directionality>Bidirectional</directionality>
-               <symmetric></symmetric>
                <sourceSTP>
                   <networkId></networkId>
                   <localId></localId>

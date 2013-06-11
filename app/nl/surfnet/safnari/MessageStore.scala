@@ -3,13 +3,13 @@ package nl.surfnet.safnari
 import anorm._
 import anorm.SqlParser._
 import java.util.UUID
-import javax.xml.soap.SOAPMessage
+import nl.surfnet.safnari.NsiSoapConversions._
 import org.joda.time.Instant
+import org.w3c.dom.Document
 import play.api.Play.current
 import play.api.db.DB
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
-import nl.surfnet.safnari.NsiSoapConversions._
 
 case class StoredMessage(correlationId: CorrelationId, protocol: String, tpe: String, content: String, createdAt: Instant = new Instant())
 
@@ -21,8 +21,8 @@ object StoredMessage {
     override def writes(a: A): JsValue = Json.toJson(conversion(a).right.get)
   }
 
-  implicit val NsiProviderOperationFormat: Format[NsiProviderOperation] = conversionToFormat(Conversion[NsiProviderOperation, SOAPMessage] andThen Conversion[SOAPMessage, String])
-  implicit val NsiRequesterOperationFormat: Format[NsiRequesterOperation] = conversionToFormat(Conversion[NsiRequesterOperation, SOAPMessage] andThen Conversion[SOAPMessage, String])
+  implicit val NsiProviderOperationFormat: Format[NsiProviderOperation] = conversionToFormat(Conversion[NsiProviderOperation, Document] andThen NsiXmlDocumentConversion andThen Conversion[Array[Byte], String])
+  implicit val NsiRequesterOperationFormat: Format[NsiRequesterOperation] = conversionToFormat(Conversion[NsiRequesterOperation, Document] andThen NsiXmlDocumentConversion andThen Conversion[Array[Byte], String])
 
   import PceMessage.ProviderEndPointFormat
 
