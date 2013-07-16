@@ -10,6 +10,7 @@ import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
+import play.api.Logger
 
 object PathComputationEngine extends Controller {
   private val pceContinuations = new Continuations[PceResponse]()
@@ -19,9 +20,11 @@ object PathComputationEngine extends Controller {
   def pceReply = Action(parse.json) { implicit request =>
     Json.fromJson[PceResponse](request.body) match {
       case JsSuccess(response, _) =>
+        Logger.info(s"Pce reply: $response")
         pceContinuations.replyReceived(response.correlationId, response)
         Ok
       case JsError(error) =>
+        Logger.info(s"Pce error: $error")
         BadRequest
     }
   }
@@ -41,6 +44,7 @@ object PathComputationEngine extends Controller {
         pceContinuations.register(request.correlationId).onSuccess {
           case reply => connection ! FromPce(reply)
         }
+        Logger.info(s"Sending request to pce ($endPoint): ${Json.toJson(request)}")
         WS.url(endPoint).post(Json.toJson(request))
     }
   }

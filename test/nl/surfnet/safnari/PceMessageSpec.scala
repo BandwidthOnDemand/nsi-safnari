@@ -59,24 +59,57 @@ class PceMessageSpec extends helpers.Specification {
       Json.fromJson[PceResponse](json) must beEqualTo(JsSuccess(response))
     }
 
+    "deserialize stp type" in {
+      val input = """{"network-id":"network-id","local-id":"local-id"}"""
+
+      val stp = Json.fromJson[StpType](Json.parse(input))
+
+      stp must beEqualTo(JsSuccess(new StpType().withNetworkId("network-id").withLocalId("local-id")))
+    }
+
+    "deserialize pce reply" in {
+      val input = """{
+        |"correlation-id":"urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02",
+        |"status":"SUCCESS",
+        |"message":"all good!",
+        |"path":[{
+        |"source-stp":{"network-id":"urn:ogf:network:stp:surfnet.nl","local-id":"15"},
+        |"destination-stp":{"network-id":"urn:ogf:network:stp:surfnet.nl","local-id":"18"},
+        |"nsa":"urn:ogf:network:nsa:surfnet.nl",
+        |"provider-url":"http://localhost:8082/bod/v2/provider",
+        |"auth":{"method":"OAUTH2","token":"f44b1e47-0a19-4c11-861b-c9abf82d4cbf"}}]
+        |}""".stripMargin
+
+      val output = PathComputationConfirmed(
+        CorrelationId.fromString("urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02").get,
+        ComputedSegment(
+          new StpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("15"),
+          new StpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("18"),
+          ProviderEndPoint("urn:ogf:network:nsa:surfnet.nl",
+          URI.create("http://localhost:8082/bod/v2/provider"),
+          OAuthAuthentication("f44b1e47-0a19-4c11-861b-c9abf82d4cbf"))) :: Nil)
+
+      Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
+    }
+
     "deserialize authentication method" in {
       Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"foo"}""")) must beLike {
         case JsError(errors) =>
           errors must contain((JsPath \ "method") -> Seq(ValidationError("bad.authentication.method", "foo")))
       }
 
-      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"basic"}""")) must beLike {
+      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"BASIC"}""")) must beLike {
         case JsError(errors) =>
           errors must contain((JsPath \ "username") -> Seq(ValidationError("validate.error.missing-path")))
       }
 
-      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"oauth2", "token":"oath2-token"}""")) must beEqualTo(JsSuccess(OAuthAuthentication("oath2-token")))
+      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"OAUTH2", "token":"oath2-token"}""")) must beEqualTo(JsSuccess(OAuthAuthentication("oath2-token")))
 
-      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"basic", "username":"user", "password":"pwd"}""")) must beEqualTo(JsSuccess(BasicAuthentication("user", "pwd")))
+      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"BASIC", "username":"user", "password":"pwd"}""")) must beEqualTo(JsSuccess(BasicAuthentication("user", "pwd")))
     }
 
     "deserialize provider end point" in {
-      Json.fromJson[ProviderEndPoint](Json.parse("""{"nsa":"urn:nsa:surfnet.nl", "provider-url":"http://localhost", "auth":{"method":"none"}}""")) must beEqualTo(
+      Json.fromJson[ProviderEndPoint](Json.parse("""{"nsa":"urn:nsa:surfnet.nl", "provider-url":"http://localhost", "auth":{"method":"NONE"}}""")) must beEqualTo(
         JsSuccess(ProviderEndPoint("urn:nsa:surfnet.nl", URI.create("http://localhost"), NoAuthentication)))
     }
 

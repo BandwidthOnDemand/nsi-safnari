@@ -49,24 +49,23 @@ object PceMessage {
   // FIXME labels
   implicit val StpTypeFormat: Format[StpType] = (
     (__ \ "network-id").format[String] and
-    (__ \ "local-id").format[String] and
-    (__ \ "labels").format[Option[JsObject]])(
-      (networkId, localId, labels) => new StpType().withNetworkId(networkId).withLocalId(localId),
-      stpType => (stpType.getNetworkId(), stpType.getLocalId(), None))
+    (__ \ "local-id").format[String])(
+      (networkId, localId) => new StpType().withNetworkId(networkId).withLocalId(localId),
+      stpType => (stpType.getNetworkId(), stpType.getLocalId()))
 
   implicit val ProviderAuthenticationReads: Reads[ProviderAuthentication] = Reads { json =>
     (__ \ "method").read[String].reads(json) match {
-      case JsSuccess("none", _)    => JsSuccess(NoAuthentication)
-      case JsSuccess("basic", _)   => Json.reads[BasicAuthentication].reads(json).clearPath
-      case JsSuccess("oauth2", _)  => Json.reads[OAuthAuthentication].reads(json).clearPath
+      case JsSuccess("NONE", _)    => JsSuccess(NoAuthentication)
+      case JsSuccess("BASIC", _)   => Json.reads[BasicAuthentication].reads(json).clearPath
+      case JsSuccess("OAUTH2", _)  => Json.reads[OAuthAuthentication].reads(json).clearPath
       case JsSuccess(method, path) => JsError(path -> ValidationError("bad.authentication.method", method))
       case errors: JsError         => errors
     }
   }
   implicit val ProviderAuthenticationWrites: Writes[ProviderAuthentication] = Writes {
-    case NoAuthentication                        => Json.obj("method" -> "none")
-    case BasicAuthentication(username, password) => Json.obj("method" -> "basic", "username" -> username, "password" -> password)
-    case OAuthAuthentication(token)              => Json.obj("method" -> "oauth2", "token" -> token)
+    case NoAuthentication                        => Json.obj("method" -> "NONE")
+    case BasicAuthentication(username, password) => Json.obj("method" -> "BASIC", "username" -> username, "password" -> password)
+    case OAuthAuthentication(token)              => Json.obj("method" -> "OAUTH2", "token" -> token)
   }
 
   implicit val ProviderEndPointFormat: OFormat[ProviderEndPoint] = (
@@ -83,13 +82,13 @@ object PceMessage {
     (__ \ "correlation-id").format[CorrelationId] and
     (__ \ "status").format[String] and
     (__ \ "path").format[Option[Seq[ComputedSegment]]])((correlationId, status, path) => status match {
-      case "success" => PathComputationConfirmed(correlationId, path.getOrElse(Nil))
-      case "failed"  => PathComputationFailed(correlationId)
+      case "SUCCESS" => PathComputationConfirmed(correlationId, path.getOrElse(Nil))
+      case "FAILED"  => PathComputationFailed(correlationId)
     }, {
       case PathComputationConfirmed(correlationId, segments) =>
-        (correlationId, "success", Some(segments))
+        (correlationId, "SUCCESS", Some(segments))
       case PathComputationFailed(correlationId) =>
-        (correlationId, "failed", None)
+        (correlationId, "FAILED", None)
     })
 
   implicit val XMLGregorianCalendarReads: Reads[XMLGregorianCalendar] = Reads {
