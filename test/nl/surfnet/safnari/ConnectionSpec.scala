@@ -97,7 +97,7 @@ class ConnectionSpec extends helpers.Specification {
     "fail the connection when path computation fails" in new fixture {
       given(InitialMessages: _*)
 
-      when(FromPce(PathComputationFailed(CorrelationId(0, 1))))
+      when(FromPce(PathComputationFailed(CorrelationId(0, 1), "failed")))
 
       messages must haveSize(1)
       messages must haveOneElementLike {

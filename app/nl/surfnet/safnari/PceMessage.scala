@@ -17,7 +17,7 @@ sealed trait PceRequest extends PceMessage
 case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, criteria: ReservationConfirmCriteriaType) extends PceRequest
 
 sealed trait PceResponse extends PceMessage
-case class PathComputationFailed(correlationId: CorrelationId) extends PceResponse
+case class PathComputationFailed(correlationId: CorrelationId, message: String) extends PceResponse
 case class PathComputationConfirmed(correlationId: CorrelationId, segments: Seq[ComputedSegment]) extends PceResponse
 
 sealed trait ProviderAuthentication
@@ -78,18 +78,28 @@ object PceMessage {
     (__ \ "destination-stp").format[StpType] and
     ProviderEndPointFormat)(ComputedSegment.apply, unlift(ComputedSegment.unapply))
 
-  implicit val PceResponseFormat: Format[PceResponse] = (
-    (__ \ "correlation-id").format[CorrelationId] and
-    (__ \ "status").format[String] and
-    (__ \ "path").format[Option[Seq[ComputedSegment]]])((correlationId, status, path) => status match {
-      case "SUCCESS" => PathComputationConfirmed(correlationId, path.getOrElse(Nil))
-      case "FAILED"  => PathComputationFailed(correlationId)
-    }, {
-      case PathComputationConfirmed(correlationId, segments) =>
-        (correlationId, "SUCCESS", Some(segments))
-      case PathComputationFailed(correlationId) =>
-        (correlationId, "FAILED", None)
-    })
+  implicit val PceResponseReads: Reads[PceResponse] = Reads { json =>
+    (__ \ "status").read[String].reads(json) match {
+      case JsSuccess("SUCCESS", _) => Json.fromJson[PathComputationConfirmed](json)
+      case JsSuccess("FAILED", _)  => Json.fromJson[PathComputationFailed](json)
+      case JsSuccess(status, path) => JsError(path -> ValidationError("bad.response.status", status))
+      case errors: JsError         => errors
+    }
+  }
+  implicit val PceResponseWrites: Writes[PceResponse] = Writes {
+    case PathComputationConfirmed(correlationId, segments) => Json.obj("correlation-id" -> correlationId, "status" -> "SUCCESS", "path" -> segments)
+    case PathComputationFailed(correlationId, message)     => Json.obj("correlation-id" -> correlationId, "status" -> "FAILED", "message" -> message)
+  }
+
+  implicit val PathComputationConfirmedReads: Reads[PathComputationConfirmed] = (
+    (__ \ "correlation-id").read[CorrelationId] and
+    (__ \ "path").read[Seq[ComputedSegment]]
+  )(PathComputationConfirmed.apply _)
+
+  implicit val PathComputationFailedReads: Reads[PathComputationFailed] = (
+    (__ \ "correlation-id").read[CorrelationId] and
+    (__ \ "message").read[String]
+  )(PathComputationFailed.apply _)
 
   implicit val XMLGregorianCalendarReads: Reads[XMLGregorianCalendar] = Reads {
     case JsString(s) => Try { DatatypeFactory.newInstance().newXMLGregorianCalendar(s) }.map { x => JsSuccess(x) }.getOrElse { JsError(ValidationError("bad.timestamp", s)) }

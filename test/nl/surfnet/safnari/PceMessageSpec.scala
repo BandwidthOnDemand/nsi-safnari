@@ -42,9 +42,9 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "serialize computation failed response to json" in {
-      val response = PathComputationFailed(correlationId)
+      val response = PathComputationFailed(correlationId, "FailedMessage")
 
-      val json = Json.toJson(response)
+      val json = Json.toJson[PceResponse](response)
 
       json \ "correlation-id" must beEqualTo(JsString(correlationId.toString))
       Json.fromJson[PceResponse](json) must beEqualTo(JsSuccess(response))
@@ -53,7 +53,7 @@ class PceMessageSpec extends helpers.Specification {
     "serialize computation confirmed response to json" in {
       val response = PathComputationConfirmed(correlationId, List(ComputedSegment(sourceStp, destStp, providerEndPoint)))
 
-      val json = Json.toJson(response)
+      val json = Json.toJson[PceResponse](response)
 
       json \ "correlation-id" must beEqualTo(JsString(correlationId.toString))
       Json.fromJson[PceResponse](json) must beEqualTo(JsSuccess(response))
@@ -67,7 +67,15 @@ class PceMessageSpec extends helpers.Specification {
       stp must beEqualTo(JsSuccess(new StpType().withNetworkId("network-id").withLocalId("local-id")))
     }
 
-    "deserialize pce reply" in {
+    "deserialize path computation failed" in {
+      val input = """{"correlation-id":"urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640","status":"FAILED","message":"oops!"}"""
+
+      val output = PathComputationFailed(CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get, "oops!")
+
+      Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
+    }
+
+    "deserialize path computation confirmed" in {
       val input = """{
         |"correlation-id":"urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02",
         |"status":"SUCCESS",

@@ -14,6 +14,7 @@ import support.ExtraBodyParsers._
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import akka.actor.Props
+import play.api.Logger
 
 object ConnectionRequester extends Controller with SoapWebService {
 
@@ -69,7 +70,9 @@ object ConnectionRequester extends Controller with SoapWebService {
           case _                                       => request
         }
 
-        request.post(message)
+        request.post(message).onFailure {
+          case e => Logger.warn(s"Could not reach nsi provider $e")
+        }
     }
   }
 
