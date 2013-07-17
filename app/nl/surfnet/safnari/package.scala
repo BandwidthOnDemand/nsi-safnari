@@ -6,6 +6,7 @@ import nl.surfnet.safnari.{Conversion, CorrelationId, Uuid}
 import org.ogf.schemas.nsi._2013._04.connection.types.{ReservationConfirmCriteriaType, ReservationRequestCriteriaType}
 import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 import scala.util.{Failure, Success, Try}
+import org.ogf.schemas.nsi._2013._04.connection.types.ServiceAttributesType
 
 package object safnari {
   type ConnectionId = String
@@ -52,7 +53,7 @@ package object safnari {
     (for {
       schedule <- Option(b.getSchedule())
       bandwidth <- Option(b.getBandwidth())
-      serviceAttributes = Option(b.getServiceAttributes()).getOrElse(new TypeValuePairListType())
+      serviceAttributes = Option(b.getServiceAttributes()).getOrElse(new ServiceAttributesType())
       path <- Option(b.getPath())
     } yield {
       new ReservationConfirmCriteriaType().

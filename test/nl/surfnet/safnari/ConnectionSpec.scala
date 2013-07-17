@@ -13,7 +13,7 @@ import org.ogf.schemas.nsi._2013._04.framework.types.TypeValuePairListType
 class ConnectionSpec extends helpers.Specification {
   trait fixture extends Scope {
 
-    val Criteria = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new TypeValuePairListType()).withPath(new PathType())
+    val Criteria = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withBandwidth(100).withServiceAttributes(new ServiceAttributesType()).withPath(new PathType())
     val InitialReserveType = new ReserveType().withCriteria(Conversion.convert(Criteria).right.get)
     val A = ComputedSegment(new StpType().withLocalId("A"), new StpType().withLocalId("X"), ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication))
     val B = ComputedSegment(new StpType().withLocalId("X"), new StpType().withLocalId("B"), ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication))

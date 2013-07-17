@@ -70,7 +70,7 @@ object NsiSoapConversions {
   implicit val NsiRequesterOperationToDocument: Conversion[NsiRequesterOperation, Document] = NsiMessageToDocumentConversion {
     messageFactories(Map(
       // FIXME this list seems to be incomplete?
-      "reserveConfirmed" -> NsiMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveConfirmed(correlationId, body.getConnectionId(), body.getCriteria().asScala.head)),
+      "reserveConfirmed" -> NsiMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveConfirmed(correlationId, body.getConnectionId(), body.getCriteria())),
       "reserveCommitConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveCommitConfirmed(correlationId, body.getConnectionId)),
       "provisionConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ProvisionConfirmed(correlationId, body.getConnectionId)),
       "releaseConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ReleaseConfirmed(correlationId, body.getConnectionId)),

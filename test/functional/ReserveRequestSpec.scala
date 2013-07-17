@@ -84,7 +84,7 @@ class ReserveRequestSpec extends helpers.Specification {
     val Criteria = new ReservationRequestCriteriaType().
       withSchedule(new ScheduleType()).
       withBandwidth(100).
-      withServiceAttributes(new TypeValuePairListType()).
+      withServiceAttributes(new ServiceAttributesType()).
       withPath(new PathType().withDirectionality(DirectionalityType.BIDIRECTIONAL).withSourceSTP(new StpType().withNetworkId("networkId").withLocalId("source-localId")).withDestSTP(new StpType().withNetworkId("networkId").withLocalId("dest-localId")))
 
     "send a reserve request to the ultimate provider agent" in new WithServer(Application, ServerPort) {
