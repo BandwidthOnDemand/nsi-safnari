@@ -70,12 +70,13 @@ object NsiSoapConversions {
   implicit val NsiRequesterOperationToDocument: Conversion[NsiRequesterOperation, Document] = NsiMessageToDocumentConversion {
     messageFactories(Map(
       // FIXME this list seems to be incomplete?
-      "reserveConfirmed" -> NsiMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveConfirmed(correlationId, body.getConnectionId(), body.getCriteria())),
-      "reserveCommitConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ReserveCommitConfirmed(correlationId, body.getConnectionId)),
-      "provisionConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ProvisionConfirmed(correlationId, body.getConnectionId)),
-      "releaseConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => ReleaseConfirmed(correlationId, body.getConnectionId)),
-      "terminateConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((correlationId, body) => TerminateConfirmed(correlationId, body.getConnectionId)),
-      "dataPlaneStateChange" -> NsiMessageFactory[DataPlaneStateChangeRequestType, NsiRequesterOperation]((correlationId, body) => DataPlaneStateChange(correlationId, body.getConnectionId(), body.getDataPlaneStatus(), body.getTimeStamp()))))
+      "reserveConfirmed" -> NsiMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((headers, body) => ReserveConfirmed(headers, body.getConnectionId(), body.getCriteria())),
+      "reserveCommitConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => ReserveCommitConfirmed(headers, body.getConnectionId)),
+      "reserveTimeout" -> NsiMessageFactory[ReserveTimeoutRequestType, NsiRequesterOperation]((headers, body) => ReserveTimeout(headers, body)),
+      "provisionConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => ProvisionConfirmed(headers, body.getConnectionId)),
+      "releaseConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => ReleaseConfirmed(headers, body.getConnectionId)),
+      "terminateConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => TerminateConfirmed(headers, body.getConnectionId)),
+      "dataPlaneStateChange" -> NsiMessageFactory[DataPlaneStateChangeRequestType, NsiRequesterOperation]((headers, body) => DataPlaneStateChange(headers, body.getConnectionId(), body.getDataPlaneStatus(), body.getTimeStamp()))))
   } {
     case ReserveConfirmed(_, connectionId, criteria)              => typesFactory.createReserveConfirmed(new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria))
     case ReserveFailed(_, failure)                                => typesFactory.createReserveFailed(failure)

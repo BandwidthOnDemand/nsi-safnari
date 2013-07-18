@@ -18,9 +18,6 @@ case class ReserveCommitFailed(headers: NsiHeaders, failed: GenericFailedType) e
   def connectionId: ConnectionId = failed.getConnectionId()
 }
 case class ReserveAbortConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
-case class ReserveTimeout(headers: NsiHeaders, timeout: ReserveTimeoutRequestType) extends NsiRequesterOperation {
-  def connectionId: ConnectionId = timeout.getConnectionId()
-}
 
 case class ProvisionConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
 case class ReleaseConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
@@ -35,5 +32,8 @@ case class ErrorEvent(headers: NsiHeaders, error: ErrorEventType) extends NsiNot
   override def connectionId = error.getConnectionId()
 }
 case class DataPlaneStateChange(headers: NsiHeaders, connectionId: ConnectionId, status: DataPlaneStatusType, timeStamp: XMLGregorianCalendar) extends NsiNotification
+case class ReserveTimeout(headers: NsiHeaders, timeout: ReserveTimeoutRequestType) extends NsiNotification {
+  def connectionId: ConnectionId = timeout.getConnectionId()
+}
 
 case class MessageDeliveryTimeout(headers: NsiHeaders, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation

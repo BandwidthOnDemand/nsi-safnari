@@ -36,7 +36,7 @@ class MessageStoreSpec extends helpers.Specification {
       }
     }
 
-    "store a FromRequester NSI message" in new WithApplication(Application) {
+    "store a fromRequester NSI message" in new WithApplication(Application) {
       val aggregatedConnectionId = newConnectionId
       val message = NsiMessageSpec.initialReserveMessage
       messageStore.store(aggregatedConnectionId, FromRequester(message)) must not(beNull)

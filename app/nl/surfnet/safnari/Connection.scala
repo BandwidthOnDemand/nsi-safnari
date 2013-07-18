@@ -36,7 +36,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
       case FromProvider(_: ReserveCommitConfirmed) => Some(rsm)
       case FromProvider(_: ReserveCommitFailed)    => Some(rsm)
       case FromProvider(_: ReserveAbortConfirmed)  => Some(rsm)
-      case FromProvider(_: ReserveTimeout)         => Some(???) // TODO
+      case FromProvider(_: ReserveTimeout)         => Some(rsm)
       case FromPce(_)                              => Some(rsm)
 
       // Data Plane Status messages
