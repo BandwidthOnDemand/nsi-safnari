@@ -1,7 +1,7 @@
 package nl.surfnet.safnari
 
 import javax.xml.datatype.XMLGregorianCalendar
-import org.ogf.schemas.nsi._2013._04.connection.types._
+import org.ogf.schemas.nsi._2013._07.connection.types._
 
 sealed trait NsiRequesterOperation extends NsiMessage
 sealed trait NsiNotification extends NsiRequesterOperation {

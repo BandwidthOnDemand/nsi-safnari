@@ -1,7 +1,7 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 
 case class NsiHeaders(correlationId: CorrelationId, requesterNSA: String, providerNSA: String, replyTo: Option[URI], protocolVersion: URI = URI.create("urn:nsi:2.0:FIXME")) {
   def asReply: NsiHeaders = copy(replyTo = None)

@@ -1,7 +1,7 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateEnumType
-import org.ogf.schemas.nsi._2013._04.connection.types.ProvisionStateEnumType._
+import org.ogf.schemas.nsi._2013._07.connection.types.ProvisionStateEnumType
+import org.ogf.schemas.nsi._2013._07.connection.types.ProvisionStateEnumType._
 
 case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, ProvisionStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
 

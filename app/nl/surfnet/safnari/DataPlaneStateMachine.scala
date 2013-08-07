@@ -1,6 +1,6 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._04.connection.types.DataPlaneStatusType
+import org.ogf.schemas.nsi._2013._07.connection.types.DataPlaneStatusType
 import javax.xml.datatype.XMLGregorianCalendar
 
 case class DataPlaneStateMachineData(providers: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, Boolean], timeStamp: Option[XMLGregorianCalendar]) {

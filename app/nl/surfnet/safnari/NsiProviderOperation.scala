@@ -1,6 +1,6 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._04.connection.types.ReserveType
+import org.ogf.schemas.nsi._2013._07.connection.types.ReserveType
 
 sealed trait NsiProviderOperation extends NsiMessage {
   def optionalConnectionId: Option[ConnectionId] = None

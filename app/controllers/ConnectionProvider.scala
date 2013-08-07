@@ -6,8 +6,8 @@ import akka.util.Timeout
 import java.net.URI
 import nl.surfnet.safnari._
 import nl.surfnet.safnari.NsiSoapConversions._
-import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType
-import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
+import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import play.api._
 import play.api.Play.current
 import play.api.libs.concurrent.Akka

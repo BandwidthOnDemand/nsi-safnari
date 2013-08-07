@@ -12,9 +12,9 @@ import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
 import javax.xml.transform.stream.StreamSource
 import javax.xml.validation.SchemaFactory
-import org.ogf.schemas.nsi._2013._04.connection.types._
-import org.ogf.schemas.nsi._2013._04.framework.headers.CommonHeaderType
-import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._07.connection.types._
+import org.ogf.schemas.nsi._2013._07.framework.headers.CommonHeaderType
+import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.w3c.dom.{ Document, Element, Node }
 import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.SAXParseException
@@ -28,9 +28,10 @@ object NsiSoapConversions {
     tryEither(string.getBytes("UTF-8"))
   }
 
-  private val typesFactory = new org.ogf.schemas.nsi._2013._04.connection.types.ObjectFactory()
-  private val headersFactory = new org.ogf.schemas.nsi._2013._04.framework.headers.ObjectFactory()
-  private val SchemaPackages = Seq(typesFactory.getClass().getPackage().getName(), headersFactory.getClass().getPackage().getName())
+  private val typesFactory = new org.ogf.schemas.nsi._2013._07.connection.types.ObjectFactory()
+  private val headersFactory = new org.ogf.schemas.nsi._2013._07.framework.headers.ObjectFactory()
+  private val pointToPointServiceFactory = new org.ogf.schemas.nsi._2013._07.services.point2point.ObjectFactory()
+  private val SchemaPackages = Seq(typesFactory, headersFactory, pointToPointServiceFactory).map(_.getClass().getPackage().getName())
 
   implicit val NsiAcknowledgementOperationToDocument: Conversion[NsiAcknowledgement, Document] = NsiMessageToDocumentConversion {
     messageFactories(Map(
@@ -130,8 +131,8 @@ object NsiSoapConversions {
     factories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
 
   private val SoapNamespaceUri = "http://schemas.xmlsoap.org/soap/envelope/"
-  private val NsiFrameworkHeaderNamespace = "http://schemas.ogf.org/nsi/2013/04/framework/headers"
-  private val NsiConnectionTypesNamespace = "http://schemas.ogf.org/nsi/2013/04/connection/types"
+  private val NsiFrameworkHeaderNamespace = "http://schemas.ogf.org/nsi/2013/07/framework/headers"
+  private val NsiConnectionTypesNamespace = "http://schemas.ogf.org/nsi/2013/07/connection/types"
 
   val NsiXmlDocumentConversion = XmlDocumentConversion("wsdl/soap/soap-envelope-1.1.xsd", "wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
 
@@ -175,9 +176,9 @@ object NsiSoapConversions {
     }
   }
 
-  def NsiMessageToDocumentConversion[T <: NsiMessage](elementToFactory: Element => Either[String, NsiMessageFactory[T]])(messageToJaxb: T => JAXBElement[_]): Conversion[T, Document] = {
-    val jaxbContext = JAXBContext.newInstance(SchemaPackages.mkString(":"))
+  val jaxbContext = JAXBContext.newInstance(SchemaPackages.mkString(":"))
 
+  def NsiMessageToDocumentConversion[T <: NsiMessage](elementToFactory: Element => Either[String, NsiMessageFactory[T]])(messageToJaxb: T => JAXBElement[_]): Conversion[T, Document] = {
     Conversion.build[T, Document] { message =>
       tryEither {
         val document = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()

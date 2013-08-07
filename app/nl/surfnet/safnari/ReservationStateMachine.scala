@@ -1,9 +1,10 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import org.ogf.schemas.nsi._2013._04.connection.types._
-import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._07.connection.types._
+import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import scala.collection.JavaConverters._
+import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 
 sealed abstract class ReservationState(val jaxb: ReservationStateEnumType)
 case object InitialReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
@@ -74,6 +75,7 @@ case class ReservationStateMachineData(
 class ReservationStateMachine(
   id: ConnectionId,
   initialReserve: Reserve,
+  initialCriteria: ReservationConfirmCriteriaType,
   pceReplyUri: URI,
   newCorrelationId: () => CorrelationId,
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
@@ -84,7 +86,9 @@ class ReservationStateMachine(
       initialReserve.headers.asReply,
       Option(initialReserve.body.getGlobalReservationId()),
       Option(initialReserve.body.getDescription()),
-      Conversion.invert(initialReserve.body.getCriteria()).fold(error => sys.error(s"Bad initial reservation criteria: $error"), identity))) {
+      initialCriteria)) {
+
+  private val p2ps = initialCriteria.getP2Ps().getOrElse(throw new IllegalArgumentException(s"missing P2PS service in $initialCriteria"))
 
   when(InitialReservationState) {
     case Event(FromRequester(message: Reserve), _) =>
@@ -161,10 +165,14 @@ class ReservationStateMachine(
       data.segments.map {
         case (correlationId, segment) =>
           val criteria = new ReservationRequestCriteriaType().
-            withBandwidth(data.criteria.getBandwidth()).
-            withPath(new PathType().withSourceSTP(segment.sourceStp).withDestSTP(segment.destinationStp).withDirectionality(DirectionalityType.BIDIRECTIONAL)).
+            withP2Ps(new P2PServiceBaseType().
+              withCapacity(p2ps.getCapacity()).
+              withDirectionality(p2ps.getDirectionality()).
+              withSymmetricPath(p2ps.isSymmetricPath()).
+              withEro(p2ps.getEro()).
+              withSourceSTP(segment.sourceStp).
+              withDestSTP(segment.destinationStp)).
             withSchedule(data.criteria.getSchedule()).
-            withServiceAttributes(data.criteria.getServiceAttributes()).
             withVersion(data.criteria.getVersion())
 
           val reserveType = new ReserveType().

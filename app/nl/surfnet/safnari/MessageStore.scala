@@ -90,7 +90,7 @@ class MessageStore[T]()(implicit conversion: Conversion[T, StoredMessage]) {
           FROM messages
          WHERE aggregated_connection_id = {aggregated_connection_id}
          ORDER BY id ASC""").on(
-      'aggregated_connection_id -> aggregatedConnectionId).as(messageParser.*).flatMap(message => conversion.invert(message).right.toOption) // FIXME error handling
+      'aggregated_connection_id -> aggregatedConnectionId).as(messageParser.*).map(message => conversion.invert(message).fold(sys.error, identity)) // FIXME error handling
   }
 
   def loadEverything(): Seq[(ConnectionId, Seq[T])] = DB.withConnection { implicit connection =>

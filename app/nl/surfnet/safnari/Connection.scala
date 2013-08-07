@@ -2,15 +2,19 @@ package nl.surfnet.safnari
 
 import akka.actor._
 import java.net.URI
-import org.ogf.schemas.nsi._2013._04.connection.types._
-import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._07.connection.types._
+import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 
 class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri))
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), aggregatorNsa, requesterNSA, None)
 
-  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
+  private val criteria: ReservationConfirmCriteriaType = Conversion.invert(initialReserve.body.getCriteria()).fold(error => throw new IllegalArgumentException(s"Bad initial reservation criteria: $error"), identity)
+  private val p2ps: P2PServiceBaseType = criteria.getP2Ps().getOrElse(throw new IllegalArgumentException(s"initial criteria does not contain P2P service: $criteria"))
+
+  val rsm = new ReservationStateMachine(id, initialReserve, criteria, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
     new GenericFailedType().
       withConnectionId(id).
       withConnectionStates(connectionStates).
@@ -78,13 +82,16 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
 
   def query = {
     val children = rsm.childConnections.zipWithIndex.map {
-      case ((id, segment), order) => new SummaryPathType().
+      case ((id, segment), order) => new ChildSummaryType().
         withConnectionId(id).
         withProviderNSA(segment.provider.nsa).
-        withPath(new PathType().
-          withSourceSTP(segment.sourceStp).
-          withDestSTP(segment.destinationStp).
-          withDirectionality(DirectionalityType.BIDIRECTIONAL)).
+        withP2Ps(new P2PServiceBaseType().
+            withCapacity(p2ps.getCapacity()).
+            withDirectionality(p2ps.getDirectionality()).
+            withSymmetricPath(p2ps.isSymmetricPath()).
+            withEro(p2ps.getEro()).
+            withSourceSTP(segment.sourceStp).
+            withDestSTP(segment.destinationStp)).
         withOrder(order)
     }
 
@@ -94,9 +101,6 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
       withDescription(initialReserve.body.getDescription()).
       withConnectionId(id).
       withCriteria(new QuerySummaryResultCriteriaType().
-        withBandwidth(criteria.getBandwidth()).
-        withPath(criteria.getPath).
-        withServiceAttributes(criteria.getServiceAttributes()).
         withSchedule(criteria.getSchedule()).
         withChildren(new ChildSummaryListType().withChild(children.toSeq: _*))).
       withRequesterNSA(requesterNSA).

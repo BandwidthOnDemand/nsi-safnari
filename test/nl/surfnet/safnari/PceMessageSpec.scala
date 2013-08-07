@@ -2,9 +2,11 @@ package nl.surfnet.safnari
 
 import play.api.libs.json._
 import java.net.URI
-import org.ogf.schemas.nsi._2013._04.connection.types._
-import org.ogf.schemas.nsi._2013._04.framework.types._
+import org.ogf.schemas.nsi._2013._07.connection.types._
+import org.ogf.schemas.nsi._2013._07.framework.types._
+import org.ogf.schemas.nsi._2013._07.services.types.StpType
 import play.api.data.validation.ValidationError
+import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 
 object PceMessageSpec {
   val sourceStp = new StpType().withNetworkId("network-id").withLocalId("source")
@@ -12,8 +14,7 @@ object PceMessageSpec {
   val destStp = new StpType().withNetworkId("network-id").withLocalId("dest")
 
   val criteria = new ReservationConfirmCriteriaType().
-    withSchedule(new ScheduleType()).withBandwidth(100).
-    withPath(new PathType().withSourceSTP(sourceStp).withDestSTP(destStp))
+    withSchedule(new ScheduleType()).withP2Ps(new P2PServiceBaseType().withCapacity(100).withSourceSTP(sourceStp).withDestSTP(destStp))
 
   val correlationId = newCorrelationId
 

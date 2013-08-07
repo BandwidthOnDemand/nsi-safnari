@@ -1,7 +1,7 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateEnumType._
-import org.ogf.schemas.nsi._2013._04.connection.types.LifecycleStateEnumType
+import org.ogf.schemas.nsi._2013._07.connection.types.LifecycleStateEnumType._
+import org.ogf.schemas.nsi._2013._07.connection.types.LifecycleStateEnumType
 
 case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childConnectionStates: Map[ConnectionId, LifecycleStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
 

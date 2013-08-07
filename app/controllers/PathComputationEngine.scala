@@ -3,7 +3,6 @@ package controllers
 import akka.actor._
 import java.net.URI
 import nl.surfnet.safnari._
-import org.ogf.schemas.nsi._2013._04.connection.types.StpType
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
@@ -52,12 +51,13 @@ object PathComputationEngine extends Controller {
   class DummyPceRequesterActor extends Actor {
     def receive = {
       case ToPce(pce: PathComputationRequest) =>
+        val p2ps = pce.criteria.getP2Ps().getOrElse(throw new IllegalArgumentException(s"P2P service is missing: ${pce.criteria}"))
         sender !
           FromPce(PathComputationConfirmed(
             pce.correlationId,
             Seq(ComputedSegment(
-              pce.criteria.getPath().getSourceSTP,
-              pce.criteria.getPath().getDestSTP(),
+              p2ps.getSourceSTP,
+              p2ps.getDestSTP(),
               ProviderEndPoint(
                 "urn:ogf:network:nsa:surfnet.nl",
                 URI.create("http://localhost:8082/bod/nsi/v2/provider"),

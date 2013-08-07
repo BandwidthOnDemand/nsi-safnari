@@ -1,7 +1,7 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType
-import org.ogf.schemas.nsi._2013._04.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
+import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 
 sealed trait NsiAcknowledgement extends NsiMessage
 case class GenericAck(headers: NsiHeaders) extends NsiAcknowledgement

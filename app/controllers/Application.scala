@@ -8,7 +8,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import akka.pattern.ask
 import akka.util.Timeout
-import org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType
+import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
 import nl.surfnet.safnari.ConnectionId
 import nl.surfnet.safnari.ReservationState
 import nl.surfnet.safnari.ConnectionData

@@ -1,6 +1,7 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._04.connection.types._
+import org.ogf.schemas.nsi._2013._07.connection.types._
+import org.ogf.schemas.nsi._2013._07.services.types.StpType
 import java.net.URI
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
@@ -9,6 +10,7 @@ import play.api.data.validation.ValidationError
 import scala.util.Try
 import javax.xml.datatype.XMLGregorianCalendar
 import javax.xml.datatype.DatatypeFactory
+import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 
 sealed trait PceMessage {
   def correlationId: CorrelationId
@@ -112,23 +114,26 @@ object PceMessage {
     (__ \ "destination-stp").format[StpType] and
     (__ \ "start-time").format[Option[XMLGregorianCalendar]] and
     (__ \ "end-time").format[Option[XMLGregorianCalendar]] and
-    (__ \ "bandwidth").format[Int] and
+    (__ \ "bandwidth").format[Long] and
     (__ \ "reply-to").format[URI] and
     (__ \ "correlation-id").format[CorrelationId] and
     (__ \ "algorithm").format[Option[String]] and
     (__ \ "constraints").format[Seq[String]])((source, destination, start, end, bandwidth, replyTo, correlationId, algorithm, constraints) => {
       val criteria = new ReservationConfirmCriteriaType().
-        withBandwidth(bandwidth).
-        withPath(new PathType().withSourceSTP(source).withDestSTP(destination)).
+        withP2Ps(new P2PServiceBaseType().
+            withCapacity(bandwidth).
+            withSourceSTP(source).
+            withDestSTP(destination)).
         withSchedule(new ScheduleType().withStartTime(start.orNull).withEndTime(end.orNull))
       PathComputationRequest(correlationId, replyTo, criteria)
     }, {
       case PathComputationRequest(correlationId, replyTo, criteria) =>
-        (criteria.getPath().getSourceSTP(),
-          criteria.getPath().getDestSTP(),
+        val p2ps = criteria.getP2Ps().getOrElse(throw new RuntimeException("reservation request does not contain P2PS element"))
+        (p2ps.getSourceSTP(),
+          p2ps.getDestSTP(),
           Option(criteria.getSchedule().getStartTime()),
           Option(criteria.getSchedule().getEndTime()),
-          criteria.getBandwidth(),
+          p2ps.getCapacity(),
           replyTo,
           correlationId,
           None,

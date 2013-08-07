@@ -1,4 +1,6 @@
-@(connections: Seq[(org.ogf.schemas.nsi._2013._04.connection.types.QuerySummaryResultType, Seq[nl.surfnet.safnari.ConnectionData])])
+@(connections: Seq[(org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType, Seq[nl.surfnet.safnari.ConnectionData])])
+
+@import nl.surfnet.safnari._
 
 @main("Connections", "connections") {
 <section>
@@ -33,9 +35,9 @@
                                                 <dt>Start</dt>
                                                 <dd>@nullable(connection.getCriteria().head.getSchedule().getStartTime())</dd>
                                                 <dt>Source</dt>
-                                                <dd>@stp(connection.getCriteria().head.getPath().getSourceSTP())</dd>
+                                                <dd>@stp(connection.getCriteria().head.getP2Ps().get.getSourceSTP())</dd>
                                                 <dt>Bandwidth</dt>
-                                                <dd>@connection.getCriteria().head.getBandwidth()</dd>
+                                                <dd>@connection.getCriteria().head.getP2Ps().get.getCapacity()</dd>
                                                 <dt>Global id</dt>
                                                 <dd>@nullable(connection.getGlobalReservationId())</dd>
                                             </dl>
@@ -45,7 +47,7 @@
                                                 <dt>End</dt>
                                                 <dd>@nullable(connection.getCriteria().head.getSchedule().getEndTime())</dd>
                                                 <dt>Destination</dt>
-                                                <dd>@stp(connection.getCriteria().head.getPath().getDestSTP())</dd>
+                                                <dd>@stp(connection.getCriteria().head.getP2Ps().get.getDestSTP())</dd>
                                                 <dt>Version</dt>
                                                 <dd>@connection.getCriteria().head.getVersion()</dd>
                                                 <dt>Requester</dt>
@@ -99,7 +101,7 @@
 
 }
 
-@stp(stp: org.ogf.schemas.nsi._2013._04.connection.types.StpType) = {
+@stp(stp: org.ogf.schemas.nsi._2013._07.services.types.StpType) = {
     @stp.getLocalId() @@ @stp.getNetworkId()
 }
 @nullable(field: Any) = @{
