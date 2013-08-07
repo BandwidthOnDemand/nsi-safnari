@@ -12,3 +12,5 @@
 /project/project/
 /project/target/
 /data/
+*.iml
+.idea/
