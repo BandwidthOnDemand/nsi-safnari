@@ -102,6 +102,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
       withConnectionId(id).
       withCriteria(new QuerySummaryResultCriteriaType().
         withSchedule(criteria.getSchedule()).
+        withP2Ps(p2ps).
         withChildren(new ChildSummaryListType().withChild(children.toSeq: _*))).
       withRequesterNSA(requesterNSA).
       withConnectionStates(connectionStates)
