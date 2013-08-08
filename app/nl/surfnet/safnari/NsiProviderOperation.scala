@@ -5,6 +5,7 @@ import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteria
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 
 sealed trait NsiProviderOperation extends NsiMessage
+
 sealed trait NsiProviderQuery extends NsiProviderOperation
 sealed trait NsiProviderCommand extends NsiProviderOperation
 sealed trait NsiProviderUpdateCommand extends NsiProviderCommand {

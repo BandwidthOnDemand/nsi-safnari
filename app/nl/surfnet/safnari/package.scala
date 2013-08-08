@@ -9,8 +9,9 @@ import scala.util.{ Failure, Success, Try }
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 import javax.xml.bind.JAXBElement
 import collection.JavaConverters._
-import org.ogf.schemas.nsi._2013._07.connection.types.ChildSummaryType
-import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultCriteriaType
+import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetVlanType
+import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetBaseType
+import javax.xml.namespace.QName
 
 package object safnari {
   type ConnectionId = String
@@ -66,39 +67,32 @@ package object safnari {
     }).toRight("cannot convert request criteria to confirm criteria. Missing fields?")
   }
 
-  private val pointToPointObjectFactory = new org.ogf.schemas.nsi._2013._07.services.point2point.ObjectFactory()
+  private val PointToPointObjectFactory = new org.ogf.schemas.nsi._2013._07.services.point2point.ObjectFactory()
+  private val P2PS_QNAME = PointToPointObjectFactory.createP2Ps(null).getName()
+  private val ETS_QNAME = PointToPointObjectFactory.createEts(null).getName()
+  private val EVTS_QNAME = PointToPointObjectFactory.createEvts(null).getName()
 
+  private object JaxbElement {
+    def unapply[A](element: JAXBElement[A]): Option[(QName, A)] = Some((element.getName(), element.getValue()))
+  }
   implicit class HasAnyServiceOps[A: HasAnyService](a: A) {
-    def withP2Ps(p2ps: P2PServiceBaseType): A = {
+    def withP2Ps(service: P2PServiceBaseType): A = {
+      val element = service match {
+        case evts: EthernetVlanType   => PointToPointObjectFactory.createEvts(evts)
+        case ets: EthernetBaseType    => PointToPointObjectFactory.createEts(ets)
+        case p2ps: P2PServiceBaseType => PointToPointObjectFactory.createP2Ps(p2ps)
+      }
+
       // FIXME replace if already exists?
-      // FIXME deal with subtypes of P2PServiceBaseType?
-      implicitly[HasAnyService[A]].withAny(a, Seq(pointToPointObjectFactory.createP2Ps(p2ps)))
+      implicitly[HasAnyService[A]].withAny(a, Seq(element))
+
       a
     }
 
-    def getP2Ps(): Option[P2PServiceBaseType] = {
-      val qname = pointToPointObjectFactory.createP2Ps(null).getName()
-      implicitly[HasAnyService[A]].getAny(a).collectFirst {
-        case element: JAXBElement[_] if element.getName() == qname =>
-          element.getValue().asInstanceOf[P2PServiceBaseType]
-      }
+    def getP2Ps(): Option[P2PServiceBaseType] = implicitly[HasAnyService[A]].getAny(a).collectFirst {
+      case JaxbElement(EVTS_QNAME, evts: EthernetVlanType)   => evts
+      case JaxbElement(ETS_QNAME, ets: EthernetBaseType)     => ets
+      case JaxbElement(P2PS_QNAME, p2ps: P2PServiceBaseType) => p2ps
     }
-  }
-
-  implicit val ReservationRequestCriteriaTypeHasAnyService = new HasAnyService[ReservationRequestCriteriaType] {
-    def getAny(a: ReservationRequestCriteriaType) = a.getAny().asScala
-    def withAny(a: ReservationRequestCriteriaType, any: Seq[AnyRef]) = a.withAny(any: _*)
-  }
-  implicit val ReservationConfirmCriteriaTypeHasAnyService = new HasAnyService[ReservationConfirmCriteriaType] {
-    def getAny(a: ReservationConfirmCriteriaType) = a.getAny().asScala
-    def withAny(a: ReservationConfirmCriteriaType, any: Seq[AnyRef]) = a.withAny(any: _*)
-  }
-  implicit val ChildSummaryTypeHasAnyService = new HasAnyService[ChildSummaryType] {
-    def getAny(a: ChildSummaryType) = a.getAny().asScala
-    def withAny(a: ChildSummaryType, any: Seq[AnyRef]) = a.withAny(any: _*)
-  }
-  implicit val QuerySummaryResultCriteriaTypeHasAnyService = new HasAnyService[QuerySummaryResultCriteriaType] {
-    def getAny(a: QuerySummaryResultCriteriaType) = a.getAny().asScala
-    def withAny(a: QuerySummaryResultCriteriaType, any: Seq[AnyRef]) = a.withAny(any: _*)
   }
 }
