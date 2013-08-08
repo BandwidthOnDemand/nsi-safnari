@@ -74,8 +74,7 @@ case class ReservationStateMachineData(
 
 class ReservationStateMachine(
   id: ConnectionId,
-  initialReserve: Reserve,
-  initialCriteria: ReservationConfirmCriteriaType,
+  initialReserve: InitialReserve,
   pceReplyUri: URI,
   newCorrelationId: () => CorrelationId,
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
@@ -86,12 +85,10 @@ class ReservationStateMachine(
       initialReserve.headers.asReply,
       Option(initialReserve.body.getGlobalReservationId()),
       Option(initialReserve.body.getDescription()),
-      initialCriteria)) {
-
-  private val p2ps = initialCriteria.getP2Ps().getOrElse(throw new IllegalArgumentException(s"missing P2PS service in $initialCriteria"))
+      initialReserve.criteria)) {
 
   when(InitialReservationState) {
-    case Event(FromRequester(message: Reserve), _) =>
+    case Event(FromRequester(message: InitialReserve), _) =>
       goto(PathComputationState)
   }
 
@@ -164,23 +161,23 @@ class ReservationStateMachine(
       val data = nextStateData
       data.segments.map {
         case (correlationId, segment) =>
+          val service = new P2PServiceBaseType().
+            withCapacity(initialReserve.service.getCapacity()).
+            withDirectionality(initialReserve.service.getDirectionality()).
+            withSymmetricPath(initialReserve.service.isSymmetricPath()).
+            withEro(initialReserve.service.getEro()).
+            withSourceSTP(segment.sourceStp).
+            withDestSTP(segment.destinationStp)
           val criteria = new ReservationRequestCriteriaType().
-            withP2Ps(new P2PServiceBaseType().
-              withCapacity(p2ps.getCapacity()).
-              withDirectionality(p2ps.getDirectionality()).
-              withSymmetricPath(p2ps.isSymmetricPath()).
-              withEro(p2ps.getEro()).
-              withSourceSTP(segment.sourceStp).
-              withDestSTP(segment.destinationStp)).
+            withP2Ps(service).
             withSchedule(data.criteria.getSchedule()).
             withVersion(data.criteria.getVersion())
-
           val reserveType = new ReserveType().
             withGlobalReservationId(data.globalReservationId.orNull).
             withDescription(data.description.orNull).
             withCriteria(criteria)
 
-          ToProvider(Reserve(newNsiHeaders(segment.provider).copy(correlationId = correlationId), reserveType), segment.provider)
+          ToProvider(InitialReserve(newNsiHeaders(segment.provider).copy(correlationId = correlationId), reserveType, Conversion.invert(criteria).right.get, service), segment.provider)
       }.toVector
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(_, failed(NsiError.PathComputationNoPath)))

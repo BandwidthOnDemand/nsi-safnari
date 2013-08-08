@@ -26,7 +26,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   private val requesterContinuations = new Continuations[NsiRequesterOperation]()
   private val pceContinuations = new Continuations[PceResponse]()
 
-  def connectionFactory(connectionId: ConnectionId, initialReserve: Reserve): (ActorRef, ConnectionEntity) = {
+  def connectionFactory(connectionId: ConnectionId, initialReserve: InitialReserve): (ActorRef, ConnectionEntity) = {
     val outbound = outboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
@@ -40,8 +40,8 @@ object ConnectionProvider extends Controller with SoapWebService {
   override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.request().url}"
 
   def request = NsiProviderEndPoint {
-    case query: NsiQuery     => handleQuery(query)(replyToClient(query.headers))
-    case command: NsiCommand => handleRequest(command)(replyToClient(command.headers))
+    case query: NsiProviderQuery     => handleQuery(query)(replyToClient(query.headers))
+    case command: NsiProviderCommand => handleCommand(command)(replyToClient(command.headers))
   }
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
@@ -52,7 +52,7 @@ object ConnectionProvider extends Controller with SoapWebService {
       }
     }
 
-  private[controllers] def handleQuery(message: NsiQuery)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = message match {
+  private[controllers] def handleQuery(message: NsiProviderQuery)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = message match {
     case q: QuerySummary =>
       val connectionStates = queryConnections(q.connectionIds)
       connectionStates.onSuccess {
@@ -70,21 +70,21 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private def queryConnections(connectionIds: Seq[ConnectionId]) = {
     val cs = if (connectionIds.isEmpty) connectionManager.all else connectionManager.find(connectionIds)
-    Future.traverse(cs)(c => c ? 'query map (_.asInstanceOf[QuerySummaryResultType]))
+    Future.traverse(cs)(c => (c ? 'query).mapTo[QuerySummaryResultType])
   }
 
-  private[controllers] def handleRequest(request: NsiProviderOperation)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
+  private[controllers] def handleCommand(request: NsiProviderCommand)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
     connectionManager.findOrCreateConnection(request) match {
-      case (_, None) =>
+      case None =>
         Future.successful(ServiceException(request.headers.asReply, NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
-      case (connectionId, Some(connectionActor)) =>
+      case Some(connectionActor) =>
         requesterContinuations.register(request.correlationId).onSuccess {
           case reply => replyTo(reply)
         }
         (connectionActor ? FromRequester(request)).mapTo[NsiAcknowledgement]
     }
 
-  def outboundActor(initialReserve: Reserve) =
+  def outboundActor(initialReserve: InitialReserve) =
     Akka.system.actorOf(Props(new OutboundRoutingActor(ConnectionRequester.nsiRequester, PathComputationEngine.pceRequester, replyToClient(initialReserve.headers))))
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiNotification => Unit) extends Actor {

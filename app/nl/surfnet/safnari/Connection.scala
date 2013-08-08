@@ -6,15 +6,12 @@ import org.ogf.schemas.nsi._2013._07.connection.types._
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 
-class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
+class ConnectionEntity(val id: ConnectionId, initialReserve: InitialReserve, newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri))
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), aggregatorNsa, requesterNSA, None)
 
-  private val criteria: ReservationConfirmCriteriaType = Conversion.invert(initialReserve.body.getCriteria()).fold(error => throw new IllegalArgumentException(s"Bad initial reservation criteria: $error"), identity)
-  private val p2ps: P2PServiceBaseType = criteria.getP2Ps().getOrElse(throw new IllegalArgumentException(s"initial criteria does not contain P2P service: $criteria"))
-
-  val rsm = new ReservationStateMachine(id, initialReserve, criteria, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
+  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
     new GenericFailedType().
       withConnectionId(id).
       withConnectionStates(connectionStates).
@@ -32,7 +29,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
   def process(message: InboundMessage): Option[Seq[OutboundMessage]] = {
     val stateMachine: Option[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
       // RSM messages
-      case FromRequester(_: Reserve)               => Some(rsm)
+      case FromRequester(_: InitialReserve)        => Some(rsm)
       case FromRequester(_: ReserveCommit)         => Some(rsm)
       case FromRequester(_: ReserveAbort)          => Some(rsm)
       case FromProvider(_: ReserveConfirmed)       => Some(rsm)
@@ -86,10 +83,10 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
         withConnectionId(id).
         withProviderNSA(segment.provider.nsa).
         withP2Ps(new P2PServiceBaseType().
-            withCapacity(p2ps.getCapacity()).
-            withDirectionality(p2ps.getDirectionality()).
-            withSymmetricPath(p2ps.isSymmetricPath()).
-            withEro(p2ps.getEro()).
+            withCapacity(initialReserve.service.getCapacity()).
+            withDirectionality(initialReserve.service.getDirectionality()).
+            withSymmetricPath(initialReserve.service.isSymmetricPath()).
+            withEro(initialReserve.service.getEro()).
             withSourceSTP(segment.sourceStp).
             withDestSTP(segment.destinationStp)).
         withOrder(order)
@@ -102,8 +99,10 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: Reserve, newCorrela
       withConnectionId(id).
       withCriteria(new QuerySummaryResultCriteriaType().
         withSchedule(criteria.getSchedule()).
-        withP2Ps(p2ps).
-        withChildren(new ChildSummaryListType().withChild(children.toSeq: _*))).
+        withServiceType(criteria.getServiceType()).
+        withP2Ps(initialReserve.service).
+        withChildren(new ChildSummaryListType().withChild(children.toSeq: _*)).
+        tap(_.getOtherAttributes().putAll(criteria.getOtherAttributes()))).
       withRequesterNSA(requesterNSA).
       withConnectionStates(connectionStates)
   }

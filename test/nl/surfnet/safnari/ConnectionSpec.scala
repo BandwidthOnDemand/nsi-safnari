@@ -15,7 +15,8 @@ import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 class ConnectionSpec extends helpers.Specification {
   trait fixture extends Scope {
 
-    val Criteria = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withP2Ps(new P2PServiceBaseType().withCapacity(100))
+    val Service = new P2PServiceBaseType().withCapacity(100)
+    val Criteria = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withP2Ps(Service)
     val InitialReserveType = new ReserveType().withCriteria(Conversion.convert(Criteria).right.get)
     val A = ComputedSegment(new StpType().withLocalId("A"), new StpType().withLocalId("X"), ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication))
     val B = ComputedSegment(new StpType().withLocalId("X"), new StpType().withLocalId("B"), ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication))
@@ -26,8 +27,8 @@ class ConnectionSpec extends helpers.Specification {
     val CommitCorrelationId = newCorrelationId
 
     val InitialReserveHeaders = Headers.copy(correlationId = ReserveCorrelationId)
-    val InitialReserve = Reserve(InitialReserveHeaders, InitialReserveType)
-    val InitialMessages = Seq(FromRequester(InitialReserve))
+    val InitialReserveMessage = InitialReserve(InitialReserveHeaders, InitialReserveType, Criteria, Service)
+    val InitialMessages = Seq(FromRequester(InitialReserveMessage))
 
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     val NsiReplyToUri = URI.create("http://example.com/nsi/requester")
@@ -37,7 +38,7 @@ class ConnectionSpec extends helpers.Specification {
     def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, provider.nsa, Some(NsiReplyToUri))
     def toRequesterHeaders(correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, "RequesterNSA", None)
 
-    val connection = new ConnectionEntity(ConnectionId, InitialReserve, () => CorrelationId.fromUuid(mockUuidGenerator()), AggregatorNsa, NsiReplyToUri, PceReplyToUri)
+    val connection = new ConnectionEntity(ConnectionId, InitialReserveMessage, () => CorrelationId.fromUuid(mockUuidGenerator()), AggregatorNsa, NsiReplyToUri, PceReplyToUri)
 
     def given(messages: InboundMessage*): Unit = messages.foreach(connection.process)
 
@@ -76,7 +77,7 @@ class ConnectionSpec extends helpers.Specification {
 
   "A connection" should {
     "send a path computation request when reserve is received" in new fixture {
-      when(FromRequester(Reserve(Headers.copy(correlationId = ReserveCorrelationId), InitialReserveType)))
+      when(FromRequester(InitialReserve(Headers.copy(correlationId = ReserveCorrelationId), InitialReserveType, Criteria, Service)))
 
       messages must contain(ToPce(PathComputationRequest(
         correlationId = CorrelationId(0, 1),
@@ -91,8 +92,8 @@ class ConnectionSpec extends helpers.Specification {
 
       messages must haveSize(2)
       messages must haveAllElementsLike {
-        case ToProvider(reserve: Reserve, A.provider) => ok
-        case ToProvider(reserve: Reserve, B.provider) => ok
+        case ToProvider(reserve: InitialReserve, A.provider) => ok
+        case ToProvider(reserve: InitialReserve, B.provider) => ok
       }
     }
 

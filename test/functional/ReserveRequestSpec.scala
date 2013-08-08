@@ -43,7 +43,7 @@ class ReserveRequestSpec extends helpers.Specification {
           Future.successful(ServiceException(response.headers.asReply, new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response")))
       })
       case "/fake/provider" => Some(NsiProviderEndPoint {
-        case reserve: Reserve =>
+        case reserve: InitialReserve =>
           val connectionId = newConnectionId
           reserve.headers.replyTo.foreach { replyTo =>
             WS.url(replyTo.toASCIIString()).post(ReserveConfirmed(reserve.headers.asReply, connectionId, Conversion.invert(reserve.body.getCriteria()).right.get): NsiRequesterOperation)

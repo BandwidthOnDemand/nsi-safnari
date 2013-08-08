@@ -9,6 +9,7 @@ import akka.testkit.TestActorRef
 import akka.pattern.ask
 import akka.actor.Actor
 import java.net.URI
+import org.ogf.schemas.nsi._2013._07.connection.types._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionManagerSpec extends helpers.Specification {
@@ -34,15 +35,14 @@ class ConnectionManagerSpec extends helpers.Specification {
 
   "Connection manager" should {
     "find a created connection" in new Fixture() {
+      val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
+      val data = await(actor ? 'query).asInstanceOf[QuerySummaryResultType]
 
-      val (connectionId, actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
-
-      actor must beSome
-      connectionManager.find(Seq(connectionId)) must beEqualTo(actor.toSeq)
+      connectionManager.get(data.getConnectionId) must beSome(actor)
     }
 
     "add child connection id" in new Fixture() {
-      val (connectionId, Some(actor)) = connectionManager.findOrCreateConnection(initialReserveMessage)
+      val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
 
       await(actor ? FromProvider(reserveConfirmed))
 
@@ -50,7 +50,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     "add child connection id during replay" in new Fixture() {
-      val (connectionId, Some(actor)) = connectionManager.findOrCreateConnection(initialReserveMessage)
+      val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
 
       await(actor ? connectionManager.Replay(Seq(FromProvider(reserveConfirmed))))
 

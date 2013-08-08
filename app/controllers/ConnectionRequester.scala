@@ -47,7 +47,7 @@ object ConnectionRequester extends Controller with SoapWebService {
 
   class DummyNsiRequesterActor extends Actor {
     def receive = {
-      case ToProvider(reserve: Reserve, _) =>
+      case ToProvider(reserve: InitialReserve, _) =>
         sender ! FromProvider(ReserveConfirmed(reserve.headers.asReply, newConnectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
       case ToProvider(commit: ReserveCommit, _) =>
         sender ! FromProvider(ReserveCommitConfirmed(commit.headers.asReply, commit.connectionId))

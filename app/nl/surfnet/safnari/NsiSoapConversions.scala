@@ -35,10 +35,10 @@ object NsiSoapConversions {
 
   implicit val NsiAcknowledgementOperationToDocument: Conversion[NsiAcknowledgement, Document] = NsiMessageToDocumentConversion {
     messageFactories(Map(
-      "acknowledgment" -> NsiMessageFactory[GenericAcknowledgmentType, NsiAcknowledgement]((headers, _) => GenericAck(headers)),
-      "reserveResponse" -> NsiMessageFactory[ReserveResponseType, NsiAcknowledgement]((headers, body) => ReserveResponse(headers, body.getConnectionId())),
-      "serviceException" -> NsiMessageFactory[ServiceExceptionType, NsiAcknowledgement]((headers, body) => ServiceException(headers, body)),
-      "querySummarySyncConfirmed" -> NsiMessageFactory[QuerySummaryConfirmedType, NsiAcknowledgement]((headers, body) => QuerySummarySyncConfirmed(headers, body.getReservation().asScala.to[Vector]))))
+      "acknowledgment" -> NsiMessageFactory[GenericAcknowledgmentType, NsiAcknowledgement]((headers, _) => Right(GenericAck(headers))),
+      "reserveResponse" -> NsiMessageFactory[ReserveResponseType, NsiAcknowledgement]((headers, body) => Right(ReserveResponse(headers, body.getConnectionId()))),
+      "serviceException" -> NsiMessageFactory[ServiceExceptionType, NsiAcknowledgement]((headers, body) => Right(ServiceException(headers, body))),
+      "querySummarySyncConfirmed" -> NsiMessageFactory[QuerySummaryConfirmedType, NsiAcknowledgement]((headers, body) => Right(QuerySummarySyncConfirmed(headers, body.getReservation().asScala.to[Vector])))))
   } {
     case GenericAck(_)                              => typesFactory.createAcknowledgment(new GenericAcknowledgmentType())
     case ReserveResponse(_, connectionId)           => typesFactory.createReserveResponse(new ReserveResponseType().withConnectionId(connectionId))
@@ -48,16 +48,24 @@ object NsiSoapConversions {
 
   implicit val NsiProviderOperationToDocument: Conversion[NsiProviderOperation, Document] = NsiMessageToDocumentConversion {
     messageFactories(Map(
-      "reserve" -> NsiMessageFactory[ReserveType, NsiProviderOperation](Reserve),
-      "reserveCommit" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => ReserveCommit(correlationId, body.getConnectionId())),
-      "reserveAbort" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => ReserveAbort(correlationId, body.getConnectionId())),
-      "provision" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Provision(correlationId, body.getConnectionId())),
-      "release" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Release(correlationId, body.getConnectionId())),
-      "terminate" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Terminate(correlationId, body.getConnectionId())),
-      "querySummary" -> NsiMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => QuerySummary(correlationId, body.getConnectionId().asScala)),
-      "querySummarySync" -> NsiMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => QuerySummarySync(correlationId, body.getConnectionId().asScala))))
+      "reserve" -> NsiMessageFactory[ReserveType, NsiProviderOperation]((correlationId, body) => {
+        if (body.getConnectionId ne null) Left("modify operation is not supported")
+        else for {
+          criteria <- Conversion.invert(body.getCriteria()).right
+          service <- criteria.getP2Ps.toRight("initial reserve is missing P2PService").right
+        } yield {
+          InitialReserve(correlationId, body, criteria, service)
+        }
+      }),
+      "reserveCommit" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(ReserveCommit(correlationId, body.getConnectionId()))),
+      "reserveAbort" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(ReserveAbort(correlationId, body.getConnectionId()))),
+      "provision" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(Provision(correlationId, body.getConnectionId()))),
+      "release" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(Release(correlationId, body.getConnectionId()))),
+      "terminate" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(Terminate(correlationId, body.getConnectionId()))),
+      "querySummary" -> NsiMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => Right(QuerySummary(correlationId, body.getConnectionId().asScala))),
+      "querySummarySync" -> NsiMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => Right(QuerySummarySync(correlationId, body.getConnectionId().asScala)))))
   } {
-    case Reserve(_, body)                   => typesFactory.createReserve(body)
+    case InitialReserve(_, body, _, _)      => typesFactory.createReserve(body)
     case ReserveCommit(_, connectionId)     => typesFactory.createReserveCommit(new GenericRequestType().withConnectionId(connectionId))
     case ReserveAbort(_, connectionId)      => typesFactory.createReserveAbort(new GenericRequestType().withConnectionId(connectionId))
     case Provision(_, connectionId)         => typesFactory.createProvision(new GenericRequestType().withConnectionId(connectionId))
@@ -71,13 +79,13 @@ object NsiSoapConversions {
   implicit val NsiRequesterOperationToDocument: Conversion[NsiRequesterOperation, Document] = NsiMessageToDocumentConversion {
     messageFactories(Map(
       // FIXME this list seems to be incomplete?
-      "reserveConfirmed" -> NsiMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((headers, body) => ReserveConfirmed(headers, body.getConnectionId(), body.getCriteria())),
-      "reserveCommitConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => ReserveCommitConfirmed(headers, body.getConnectionId)),
-      "reserveTimeout" -> NsiMessageFactory[ReserveTimeoutRequestType, NsiRequesterOperation]((headers, body) => ReserveTimeout(headers, body)),
-      "provisionConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => ProvisionConfirmed(headers, body.getConnectionId)),
-      "releaseConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => ReleaseConfirmed(headers, body.getConnectionId)),
-      "terminateConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => TerminateConfirmed(headers, body.getConnectionId)),
-      "dataPlaneStateChange" -> NsiMessageFactory[DataPlaneStateChangeRequestType, NsiRequesterOperation]((headers, body) => DataPlaneStateChange(headers, body.getConnectionId(), body.getDataPlaneStatus(), body.getTimeStamp()))))
+      "reserveConfirmed" -> NsiMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((headers, body) => Right(ReserveConfirmed(headers, body.getConnectionId(), body.getCriteria()))),
+      "reserveCommitConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(ReserveCommitConfirmed(headers, body.getConnectionId))),
+      "reserveTimeout" -> NsiMessageFactory[ReserveTimeoutRequestType, NsiRequesterOperation]((headers, body) => Right(ReserveTimeout(headers, body))),
+      "provisionConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(ProvisionConfirmed(headers, body.getConnectionId))),
+      "releaseConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(ReleaseConfirmed(headers, body.getConnectionId))),
+      "terminateConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(TerminateConfirmed(headers, body.getConnectionId))),
+      "dataPlaneStateChange" -> NsiMessageFactory[DataPlaneStateChangeRequestType, NsiRequesterOperation]((headers, body) => Right(DataPlaneStateChange(headers, body.getConnectionId(), body.getDataPlaneStatus(), body.getTimeStamp())))))
   } {
     case ReserveConfirmed(_, connectionId, criteria)              => typesFactory.createReserveConfirmed(new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria))
     case ReserveFailed(_, failure)                                => typesFactory.createReserveFailed(failure)
@@ -117,13 +125,13 @@ object NsiSoapConversions {
   private trait NsiMessageFactory[T] {
     type JaxbMessage
     def klass: Class[JaxbMessage]
-    def apply(headers: NsiHeaders, body: JaxbMessage): T
+    def apply(headers: NsiHeaders, body: JaxbMessage): Either[String, T]
   }
   private object NsiMessageFactory {
-    def apply[M, T](f: (NsiHeaders, M) => T)(implicit manifest: ClassTag[M]) = new NsiMessageFactory[T] {
+    def apply[M, T](f: (NsiHeaders, M) => Either[String, T])(implicit manifest: ClassTag[M]) = new NsiMessageFactory[T] {
       override type JaxbMessage = M
       override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]
-      override def apply(headers: NsiHeaders, body: M): T = f(headers, body)
+      override def apply(headers: NsiHeaders, body: M) = f(headers, body)
     }
   }
 
@@ -213,8 +221,9 @@ object NsiSoapConversions {
         headers <- Conversion[NsiHeaders, CommonHeaderType].invert(commonHeaderType).right
         messageFactory <- elementToFactory(bodyNode).right
         body <- tryEither(unmarshaller.unmarshal(bodyNode, messageFactory.klass).getValue()).right
+        message <- messageFactory(headers, body).right
       } yield {
-        messageFactory(headers, body)
+        message
       }
     }
   }

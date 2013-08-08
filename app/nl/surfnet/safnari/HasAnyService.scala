@@ -9,6 +9,3 @@ trait HasAnyService[A] {
   def getAny(a: A): Seq[AnyRef]
   def withAny(a: A, any: Seq[AnyRef]): Unit
 }
-object HasAnyService {
-
-}

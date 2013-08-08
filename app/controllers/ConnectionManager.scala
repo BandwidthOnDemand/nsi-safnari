@@ -9,7 +9,7 @@ import scala.concurrent.duration.{ Duration, DurationInt }
 import scala.concurrent.stm._
 import play.Logger
 
-class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef, ConnectionEntity)) {
+class ConnectionManager(connectionFactory: (ConnectionId, InitialReserve) => (ActorRef, ConnectionEntity)) {
   implicit val timeout = Timeout(2.seconds)
 
   private val connections = TMap.empty[ConnectionId, ActorRef]
@@ -33,7 +33,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
   def restore(implicit actorSystem: ActorSystem, executionContext: ExecutionContext) {
     Logger.info("Start replaying of connection messages")
     Await.ready(Future.sequence(for {
-      (connectionId, messages @ (FromRequester(initialReserve: Reserve) +: _)) <- messageStore.loadEverything()
+      (connectionId, messages @ (FromRequester(initialReserve: InitialReserve) +: _)) <- messageStore.loadEverything()
       connection = createConnection(connectionId, initialReserve)
     } yield {
       connection ? Replay(messages)
@@ -42,18 +42,16 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
     Logger.info("Replay completed")
   }
 
-  def findOrCreateConnection(request: NsiProviderOperation)(implicit actorSystem: ActorSystem): (ConnectionId, Option[ActorRef]) = (request, request.optionalConnectionId) match {
-    case (_, Some(connectionId)) =>
-      (connectionId, get(connectionId))
-    case (initialReserve: Reserve, None) =>
+  def findOrCreateConnection(request: NsiProviderCommand)(implicit actorSystem: ActorSystem): Option[ActorRef] = request match {
+    case update: NsiProviderUpdateCommand =>
+      get(update.connectionId)
+    case initialReserve: InitialReserve =>
       val connectionId = newConnectionId
       val connection = createConnection(connectionId, initialReserve)
-      (connectionId, Some(connection))
-    case _ =>
-      sys.error("illegal initial message")
+      Some(connection)
   }
 
-  private def createConnection(connectionId: ConnectionId, initialReserve: Reserve)(implicit actorSystem: ActorSystem): ActorRef = {
+  private def createConnection(connectionId: ConnectionId, initialReserve: InitialReserve)(implicit actorSystem: ActorSystem): ActorRef = {
     val (output, connection) = connectionFactory(connectionId, initialReserve)
 
     val storingActor = actorSystem.actorOf(Props(new ConnectionActor(connection, output)))
@@ -81,10 +79,10 @@ class ConnectionManager(connectionFactory: (ConnectionId, Reserve) => (ActorRef,
             outbound.foreach(output ! _)
 
             inbound match {
-              case FromRequester(reserve: Reserve) => ReserveResponse(reserve.headers.asReply, connection.id)
-              case FromRequester(request)          => request.ack
-              case FromProvider(request)           => request.ack
-              case FromPce(request)                => 200
+              case FromRequester(reserve: InitialReserve) => ReserveResponse(reserve.headers.asReply, connection.id)
+              case FromRequester(request)                 => request.ack
+              case FromProvider(request)                  => request.ack
+              case FromPce(request)                       => 200
             }
         }
 
