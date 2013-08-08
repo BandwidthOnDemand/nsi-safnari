@@ -14,7 +14,7 @@ object NsiMessageSpec {
     withDestSTP(new StpType().withNetworkId("networkId").withLocalId("dest-localId"))
   val Criteria = new ReservationRequestCriteriaType().
     withSchedule(new ScheduleType()).
-    withP2Ps(Service)
+    withPointToPointService(Service)
 
   val ConfirmCriteria = Conversion.invert(Criteria).right.get
 

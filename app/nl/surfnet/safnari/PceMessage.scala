@@ -16,7 +16,7 @@ sealed trait PceMessage {
   def correlationId: CorrelationId
 }
 sealed trait PceRequest extends PceMessage
-case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, criteria: ReservationConfirmCriteriaType) extends PceRequest
+case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, schedule: ScheduleType, service: P2PServiceBaseType) extends PceRequest
 
 sealed trait PceResponse extends PceMessage
 case class PathComputationFailed(correlationId: CorrelationId, message: String) extends PceResponse
@@ -119,21 +119,16 @@ object PceMessage {
     (__ \ "correlation-id").format[CorrelationId] and
     (__ \ "algorithm").format[Option[String]] and
     (__ \ "constraints").format[Seq[String]])((source, destination, start, end, bandwidth, replyTo, correlationId, algorithm, constraints) => {
-      val criteria = new ReservationConfirmCriteriaType().
-        withP2Ps(new P2PServiceBaseType().
-            withCapacity(bandwidth).
-            withSourceSTP(source).
-            withDestSTP(destination)).
-        withSchedule(new ScheduleType().withStartTime(start.orNull).withEndTime(end.orNull))
-      PathComputationRequest(correlationId, replyTo, criteria)
+      val service = new P2PServiceBaseType().withCapacity(bandwidth).withSourceSTP(source).withDestSTP(destination)
+      val schedule = new ScheduleType().withStartTime(start.orNull).withEndTime(end.orNull)
+      PathComputationRequest(correlationId, replyTo, schedule, service)
     }, {
-      case PathComputationRequest(correlationId, replyTo, criteria) =>
-        val p2ps = criteria.getP2Ps().getOrElse(throw new RuntimeException("reservation request does not contain P2PS element"))
-        (p2ps.getSourceSTP(),
-          p2ps.getDestSTP(),
-          Option(criteria.getSchedule().getStartTime()),
-          Option(criteria.getSchedule().getEndTime()),
-          p2ps.getCapacity(),
+      case PathComputationRequest(correlationId, replyTo, schedule, service) =>
+        (service.getSourceSTP(),
+          service.getDestSTP(),
+          Option(schedule.getStartTime()),
+          Option(schedule.getEndTime()),
+          service.getCapacity(),
           replyTo,
           correlationId,
           None,

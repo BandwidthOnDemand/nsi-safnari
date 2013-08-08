@@ -75,8 +75,8 @@ package object safnari {
   private object JaxbElement {
     def unapply[A](element: JAXBElement[A]): Option[(QName, A)] = Some((element.getName(), element.getValue()))
   }
-  implicit class HasAnyServiceOps[A: HasAnyService](a: A) {
-    def withP2Ps(service: P2PServiceBaseType): A = {
+  implicit class XmlPointToPointServiceOps[A: HasXmlAny](a: A) {
+    def withPointToPointService(service: P2PServiceBaseType): A = {
       val element = service match {
         case evts: EthernetVlanType   => PointToPointObjectFactory.createEvts(evts)
         case ets: EthernetBaseType    => PointToPointObjectFactory.createEts(ets)
@@ -84,12 +84,12 @@ package object safnari {
       }
 
       // FIXME replace if already exists?
-      implicitly[HasAnyService[A]].withAny(a, Seq(element))
+      HasXmlAny[A].setAny(a, Seq(element))
 
       a
     }
 
-    def getP2Ps(): Option[P2PServiceBaseType] = implicitly[HasAnyService[A]].getAny(a).collectFirst {
+    def getPointToPointService(): Option[P2PServiceBaseType] = HasXmlAny[A].getAny(a).collectFirst {
       case JaxbElement(EVTS_QNAME, evts: EthernetVlanType)   => evts
       case JaxbElement(ETS_QNAME, ets: EthernetBaseType)     => ets
       case JaxbElement(P2PS_QNAME, p2ps: P2PServiceBaseType) => p2ps

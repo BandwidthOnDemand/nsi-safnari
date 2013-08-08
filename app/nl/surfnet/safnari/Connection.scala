@@ -82,7 +82,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: InitialReserve, new
       case ((id, segment), order) => new ChildSummaryType().
         withConnectionId(id).
         withProviderNSA(segment.provider.nsa).
-        withP2Ps(new P2PServiceBaseType().
+        withPointToPointService(new P2PServiceBaseType().
             withCapacity(initialReserve.service.getCapacity()).
             withDirectionality(initialReserve.service.getDirectionality()).
             withSymmetricPath(initialReserve.service.isSymmetricPath()).
@@ -100,7 +100,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: InitialReserve, new
       withCriteria(new QuerySummaryResultCriteriaType().
         withSchedule(criteria.getSchedule()).
         withServiceType(criteria.getServiceType()).
-        withP2Ps(initialReserve.service).
+        withPointToPointService(initialReserve.service).
         withChildren(new ChildSummaryListType().withChild(children.toSeq: _*)).
         tap(_.getOtherAttributes().putAll(criteria.getOtherAttributes()))).
       withRequesterNSA(requesterNSA).

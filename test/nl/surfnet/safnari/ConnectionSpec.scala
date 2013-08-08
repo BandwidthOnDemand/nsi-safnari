@@ -16,7 +16,8 @@ class ConnectionSpec extends helpers.Specification {
   trait fixture extends Scope {
 
     val Service = new P2PServiceBaseType().withCapacity(100)
-    val Criteria = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType()).withP2Ps(Service)
+    val Schedule = new ScheduleType()
+    val Criteria = new ReservationConfirmCriteriaType().withSchedule(Schedule).withPointToPointService(Service)
     val InitialReserveType = new ReserveType().withCriteria(Conversion.convert(Criteria).right.get)
     val A = ComputedSegment(new StpType().withLocalId("A"), new StpType().withLocalId("X"), ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication))
     val B = ComputedSegment(new StpType().withLocalId("X"), new StpType().withLocalId("B"), ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication))
@@ -82,7 +83,8 @@ class ConnectionSpec extends helpers.Specification {
       messages must contain(ToPce(PathComputationRequest(
         correlationId = CorrelationId(0, 1),
         replyTo = PceReplyToUri,
-        criteria = Criteria)))
+        schedule = Schedule,
+        service = Service)))
     }
 
     "send reserve request for each segment when path computation confirmed is received" in new fixture {

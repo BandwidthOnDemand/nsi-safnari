@@ -12,13 +12,12 @@ object PceMessageSpec {
   val sourceStp = new StpType().withNetworkId("network-id").withLocalId("source")
 
   val destStp = new StpType().withNetworkId("network-id").withLocalId("dest")
-
-  val criteria = new ReservationConfirmCriteriaType().
-    withSchedule(new ScheduleType()).withP2Ps(new P2PServiceBaseType().withCapacity(100).withSourceSTP(sourceStp).withDestSTP(destStp))
+  val Service = new P2PServiceBaseType().withCapacity(100).withSourceSTP(sourceStp).withDestSTP(destStp)
+  val Schedule = new ScheduleType()
 
   val correlationId = newCorrelationId
 
-  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), criteria)
+  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, Service)
 
   val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication)
   val computedSegment = ComputedSegment(sourceStp, destStp, providerEndPoint)
@@ -34,7 +33,7 @@ class PceMessageSpec extends helpers.Specification {
     import nl.surfnet.safnari.PceMessage._
 
     "serialize request to json" in {
-      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), criteria)
+      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, Service)
 
       val json = Json.toJson(request)
 

@@ -52,7 +52,7 @@ object NsiSoapConversions {
         if (body.getConnectionId ne null) Left("modify operation is not supported")
         else for {
           criteria <- Conversion.invert(body.getCriteria()).right
-          service <- criteria.getP2Ps.toRight("initial reserve is missing P2PService").right
+          service <- criteria.getPointToPointService().toRight("initial reserve is missing point2point service").right
         } yield {
           InitialReserve(correlationId, body, criteria, service)
         }

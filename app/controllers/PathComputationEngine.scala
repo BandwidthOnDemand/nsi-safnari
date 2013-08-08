@@ -51,18 +51,16 @@ object PathComputationEngine extends Controller {
   class DummyPceRequesterActor extends Actor {
     def receive = {
       case ToPce(pce: PathComputationRequest) =>
-        val p2ps = pce.criteria.getP2Ps().getOrElse(throw new IllegalArgumentException(s"P2P service is missing: ${pce.criteria}"))
         sender !
           FromPce(PathComputationConfirmed(
             pce.correlationId,
             Seq(ComputedSegment(
-              p2ps.getSourceSTP,
-              p2ps.getDestSTP(),
+              pce.service.getSourceSTP,
+              pce.service.getDestSTP(),
               ProviderEndPoint(
                 "urn:ogf:network:nsa:surfnet.nl",
                 URI.create("http://localhost:8082/bod/nsi/v2/provider"),
                 OAuthAuthentication("4e54d76e-8767-4e6d-95a8-e2b7387e53bb"))))))
     }
   }
-
 }

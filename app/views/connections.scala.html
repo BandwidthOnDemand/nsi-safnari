@@ -35,9 +35,9 @@
                                                 <dt>Start</dt>
                                                 <dd>@nullable(connection.getCriteria().head.getSchedule().getStartTime())</dd>
                                                 <dt>Source</dt>
-                                                <dd>@stp(connection.getCriteria().head.getP2Ps().get.getSourceSTP())</dd>
+                                                <dd>@connection.getCriteria().head.getPointToPointService().map(_.getSourceSTP()).map(stp).getOrElse("unknown")</dd>
                                                 <dt>Bandwidth</dt>
-                                                <dd>@connection.getCriteria().head.getP2Ps().get.getCapacity()</dd>
+                                                <dd>@connection.getCriteria().head.getPointToPointService().map(_.getCapacity()).getOrElse("unknown")</dd>
                                                 <dt>Global id</dt>
                                                 <dd>@nullable(connection.getGlobalReservationId())</dd>
                                             </dl>
@@ -47,7 +47,7 @@
                                                 <dt>End</dt>
                                                 <dd>@nullable(connection.getCriteria().head.getSchedule().getEndTime())</dd>
                                                 <dt>Destination</dt>
-                                                <dd>@stp(connection.getCriteria().head.getP2Ps().get.getDestSTP())</dd>
+                                                <dd>@connection.getCriteria().head.getPointToPointService().map(_.getDestSTP()).map(stp).getOrElse("unknown")</dd>
                                                 <dt>Version</dt>
                                                 <dd>@connection.getCriteria().head.getVersion()</dd>
                                                 <dt>Requester</dt>
