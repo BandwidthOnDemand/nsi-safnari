@@ -34,11 +34,11 @@ object NsiSoapConversions {
   private val SchemaPackages = Seq(typesFactory, headersFactory, pointToPointServiceFactory).map(_.getClass().getPackage().getName())
 
   implicit val NsiAcknowledgementOperationToDocument: Conversion[NsiAcknowledgement, Document] = NsiMessageToDocumentConversion {
-    messageFactories(Map(
-      "acknowledgment" -> NsiMessageFactory[GenericAcknowledgmentType, NsiAcknowledgement]((headers, _) => Right(GenericAck(headers))),
-      "reserveResponse" -> NsiMessageFactory[ReserveResponseType, NsiAcknowledgement]((headers, body) => Right(ReserveResponse(headers, body.getConnectionId()))),
-      "serviceException" -> NsiMessageFactory[ServiceExceptionType, NsiAcknowledgement]((headers, body) => Right(ServiceException(headers, body))),
-      "querySummarySyncConfirmed" -> NsiMessageFactory[QuerySummaryConfirmedType, NsiAcknowledgement]((headers, body) => Right(QuerySummarySyncConfirmed(headers, body.getReservation().asScala.to[Vector])))))
+    messageFactories(Map[String, NsiMessageParser[NsiAcknowledgement]](
+      "acknowledgment" -> NsiMessageParser { (headers, body: GenericAcknowledgmentType) => Right(GenericAck(headers)) },
+      "reserveResponse" -> NsiMessageParser { (headers, body: ReserveResponseType) => Right(ReserveResponse(headers, body.getConnectionId())) },
+      "serviceException" -> NsiMessageParser { (headers, body: ServiceExceptionType) => Right(ServiceException(headers, body)) },
+      "querySummarySyncConfirmed" -> NsiMessageParser { (headers, body: QuerySummaryConfirmedType) => Right(QuerySummarySyncConfirmed(headers, body.getReservation().asScala.to[Vector])) }))
   } {
     case GenericAck(_)                              => typesFactory.createAcknowledgment(new GenericAcknowledgmentType())
     case ReserveResponse(_, connectionId)           => typesFactory.createReserveResponse(new ReserveResponseType().withConnectionId(connectionId))
@@ -47,23 +47,23 @@ object NsiSoapConversions {
   }
 
   implicit val NsiProviderOperationToDocument: Conversion[NsiProviderOperation, Document] = NsiMessageToDocumentConversion {
-    messageFactories(Map(
-      "reserve" -> NsiMessageFactory[ReserveType, NsiProviderOperation]((correlationId, body) => {
+    messageFactories(Map[String, NsiMessageParser[NsiProviderOperation]](
+      "reserve" -> NsiMessageParser { (headers, body: ReserveType) =>
         if (body.getConnectionId ne null) Left("modify operation is not supported")
         else for {
           criteria <- Conversion.invert(body.getCriteria()).right
           service <- criteria.getPointToPointService().toRight("initial reserve is missing point2point service").right
         } yield {
-          InitialReserve(correlationId, body, criteria, service)
+          InitialReserve(headers, body, criteria, service)
         }
-      }),
-      "reserveCommit" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(ReserveCommit(correlationId, body.getConnectionId()))),
-      "reserveAbort" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(ReserveAbort(correlationId, body.getConnectionId()))),
-      "provision" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(Provision(correlationId, body.getConnectionId()))),
-      "release" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(Release(correlationId, body.getConnectionId()))),
-      "terminate" -> NsiMessageFactory[GenericRequestType, NsiProviderOperation]((correlationId, body) => Right(Terminate(correlationId, body.getConnectionId()))),
-      "querySummary" -> NsiMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => Right(QuerySummary(correlationId, body.getConnectionId().asScala))),
-      "querySummarySync" -> NsiMessageFactory[QueryType, NsiProviderOperation]((correlationId, body) => Right(QuerySummarySync(correlationId, body.getConnectionId().asScala)))))
+      },
+      "reserveCommit" -> NsiMessageParser { (headers, body: GenericRequestType) => Right(ReserveCommit(headers, body.getConnectionId())) },
+      "reserveAbort" -> NsiMessageParser { (headers, body: GenericRequestType) => Right(ReserveAbort(headers, body.getConnectionId())) },
+      "provision" -> NsiMessageParser { (headers, body: GenericRequestType) => Right(Provision(headers, body.getConnectionId())) },
+      "release" -> NsiMessageParser { (headers, body: GenericRequestType) => Right(Release(headers, body.getConnectionId())) },
+      "terminate" -> NsiMessageParser { (headers, body: GenericRequestType) => Right(Terminate(headers, body.getConnectionId())) },
+      "querySummary" -> NsiMessageParser { (headers, body: QueryType) => Right(QuerySummary(headers, body.getConnectionId().asScala)) },
+      "querySummarySync" -> NsiMessageParser { (headers, body: QueryType) => Right(QuerySummarySync(headers, body.getConnectionId().asScala)) }))
   } {
     case InitialReserve(_, body, _, _)      => typesFactory.createReserve(body)
     case ReserveCommit(_, connectionId)     => typesFactory.createReserveCommit(new GenericRequestType().withConnectionId(connectionId))
@@ -77,15 +77,15 @@ object NsiSoapConversions {
   }
 
   implicit val NsiRequesterOperationToDocument: Conversion[NsiRequesterOperation, Document] = NsiMessageToDocumentConversion {
-    messageFactories(Map(
+    messageFactories(Map[String, NsiMessageParser[NsiRequesterOperation]](
       // FIXME this list seems to be incomplete?
-      "reserveConfirmed" -> NsiMessageFactory[ReserveConfirmedType, NsiRequesterOperation]((headers, body) => Right(ReserveConfirmed(headers, body.getConnectionId(), body.getCriteria()))),
-      "reserveCommitConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(ReserveCommitConfirmed(headers, body.getConnectionId))),
-      "reserveTimeout" -> NsiMessageFactory[ReserveTimeoutRequestType, NsiRequesterOperation]((headers, body) => Right(ReserveTimeout(headers, body))),
-      "provisionConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(ProvisionConfirmed(headers, body.getConnectionId))),
-      "releaseConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(ReleaseConfirmed(headers, body.getConnectionId))),
-      "terminateConfirmed" -> NsiMessageFactory[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(TerminateConfirmed(headers, body.getConnectionId))),
-      "dataPlaneStateChange" -> NsiMessageFactory[DataPlaneStateChangeRequestType, NsiRequesterOperation]((headers, body) => Right(DataPlaneStateChange(headers, body.getConnectionId(), body.getDataPlaneStatus(), body.getTimeStamp())))))
+      "reserveConfirmed" -> NsiMessageParser { (headers, body: ReserveConfirmedType) => Right(ReserveConfirmed(headers, body.getConnectionId(), body.getCriteria())) },
+      "reserveCommitConfirmed" -> NsiMessageParser[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(ReserveCommitConfirmed(headers, body.getConnectionId))),
+      "reserveTimeout" -> NsiMessageParser[ReserveTimeoutRequestType, NsiRequesterOperation]((headers, body) => Right(ReserveTimeout(headers, body))),
+      "provisionConfirmed" -> NsiMessageParser[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(ProvisionConfirmed(headers, body.getConnectionId))),
+      "releaseConfirmed" -> NsiMessageParser[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(ReleaseConfirmed(headers, body.getConnectionId))),
+      "terminateConfirmed" -> NsiMessageParser[GenericConfirmedType, NsiRequesterOperation]((headers, body) => Right(TerminateConfirmed(headers, body.getConnectionId))),
+      "dataPlaneStateChange" -> NsiMessageParser[DataPlaneStateChangeRequestType, NsiRequesterOperation]((headers, body) => Right(DataPlaneStateChange(headers, body.getConnectionId(), body.getDataPlaneStatus(), body.getTimeStamp())))))
   } {
     case ReserveConfirmed(_, connectionId, criteria)              => typesFactory.createReserveConfirmed(new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria))
     case ReserveFailed(_, failure)                                => typesFactory.createReserveFailed(failure)
@@ -122,20 +122,24 @@ object NsiSoapConversions {
     }
   }
 
-  private trait NsiMessageFactory[T] {
-    type JaxbMessage
-    def klass: Class[JaxbMessage]
-    def apply(headers: NsiHeaders, body: JaxbMessage): Either[String, T]
+  private trait NsiMessageParser[T] {
+    def apply(headerNode: Element, bodyNode: Element): Either[String, T]
   }
-  private object NsiMessageFactory {
-    def apply[M, T](f: (NsiHeaders, M) => Either[String, T])(implicit manifest: ClassTag[M]) = new NsiMessageFactory[T] {
-      override type JaxbMessage = M
-      override def klass = manifest.runtimeClass.asInstanceOf[Class[M]]
-      override def apply(headers: NsiHeaders, body: M) = f(headers, body)
+  private object NsiMessageParser {
+    def apply[M, T](f: (NsiHeaders, M) => Either[String, T])(implicit manifest: ClassTag[M]) = new NsiMessageParser[T] {
+      override def apply(headerNode: Element, bodyNode: Element) = {
+        val unmarshaller = jaxbContext.createUnmarshaller()
+        for {
+          commonHeaderType <- tryEither(unmarshaller.unmarshal(headerNode, classOf[CommonHeaderType]).getValue).right
+          header <- Conversion[NsiHeaders, CommonHeaderType].invert(commonHeaderType).right
+          body <- tryEither(unmarshaller.unmarshal(bodyNode, manifest.runtimeClass.asInstanceOf[Class[M]]).getValue).right
+          message <- f(header, body).right
+        } yield message
+      }
     }
   }
 
-  private def messageFactories[T <: NsiMessage](factories: Map[String, NsiMessageFactory[T]])(bodyNode: Element): Either[String, NsiMessageFactory[T]] =
+  private def messageFactories[T <: NsiMessage](factories: Map[String, NsiMessageParser[T]])(bodyNode: Element): Either[String, NsiMessageParser[T]] =
     factories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName}'")
 
   private val SoapNamespaceUri = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -186,7 +190,7 @@ object NsiSoapConversions {
 
   val jaxbContext = JAXBContext.newInstance(SchemaPackages.mkString(":"))
 
-  def NsiMessageToDocumentConversion[T <: NsiMessage](elementToFactory: Element => Either[String, NsiMessageFactory[T]])(messageToJaxb: T => JAXBElement[_]): Conversion[T, Document] = {
+  private def NsiMessageToDocumentConversion[T <: NsiMessage](elementToFactory: Element => Either[String, NsiMessageParser[T]])(messageToJaxb: T => JAXBElement[_]): Conversion[T, Document] = {
     Conversion.build[T, Document] { message =>
       tryEither {
         val document = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
@@ -210,18 +214,14 @@ object NsiSoapConversions {
         document
       }
     } { document =>
-      val unmarshaller = jaxbContext.createUnmarshaller()
       for {
         soapEnvelope <- Option(document.getDocumentElement).toRight("missing document root").right
         soapHeader <- onlyChildElementWithNamespaceAndLocalName(SoapNamespaceUri, "Header", soapEnvelope).right
         headerNode <- onlyChildElementWithNamespaceAndLocalName(NsiFrameworkHeaderNamespace, "nsiHeader", soapHeader).right
         soapBody <- onlyChildElementWithNamespaceAndLocalName(SoapNamespaceUri, "Body", soapEnvelope).right
         bodyNode <- onlyChildElementWithNamespace(NsiConnectionTypesNamespace, soapBody).right
-        commonHeaderType <- tryEither(unmarshaller.unmarshal(headerNode, classOf[CommonHeaderType]).getValue()).right
-        headers <- Conversion[NsiHeaders, CommonHeaderType].invert(commonHeaderType).right
         messageFactory <- elementToFactory(bodyNode).right
-        body <- tryEither(unmarshaller.unmarshal(bodyNode, messageFactory.klass).getValue()).right
-        message <- messageFactory(headers, body).right
+        message <- messageFactory.apply(headerNode, bodyNode).right
       } yield {
         message
       }

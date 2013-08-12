@@ -65,7 +65,8 @@ object ConnectionProvider extends Controller with SoapWebService {
       connectionStates map { states =>
         QuerySummarySyncConfirmed(q.headers.asReply, states)
       }
-    case q => ???
+    case q: QueryRecursive =>
+      ???
   }
 
   private def queryConnections(connectionIds: Seq[ConnectionId]) = {
