@@ -58,7 +58,7 @@ class ReserveRequestSpec extends helpers.Specification {
           val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
             case JsSuccess(request: PathComputationRequest, _) =>
-              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(request.service.getSourceSTP(), request.service.getDestSTP(), ProviderEndPoint("provider-nsa", URI.create(FakeProviderUri), NoAuthentication)) :: Nil)
+              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(request.service, ProviderEndPoint("provider-nsa", URI.create(FakeProviderUri), NoAuthentication)) :: Nil)
               WS.url(request.replyTo.toASCIIString()).post(Json.toJson(response))
               Results.Ok
             case _ =>

@@ -29,7 +29,7 @@ case class OAuthAuthentication(token: String) extends ProviderAuthentication
 
 case class ProviderEndPoint(nsa: String, url: URI, authentication: ProviderAuthentication)
 
-case class ComputedSegment(sourceStp: StpType, destinationStp: StpType, provider: ProviderEndPoint)
+case class ComputedSegment(service: P2PServiceBaseType, provider: ProviderEndPoint)
 
 object PceMessage {
   private implicit class JsResultOps[A](js: JsResult[A]) {
@@ -75,9 +75,16 @@ object PceMessage {
     (__ \ "provider-url").format[URI] and
     (__ \ "auth").format[ProviderAuthentication])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply))
 
-  implicit val ComputedSegmentFormat: Format[ComputedSegment] = (
+  // FIXME handle ets and evts
+  implicit val PointToPointServiceFormat: OFormat[P2PServiceBaseType] = (
+    (__ \ "capacity").format[Long] and
     (__ \ "source-stp").format[StpType] and
-    (__ \ "destination-stp").format[StpType] and
+    (__ \ "destination-stp").format[StpType]
+  )((capacity, source, dest) => new P2PServiceBaseType().withCapacity(capacity).withSourceSTP(source).withDestSTP(dest),
+    p2p => (p2p.getCapacity(), p2p.getSourceSTP(), p2p.getDestSTP()))
+
+  implicit val ComputedSegmentFormat: Format[ComputedSegment] = (
+    PointToPointServiceFormat and
     ProviderEndPointFormat)(ComputedSegment.apply, unlift(ComputedSegment.unapply))
 
   implicit val PceResponseReads: Reads[PceResponse] = Reads { json =>

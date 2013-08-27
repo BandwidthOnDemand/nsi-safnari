@@ -82,13 +82,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: InitialReserve, new
       case ((id, segment), order) => new ChildSummaryType().
         withConnectionId(id).
         withProviderNSA(segment.provider.nsa).
-        withPointToPointService(new P2PServiceBaseType().
-            withCapacity(initialReserve.service.getCapacity()).
-            withDirectionality(initialReserve.service.getDirectionality()).
-            withSymmetricPath(initialReserve.service.isSymmetricPath()).
-            withEro(initialReserve.service.getEro()).
-            withSourceSTP(segment.sourceStp).
-            withDestSTP(segment.destinationStp)).
+        withPointToPointService(segment.service).
         withOrder(order)
     }
 

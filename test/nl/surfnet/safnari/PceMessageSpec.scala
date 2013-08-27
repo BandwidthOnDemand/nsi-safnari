@@ -20,7 +20,7 @@ object PceMessageSpec {
   val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, Service)
 
   val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication)
-  val computedSegment = ComputedSegment(sourceStp, destStp, providerEndPoint)
+  val computedSegment = ComputedSegment(Service, providerEndPoint)
   val pathComputationResponse = PathComputationConfirmed(correlationId, Seq(computedSegment))
 }
 
@@ -51,7 +51,7 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "serialize computation confirmed response to json" in {
-      val response = PathComputationConfirmed(correlationId, List(ComputedSegment(sourceStp, destStp, providerEndPoint)))
+      val response = PathComputationConfirmed(correlationId, List(ComputedSegment(Service, providerEndPoint)))
 
       val json = Json.toJson[PceResponse](response)
 
@@ -81,6 +81,7 @@ class PceMessageSpec extends helpers.Specification {
         |"status":"SUCCESS",
         |"message":"all good!",
         |"path":[{
+        |"capacity":100,
         |"source-stp":{"network-id":"urn:ogf:network:stp:surfnet.nl","local-id":"15"},
         |"destination-stp":{"network-id":"urn:ogf:network:stp:surfnet.nl","local-id":"18"},
         |"nsa":"urn:ogf:network:nsa:surfnet.nl",
@@ -91,8 +92,10 @@ class PceMessageSpec extends helpers.Specification {
       val output = PathComputationConfirmed(
         CorrelationId.fromString("urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02").get,
         ComputedSegment(
-          new StpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("15"),
-          new StpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("18"),
+          new P2PServiceBaseType().
+            withCapacity(100).
+            withSourceSTP(new StpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("15")).
+            withDestSTP(new StpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("18")),
           ProviderEndPoint("urn:ogf:network:nsa:surfnet.nl",
           URI.create("http://localhost:8082/bod/v2/provider"),
           OAuthAuthentication("f44b1e47-0a19-4c11-861b-c9abf82d4cbf"))) :: Nil)

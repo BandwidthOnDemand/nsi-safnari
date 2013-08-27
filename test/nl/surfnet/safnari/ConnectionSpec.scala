@@ -15,12 +15,16 @@ import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 class ConnectionSpec extends helpers.Specification {
   trait fixture extends Scope {
 
-    val Service = new P2PServiceBaseType().withCapacity(100)
+    val Service = new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("A")).withDestSTP(new StpType().withLocalId("B"))
     val Schedule = new ScheduleType()
     val Criteria = new ReservationConfirmCriteriaType().withSchedule(Schedule).withPointToPointService(Service)
     val InitialReserveType = new ReserveType().withCriteria(Conversion.convert(Criteria).right.get)
-    val A = ComputedSegment(new StpType().withLocalId("A"), new StpType().withLocalId("X"), ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication))
-    val B = ComputedSegment(new StpType().withLocalId("X"), new StpType().withLocalId("B"), ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication))
+    val A = ComputedSegment(
+        new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("A")).withDestSTP(new StpType().withLocalId("X")),
+        ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication))
+    val B = ComputedSegment(
+        new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("X")).withDestSTP(new StpType().withLocalId("B")),
+        ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication))
 
     val Headers = NsiHeaders(newCorrelationId, "RequesterNSA", "ProviderNSA", Some(URI.create("http://example.com/")))
     val ConnectionId = "ConnectionId"

@@ -161,13 +161,7 @@ class ReservationStateMachine(
       val data = nextStateData
       data.segments.map {
         case (correlationId, segment) =>
-          val service = new P2PServiceBaseType().
-            withCapacity(initialReserve.service.getCapacity()).
-            withDirectionality(initialReserve.service.getDirectionality()).
-            withSymmetricPath(initialReserve.service.isSymmetricPath()).
-            withEro(initialReserve.service.getEro()).
-            withSourceSTP(segment.sourceStp).
-            withDestSTP(segment.destinationStp)
+          val service = segment.service
           val criteria = new ReservationRequestCriteriaType().
             withPointToPointService(service).
             withSchedule(data.criteria.getSchedule()).
