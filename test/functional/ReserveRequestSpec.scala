@@ -37,18 +37,18 @@ class ReserveRequestSpec extends helpers.Specification {
       case "/fake/requester" => Some(NsiRequesterEndPoint {
         case confirm: ReserveConfirmed =>
           reserveConfirmed.success(confirm)
-          Future.successful(GenericAck(confirm.headers.asReply))
+          Future.successful(GenericAck(confirm.headers.forSyncAck))
         case response =>
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
-          Future.successful(ServiceException(response.headers.asReply, new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response")))
+          Future.successful(ServiceException(response.headers.forSyncAck, new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response")))
       })
       case "/fake/provider" => Some(NsiProviderEndPoint {
         case reserve: InitialReserve =>
           val connectionId = newConnectionId
           reserve.headers.replyTo.foreach { replyTo =>
-            WS.url(replyTo.toASCIIString()).post(ReserveConfirmed(reserve.headers.asReply, connectionId, Conversion.invert(reserve.body.getCriteria()).right.get): NsiRequesterOperation)
+            WS.url(replyTo.toASCIIString()).post(ReserveConfirmed(reserve.headers.forAsyncReply, connectionId, Conversion.invert(reserve.body.getCriteria()).right.get): NsiRequesterOperation)
           }
-          Future.successful(ReserveResponse(reserve.headers.asReply, connectionId))
+          Future.successful(ReserveResponse(reserve.headers.forSyncAck, connectionId))
         case wtf =>
           wtf.pp
           ???

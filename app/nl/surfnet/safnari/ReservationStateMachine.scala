@@ -60,7 +60,7 @@ case class ReservationStateMachineData(
 
   def startProcessingNewCommand(commandHeaders: NsiHeaders, transitionalState: ReservationState) =
     copy(
-      commandReplyHeaders = commandHeaders.asReply,
+      commandReplyHeaders = commandHeaders.forAsyncReply,
       childConnectionStates = childConnectionStates.map { _._1 -> transitionalState },
       childExceptions = Map.empty)
 
@@ -82,7 +82,7 @@ class ReservationStateMachine(
   extends FiniteStateMachine[ReservationState, ReservationStateMachineData, InboundMessage, OutboundMessage](
     InitialReservationState,
     ReservationStateMachineData(
-      initialReserve.headers.asReply,
+      initialReserve.headers.forAsyncReply,
       Option(initialReserve.body.getGlobalReservationId()),
       Option(initialReserve.body.getDescription()),
       initialReserve.criteria)) {

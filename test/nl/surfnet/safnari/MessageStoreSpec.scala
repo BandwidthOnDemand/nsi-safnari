@@ -49,7 +49,7 @@ class MessageStoreSpec extends helpers.Specification {
 
     "store a fromProvider NSI message" in new WithApplication(Application) {
       val aggregatedConnectionId = newConnectionId
-      val message = ReserveConfirmed(NsiMessageSpec.headers(newCorrelationId), newConnectionId, NsiMessageSpec.ConfirmCriteria)
+      val message = ReserveConfirmed(NsiMessageSpec.headers(newCorrelationId, NsiHeaders.RequesterProtocolVersion), newConnectionId, NsiMessageSpec.ConfirmCriteria)
 
       messageStore.store(aggregatedConnectionId, FromProvider(message)) must not(beNull)
 

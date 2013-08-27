@@ -79,7 +79,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, InitialReserve) => (Ac
             outbound.foreach(output ! _)
 
             inbound match {
-              case FromRequester(reserve: InitialReserve) => ReserveResponse(reserve.headers.asReply, connection.id)
+              case FromRequester(reserve: InitialReserve) => ReserveResponse(reserve.headers.forSyncAck, connection.id)
               case FromRequester(request)                 => request.ack
               case FromProvider(request)                  => request.ack
               case FromPce(request)                       => 200
@@ -109,8 +109,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, InitialReserve) => (Ac
     }
 
     private def messageNotApplicable(message: InboundMessage) = message match {
-      case FromRequester(message) => ServiceException(message.headers.asReply, NsiError.InvalidState.toServiceException("NSA-ID"))
-      case FromProvider(message)  => ServiceException(message.headers.asReply, NsiError.InvalidState.toServiceException("NSA-ID"))
+      case FromRequester(message) => ServiceException(message.headers.forSyncAck, NsiError.InvalidState.toServiceException("NSA-ID"))
+      case FromProvider(message)  => ServiceException(message.headers.forSyncAck, NsiError.InvalidState.toServiceException("NSA-ID"))
       case FromPce(message)       => 400
     }
   }

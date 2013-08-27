@@ -33,7 +33,7 @@ class ConnectionProviderSpec extends helpers.Specification {
           op.correlationId must beEqualTo(CorrelationId)
 
           val queryResult = Promise[NsiRequesterOperation]
-          await(ConnectionProvider.handleQuery(QuerySummary(headers(newCorrelationId), Seq(op.connectionId))) { queryResult.success(_) })
+          await(ConnectionProvider.handleQuery(QuerySummary(headers(newCorrelationId, NsiHeaders.ProviderProtocolVersion), Seq(op.connectionId))) { queryResult.success(_) })
 
           await(queryResult.future) must beLike {
             case QuerySummaryConfirmed(_, Seq(reservation: QuerySummaryResultType)) =>

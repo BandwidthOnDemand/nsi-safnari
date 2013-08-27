@@ -57,9 +57,9 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
           ToProvider(Release(newNsiHeaders(provider), connectionId), provider)
       }.toVector
     case RELEASING -> RELEASED =>
-      Seq(ToRequester(ReleaseConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
+      Seq(ToRequester(ReleaseConfirmed(stateData.commandHeaders.get.forAsyncReply, connectionId)))
     case PROVISIONING -> PROVISIONED =>
-      Seq(ToRequester(ProvisionConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
+      Seq(ToRequester(ProvisionConfirmed(stateData.commandHeaders.get.forAsyncReply, connectionId)))
   }
 
   def provisionState = stateName

@@ -3,15 +3,20 @@ package nl.surfnet.safnari
 import java.net.URI
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 
-case class NsiHeaders(correlationId: CorrelationId, requesterNSA: String, providerNSA: String, replyTo: Option[URI], protocolVersion: URI = URI.create("urn:nsi:2.0:FIXME")) {
-  def asReply: NsiHeaders = copy(replyTo = None)
+object NsiHeaders {
+  val ProviderProtocolVersion: URI = URI.create("application/vdn.ogf.nsi.cs.v2.provider+soap")
+  val RequesterProtocolVersion: URI = URI.create("application/vdn.ogf.nsi.cs.v2.requester+soap")
+}
+case class NsiHeaders(correlationId: CorrelationId, requesterNSA: String, providerNSA: String, replyTo: Option[URI], protocolVersion: URI) {
+  def forSyncAck: NsiHeaders = copy(replyTo = None)
+  def forAsyncReply: NsiHeaders = copy(replyTo = None, protocolVersion = NsiHeaders.RequesterProtocolVersion)
 }
 
 trait NsiMessage {
   def headers: NsiHeaders
   def correlationId: CorrelationId = headers.correlationId
 
-  def ack = GenericAck(headers.asReply)
+  def ack = GenericAck(headers.forSyncAck)
 }
 final case class NsiError(id: String, description: String, text: String) {
   override def toString = s"$id: $description: $text"

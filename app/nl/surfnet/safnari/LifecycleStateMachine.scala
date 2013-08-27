@@ -42,7 +42,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
           ToProvider(Terminate(newNsiHeaders(provider), connectionId), provider)
       }.toVector
     case TERMINATING -> TERMINATED =>
-      Seq(ToRequester(TerminateConfirmed(stateData.commandHeaders.get.asReply, connectionId)))
+      Seq(ToRequester(TerminateConfirmed(stateData.commandHeaders.get.forAsyncReply, connectionId)))
   }
 
   def lifecycleState = stateName

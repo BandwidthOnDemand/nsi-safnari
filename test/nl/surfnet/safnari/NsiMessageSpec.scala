@@ -5,9 +5,10 @@ import org.ogf.schemas.nsi._2013._07.framework.types._
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._07.services.types.DirectionalityType
 import org.ogf.schemas.nsi._2013._07.services.types.StpType
+import java.net.URI
 
 object NsiMessageSpec {
-  def headers(correlationId: CorrelationId) = NsiHeaders(correlationId, "RequesterNSA", "ProviderNSA", None)
+  def headers(correlationId: CorrelationId, protocolVersion: URI) = NsiHeaders(correlationId, "RequesterNSA", "ProviderNSA", None, protocolVersion)
   val Service = new P2PServiceBaseType().
     withDirectionality(DirectionalityType.BIDIRECTIONAL).
     withSourceSTP(new StpType().withNetworkId("networkId").withLocalId("source-localId")).
@@ -21,7 +22,7 @@ object NsiMessageSpec {
   def InitialReserveType = new ReserveType().withCriteria(Criteria)
   val CorrelationId = newCorrelationId
 
-  def initialReserveMessage = InitialReserve(headers(CorrelationId), InitialReserveType, ConfirmCriteria, Service)
+  def initialReserveMessage = InitialReserve(headers(CorrelationId, NsiHeaders.ProviderProtocolVersion), InitialReserveType, ConfirmCriteria, Service)
 
-  val reserveConfirmed = ReserveConfirmed(headers(CorrelationId), "ConnectionIdA", ConfirmCriteria)
+  val reserveConfirmed = ReserveConfirmed(headers(CorrelationId, NsiHeaders.RequesterProtocolVersion), "ConnectionIdA", ConfirmCriteria)
 }

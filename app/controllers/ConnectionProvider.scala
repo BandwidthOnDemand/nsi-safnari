@@ -57,13 +57,13 @@ object ConnectionProvider extends Controller with SoapWebService {
       val connectionStates = queryConnections(q.connectionIds)
       connectionStates.onSuccess {
         case reservations =>
-          replyTo(QuerySummaryConfirmed(q.headers.asReply, reservations))
+          replyTo(QuerySummaryConfirmed(q.headers.forAsyncReply, reservations))
       }
-      Future.successful(GenericAck(q.headers.asReply))
+      Future.successful(GenericAck(q.headers.forSyncAck))
     case q: QuerySummarySync =>
       val connectionStates = queryConnections(q.connectionIds)
       connectionStates map { states =>
-        QuerySummarySyncConfirmed(q.headers.asReply, states)
+        QuerySummarySyncConfirmed(q.headers.forSyncAck, states)
       }
     case q: QueryRecursive =>
       ???
@@ -77,7 +77,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   private[controllers] def handleCommand(request: NsiProviderCommand)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
     connectionManager.findOrCreateConnection(request) match {
       case None =>
-        Future.successful(ServiceException(request.headers.asReply, NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
+        Future.successful(ServiceException(request.headers.forSyncAck, NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
       case Some(connectionActor) =>
         requesterContinuations.register(request.correlationId).onSuccess {
           case reply => replyTo(reply)
