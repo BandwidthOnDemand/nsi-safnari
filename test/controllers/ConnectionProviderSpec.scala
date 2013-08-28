@@ -21,22 +21,19 @@ class ConnectionProviderSpec extends helpers.Specification {
       val requesterOperation: Promise[NsiRequesterOperation] = Promise()
       val response = await(ConnectionProvider.handleCommand(initialReserveMessage) { requesterOperation.success(_) })
 
-      response must beAnInstanceOf[ReserveResponse]
+      response must beAnInstanceOf[NsiAcknowledgement]
       response must beLike {
-        case ReserveResponse(headers, connectionId) =>
-          headers.correlationId must beEqualTo(CorrelationId)
+        case ReserveResponse(connectionId) =>
           connectionId must not(beEmpty)
       }
 
       await(requesterOperation.future) must beLike {
         case op: ReserveConfirmed =>
-          op.correlationId must beEqualTo(CorrelationId)
-
           val queryResult = Promise[NsiRequesterOperation]
-          await(ConnectionProvider.handleQuery(QuerySummary(headers(newCorrelationId, NsiHeaders.ProviderProtocolVersion), Seq(op.connectionId))) { queryResult.success(_) })
+          await(ConnectionProvider.handleQuery(QuerySummary(Seq(op.connectionId))) { queryResult.success(_) })
 
           await(queryResult.future) must beLike {
-            case QuerySummaryConfirmed(_, Seq(reservation: QuerySummaryResultType)) =>
+            case QuerySummaryConfirmed(Seq(reservation: QuerySummaryResultType)) =>
               reservation.getConnectionId() must beEqualTo(op.connectionId)
           }
       }

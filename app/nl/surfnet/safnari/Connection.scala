@@ -6,10 +6,10 @@ import org.ogf.schemas.nsi._2013._07.connection.types._
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 
-class ConnectionEntity(val id: ConnectionId, initialReserve: InitialReserve, newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
+class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion)
-  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), aggregatorNsa, requesterNSA, None, NsiHeaders.RequesterProtocolVersion)
+  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
 
   val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
     new GenericFailedType().
@@ -29,32 +29,29 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: InitialReserve, new
   def process(message: InboundMessage): Option[Seq[OutboundMessage]] = {
     val stateMachine: Option[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
       // RSM messages
-      case FromRequester(_: InitialReserve)        => Some(rsm)
-      case FromRequester(_: ReserveCommit)         => Some(rsm)
-      case FromRequester(_: ReserveAbort)          => Some(rsm)
-      case FromProvider(_: ReserveConfirmed)       => Some(rsm)
-      case FromProvider(_: ReserveFailed)          => Some(rsm)
-      case FromProvider(_: ReserveCommitConfirmed) => Some(rsm)
-      case FromProvider(_: ReserveCommitFailed)    => Some(rsm)
-      case FromProvider(_: ReserveAbortConfirmed)  => Some(rsm)
-      case FromProvider(_: ReserveTimeout)         => Some(rsm)
-      case FromPce(_)                              => Some(rsm)
+      case FromRequester(NsiProviderMessage(_, _: InitialReserve)) => Some(rsm)
+      case FromRequester(NsiProviderMessage(_, _: ReserveCommit)) => Some(rsm)
+      case FromRequester(NsiProviderMessage(_, _: ReserveAbort)) => Some(rsm)
+      case FromProvider(NsiRequesterMessage(_, _: ReserveConfirmed)) => Some(rsm)
+      case FromProvider(NsiRequesterMessage(_, _: ReserveFailed)) => Some(rsm)
+      case FromProvider(NsiRequesterMessage(_, _: ReserveCommitConfirmed)) => Some(rsm)
+      case FromProvider(NsiRequesterMessage(_, _: ReserveCommitFailed)) => Some(rsm)
+      case FromProvider(NsiRequesterMessage(_, _: ReserveAbortConfirmed)) => Some(rsm)
+      case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout)) => Some(rsm)
+      case FromPce(_) => Some(rsm)
 
       // Data Plane Status messages
-      case FromProvider(_: DataPlaneStateChange)   => dsm
+      case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm
 
       // PSM messages
-      case FromRequester(_: Provision)             => psm
-      case FromRequester(_: Release)               => psm
-      case FromProvider(_: ProvisionConfirmed)     => psm
-      case FromProvider(_: ReleaseConfirmed)       => psm
+      case FromRequester(NsiProviderMessage(_, _: Provision)) => psm
+      case FromRequester(NsiProviderMessage(_, _: Release)) => psm
+      case FromProvider(NsiRequesterMessage(_, _: ProvisionConfirmed)) => psm
+      case FromProvider(NsiRequesterMessage(_, _: ReleaseConfirmed)) => psm
 
       // LSM messages
-      case FromRequester(_: Terminate)             => lsm
-      case FromProvider(_: TerminateConfirmed)     => lsm
-
-      case FromRequester(_: QuerySummary | _: QuerySummarySync | _: QueryRecursive) =>
-        ???
+      case FromRequester(NsiProviderMessage(_, _: Terminate)) => lsm
+      case FromProvider(NsiRequesterMessage(_, _: TerminateConfirmed)) => lsm
     }
 
     stateMachine.flatMap(applyMessageToStateMachine(_, message))
@@ -65,7 +62,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: InitialReserve, new
 
     output.foreach { messages =>
       messages.collectFirst {
-        case ToRequester(confirmed: ReserveCommitConfirmed) => rsm.childConnections.map(kv => kv._1 -> kv._2.provider)
+        case ToRequester(NsiRequesterMessage(_, confirmed: ReserveCommitConfirmed)) => rsm.childConnections.map(kv => kv._1 -> kv._2.provider)
       }.foreach { children =>
         otherStateMachines = Some((
           new ProvisionStateMachine(id, newNsiHeaders, children),
@@ -88,13 +85,13 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: InitialReserve, new
 
     val criteria = rsm.criteria
     new QuerySummaryResultType().
-      withGlobalReservationId(initialReserve.body.getGlobalReservationId()).
-      withDescription(initialReserve.body.getDescription()).
+      withGlobalReservationId(initialReserve.body.body.getGlobalReservationId()).
+      withDescription(initialReserve.body.body.getDescription()).
       withConnectionId(id).
       withCriteria(new QuerySummaryResultCriteriaType().
         withSchedule(criteria.getSchedule()).
         withServiceType(criteria.getServiceType()).
-        withPointToPointService(initialReserve.service).
+        withPointToPointService(initialReserve.body.service).
         withChildren(new ChildSummaryListType().withChild(children.toSeq: _*)).
         tap(_.getOtherAttributes().putAll(criteria.getOtherAttributes()))).
       withRequesterNSA(requesterNSA).

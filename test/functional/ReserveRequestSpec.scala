@@ -30,25 +30,25 @@ import org.w3c.dom.Document
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ReserveRequestSpec extends helpers.Specification {
 
-  val reserveConfirmed = Promise[ReserveConfirmed]
+  val reserveConfirmed = Promise[NsiRequesterMessage[ReserveConfirmed]]
 
   object Global extends play.api.GlobalSettings {
     override def onRouteRequest(request: RequestHeader): Option[Handler] = request.path match {
       case "/fake/requester" => Some(NsiRequesterEndPoint {
-        case confirm: ReserveConfirmed =>
-          reserveConfirmed.success(confirm)
-          Future.successful(GenericAck(confirm.headers.forSyncAck))
+        case message @ NsiRequesterMessage(headers, confirm: ReserveConfirmed) =>
+          reserveConfirmed.success(NsiRequesterMessage(headers, confirm))
+          Future.successful(message.ack())
         case response =>
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
-          Future.successful(ServiceException(response.headers.forSyncAck, new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response")))
+          Future.successful(response.ack(ServiceException(new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response"))))
       })
       case "/fake/provider" => Some(NsiProviderEndPoint {
-        case reserve: InitialReserve =>
+        case message @ NsiProviderMessage(headers, reserve: InitialReserve) =>
           val connectionId = newConnectionId
-          reserve.headers.replyTo.foreach { replyTo =>
-            WS.url(replyTo.toASCIIString()).post(ReserveConfirmed(reserve.headers.forAsyncReply, connectionId, Conversion.invert(reserve.body.getCriteria()).right.get): NsiRequesterOperation)
+          headers.replyTo.foreach { replyTo =>
+            WS.url(replyTo.toASCIIString()).post(message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
           }
-          Future.successful(ReserveResponse(reserve.headers.forSyncAck, connectionId))
+          Future.successful(message.ack(ReserveResponse(connectionId)))
         case wtf =>
           wtf.pp
           ???

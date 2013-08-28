@@ -3,7 +3,7 @@ package nl.surfnet.safnari
 import org.ogf.schemas.nsi._2013._07.connection.types.LifecycleStateEnumType._
 import org.ogf.schemas.nsi._2013._07.connection.types.LifecycleStateEnumType
 
-case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childConnectionStates: Map[ConnectionId, LifecycleStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
+case class LifecycleStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childConnectionStates: Map[ConnectionId, LifecycleStateEnumType], command: Option[NsiProviderMessage[NsiProviderOperation]] = None) {
 
   def aggregatedLifecycleStatus: LifecycleStateEnumType = {
     if (childConnectionStates.values.forall(_ == CREATED)) CREATED
@@ -23,12 +23,12 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   extends FiniteStateMachine[LifecycleStateEnumType, LifecycleStateMachineData, InboundMessage, OutboundMessage](CREATED, new LifecycleStateMachineData(children, children.map(_._1 -> CREATED))) {
 
   when(CREATED) {
-    case Event(FromRequester(message: Terminate), data) =>
-      goto(TERMINATING) using (data.copy(commandHeaders = Some(message.headers)))
+    case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
+      goto(TERMINATING) using (data.copy(command = Some(message)))
   }
 
   when(TERMINATING) {
-    case Event(FromProvider(message: TerminateConfirmed), data) if data.childHasState(message.connectionId, CREATED) =>
+    case Event(FromProvider(NsiRequesterMessage(headers, message: TerminateConfirmed)), data) if data.childHasState(message.connectionId, CREATED) =>
       val newData = data.updateChild(message.connectionId, TERMINATED)
       goto(newData.aggregatedLifecycleStatus) using (newData)
   }
@@ -39,10 +39,10 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
     case CREATED -> TERMINATING =>
       stateData.children.map {
         case (connectionId, provider) =>
-          ToProvider(Terminate(newNsiHeaders(provider), connectionId), provider)
+          ToProvider(NsiProviderMessage(newNsiHeaders(provider), Terminate(connectionId)), provider)
       }.toVector
     case TERMINATING -> TERMINATED =>
-      Seq(ToRequester(TerminateConfirmed(stateData.commandHeaders.get.forAsyncReply, connectionId)))
+      Seq(ToRequester(stateData.command.get reply TerminateConfirmed(connectionId)))
   }
 
   def lifecycleState = stateName

@@ -3,7 +3,7 @@ package nl.surfnet.safnari
 import org.ogf.schemas.nsi._2013._07.connection.types.ProvisionStateEnumType
 import org.ogf.schemas.nsi._2013._07.connection.types.ProvisionStateEnumType._
 
-case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, ProvisionStateEnumType], commandHeaders: Option[NsiHeaders] = None) {
+case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, ProvisionStateEnumType], command: Option[NsiProviderMessage[NsiProviderOperation]] = None) {
 
   def aggregatedProvisionStatus: ProvisionStateEnumType =
     if (childStates.values.exists(_ == RELEASING)) RELEASING
@@ -23,24 +23,24 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   extends FiniteStateMachine[ProvisionStateEnumType, ProvisionStateMachineData, InboundMessage, OutboundMessage](RELEASED, ProvisionStateMachineData(children, children.map(_._1 -> RELEASED))) {
 
   when(RELEASED) {
-    case Event(FromRequester(message: Provision), data) =>
-      goto(PROVISIONING) using data.copy(commandHeaders = Some(message.headers))
+    case Event(FromRequester(message @ NsiProviderMessage(_, _: Provision)), data) =>
+      goto(PROVISIONING) using data.copy(command = Some(message))
   }
 
   when(PROVISIONING) {
-    case Event(FromProvider(message: ProvisionConfirmed), data) if data.childHasState(message.connectionId, RELEASED) =>
+    case Event(FromProvider(NsiRequesterMessage(headers, message: ProvisionConfirmed)), data) if data.childHasState(message.connectionId, RELEASED) =>
       val newData = data.updateChild(message.connectionId, PROVISIONED)
       goto(newData.aggregatedProvisionStatus) using newData
   }
 
   when(PROVISIONED) {
-    case Event(FromRequester(message: Release), data) =>
-      goto(RELEASING) using data.copy(commandHeaders = Some(message.headers))
+    case Event(FromRequester(message @ NsiProviderMessage(_, _: Release)), data) =>
+      goto(RELEASING) using data.copy(command = Some(message))
 
   }
 
   when(RELEASING) {
-    case Event(FromProvider(message: ReleaseConfirmed), data) if data.childHasState(message.connectionId, PROVISIONED) =>
+    case Event(FromProvider(NsiRequesterMessage(headers, message: ReleaseConfirmed)), data) if data.childHasState(message.connectionId, PROVISIONED) =>
       val newData = data.updateChild(message.connectionId, RELEASED)
       goto(newData.aggregatedProvisionStatus) using newData
   }
@@ -49,17 +49,17 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
     case RELEASED -> PROVISIONING =>
       stateData.children.map {
         case (connectionId, provider) =>
-          ToProvider(Provision(newNsiHeaders(provider), connectionId), provider)
+          ToProvider(NsiProviderMessage(newNsiHeaders(provider), Provision(connectionId)), provider)
       }.toVector
     case PROVISIONED -> RELEASING =>
       stateData.children.map {
         case (connectionId, provider) =>
-          ToProvider(Release(newNsiHeaders(provider), connectionId), provider)
+          ToProvider(NsiProviderMessage(newNsiHeaders(provider), Release(connectionId)), provider)
       }.toVector
     case RELEASING -> RELEASED =>
-      Seq(ToRequester(ReleaseConfirmed(stateData.commandHeaders.get.forAsyncReply, connectionId)))
+      Seq(ToRequester(stateData.command.get reply ReleaseConfirmed(connectionId)))
     case PROVISIONING -> PROVISIONED =>
-      Seq(ToRequester(ProvisionConfirmed(stateData.commandHeaders.get.forAsyncReply, connectionId)))
+      Seq(ToRequester(stateData.command.get reply ProvisionConfirmed(connectionId)))
   }
 
   def provisionState = stateName

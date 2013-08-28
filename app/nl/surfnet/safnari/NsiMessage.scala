@@ -12,12 +12,19 @@ case class NsiHeaders(correlationId: CorrelationId, requesterNSA: String, provid
   def forAsyncReply: NsiHeaders = copy(replyTo = None, protocolVersion = NsiHeaders.RequesterProtocolVersion)
 }
 
-trait NsiMessage {
+sealed trait NsiMessage[+T] {
   def headers: NsiHeaders
+  def body: T
   def correlationId: CorrelationId = headers.correlationId
-
-  def ack = GenericAck(headers.forSyncAck)
 }
+final case class NsiProviderMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
+  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiProviderMessage(headers.forSyncAck, ack)
+  def reply(reply: NsiRequesterOperation) = NsiRequesterMessage(headers.forAsyncReply, reply)
+}
+final case class NsiRequesterMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
+  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiRequesterMessage(headers.forSyncAck, ack)
+}
+
 final case class NsiError(id: String, description: String, text: String) {
   override def toString = s"$id: $description: $text"
 

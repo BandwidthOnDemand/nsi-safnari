@@ -9,7 +9,7 @@ import scala.concurrent.duration.{ Duration, DurationInt }
 import scala.concurrent.stm._
 import play.Logger
 
-class ConnectionManager(connectionFactory: (ConnectionId, InitialReserve) => (ActorRef, ConnectionEntity)) {
+class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity)) {
   implicit val timeout = Timeout(2.seconds)
 
   private val connections = TMap.empty[ConnectionId, ActorRef]
@@ -33,8 +33,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, InitialReserve) => (Ac
   def restore(implicit actorSystem: ActorSystem, executionContext: ExecutionContext) {
     Logger.info("Start replaying of connection messages")
     Await.ready(Future.sequence(for {
-      (connectionId, messages @ (FromRequester(initialReserve: InitialReserve) +: _)) <- messageStore.loadEverything()
-      connection = createConnection(connectionId, initialReserve)
+      (connectionId, messages @ (FromRequester(NsiProviderMessage(headers, initialReserve: InitialReserve)) +: _)) <- messageStore.loadEverything()
+      connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
     } yield {
       connection ? Replay(messages)
     }), Duration.Inf)
@@ -42,16 +42,16 @@ class ConnectionManager(connectionFactory: (ConnectionId, InitialReserve) => (Ac
     Logger.info("Replay completed")
   }
 
-  def findOrCreateConnection(request: NsiProviderCommand)(implicit actorSystem: ActorSystem): Option[ActorRef] = request match {
-    case update: NsiProviderUpdateCommand =>
+  def findOrCreateConnection(request: NsiProviderMessage[NsiProviderOperation])(implicit actorSystem: ActorSystem): Option[ActorRef] = request match {
+    case NsiProviderMessage(_, update: NsiProviderUpdateCommand) =>
       get(update.connectionId)
-    case initialReserve: InitialReserve =>
+    case NsiProviderMessage(headers, initialReserve: InitialReserve) =>
       val connectionId = newConnectionId
-      val connection = createConnection(connectionId, initialReserve)
+      val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
       Some(connection)
   }
 
-  private def createConnection(connectionId: ConnectionId, initialReserve: InitialReserve)(implicit actorSystem: ActorSystem): ActorRef = {
+  private def createConnection(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve])(implicit actorSystem: ActorSystem): ActorRef = {
     val (output, connection) = connectionFactory(connectionId, initialReserve)
 
     val storingActor = actorSystem.actorOf(Props(new ConnectionActor(connection, output)))
@@ -79,9 +79,9 @@ class ConnectionManager(connectionFactory: (ConnectionId, InitialReserve) => (Ac
             outbound.foreach(output ! _)
 
             inbound match {
-              case FromRequester(reserve: InitialReserve) => ReserveResponse(reserve.headers.forSyncAck, connection.id)
-              case FromRequester(request)                 => request.ack
-              case FromProvider(request)                  => request.ack
+              case FromRequester(NsiProviderMessage(headers, reserve: InitialReserve)) => ReserveResponse(connection.id)
+              case FromRequester(request)                 => GenericAck()
+              case FromProvider(request)                  => GenericAck()
               case FromPce(request)                       => 200
             }
         }
@@ -103,14 +103,14 @@ class ConnectionManager(connectionFactory: (ConnectionId, InitialReserve) => (Ac
     }
 
     private def updateChildConnection(message: InboundMessage): Unit = message match {
-      case FromProvider(ReserveConfirmed(_, connectionId, _)) => addChildConnectionId(self, connectionId)
-      case FromProvider(ReserveFailed(_, body))               => addChildConnectionId(self, body.getConnectionId)
+      case FromProvider(NsiRequesterMessage(_, ReserveConfirmed(connectionId, _))) => addChildConnectionId(self, connectionId)
+      case FromProvider(NsiRequesterMessage(_, ReserveFailed(body)))               => addChildConnectionId(self, body.getConnectionId)
       case _ =>
     }
 
     private def messageNotApplicable(message: InboundMessage) = message match {
-      case FromRequester(message) => ServiceException(message.headers.forSyncAck, NsiError.InvalidState.toServiceException("NSA-ID"))
-      case FromProvider(message)  => ServiceException(message.headers.forSyncAck, NsiError.InvalidState.toServiceException("NSA-ID"))
+      case FromRequester(NsiProviderMessage(headers, message)) => ServiceException(NsiError.InvalidState.toServiceException("NSA-ID"))
+      case FromProvider(NsiRequesterMessage(headers, message)) => ServiceException(NsiError.InvalidState.toServiceException("NSA-ID"))
       case FromPce(message)       => 400
     }
   }

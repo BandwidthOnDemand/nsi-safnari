@@ -10,6 +10,7 @@ import play.api.Play.current
 import play.api.db.DB
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
+import play.api.libs.functional.FunctionalBuilder
 
 case class StoredMessage(correlationId: CorrelationId, protocol: String, tpe: String, content: String, createdAt: Instant = new Instant())
 
@@ -21,14 +22,15 @@ object StoredMessage {
     override def writes(a: A): JsValue = Json.toJson(conversion(a).right.get)
   }
 
-  implicit val NsiProviderOperationFormat: Format[NsiProviderOperation] = conversionToFormat(Conversion[NsiProviderOperation, Document] andThen NsiXmlDocumentConversion andThen Conversion[Array[Byte], String])
-  implicit val NsiRequesterOperationFormat: Format[NsiRequesterOperation] = conversionToFormat(Conversion[NsiRequesterOperation, Document] andThen NsiXmlDocumentConversion andThen Conversion[Array[Byte], String])
+  implicit val NsiProviderOperationFormat: Format[NsiProviderMessage[NsiProviderOperation]] = conversionToFormat(Conversion[NsiProviderMessage[NsiProviderOperation], Document] andThen NsiXmlDocumentConversion andThen Conversion[Array[Byte], String])
+  implicit val NsiRequesterOperationFormat: Format[NsiRequesterMessage[NsiRequesterOperation]] = conversionToFormat(Conversion[NsiRequesterMessage[NsiRequesterOperation], Document] andThen NsiXmlDocumentConversion andThen Conversion[Array[Byte], String])
 
   import PceMessage.ProviderEndPointFormat
 
-  implicit val FromRequesterFormat = Json.format[FromRequester]
-  implicit val ToRequesterFormat = Json.format[ToRequester]
-  implicit val FromProviderFormat = Json.format[FromProvider]
+  // Json.format doesn't work, so use manual conversion instead.
+  implicit val FromRequesterFormat = ((__ \ 'message).format[NsiProviderMessage[NsiProviderOperation]]).inmap(FromRequester.apply, unlift(FromRequester.unapply))
+  implicit val ToRequesterFormat = ((__ \ 'message).format[NsiRequesterMessage[NsiRequesterOperation]]).inmap(ToRequester.apply, unlift(ToRequester.unapply))
+  implicit val FromProviderFormat = ((__ \ 'message).format[NsiRequesterMessage[NsiRequesterOperation]]).inmap(FromProvider.apply, unlift(FromProvider.unapply))
   implicit val ToProviderFormat = Json.format[ToProvider]
   implicit val FromPceFormat = Json.format[FromPce]
   implicit val ToPceFormat = Json.format[ToPce]

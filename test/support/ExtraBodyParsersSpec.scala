@@ -12,13 +12,10 @@ import play.api.test.Helpers._
 import play.api.libs.iteratee._
 import javax.xml.soap._
 import java.io.File
-import nl.surfnet.safnari.NsiProviderOperation
+import nl.surfnet.safnari._
 import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions
-import nl.surfnet.safnari.NsiRequesterOperation
-import nl.surfnet.safnari.InitialReserve
 import nl.surfnet.safnari.NsiSoapConversions.NsiXmlDocumentConversion
-import nl.surfnet.safnari.ReserveConfirmed
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ExtraBodyParsersSpec extends helpers.Specification {
@@ -58,7 +55,7 @@ class ExtraBodyParsersSpec extends helpers.Specification {
     "give NSI Reserve for a valid reserve request" in {
       val result = await(Enumerator.fromFile(new File("test/reserve.xml")) |>>> nsiProviderOperation.apply(FakeSoapRequest()))
 
-      result must beRight.like { case _: InitialReserve => ok }
+      result must beRight.like { case NsiProviderMessage(_, _: InitialReserve) => ok }
     }
 
     "give Badrequest when NSI Reserve contains extra xml" in {
@@ -77,7 +74,7 @@ class ExtraBodyParsersSpec extends helpers.Specification {
       result must beLeft.like {
         case result =>
           status(result) must beEqualTo(400)
-          contentAsString(result) must beEqualTo("missing element in 'Header', expected exactly one")
+          contentAsString(result) must beEqualTo("missing element 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one")
       }
     }
 
@@ -87,7 +84,7 @@ class ExtraBodyParsersSpec extends helpers.Specification {
       result must beLeft.like {
         case result =>
           status(result) must beEqualTo(400)
-          contentAsString(result) must beEqualTo("multiple elements in 'Header', expected exactly one")
+          contentAsString(result) must beEqualTo("multiple elements 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one")
       }
     }
 
@@ -97,7 +94,7 @@ class ExtraBodyParsersSpec extends helpers.Specification {
     "give NSI Reserve Commit for a valid reserve confirmed request" in {
       val result = await(Enumerator.fromFile(new File("test/reserveconfirmed.xml")) |>>> nsiRequesterOperation.apply(FakeSoapRequest()))
 
-      result must beRight.like { case _: ReserveConfirmed => ok }
+      result must beRight.like { case NsiRequesterMessage(_, _: ReserveConfirmed) => ok }
     }
   }
 

@@ -20,17 +20,16 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newNsiHeaders: () => Nsi
   when(true)(PartialFunction.empty)
 
   whenUnhandled {
-    case Event(FromProvider(message: DataPlaneStateChange), data) =>
+    case Event(FromProvider(NsiRequesterMessage(headers, message: DataPlaneStateChange)), data) =>
       val newData = data.updateState(message.connectionId, message.status.isActive(), message.timeStamp)
       goto(newData.aggregatedProvisionStatus) using newData
   }
 
   onTransition {
     case false -> true | true -> false =>
-      Seq(ToRequester(DataPlaneStateChange(
-        newNsiHeaders(),
+      Seq(ToRequester(NsiRequesterMessage(newNsiHeaders(), DataPlaneStateChange(
         connectionId,
-        new DataPlaneStatusType().withVersion(0).withActive(nextStateName).withVersionConsistent(true), nextStateData.timeStamp.get)))
+        new DataPlaneStatusType().withVersion(0).withActive(nextStateName).withVersionConsistent(true), nextStateData.timeStamp.get))))
   }
 
   def dataPlaneStatus(version: Int) = new DataPlaneStatusType().withVersion(version).withActive(stateName).withVersionConsistent(true)

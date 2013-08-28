@@ -23,10 +23,10 @@ object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
   implicit def actorSystem = Akka.system
 
-  private val requesterContinuations = new Continuations[NsiRequesterOperation]()
+  private val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]]()
   private val pceContinuations = new Continuations[PceResponse]()
 
-  def connectionFactory(connectionId: ConnectionId, initialReserve: InitialReserve): (ActorRef, ConnectionEntity) = {
+  def connectionFactory(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
     val outbound = outboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
@@ -40,13 +40,13 @@ object ConnectionProvider extends Controller with SoapWebService {
   override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.request().url}"
 
   def request = NsiProviderEndPoint {
-    case query: NsiProviderQuery     => handleQuery(query)(replyToClient(query.headers))
-    case command: NsiProviderCommand => handleCommand(command)(replyToClient(command.headers))
+    case message @ NsiProviderMessage(headers, query: NsiProviderQuery)     => handleQuery(query)(replyToClient(headers)).map(message.ack)
+    case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(message)(replyToClient(headers)).map(message.ack)
   }
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
     requestHeaders.replyTo.foreach { replyTo =>
-      WS.url(replyTo.toASCIIString()).post(response).onComplete {
+      WS.url(replyTo.toASCIIString()).post(NsiRequesterMessage(requestHeaders.forAsyncReply, response)).onComplete {
         case Failure(error)           => Logger.info(s"Replying to $replyTo: $error", error)
         case Success(acknowledgement) => Logger.debug(s"Replying $response to $replyTo")
       }
@@ -57,13 +57,13 @@ object ConnectionProvider extends Controller with SoapWebService {
       val connectionStates = queryConnections(q.connectionIds)
       connectionStates.onSuccess {
         case reservations =>
-          replyTo(QuerySummaryConfirmed(q.headers.forAsyncReply, reservations))
+          replyTo(QuerySummaryConfirmed(reservations))
       }
-      Future.successful(GenericAck(q.headers.forSyncAck))
+      Future.successful(GenericAck())
     case q: QuerySummarySync =>
       val connectionStates = queryConnections(q.connectionIds)
       connectionStates map { states =>
-        QuerySummarySyncConfirmed(q.headers.forSyncAck, states)
+        QuerySummarySyncConfirmed(states)
       }
     case q: QueryRecursive =>
       ???
@@ -74,30 +74,30 @@ object ConnectionProvider extends Controller with SoapWebService {
     Future.traverse(cs)(c => (c ? 'query).mapTo[QuerySummaryResultType])
   }
 
-  private[controllers] def handleCommand(request: NsiProviderCommand)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
+  private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
     connectionManager.findOrCreateConnection(request) match {
       case None =>
-        Future.successful(ServiceException(request.headers.forSyncAck, NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
+        Future.successful(ServiceException(NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
       case Some(connectionActor) =>
-        requesterContinuations.register(request.correlationId).onSuccess {
-          case reply => replyTo(reply)
+        requesterContinuations.register(request.headers.correlationId).onSuccess {
+          case reply => replyTo(reply.body)
         }
         (connectionActor ? FromRequester(request)).mapTo[NsiAcknowledgement]
     }
 
-  def outboundActor(initialReserve: InitialReserve) =
+  def outboundActor(initialReserve: NsiProviderMessage[InitialReserve]) =
     Akka.system.actorOf(Props(new OutboundRoutingActor(ConnectionRequester.nsiRequester, PathComputationEngine.pceRequester, replyToClient(initialReserve.headers))))
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiNotification => Unit) extends Actor {
     def receive = {
       case pceRequest: ToPce                     => pceRequester forward pceRequest
       case nsiRequest: ToProvider                => nsiRequester forward nsiRequest
-      case ToRequester(message: NsiNotification) => notify(message)
+      case ToRequester(NsiRequesterMessage(headers, message: NsiNotification)) => notify(message)
       case ToRequester(response)                 => handleResponse(response)
     }
   }
 
-  private[controllers] def handleResponse(message: NsiRequesterOperation): Unit =
-    requesterContinuations.replyReceived(message.correlationId, message)
+  private[controllers] def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
+    requesterContinuations.replyReceived(message.headers.correlationId, message)
 
 }

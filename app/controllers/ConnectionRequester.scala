@@ -22,17 +22,17 @@ object ConnectionRequester extends Controller with SoapWebService {
 
   override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionRequester.request().url}"
 
-  def expectReplyFor(correlationId: CorrelationId): Future[NsiRequesterOperation] = continuations.register(correlationId)
+  def expectReplyFor(correlationId: CorrelationId): Future[NsiRequesterMessage[NsiRequesterOperation]] = continuations.register(correlationId)
 
   def request = NsiRequesterEndPoint {
-    case notification: NsiNotification =>
+    case message @ NsiRequesterMessage(headers, notification: NsiNotification) =>
       val connection = ConnectionProvider.connectionManager.findByChildConnectionId(notification.connectionId)
-      connection foreach { _ ! FromProvider(notification) }
-      val reply = connection map (_ => GenericAck(notification.headers.forSyncAck)) getOrElse ServiceException(notification.headers.forSyncAck, NsiError.DoesNotExist.toServiceException(Configuration.Nsa))
-      Future.successful(reply)
+      connection foreach { _ ! FromProvider(NsiRequesterMessage(headers, notification)) }
+      val acknowledgement = connection map (_ => GenericAck()) getOrElse ServiceException(NsiError.DoesNotExist.toServiceException(Configuration.Nsa))
+      Future.successful(message.ack(acknowledgement))
     case response =>
-      continuations.replyReceived(response.correlationId, response)
-      Future.successful(GenericAck(response.headers.forSyncAck))
+      continuations.replyReceived(response.headers.correlationId, response)
+      Future.successful(response.ack(GenericAck()))
   }
 
   def nsiRequester = {
@@ -43,22 +43,22 @@ object ConnectionRequester extends Controller with SoapWebService {
     }
   }
 
-  private val continuations = new Continuations[NsiRequesterOperation]()
+  private val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]]()
 
   class DummyNsiRequesterActor extends Actor {
     def receive = {
-      case ToProvider(reserve: InitialReserve, _) =>
-        sender ! FromProvider(ReserveConfirmed(reserve.headers.forAsyncReply, newConnectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
-      case ToProvider(commit: ReserveCommit, _) =>
-        sender ! FromProvider(ReserveCommitConfirmed(commit.headers.forAsyncReply, commit.connectionId))
+      case ToProvider(message @ NsiProviderMessage(headers, reserve: InitialReserve), _) =>
+        sender ! FromProvider(message reply ReserveConfirmed(newConnectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
+      case ToProvider(message @ NsiProviderMessage(headers, commit: ReserveCommit), _) =>
+        sender ! FromProvider(message reply ReserveCommitConfirmed(commit.connectionId))
     }
   }
 
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
     def receive = {
-      case ToProvider(message: NsiProviderOperation, provider) =>
+      case ToProvider(message @ NsiProviderMessage(headers, _: NsiProviderOperation), provider) =>
         val connection = sender
-        ConnectionRequester.expectReplyFor(message.correlationId).onSuccess {
+        ConnectionRequester.expectReplyFor(headers.correlationId).onSuccess {
           case reply => connection ! FromProvider(reply)
         }
 
@@ -75,5 +75,4 @@ object ConnectionRequester extends Controller with SoapWebService {
         }
     }
   }
-
 }

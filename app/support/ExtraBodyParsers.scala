@@ -26,13 +26,14 @@ import play.api.mvc.AsyncResult
 import play.api.libs.concurrent.Execution.Implicits._
 import org.w3c.dom.Document
 import javax.xml.soap.SOAPConstants
+import scala.language.higherKinds
 
 object ExtraBodyParsers {
   private val logger = Logger("ExtraBodyParsers")
 
-  implicit def NsiMessageContentType[T <: NsiMessage](implicit conversion: Conversion[T, Document]): ContentTypeOf[T] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+  implicit def NsiMessageContentType[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): ContentTypeOf[T] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
-  implicit def NsiMessageWriteable[T <: NsiMessage](implicit conversion: Conversion[T, Document]): Writeable[T] = Writeable { message =>
+  implicit def NsiMessageWriteable[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): Writeable[T] = Writeable { message =>
     conversion.andThen(NsiXmlDocumentConversion)(message).fold({ error =>
       // Exceptions from writeable are swallowed by Play, so log these here.
       logger.error(error)
@@ -40,17 +41,15 @@ object ExtraBodyParsers {
     }, bytes => bytes)
   }
 
-  def NsiProviderEndPoint(action: NsiProviderOperation => Future[NsiAcknowledgement]): Action[NsiProviderOperation] =
+  def NsiProviderEndPoint(action: NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]): Action[NsiProviderMessage[NsiProviderOperation]] =
     NsiEndPoint(nsiProviderOperation)(action)
 
-  def NsiRequesterEndPoint(action: NsiRequesterOperation => Future[NsiAcknowledgement]): Action[NsiRequesterOperation] =
+  def NsiRequesterEndPoint(action: NsiRequesterMessage[NsiRequesterOperation] => Future[NsiRequesterMessage[NsiAcknowledgement]]): Action[NsiRequesterMessage[NsiRequesterOperation]] =
     NsiEndPoint(nsiRequesterOperation)(action)
 
-  def NsiEndPoint[T <: NsiMessage](parser: BodyParser[T])(action: T => Future[NsiAcknowledgement]) = Action(parser) { request =>
-    Logger.debug(s"Received: ${request.body}")
+  def NsiEndPoint[M, T[_] <: NsiMessage[_]](parser: BodyParser[T[M]])(action: T[M] => Future[T[NsiAcknowledgement]])(implicit conversion: Conversion[T[NsiAcknowledgement], Document]) = Action(parser) { request =>
     AsyncResult {
       action(request.body).map { response =>
-        Logger.debug(s"Respond: $response")
         Results.Ok(response)
       }
     }
@@ -75,11 +74,11 @@ object ExtraBodyParsers {
       }
   }
 
-  private[support] def nsiProviderOperation = nsiBodyParser[NsiProviderOperation]
+  private[support] def nsiProviderOperation = nsiBodyParser[NsiProviderMessage[NsiProviderOperation]]
 
-  private[support] def nsiRequesterOperation = nsiBodyParser[NsiRequesterOperation]
+  private[support] def nsiRequesterOperation = nsiBodyParser[NsiRequesterMessage[NsiRequesterOperation]]
 
-  private def nsiBodyParser[T <: NsiMessage](implicit conversion: Conversion[T, Document]): BodyParser[T] = soap(NsiXmlDocumentConversion).flatMap { soapMessage =>
+  private def nsiBodyParser[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): BodyParser[T] = soap(NsiXmlDocumentConversion).flatMap { soapMessage =>
     BodyParser { requestHeader =>
       val parsedMessage = conversion.invert(soapMessage)
 

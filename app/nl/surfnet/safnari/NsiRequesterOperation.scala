@@ -3,37 +3,37 @@ package nl.surfnet.safnari
 import javax.xml.datatype.XMLGregorianCalendar
 import org.ogf.schemas.nsi._2013._07.connection.types._
 
-sealed trait NsiRequesterOperation extends NsiMessage
+sealed trait NsiRequesterOperation
 sealed trait NsiNotification extends NsiRequesterOperation {
   def connectionId: ConnectionId
 }
 
-case class ReserveConfirmed(headers: NsiHeaders, connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiRequesterOperation
+case class ReserveConfirmed(connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiRequesterOperation
 
-case class ReserveFailed(headers: NsiHeaders, failed: GenericFailedType) extends NsiRequesterOperation {
+case class ReserveFailed(failed: GenericFailedType) extends NsiRequesterOperation {
   def connectionId: ConnectionId = failed.getConnectionId()
 }
-case class ReserveCommitConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
-case class ReserveCommitFailed(headers: NsiHeaders, failed: GenericFailedType) extends NsiRequesterOperation {
+case class ReserveCommitConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
+case class ReserveCommitFailed(failed: GenericFailedType) extends NsiRequesterOperation {
   def connectionId: ConnectionId = failed.getConnectionId()
 }
-case class ReserveAbortConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
+case class ReserveAbortConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
 
-case class ProvisionConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
-case class ReleaseConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
-case class TerminateConfirmed(headers: NsiHeaders, connectionId: ConnectionId) extends NsiRequesterOperation
+case class ProvisionConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
+case class ReleaseConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
+case class TerminateConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
 
-case class QuerySummaryConfirmed(headers: NsiHeaders, reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
-case class QuerySummaryFailed(headers: NsiHeaders, failed: QueryFailedType) extends NsiRequesterOperation
-case class QueryRecursiveConfirmed(headers: NsiHeaders, reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
-case class QueryRecursiveFailed(headers: NsiHeaders, failed: QueryFailedType) extends NsiRequesterOperation
+case class QuerySummaryConfirmed(reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
+case class QuerySummaryFailed(failed: QueryFailedType) extends NsiRequesterOperation
+case class QueryRecursiveConfirmed(reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
+case class QueryRecursiveFailed(failed: QueryFailedType) extends NsiRequesterOperation
 
-case class ErrorEvent(headers: NsiHeaders, error: ErrorEventType) extends NsiNotification {
+case class ErrorEvent(error: ErrorEventType) extends NsiNotification {
   override def connectionId = error.getConnectionId()
 }
-case class DataPlaneStateChange(headers: NsiHeaders, connectionId: ConnectionId, status: DataPlaneStatusType, timeStamp: XMLGregorianCalendar) extends NsiNotification
-case class ReserveTimeout(headers: NsiHeaders, timeout: ReserveTimeoutRequestType) extends NsiNotification {
+case class DataPlaneStateChange(connectionId: ConnectionId, status: DataPlaneStatusType, timeStamp: XMLGregorianCalendar) extends NsiNotification
+case class ReserveTimeout(timeout: ReserveTimeoutRequestType) extends NsiNotification {
   def connectionId: ConnectionId = timeout.getConnectionId()
 }
 
-case class MessageDeliveryTimeout(headers: NsiHeaders, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation
+case class MessageDeliveryTimeout(correlationId: CorrelationId, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation

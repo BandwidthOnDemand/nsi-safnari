@@ -46,7 +46,7 @@ class ConnectionManagerSpec extends helpers.Specification {
 
       await(actor ? FromProvider(reserveConfirmed))
 
-      connectionManager.findByChildConnectionId(reserveConfirmed.connectionId) must beSome(actor)
+      connectionManager.findByChildConnectionId(reserveConfirmed.body.connectionId) must beSome(actor)
     }
 
     "add child connection id during replay" in new Fixture() {
@@ -54,7 +54,7 @@ class ConnectionManagerSpec extends helpers.Specification {
 
       await(actor ? connectionManager.Replay(Seq(FromProvider(reserveConfirmed))))
 
-      connectionManager.findByChildConnectionId(reserveConfirmed.connectionId) must beSome(actor)
+      connectionManager.findByChildConnectionId(reserveConfirmed.body.connectionId) must beSome(actor)
     }
   }
 }
