@@ -17,7 +17,7 @@ class ConnectionSpec extends helpers.Specification {
 
     val Service = new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("A")).withDestSTP(new StpType().withLocalId("B"))
     val Schedule = new ScheduleType()
-    val Criteria = new ReservationConfirmCriteriaType().withSchedule(Schedule).withPointToPointService(Service)
+    val Criteria = new ReservationConfirmCriteriaType().withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
     val InitialReserveType = new ReserveType().withCriteria(Conversion.convert(Criteria).right.get)
     val A = ComputedSegment(
         new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("A")).withDestSTP(new StpType().withLocalId("X")),

@@ -165,6 +165,7 @@ class ReservationStateMachine(
           val criteria = new ReservationRequestCriteriaType().
             withPointToPointService(service).
             withSchedule(data.criteria.getSchedule()).
+            withServiceType(data.criteria.getServiceType()).
             withVersion(data.criteria.getVersion())
           val reserveType = new ReserveType().
             withGlobalReservationId(data.globalReservationId.orNull).

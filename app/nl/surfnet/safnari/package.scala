@@ -55,8 +55,9 @@ package object safnari {
       withVersion(a.getVersion()).
       tap(_.getOtherAttributes().putAll(a.getOtherAttributes())))
   } { b =>
-    (for {
-      schedule <- Option(b.getSchedule())
+    for {
+      schedule <- Option(b.getSchedule()).toRight("schedule is required").right
+      serviceType <- Option(b.getServiceType()).toRight("serviceType is required").right
     } yield {
       new ReservationConfirmCriteriaType().
         withSchedule(schedule).
@@ -64,7 +65,7 @@ package object safnari {
         withServiceType(b.getServiceType()).
         withVersion(if (b.getVersion() == null) 0 else b.getVersion()).
         tap(_.getOtherAttributes().putAll(b.getOtherAttributes()))
-    }).toRight("cannot convert request criteria to confirm criteria. Missing fields?")
+    }
   }
 
   private val PointToPointObjectFactory = new org.ogf.schemas.nsi._2013._07.services.point2point.ObjectFactory()

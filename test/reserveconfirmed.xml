@@ -22,6 +22,7 @@
           <startTime>2013-04-29T13:07:00.000+02:00</startTime>
           <endTime>2013-04-29T13:17:00.000+02:00</endTime>
         </schedule>
+        <serviceType>http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE</serviceType>
         <p2p:p2ps xmlns:p2p="http://schemas.ogf.org/nsi/2013/07/services/point2point">
           <capacity>100</capacity>
           <directionality>Bidirectional</directionality>

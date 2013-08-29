@@ -97,6 +97,7 @@ class ReserveRequestSpec extends helpers.Specification {
     val ConnectionId = new Holder[String]()
     val Criteria = new ReservationRequestCriteriaType().
       withSchedule(new ScheduleType()).
+      withServiceType("ServiceType").
       withAny(marshal(new P2PServiceBaseType().
           withCapacity(100).
           withDirectionality(DirectionalityType.BIDIRECTIONAL).
