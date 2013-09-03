@@ -29,6 +29,8 @@ object NsiSoapConversions {
     tryEither(string.getBytes("UTF-8"))
   }
 
+  implicit def NsiToString[T](implicit conversion: Conversion[T, Document]): Conversion[T, String] = conversion.andThen(NsiXmlDocumentConversion).andThen(ByteArrayToString)
+
   private val typesFactory = new org.ogf.schemas.nsi._2013._07.connection.types.ObjectFactory()
   private val headersFactory = new org.ogf.schemas.nsi._2013._07.framework.headers.ObjectFactory()
   private val pointToPointServiceFactory = new org.ogf.schemas.nsi._2013._07.services.point2point.ObjectFactory()

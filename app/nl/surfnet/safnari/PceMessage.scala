@@ -24,8 +24,12 @@ case class PathComputationConfirmed(correlationId: CorrelationId, segments: Seq[
 
 sealed trait ProviderAuthentication
 case object NoAuthentication extends ProviderAuthentication
-case class BasicAuthentication(username: String, password: String) extends ProviderAuthentication
-case class OAuthAuthentication(token: String) extends ProviderAuthentication
+case class BasicAuthentication(username: String, password: String) extends ProviderAuthentication {
+  // FIXME override toString to avoid printing password to log.
+}
+case class OAuthAuthentication(token: String) extends ProviderAuthentication {
+  // FIXME override toString to avoid printing token to log.
+}
 
 case class ProviderEndPoint(nsa: String, url: URI, authentication: ProviderAuthentication)
 

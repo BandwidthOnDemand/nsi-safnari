@@ -47,7 +47,6 @@ case class ReservationStateMachineData(
     else throw new IllegalStateException(s"cannot determine aggregated state from ${childConnectionStates.values.mkString(",")}")
 
   def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = {
-    require(awaitingConnectionId.contains(correlationId), s"bad correlationId: $correlationId, awaiting $awaitingConnectionId")
     require(!childConnectionStates.contains(connectionId), s"duplicate connectionId: $connectionId, already have $childConnectionStates")
     copy(connections = connections.updated(connectionId, correlationId))
   }
@@ -101,6 +100,8 @@ class ReservationStateMachine(
   }
 
   when(CheckingReservationState) {
+    case Event(AckFromProvider(NsiProviderMessage(headers, ReserveResponse(connectionId))), data) if data.childHasState(connectionId, CheckingReservationState) =>
+      stay using data.receivedConnectionId(headers.correlationId, connectionId)
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveConfirmed)), data) if data.childHasState(message.connectionId, CheckingReservationState) =>
       val newData = data
         .receivedConnectionId(headers.correlationId, message.connectionId)
@@ -152,6 +153,13 @@ class ReservationStateMachine(
   when(ReservedReservationState)(PartialFunction.empty)
   when(FailedReservationState)(PartialFunction.empty)
   when(CommitFailedReservationState)(PartialFunction.empty)
+
+  whenUnhandled {
+    case Event(AckFromProvider(NsiProviderMessage(_, _: ReserveResponse)), _) => stay
+    case Event(AckFromProvider(NsiProviderMessage(_, _: GenericAck)), _) => stay
+    case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(exception))), data) =>
+      ???
+  }
 
   onTransition {
     case InitialReservationState -> PathComputationState =>

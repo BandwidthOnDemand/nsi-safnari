@@ -80,9 +80,10 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
             inbound match {
               case FromRequester(NsiProviderMessage(headers, reserve: InitialReserve)) => ReserveResponse(connection.id)
-              case FromRequester(request)                 => GenericAck()
-              case FromProvider(request)                  => GenericAck()
-              case FromPce(request)                       => 200
+              case FromRequester(request) => GenericAck()
+              case FromProvider(request) => GenericAck()
+              case FromPce(request) => 200
+              case AckFromProvider(_) => ()
             }
         }
 
@@ -91,13 +92,13 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       case Replay(messages) =>
         Logger.info(s"Replaying ${messages.size} messages for connection ${connection.id}")
         messages.foreach {
-          case message: InboundMessage =>
-            updateChildConnection(message)
-            connection.process(message).getOrElse {
-              Logger.warn(s"Connection ${connection.id} failed to replay message $message")
+          case inbound: InboundMessage =>
+            updateChildConnection(inbound)
+            connection.process(inbound).getOrElse {
+              Logger.warn(s"Connection ${connection.id} failed to replay message $inbound")
             }
-          case message: OutboundMessage =>
-          // Ignore.
+          case _: OutboundMessage =>
+            // Ignore.
         }
         sender ! (())
     }
@@ -108,10 +109,11 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       case _ =>
     }
 
-    private def messageNotApplicable(message: InboundMessage) = message match {
+    private def messageNotApplicable(message: InboundMessage): Any = message match {
       case FromRequester(NsiProviderMessage(headers, message)) => ServiceException(NsiError.InvalidState.toServiceException("NSA-ID"))
       case FromProvider(NsiRequesterMessage(headers, message)) => ServiceException(NsiError.InvalidState.toServiceException("NSA-ID"))
-      case FromPce(message)       => 400
+      case FromPce(message)                                    => 400
+      case AckFromProvider(_)                                      => 500
     }
   }
 }

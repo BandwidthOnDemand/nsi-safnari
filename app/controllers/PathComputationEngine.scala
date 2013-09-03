@@ -57,7 +57,7 @@ object PathComputationEngine extends Controller {
             Seq(ComputedSegment(
               pce.service,
               ProviderEndPoint(
-                "urn:ogf:network:nsa:surfnet.nl",
+                "urn:ogf:network:nsa:surfnet.nl:1990",
                 URI.create("http://localhost:8082/bod/nsi/v2/provider"),
                 OAuthAuthentication("fe6a436a-f8ad-42fa-a2ce-823908f09c56"))))))
     }

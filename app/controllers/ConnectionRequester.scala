@@ -15,6 +15,7 @@ import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import akka.actor.Props
 import play.api.Logger
+import scala.util.{ Failure, Success }
 
 object ConnectionRequester extends Controller with SoapWebService {
 
@@ -70,8 +71,19 @@ object ConnectionRequester extends Controller with SoapWebService {
           case _                                       => request
         }
 
-        request.post(message).onFailure {
-          case e => Logger.warn(s"Could not reach nsi provider $e")
+        request.post(message).onComplete {
+          case Failure(e) =>
+            Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $e", e)
+          case Success(ack) if ack.status == 200 || ack.status == 500 =>
+            Conversion[NsiProviderMessage[NsiAcknowledgement], String].invert(ack.body) match {
+              case Left(error) =>
+                Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error")
+              case Right(ack) =>
+                Logger.debug(s"Received ack from ${provider.nsa} at ${provider.url}: $ack")
+                connection ! AckFromProvider(ack)
+            }
+          case Success(ack) =>
+            Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
         }
     }
   }

@@ -5,6 +5,7 @@ import java.net.URI
 import org.ogf.schemas.nsi._2013._07.connection.types._
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
+import play.api.Logger
 
 class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
@@ -26,32 +27,30 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   def lsm = otherStateMachines.map(_._2)
   def dsm = otherStateMachines.map(_._3)
 
+  private var providerConversations: Map[CorrelationId, FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = Map.empty
+
   def process(message: InboundMessage): Option[Seq[OutboundMessage]] = {
     val stateMachine: Option[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
-      // RSM messages
       case FromRequester(NsiProviderMessage(_, _: InitialReserve)) => Some(rsm)
       case FromRequester(NsiProviderMessage(_, _: ReserveCommit)) => Some(rsm)
       case FromRequester(NsiProviderMessage(_, _: ReserveAbort)) => Some(rsm)
-      case FromProvider(NsiRequesterMessage(_, _: ReserveConfirmed)) => Some(rsm)
-      case FromProvider(NsiRequesterMessage(_, _: ReserveFailed)) => Some(rsm)
-      case FromProvider(NsiRequesterMessage(_, _: ReserveCommitConfirmed)) => Some(rsm)
-      case FromProvider(NsiRequesterMessage(_, _: ReserveCommitFailed)) => Some(rsm)
-      case FromProvider(NsiRequesterMessage(_, _: ReserveAbortConfirmed)) => Some(rsm)
-      case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout)) => Some(rsm)
-      case FromPce(_) => Some(rsm)
-
-      // Data Plane Status messages
-      case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm
-
-      // PSM messages
       case FromRequester(NsiProviderMessage(_, _: Provision)) => psm
       case FromRequester(NsiProviderMessage(_, _: Release)) => psm
-      case FromProvider(NsiRequesterMessage(_, _: ProvisionConfirmed)) => psm
-      case FromProvider(NsiRequesterMessage(_, _: ReleaseConfirmed)) => psm
-
-      // LSM messages
       case FromRequester(NsiProviderMessage(_, _: Terminate)) => lsm
-      case FromProvider(NsiRequesterMessage(_, _: TerminateConfirmed)) => lsm
+      case FromRequester(NsiProviderMessage(_, _)) => None
+
+      case FromPce(_) => Some(rsm)
+
+      case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout)) => Some(rsm)
+      case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm
+      case FromProvider(NsiRequesterMessage(headers, _)) =>
+        val stateMachine = providerConversations.get(headers.correlationId)
+        if (stateMachine.isEmpty) Logger.debug(s"No active conversation for ${message.toShortString}")
+        providerConversations -= headers.correlationId
+        stateMachine
+
+      case AckFromProvider(NsiProviderMessage(headers, _)) =>
+        providerConversations.get(headers.correlationId)
     }
 
     stateMachine.flatMap(applyMessageToStateMachine(_, message))
@@ -61,6 +60,12 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     val output = stateMachine.process(message)
 
     output.foreach { messages =>
+      providerConversations ++= messages.collect {
+        case message: ToProvider =>
+          Logger.trace(s"Registering conversation for ${message.toShortString}")
+          message.correlationId -> stateMachine
+      }
+
       messages.collectFirst {
         case ToRequester(NsiRequesterMessage(_, confirmed: ReserveCommitConfirmed)) => rsm.childConnections.map(kv => kv._1 -> kv._2.provider)
       }.foreach { children =>
