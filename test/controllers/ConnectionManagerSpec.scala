@@ -13,6 +13,8 @@ import org.ogf.schemas.nsi._2013._07.connection.types._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionManagerSpec extends helpers.Specification {
+  sequential
+
   import NsiMessageSpec._
 
   class RecordingActor extends Actor {
@@ -23,7 +25,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
   }
 
-  class Fixture() extends WithApplication(FakeApplication(additionalConfiguration = testConfiguration)) {
+  class Fixture() extends WithApplication() {
     implicit lazy val system = Akka.system
 
     lazy val outbound = TestActorRef(new RecordingActor)

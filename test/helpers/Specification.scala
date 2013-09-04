@@ -11,6 +11,4 @@ abstract class Specification
     with org.specs2.ScalaCheck {
 
   implicit val timeout = Timeout(2000)
-
-  def testConfiguration = Map("db.default.url" -> "jdbc:h2:mem:test")
 }

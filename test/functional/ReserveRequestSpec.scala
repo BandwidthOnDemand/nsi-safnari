@@ -29,6 +29,7 @@ import org.w3c.dom.Document
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ReserveRequestSpec extends helpers.Specification {
+  sequential
 
   val reserveConfirmed = Promise[NsiRequesterMessage[ReserveConfirmed]]
 
@@ -73,7 +74,7 @@ class ReserveRequestSpec extends helpers.Specification {
   val FakePceUri = s"http://localhost:$ServerPort/fake/pce"
   val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
   val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"
-  val Application = FakeApplication(additionalConfiguration = testConfiguration ++ Map(
+  val Application = FakeApplication(additionalConfiguration = Map(
     "nsi.actor" -> "real",
     "pce.actor" -> "real",
     "pce.endpoint" -> FakePceUri,

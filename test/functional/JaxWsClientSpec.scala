@@ -28,9 +28,10 @@ import javax.xml.ws.Holder
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
 class JaxWsClientSpec extends helpers.Specification {
+  sequential
 
   val ServerPort = Helpers.testServerPort
-  def Application = FakeApplication(additionalConfiguration = testConfiguration ++ Map("nsi.base.url" -> s"http://localhost:$ServerPort"))
+  def Application = FakeApplication(additionalConfiguration = Map("nsi.base.url" -> s"http://localhost:$ServerPort"))
 
   "A JAX WS client" should {
 

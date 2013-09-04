@@ -1,14 +1,14 @@
-# Users schema
-
 # --- !Ups
 
+CREATE SEQUENCE pk_sequence;
+
 CREATE TABLE messages (
-  id BIGINT(20) NOT NULL AUTO_INCREMENT,
-  aggregated_connection_id VARCHAR NOT NULL,
+  id BIGINT DEFAULT NEXTVAL('pk_sequence') NOT NULL,
+  aggregated_connection_id TEXT NOT NULL,
   correlation_id UUID NOT NULL,
-  protocol VARCHAR NOT NULL,
-  type VARCHAR NOT NULL,
-  content VARCHAR NOT NULL,
+  protocol TEXT NOT NULL,
+  type TEXT NOT NULL,
+  content TEXT NOT NULL,
   created_at TIMESTAMP NOT NULL,
   PRIMARY KEY (id)
 );

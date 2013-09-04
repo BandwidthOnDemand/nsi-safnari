@@ -11,9 +11,11 @@ import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends helpers.Specification {
+  sequential
+
   import nl.surfnet.safnari.NsiMessageSpec._
 
-  def Application = FakeApplication(additionalConfiguration = testConfiguration ++ Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
+  def Application = FakeApplication(additionalConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
 
   "Reserve operation" should {
 

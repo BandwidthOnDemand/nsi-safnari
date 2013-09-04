@@ -12,7 +12,7 @@ object ApplicationBuild extends Build {
     anorm,
     "nl.surfnet.bod" % "bod-nsi" % "0.2.4-SNAPSHOT" changing(),
     "org.scala-stm" %% "scala-stm" % "0.7",
-    "com.h2database" % "h2" % "1.3.171",
+    "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
     "org.scalacheck" %% "scalacheck" % "1.10.1" % "test",
     "com.typesafe.akka" %% "akka-testkit" % "2.1.0" % "test"
   )
@@ -24,6 +24,7 @@ object ApplicationBuild extends Build {
         "SURFnet BoD Snapshots" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-snapshots",
         "SURFnet BoD Releases" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-releases"
     ),
+    javaOptions in Test += "-Dconfig.file=conf/test.conf",
     testFrameworks in Test := Seq(TestFrameworks.Specs2),
 
     // Override Play! defaults to enable parallel test execution

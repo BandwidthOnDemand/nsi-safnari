@@ -7,7 +7,9 @@ import java.net.URI
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class MessageStoreSpec extends helpers.Specification {
-  def Application = FakeApplication(additionalConfiguration = testConfiguration)
+  sequential
+
+  def Application = FakeApplication()
 
   val messageStore = new MessageStore[Message]()
 
