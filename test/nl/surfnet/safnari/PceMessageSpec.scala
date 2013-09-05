@@ -111,7 +111,7 @@ class PceMessageSpec extends helpers.Specification {
 
       Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"BASIC"}""")) must beLike {
         case JsError(errors) =>
-          errors must contain((JsPath \ "username") -> Seq(ValidationError("validate.error.missing-path")))
+          errors must contain((JsPath \ "username") -> Seq(ValidationError("error.path.missing")))
       }
 
       Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"OAUTH2", "token":"oath2-token"}""")) must beEqualTo(JsSuccess(OAuthAuthentication("oath2-token")))

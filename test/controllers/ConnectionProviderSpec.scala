@@ -23,7 +23,6 @@ class ConnectionProviderSpec extends helpers.Specification {
       val requesterOperation: Promise[NsiRequesterOperation] = Promise()
       val response = await(ConnectionProvider.handleCommand(initialReserveMessage) { requesterOperation.success(_) })
 
-      response must beAnInstanceOf[NsiAcknowledgement]
       response must beLike {
         case ReserveResponse(connectionId) =>
           connectionId must not(beEmpty)

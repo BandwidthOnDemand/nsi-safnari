@@ -8,7 +8,6 @@ abstract class Specification
     with org.specs2.mutable.Tags
     with org.specs2.execute.PendingUntilFixed
     with org.specs2.time.NoTimeConversions
-    with org.specs2.ScalaCheck {
-
-  implicit val timeout = Timeout(2000)
-}
+    with org.specs2.ScalaCheck
+    with play.api.test.DefaultAwaitTimeout
+    with play.api.test.FutureAwaits

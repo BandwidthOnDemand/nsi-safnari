@@ -14,7 +14,7 @@ object ApplicationBuild extends Build {
     "org.scala-stm" %% "scala-stm" % "0.7",
     "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
     "org.scalacheck" %% "scalacheck" % "1.10.1" % "test",
-    "com.typesafe.akka" %% "akka-testkit" % "2.1.0" % "test"
+    "com.typesafe.akka" %% "akka-testkit" % "2.2.0" % "test"
   )
 
   val main = play.Project(appName, appVersion, appDependencies).settings(

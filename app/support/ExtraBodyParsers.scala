@@ -47,23 +47,19 @@ object ExtraBodyParsers {
   def NsiRequesterEndPoint(action: NsiRequesterMessage[NsiRequesterOperation] => Future[NsiRequesterMessage[NsiAcknowledgement]]): Action[NsiRequesterMessage[NsiRequesterOperation]] =
     NsiEndPoint(nsiRequesterOperation)(action)
 
-  def NsiEndPoint[M, T[_] <: NsiMessage[_]](parser: BodyParser[T[M]])(action: T[M] => Future[T[NsiAcknowledgement]])(implicit conversion: Conversion[T[NsiAcknowledgement], Document]) = Action(parser) { request =>
-    AsyncResult {
-      action(request.body).map { response =>
-        Results.Ok(response)
-      }
-    }
+  def NsiEndPoint[M, T[_] <: NsiMessage[_]](parser: BodyParser[T[M]])(action: T[M] => Future[T[NsiAcknowledgement]])(implicit conversion: Conversion[T[NsiAcknowledgement], Document]) = Action.async(parser) { request =>
+    action(request.body).map(Results.Ok(_))
   }
 
   def soap(parser: Conversion[Document, Array[Byte]], maxLength: Int = BodyParsers.parse.DEFAULT_MAX_TEXT_LENGTH): BodyParser[Document] = when(
-    _.contentType.exists(_ == SOAPConstants.SOAP_1_1_CONTENT_TYPE),
-    tolerantSoap(parser: Conversion[Document, Array[Byte]], maxLength),
-    _ => Results.BadRequest("Expecting " + SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+    predicate = _.contentType.exists(_ == SOAPConstants.SOAP_1_1_CONTENT_TYPE),
+    parser = tolerantSoap(parser: Conversion[Document, Array[Byte]], maxLength),
+    badResult = _ => Future.successful(Results.BadRequest("Expecting " + SOAPConstants.SOAP_1_1_CONTENT_TYPE)))
 
   def tolerantSoap(parser: Conversion[Document, Array[Byte]], maxLength: Int): BodyParser[Document] = BodyParser("SOAP, maxLength=" + maxLength) { request =>
     import scala.language.reflectiveCalls
     Traversable.takeUpTo[Array[Byte]](maxLength)
-      .apply(Iteratee.consume[Array[Byte]]().mapDone(parser.invert.apply))
+      .apply(Iteratee.consume[Array[Byte]]().map(parser.invert.apply))
       .flatMap(Iteratee.eofOrElse(Results.EntityTooLarge))
       .flatMap {
         case Left(b) => Done(Left(b), Empty)

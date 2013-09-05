@@ -17,7 +17,7 @@ class XmlGregorianCalendarOrderingSpec extends helpers.Specification {
 
       val sorted = List(date3, date5, date2, date1, date4).sorted
 
-      sorted must contain(date1, date2, date3, date4, date5).inOrder
+      sorted must containAllOf(Seq(date1, date2, date3, date4, date5)).inOrder
     }
 
     "find max in" in {
