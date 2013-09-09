@@ -44,16 +44,12 @@ object ApplicationBuild extends Build {
       val groupId = organization.value
       val artifactId = artifact.value.name
       val maven = mavenCommand.value
-      val command = s"""$maven -B deploy:deploy-file
-                     |  -DrepositoryId=$repoId
-                     |  -Durl=$repoUrl
-                     |  -Dfile=$distFile
-                     |  -DgroupId=$groupId
-                     |  -DartifactId=$artifactId
-                     |  -Dversion=$version
-                     |  -Dpackaging=zip""".stripMargin
+      val command = Seq(
+        maven, "-B", "deploy:deploy-file",
+        s"-DrepositoryId=$repoId", s"-Durl=$repoUrl", s"-Dfile=$distFile",
+        s"-DgroupId=$groupId", s"-DartifactId=$artifactId", s"-Dversion=$version", "-Dpackaging=zip")
 
-      println(s"Deploying $distFile to $repoId at $repoUrl using command:\n $command")
+      println(s"Deploying $distFile to $repoId at $repoUrl using command:\n ${command.mkString(" ")}")
       Process(command).lines.foreach(println)
       distFile
     }
