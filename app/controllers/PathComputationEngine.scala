@@ -44,7 +44,9 @@ object PathComputationEngine extends Controller {
           case reply => connection ! FromPce(reply)
         }
         Logger.info(s"Sending request to pce ($endPoint): ${Json.toJson(request)}")
-        WS.url(endPoint).post(Json.toJson(request))
+        WS.url(endPoint).post(Json.toJson(request)).onFailure{
+          case e => Logger.error(s"Could not reach the pce ($endPoint): $e")
+        }
     }
   }
 

@@ -121,6 +121,7 @@ class ConnectionSpec extends helpers.Specification {
         correlationId = CorrelationId(0, 3),
         replyTo = PceReplyToUri,
         schedule = Schedule,
+        serviceType = "ServiceType",
         service = Service)))
     }
 

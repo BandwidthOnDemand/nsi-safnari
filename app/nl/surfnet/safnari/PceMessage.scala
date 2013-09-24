@@ -11,12 +11,15 @@ import scala.util.Try
 import javax.xml.datatype.XMLGregorianCalendar
 import javax.xml.datatype.DatatypeFactory
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetVlanType
+import org.ogf.schemas.nsi._2013._07.services.types.DirectionalityType
+import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetBaseType
 
 sealed trait PceMessage {
   def correlationId: CorrelationId
 }
 sealed trait PceRequest extends PceMessage
-case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, schedule: ScheduleType, service: P2PServiceBaseType) extends PceRequest
+case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, schedule: ScheduleType, serviceType: String, service: P2PServiceBaseType) extends PceRequest
 
 sealed trait PceResponse extends PceMessage
 case class PathComputationFailed(correlationId: CorrelationId, message: String) extends PceResponse
@@ -52,10 +55,9 @@ object PceMessage {
   }
   implicit val UriWrites: Writes[URI] = Writes[URI] { x => JsString(x.toASCIIString()) }
 
-  // FIXME labels
   implicit val StpTypeFormat: Format[StpType] = (
-    (__ \ "network-id").format[String] and
-    (__ \ "local-id").format[String])(
+    (__ \ "networkId").format[String] and
+    (__ \ "localId").format[String])(
       (networkId, localId) => new StpType().withNetworkId(networkId).withLocalId(localId),
       stpType => (stpType.getNetworkId(), stpType.getLocalId()))
 
@@ -76,16 +78,65 @@ object PceMessage {
 
   implicit val ProviderEndPointFormat: OFormat[ProviderEndPoint] = (
     (__ \ "nsa").format[String] and
-    (__ \ "provider-url").format[URI] and
+    (__ \ "providerUrl").format[URI] and
     (__ \ "auth").format[ProviderAuthentication])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply))
 
-  // FIXME handle ets and evts
+  implicit val EthernetVlanTypeFormat: OFormat[EthernetVlanType] = (
+    (__ \ "capacity").format[Long] and
+    (__ \ "directionality").formatNullable[String].inmap[DirectionalityType](_.map(DirectionalityType.fromValue(_)).getOrElse(DirectionalityType.BIDIRECTIONAL), x => Some(x.value)) and
+    (__ \ "symmetricPath").format[Boolean] and
+    (__ \ "sourceSTP").format[StpType] and
+    (__ \ "destSTP").format[StpType] and
+    (__ \ "mtu").formatNullable[Int] and
+    (__ \ "burstsize").formatNullable[Long] and
+    (__ \ "sourceVLAN").format[Int] and
+    (__ \ "destVLAN").format[Int]
+  )((capacity, directionality, symmetricPath, source, dest, mtu, burstsize, sourceVlan, destVlan) =>
+      new EthernetVlanType()
+        .withCapacity(capacity)
+        .withDirectionality(directionality)
+        .withSymmetricPath(symmetricPath)
+        .withSourceSTP(source)
+        .withDestSTP(dest)
+        .withMtu(mtu.orNull)
+        .withBurstsize(burstsize.orNull)
+        .withSourceVLAN(sourceVlan)
+        .withDestVLAN(destVlan),
+    p2p => (p2p.getCapacity(), p2p.getDirectionality(), p2p.isSymmetricPath(), p2p.getSourceSTP(), p2p.getDestSTP(), Option(p2p.getMtu()), Option(p2p.getBurstsize()), p2p.getSourceVLAN(), p2p.getDestVLAN()))
+
+  implicit val EthernetBaseTypeFormat: OFormat[EthernetBaseType] = (
+    (__ \ "capacity").format[Long] and
+    (__ \ "directionality").formatNullable[String].inmap[DirectionalityType](_.map(DirectionalityType.fromValue(_)).getOrElse(DirectionalityType.BIDIRECTIONAL), x => Some(x.value)) and
+    (__ \ "symmetricPath").format[Boolean] and
+    (__ \ "sourceSTP").format[StpType] and
+    (__ \ "destSTP").format[StpType] and
+    (__ \ "mtu").formatNullable[Int] and
+    (__ \ "burstsize").formatNullable[Long]
+  )((capacity, directionality, symmetricPath, source, dest, mtu, burstsize) =>
+      new EthernetBaseType()
+        .withCapacity(capacity)
+        .withDirectionality(directionality)
+        .withSymmetricPath(symmetricPath)
+        .withSourceSTP(source)
+        .withDestSTP(dest)
+        .withMtu(mtu.orNull)
+        .withBurstsize(burstsize.orNull),
+    p2p => (p2p.getCapacity(), p2p.getDirectionality(), p2p.isSymmetricPath(), p2p.getSourceSTP(), p2p.getDestSTP(), Option(p2p.getMtu()), Option(p2p.getBurstsize())))
+
   implicit val PointToPointServiceFormat: OFormat[P2PServiceBaseType] = (
     (__ \ "capacity").format[Long] and
-    (__ \ "source-stp").format[StpType] and
-    (__ \ "destination-stp").format[StpType]
-  )((capacity, source, dest) => new P2PServiceBaseType().withCapacity(capacity).withSourceSTP(source).withDestSTP(dest),
-    p2p => (p2p.getCapacity(), p2p.getSourceSTP(), p2p.getDestSTP()))
+    (__ \ "directionality").formatNullable[String].inmap[Option[DirectionalityType]](_.map(DirectionalityType.fromValue(_)), _.map(_.value)) and
+    (__ \ "symmetricPath").formatNullable[Boolean] and
+    (__ \ "sourceSTP").format[StpType] and
+    (__ \ "destSTP").format[StpType]
+  )((capacity, directionality, symmetricPath, source, dest) => {
+      new P2PServiceBaseType()
+        .withCapacity(capacity)
+        .withDirectionality(directionality.getOrElse(DirectionalityType.BIDIRECTIONAL))
+        .withSymmetricPath(symmetricPath.map(x => x: java.lang.Boolean).orNull)
+        .withSourceSTP(source)
+        .withDestSTP(dest)},
+    p2p => (p2p.getCapacity(), Option(p2p.getDirectionality()), Option(p2p.isSymmetricPath()).map(_.booleanValue), p2p.getSourceSTP(), p2p.getDestSTP()))
 
   implicit val ComputedSegmentFormat: Format[ComputedSegment] = (
     PointToPointServiceFormat and
@@ -100,17 +151,17 @@ object PceMessage {
     }
   }
   implicit val PceResponseWrites: Writes[PceResponse] = Writes {
-    case PathComputationConfirmed(correlationId, segments) => Json.obj("correlation-id" -> correlationId, "status" -> "SUCCESS", "path" -> segments)
-    case PathComputationFailed(correlationId, message)     => Json.obj("correlation-id" -> correlationId, "status" -> "FAILED", "message" -> message)
+    case PathComputationConfirmed(correlationId, segments) => Json.obj("correlationId" -> correlationId, "status" -> "SUCCESS", "path" -> segments)
+    case PathComputationFailed(correlationId, message)     => Json.obj("correlationId" -> correlationId, "status" -> "FAILED", "message" -> message)
   }
 
   implicit val PathComputationConfirmedReads: Reads[PathComputationConfirmed] = (
-    (__ \ "correlation-id").read[CorrelationId] and
+    (__ \ "correlationId").read[CorrelationId] and
     (__ \ "path").read[Seq[ComputedSegment]]
   )(PathComputationConfirmed.apply _)
 
   implicit val PathComputationFailedReads: Reads[PathComputationFailed] = (
-    (__ \ "correlation-id").read[CorrelationId] and
+    (__ \ "correlationId").read[CorrelationId] and
     (__ \ "message").read[String]
   )(PathComputationFailed.apply _)
 
@@ -120,29 +171,37 @@ object PceMessage {
   }
   implicit val XMLGregorianCalendarWrites: Writes[XMLGregorianCalendar] = Writes { x => JsString(x.toString) }
 
+  implicit val PceRequestWrites: Writes[P2PServiceBaseType] = Writes {
+    case service: EthernetVlanType => Json.obj()
+    case service: EthernetBaseType => ???
+    case service: P2PServiceBaseType => ???
+  }
+
   implicit val PceRequestFormat: Format[PceRequest] = (
-    (__ \ "source-stp").format[StpType] and
-    (__ \ "destination-stp").format[StpType] and
-    (__ \ "start-time").format[Option[XMLGregorianCalendar]] and
-    (__ \ "end-time").format[Option[XMLGregorianCalendar]] and
-    (__ \ "bandwidth").format[Long] and
-    (__ \ "reply-to").format[URI] and
-    (__ \ "correlation-id").format[CorrelationId] and
+    (__ \ "correlationId").format[CorrelationId] and
+    (__ \ "replyTo" \ "url").format[URI] and
+    (__ \ "replyTo" \ "mediaType").format[String] and
     (__ \ "algorithm").format[Option[String]] and
-    (__ \ "constraints").format[Seq[String]])((source, destination, start, end, bandwidth, replyTo, correlationId, algorithm, constraints) => {
-      val service = new P2PServiceBaseType().withCapacity(bandwidth).withSourceSTP(source).withDestSTP(destination)
+    (__ \ "startTime").format[Option[XMLGregorianCalendar]] and
+    (__ \ "endTime").format[Option[XMLGregorianCalendar]] and
+    (__ \ "serviceType").format[String] and
+    (__ \ "constraints").format[Seq[String]] and
+    (__ \ "p.pts").formatNullable[P2PServiceBaseType] and
+    (__ \ "p.ets").formatNullable[EthernetBaseType] and
+    (__ \ "p.evts").formatNullable[EthernetVlanType]
+  ).apply((correlationId, replyTo, mediaType, algorithm, start, end, serviceType, constraints, pts, ets, evts) => {
       val schedule = new ScheduleType().withStartTime(start.orNull).withEndTime(end.orNull)
-      PathComputationRequest(correlationId, replyTo, schedule, service)
+      PathComputationRequest(correlationId, replyTo, schedule, serviceType, pts.orElse(ets).orElse(evts).get)
     }, {
-      case PathComputationRequest(correlationId, replyTo, schedule, service) =>
-        (service.getSourceSTP(),
-          service.getDestSTP(),
+      case PathComputationRequest(correlationId, replyTo, schedule, serviceType, service) =>
+        (correlationId,
+          replyTo,
+          "application/json",
+          None,
           Option(schedule.getStartTime()),
           Option(schedule.getEndTime()),
-          service.getCapacity(),
-          replyTo,
-          correlationId,
-          None,
-          Nil)
+          serviceType,
+          Nil,
+          service)
     })
 }

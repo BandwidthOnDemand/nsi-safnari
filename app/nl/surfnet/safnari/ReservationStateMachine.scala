@@ -163,7 +163,7 @@ class ReservationStateMachine(
 
   onTransition {
     case InitialReservationState -> PathComputationState =>
-      Seq(ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, initialReserve.body.criteria.getSchedule(), initialReserve.body.service)))
+      Seq(ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, initialReserve.body.criteria.getSchedule(), initialReserve.body.criteria.getServiceType(), initialReserve.body.service)))
 
     case PathComputationState -> CheckingReservationState =>
       val data = nextStateData
