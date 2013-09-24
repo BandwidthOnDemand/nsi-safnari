@@ -22,11 +22,11 @@ class ConnectionSpec extends helpers.Specification {
     val Criteria = new ReservationConfirmCriteriaType().withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
     val InitialReserveType = new ReserveType().withCriteria(Conversion.convert(Criteria).right.get)
     val A = ComputedSegment(
-      new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("A")).withDestSTP(new StpType().withLocalId("X")),
-      ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication))
+      serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("A")).withDestSTP(new StpType().withLocalId("X"))),
+      provider = ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication))
     val B = ComputedSegment(
-      new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("X")).withDestSTP(new StpType().withLocalId("B")),
-      ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication))
+      serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("X")).withDestSTP(new StpType().withLocalId("B"))),
+      provider = ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication))
 
     val AggregatorNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
     val Headers = NsiHeaders(CorrelationId(0, 0), "RequesterNSA", AggregatorNsa, Some(URI.create("http://example.com/")), NsiHeaders.ProviderProtocolVersion)
@@ -121,8 +121,7 @@ class ConnectionSpec extends helpers.Specification {
         correlationId = CorrelationId(0, 3),
         replyTo = PceReplyToUri,
         schedule = Schedule,
-        serviceType = "ServiceType",
-        service = Service)))
+        serviceType = ServiceType("ServiceType", Service))))
     }
 
     "send reserve request for each segment when path computation confirmed is received" in new fixture {

@@ -84,7 +84,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       case ((id, segment), order) => new ChildSummaryType().
         withConnectionId(id).
         withProviderNSA(segment.provider.nsa).
-        withPointToPointService(segment.service).
+        withPointToPointService(segment.serviceType.service).
         withOrder(order)
     }
 

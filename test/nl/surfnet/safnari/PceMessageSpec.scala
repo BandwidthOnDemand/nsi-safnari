@@ -26,14 +26,14 @@ object PceMessageSpec {
     .withSourceSTP(sourceStp)
     .withDestSTP(destStp)
   val Schedule = new ScheduleType()
-  val ServiceType = "http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE"
+  val ServiceTypeUrl = "http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE"
 
   val correlationId = newCorrelationId
 
-  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType, ServiceBaseType)
+  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType))
 
   val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication)
-  val computedSegment = ComputedSegment(ServiceBaseType, providerEndPoint)
+  val computedSegment = ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))
   val pathComputationResponse = PathComputationConfirmed(correlationId, Seq(computedSegment))
 }
 
@@ -46,7 +46,7 @@ class PceMessageSpec extends helpers.Specification {
     import nl.surfnet.safnari.PceMessage._
 
     "serialize request with ethernetVlanService to json" in {
-      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType, EthernetVlanService)
+      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, EthernetVlanService))
 
       val json = Json.toJson(request)
 
@@ -61,12 +61,13 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "serialize request with p2pServiceBaseType to json" in {
-      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType, ServiceBaseType)
+      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType))
 
       val json = Json.toJson(request)
 
       json \ "correlationId" must beEqualTo(JsString(correlationId.toString))
       json \ "replyTo" \ "url" must beEqualTo(JsString("http://localhost/pce/reply"))
+      (json \ "p.p2ps" apply 0) \ "capacity" must beEqualTo(JsNumber(100))
 
       Json.fromJson[PceRequest](json) must beEqualTo(JsSuccess(request))
     }
@@ -82,7 +83,7 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "serialize computation confirmed response to json" in {
-      val response = PathComputationConfirmed(correlationId, List(ComputedSegment(ServiceBaseType, providerEndPoint)))
+      val response = PathComputationConfirmed(correlationId, List(ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))))
 
       val json = Json.toJson[PceResponse](response)
 
@@ -107,30 +108,91 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "deserialize path computation confirmed" in {
-      val input = """{
-        |"correlationId":"urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02",
-        |"status":"SUCCESS",
-        |"message":"all good!",
-        |"path":[{
-        |"capacity":100,
-        |"sourceSTP":{"networkId":"urn:ogf:network:stp:surfnet.nl","localId":"15"},
-        |"destSTP":{"networkId":"urn:ogf:network:stp:surfnet.nl","localId":"18"},
-        |"nsa":"urn:ogf:network:nsa:surfnet.nl",
-        |"providerUrl":"http://localhost:8082/bod/v2/provider",
-        |"auth":{"method":"OAUTH2","token":"f44b1e47-0a19-4c11-861b-c9abf82d4cbf"}}]
+      val input = """
+        |{
+        |  "correlationId": "urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02",
+        |  "status": "SUCCESS",
+        |  "path": [
+        |    {
+        |      "nsa": "urn:ogf:network:nsa:internet2.edu",
+        |      "csProviderURL": "http://oscars.internet2.edu/provider",
+        |      "credentials": {
+        |        "method": "NONE"
+        |      },
+        |      "serviceType": "http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE",
+        |      "p.evts": [
+        |        {
+        |          "capacity": 100,
+        |          "directionality": "Bidirectional",
+        |          "symmetricPath": true,
+        |          "sourceSTP": {
+        |            "networkId": "urn:ogf:network:internet2.edu",
+        |            "localId": "i2-edge"
+        |          },
+        |          "destSTP": {
+        |            "networkId": "urn:ogf:network:internet2.edu",
+        |            "localId": "to-esnet"
+        |          },
+        |          "sourceVLAN": 1780,
+        |          "destVLAN": 1780
+        |        }
+        |      ]
+        |    },
+        |    {
+        |      "nsa": "urn:ogf:network:nsa:es.net",
+        |      "csProviderURL": "http://oscars.es.net/nsi/ConnectionService",
+        |      "credentials": {
+        |        "method": "BASIC",
+        |        "username": "foo",
+        |        "password": "bar"
+        |      },
+        |      "serviceType": "http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE",
+        |      "p.evts": [
+        |        {
+        |          "capacity": 100,
+        |          "directionality": "Bidirectional",
+        |          "symmetricPath": true,
+        |          "sourceSTP": {
+        |            "networkId": "urn:ogf:network:es.net",
+        |            "localId": "to-internet2"
+        |          },
+        |          "destSTP": {
+        |            "networkId": "urn:ogf:network:es.net",
+        |            "localId": "esnet-edge-one"
+        |          },
+        |          "sourceVLAN": 1780,
+        |          "destVLAN": 1780
+        |        }
+        |      ]
+        |    }
+        |  ]
         |}""".stripMargin
 
       val output = PathComputationConfirmed(
         CorrelationId.fromString("urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02").get,
         ComputedSegment(
-          new P2PServiceBaseType()
+          ProviderEndPoint("urn:ogf:network:nsa:internet2.edu",
+            URI.create("http://oscars.internet2.edu/provider"),
+            NoAuthentication),
+          ServiceType("http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE", new EthernetVlanType()
             .withCapacity(100)
             .withDirectionality(DirectionalityType.BIDIRECTIONAL)
-            .withSourceSTP(new StpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("15"))
-            .withDestSTP(new StpType().withNetworkId("urn:ogf:network:stp:surfnet.nl").withLocalId("18")),
-          ProviderEndPoint("urn:ogf:network:nsa:surfnet.nl",
-          URI.create("http://localhost:8082/bod/v2/provider"),
-          OAuthAuthentication("f44b1e47-0a19-4c11-861b-c9abf82d4cbf"))) :: Nil)
+            .withSymmetricPath(true)
+            .withSourceSTP(new StpType().withNetworkId("urn:ogf:network:internet2.edu").withLocalId("i2-edge"))
+            .withDestSTP(new StpType().withNetworkId("urn:ogf:network:internet2.edu").withLocalId("to-esnet"))
+            .withSourceVLAN(1780).withDestVLAN(1780)))
+        :: ComputedSegment(
+          ProviderEndPoint("urn:ogf:network:nsa:es.net",
+            URI.create("http://oscars.es.net/nsi/ConnectionService"),
+            BasicAuthentication("foo", "bar")),
+          ServiceType("http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE", new EthernetVlanType()
+            .withCapacity(100)
+            .withDirectionality(DirectionalityType.BIDIRECTIONAL)
+            .withSymmetricPath(true)
+            .withSourceSTP(new StpType().withNetworkId("urn:ogf:network:es.net").withLocalId("to-internet2"))
+            .withDestSTP(new StpType().withNetworkId("urn:ogf:network:es.net").withLocalId("esnet-edge-one"))
+            .withSourceVLAN(1780).withDestVLAN(1780)))
+        :: Nil)
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
     }
@@ -152,7 +214,7 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "deserialize provider end point" in {
-      Json.fromJson[ProviderEndPoint](Json.parse("""{"nsa":"urn:nsa:surfnet.nl", "providerUrl":"http://localhost", "auth":{"method":"NONE"}}""")) must beEqualTo(
+      Json.fromJson[ProviderEndPoint](Json.parse("""{"nsa":"urn:nsa:surfnet.nl", "csProviderURL":"http://localhost", "credentials":{"method":"NONE"}}""")) must beEqualTo(
         JsSuccess(ProviderEndPoint("urn:nsa:surfnet.nl", URI.create("http://localhost"), NoAuthentication)))
     }
 
