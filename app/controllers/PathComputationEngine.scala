@@ -23,7 +23,7 @@ object PathComputationEngine extends Controller {
         pceContinuations.replyReceived(response.correlationId, response)
         Ok
       case JsError(error) =>
-        Logger.info(s"Pce error: $error")
+        Logger.info(s"Pce error: $error body: ${request.body}")
         BadRequest
     }
   }

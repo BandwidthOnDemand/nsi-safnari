@@ -176,9 +176,9 @@ object PceMessage {
     (__ \ "correlationId").format[CorrelationId] and
     (__ \ "replyTo" \ "url").format[URI] and
     (__ \ "replyTo" \ "mediaType").format[String] and
-    (__ \ "algorithm").format[Option[String]] and
-    (__ \ "startTime").format[Option[XMLGregorianCalendar]] and
-    (__ \ "endTime").format[Option[XMLGregorianCalendar]] and
+    (__ \ "algorithm").formatNullable[String] and
+    (__ \ "startTime").formatNullable[XMLGregorianCalendar] and
+    (__ \ "endTime").formatNullable[XMLGregorianCalendar] and
     (__ \ "constraints").format[Seq[String]] and
     ServiceTypeFormat)
     .apply((correlationId, replyTo, mediaType, algorithm, start, end, constraints, serviceType) => {
