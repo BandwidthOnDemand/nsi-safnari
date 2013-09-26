@@ -122,7 +122,6 @@ object NsiSoapConversions {
     })
   } {
     messageFactories(Map[String, NsiMessageParser[NsiRequesterOperation]](
-      // FIXME this list seems to be incomplete?
       "reserveConfirmed" -> NsiMessageParser { (body: ReserveConfirmedType) => Right(ReserveConfirmed(body.getConnectionId(), body.getCriteria())) },
       "reserveFailed" -> NsiMessageParser { (body: GenericFailedType) => Right(ReserveFailed(body)) },
       "reserveCommitConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ReserveCommitConfirmed(body.getConnectionId)) },
