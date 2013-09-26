@@ -124,12 +124,24 @@ object NsiSoapConversions {
     messageFactories(Map[String, NsiMessageParser[NsiRequesterOperation]](
       // FIXME this list seems to be incomplete?
       "reserveConfirmed" -> NsiMessageParser { (body: ReserveConfirmedType) => Right(ReserveConfirmed(body.getConnectionId(), body.getCriteria())) },
-      "reserveCommitConfirmed" -> NsiMessageParser[GenericConfirmedType, NsiRequesterOperation]((body) => Right(ReserveCommitConfirmed(body.getConnectionId))),
-      "reserveTimeout" -> NsiMessageParser[ReserveTimeoutRequestType, NsiRequesterOperation]((body) => Right(ReserveTimeout(body))),
-      "provisionConfirmed" -> NsiMessageParser[GenericConfirmedType, NsiRequesterOperation]((body) => Right(ProvisionConfirmed(body.getConnectionId))),
-      "releaseConfirmed" -> NsiMessageParser[GenericConfirmedType, NsiRequesterOperation]((body) => Right(ReleaseConfirmed(body.getConnectionId))),
-      "terminateConfirmed" -> NsiMessageParser[GenericConfirmedType, NsiRequesterOperation]((body) => Right(TerminateConfirmed(body.getConnectionId))),
-      "dataPlaneStateChange" -> NsiMessageParser[DataPlaneStateChangeRequestType, NsiRequesterOperation]((body) => Right(DataPlaneStateChange(body.getConnectionId(), body.getDataPlaneStatus(), body.getTimeStamp())))))
+      "reserveFailed" -> NsiMessageParser { (body: GenericFailedType) => Right(ReserveFailed(body)) },
+      "reserveCommitConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ReserveCommitConfirmed(body.getConnectionId)) },
+      "reserveCommitFailed" -> NsiMessageParser { (body: GenericFailedType) => Right(ReserveCommitFailed(body)) },
+      "reserveAbortConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ReserveAbortConfirmed(body.getConnectionId)) },
+      "reserveTimeout" -> NsiMessageParser { (body: ReserveTimeoutRequestType) => Right(ReserveTimeout(body)) },
+      "provisionConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ProvisionConfirmed(body.getConnectionId)) },
+      "releaseConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ReleaseConfirmed(body.getConnectionId)) },
+      "terminateConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(TerminateConfirmed(body.getConnectionId)) },
+      "querySummaryConfirmed" -> NsiMessageParser { (body: QuerySummaryConfirmedType) => Right(QuerySummaryConfirmed(body.getReservation().asScala.toVector)) },
+      "querySummaryFailed" -> NsiMessageParser { (body: QueryFailedType) => Right(QuerySummaryFailed(body)) },
+      "queryRecursiveConfirmed" -> NsiMessageParser { (body: QueryRecursiveConfirmedType) => Right(QueryRecursiveConfirmed(body.getReservation().asScala.toVector)) },
+      "queryRecursiveFailed" -> NsiMessageParser { (body: QueryFailedType) => Right(QueryRecursiveFailed(body)) },
+      "dataPlaneStateChange" -> NsiMessageParser { (body: DataPlaneStateChangeRequestType) => Right(DataPlaneStateChange(body.getConnectionId(), body.getDataPlaneStatus(), body.getTimeStamp())) },
+      "errorEvent" -> NsiMessageParser { (body: ErrorEventType) => Right(ErrorEvent(body)) },
+      "messageDeliveryTimeout" -> NsiMessageParser { (body: MessageDeliveryTimeoutRequestType) =>
+        val correlationId = CorrelationId.fromString(body.getCorrelationId()).toRight(s"bad correlation id ${body.getCorrelationId()}")
+        correlationId.right.map(MessageDeliveryTimeout(_, body.getTimeStamp()))
+      }))
   }
 
   private implicit val NsiHeadersToCommonHeaderType = Conversion.build[NsiHeaders, CommonHeaderType] { headers =>
