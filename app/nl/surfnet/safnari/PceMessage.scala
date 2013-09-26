@@ -164,7 +164,9 @@ object PceMessage {
 
   implicit val PathComputationFailedReads: Reads[PathComputationFailed] = (
     (__ \ "correlationId").read[CorrelationId] and
-    (__ \ "message").read[String])(PathComputationFailed.apply _)
+    (__ \ "message").readNullable[String]) { (correlationId, optionalMessage) =>
+      PathComputationFailed(correlationId, optionalMessage.getOrElse("no error message received from PCE"))
+    }
 
   implicit val XMLGregorianCalendarReads: Reads[XMLGregorianCalendar] = Reads {
     case JsString(s) => Try { DatatypeFactory.newInstance().newXMLGregorianCalendar(s) }.map { x => JsSuccess(x) }.getOrElse { JsError(ValidationError("bad.timestamp", s)) }
