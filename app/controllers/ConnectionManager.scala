@@ -1,13 +1,14 @@
 package controllers
 
 import akka.actor._
+import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
 import nl.surfnet.safnari._
+import play.Logger
 import scala.concurrent._
 import scala.concurrent.duration.{ Duration, DurationInt }
 import scala.concurrent.stm._
-import play.Logger
 
 class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity)) {
   implicit val timeout = Timeout(2.seconds)
@@ -62,7 +63,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   private[controllers] case class Replay(messages: Seq[Message])
 
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
-    override def receive = {
+    override def receive = LoggingReceive {
       case 'query         => sender ! connection.query
       case 'querySegments => sender ! connection.segments
 
