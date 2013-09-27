@@ -12,6 +12,9 @@ case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     else if (childStates.values.forall(_ == PROVISIONED)) PROVISIONED
     else throw new IllegalStateException(s"cannot determine aggregated status from ${childStates.values}")
 
+  def startCommand(newCommand: NsiProviderMessage[NsiProviderOperation], transitionalState: ProvisionStateEnumType) =
+    copy(command = Some(newCommand), childStates = childStates.map( _._1 -> transitionalState))
+
   def updateChild(connectionId: ConnectionId, state: ProvisionStateEnumType) =
     copy(childStates = childStates.updated(connectionId, state))
 
@@ -24,23 +27,22 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   when(RELEASED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Provision)), data) =>
-      goto(PROVISIONING) using data.copy(command = Some(message))
+      goto(PROVISIONING) using data.startCommand(message, PROVISIONING)
   }
 
   when(PROVISIONING) {
-    case Event(FromProvider(NsiRequesterMessage(headers, message: ProvisionConfirmed)), data) if data.childHasState(message.connectionId, RELEASED) =>
+    case Event(FromProvider(NsiRequesterMessage(headers, message: ProvisionConfirmed)), data) if data.childHasState(message.connectionId, PROVISIONING) =>
       val newData = data.updateChild(message.connectionId, PROVISIONED)
       goto(newData.aggregatedProvisionStatus) using newData
   }
 
   when(PROVISIONED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Release)), data) =>
-      goto(RELEASING) using data.copy(command = Some(message))
-
+      goto(RELEASING) using data.startCommand(message, RELEASING)
   }
 
   when(RELEASING) {
-    case Event(FromProvider(NsiRequesterMessage(headers, message: ReleaseConfirmed)), data) if data.childHasState(message.connectionId, PROVISIONED) =>
+    case Event(FromProvider(NsiRequesterMessage(headers, message: ReleaseConfirmed)), data) if data.childHasState(message.connectionId, RELEASING) =>
       val newData = data.updateChild(message.connectionId, RELEASED)
       goto(newData.aggregatedProvisionStatus) using newData
   }

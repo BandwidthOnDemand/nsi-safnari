@@ -103,6 +103,22 @@ class ConnectionSpec extends helpers.Specification {
       upa.response(CorrelationId(0, 6), ReserveCommitConfirmed("ConnectionIdA")))
   }
 
+  trait ReservedConnectionWithTwoSegments extends fixture {
+    given(
+      ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
+      FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))),
+
+      upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
+      upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")),
+      upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", Criteria)),
+      upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", Criteria)),
+
+      ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)),
+      upa.response(CorrelationId(0, 8), ReserveCommitConfirmed("ConnectionIdA")),
+      upa.response(CorrelationId(0, 9), ReserveCommitConfirmed("ConnectionIdB"))
+    )
+  }
+
   trait Released { this: ReservedConnection =>
   }
 
@@ -304,7 +320,6 @@ class ConnectionSpec extends helpers.Specification {
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
     }
 
-    tag("focus")
     "be in reserve timeout state when provider times out" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
@@ -361,10 +376,34 @@ class ConnectionSpec extends helpers.Specification {
 
       given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
 
+      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
+
       when(upa.response(CorrelationId(0, 8), ProvisionConfirmed("ConnectionIdA")))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
       messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = ProvisionCorrelationId).forAsyncReply, ProvisionConfirmed(ConnectionId))))
+    }
+
+    "send a provision confirmed with multiple segments" in new ReservedConnectionWithTwoSegments {
+      val ProvisionCorrelationId = newCorrelationId
+
+      given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
+
+      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdA", _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _) => ok}
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdB", _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _) => ok}
+
+      when(upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")))
+
+      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdA", _, _, _, ProvisionStateEnumType.PROVISIONED, _) => ok}
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdB", _, _, _, ProvisionStateEnumType.PROVISIONING, _) => ok}
+
+      when(upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
+
+      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdA", _, _, _, ProvisionStateEnumType.PROVISIONED, _) => ok}
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdB", _, _, _, ProvisionStateEnumType.PROVISIONED, _) => ok}
     }
 
     "become releasing on release request" in new ReservedConnection with Provisioned {
