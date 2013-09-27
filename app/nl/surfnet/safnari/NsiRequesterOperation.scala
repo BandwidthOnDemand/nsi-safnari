@@ -38,4 +38,6 @@ case class ReserveTimeout(timeout: ReserveTimeoutRequestType) extends NsiNotific
   def connectionId: ConnectionId = timeout.getConnectionId()
 }
 
-case class MessageDeliveryTimeout(correlationId: CorrelationId, timeStamp: XMLGregorianCalendar) extends NsiRequesterOperation
+case class MessageDeliveryTimeout(timeout: MessageDeliveryTimeoutRequestType) extends NsiNotification {
+  def connectionId: ConnectionId = timeout.getConnectionId()
+}

@@ -503,11 +503,11 @@ class ConnectionSpec extends helpers.Specification {
       val ProviderErrorEventCorrelationId = newCorrelationId
       val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
       val ChildException = new ServiceExceptionType()
-          .withConnectionId("ConnectionIdA")
-          .withNsaId(A.provider.nsa)
-          .withErrorId("FORCED_END")
-          .withText("ERROR_TEXT")
-          .withServiceType("SERVICE_TYPE")
+        .withConnectionId("ConnectionIdA")
+        .withNsaId(A.provider.nsa)
+        .withErrorId("FORCED_END")
+        .withText("ERROR_TEXT")
+        .withServiceType("SERVICE_TYPE")
 
       when(upa.notification(ProviderErrorEventCorrelationId, ErrorEvent(new ErrorEventType()
         .withConnectionId("ConnectionIdA")
@@ -555,6 +555,53 @@ class ConnectionSpec extends helpers.Specification {
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
       messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 11)), Terminate("ConnectionIdA")), A.provider))
+    }
+
+    "pass MessageDeliveryTimeout notifications to requester" in new ReservedConnection {
+      val TimedOutMessageCorrelationId = newCorrelationId.toString
+      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+
+      when(upa.notification(newCorrelationId, MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
+        .withConnectionId("ConnectionIdA")
+        .withNotificationId(12)
+        .withCorrelationId(TimedOutMessageCorrelationId)
+        .withTimeStamp(TimeStamp))))
+
+      messages must contain(agg.notification(CorrelationId(0, 9), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
+        .withConnectionId(ConnectionId)
+        .withNotificationId(1)
+        .withCorrelationId(TimedOutMessageCorrelationId)
+        .withTimeStamp(TimeStamp))))
+    }
+
+    "pass ErrorEvent notifications to requester" in new ReservedConnection {
+      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+      val ChildException = new ServiceExceptionType()
+        .withConnectionId("ConnectionIdA")
+        .withNsaId(A.provider.nsa)
+        .withErrorId("ERROR_ID")
+        .withText("TEXT")
+        .withServiceType("SERVICE_TYPE")
+
+      when(upa.notification(newCorrelationId, ErrorEvent(new ErrorEventType()
+        .withConnectionId("ConnectionIdA")
+        .withNotificationId(12)
+        .withEvent(EventEnumType.DATAPLANE_ERROR)
+        .withTimeStamp(TimeStamp)
+        .withServiceException(ChildException))))
+
+      messages must contain(agg.notification(CorrelationId(0, 8), ErrorEvent(new ErrorEventType()
+        .withConnectionId(ConnectionId)
+        .withNotificationId(1)
+        .withEvent(EventEnumType.DATAPLANE_ERROR)
+        .withTimeStamp(TimeStamp)
+        .withServiceException(new ServiceExceptionType()
+          .withConnectionId(ConnectionId)
+          .withNsaId(AggregatorNsa)
+          .withErrorId("ERROR_ID")
+          .withText("TEXT")
+          .withServiceType("SERVICE_TYPE")
+          .withChildException(ChildException)))))
     }
   }
 

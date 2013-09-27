@@ -32,6 +32,8 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   when(CREATED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
       goto(TERMINATING) using (data.copy(command = Some(message)))
+    case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.error.getEvent() == EventEnumType.FORCED_END =>
+      goto(FAILED) using data.updateChild(errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
   }
 
   when(TERMINATING) {
@@ -45,11 +47,6 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   when(FAILED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
       goto(TERMINATING) using (data.copy(command = Some(message)))
-  }
-
-  whenUnhandled {
-    case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.error.getEvent() == EventEnumType.FORCED_END =>
-      goto(FAILED) using data.updateChild(errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
   }
 
   onTransition {

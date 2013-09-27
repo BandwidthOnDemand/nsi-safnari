@@ -103,22 +103,22 @@ object NsiSoapConversions {
 
   implicit val NsiRequesterOperationToJaxbElement = Conversion.build[NsiRequesterOperation, Element] { operation =>
     marshal(operation match {
-      case ReserveConfirmed(connectionId, criteria)         => typesFactory.createReserveConfirmed(new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria))
-      case ReserveFailed(failure)                           => typesFactory.createReserveFailed(failure)
-      case ReserveCommitConfirmed(connectionId)             => typesFactory.createReserveCommitConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
-      case ReserveCommitFailed(failure)                     => typesFactory.createReserveCommitFailed(failure)
-      case ReserveAbortConfirmed(connectionId)              => typesFactory.createReserveAbortConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
-      case ReserveTimeout(timeout)                          => typesFactory.createReserveTimeout(timeout)
-      case ProvisionConfirmed(connectionId)                 => typesFactory.createProvisionConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
-      case ReleaseConfirmed(connectionId)                   => typesFactory.createReleaseConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
-      case TerminateConfirmed(connectionId)                 => typesFactory.createTerminateConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
-      case QuerySummaryConfirmed(reservations)              => typesFactory.createQuerySummaryConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava))
-      case QuerySummaryFailed(failed)                       => typesFactory.createQuerySummaryFailed(failed)
-      case QueryRecursiveConfirmed(reservations)            => typesFactory.createQueryRecursiveConfirmed(new QueryRecursiveConfirmedType().withReservation(reservations.asJava))
-      case QueryRecursiveFailed(failed)                     => typesFactory.createQueryRecursiveFailed(failed)
-      case DataPlaneStateChange(notification)               => typesFactory.createDataPlaneStateChange(notification)
-      case ErrorEvent(error)                                => typesFactory.createErrorEvent(error)
-      case MessageDeliveryTimeout(correlationId, timeStamp) => typesFactory.createMessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType().withCorrelationId(correlationId.toString).withTimeStamp(timeStamp))
+      case ReserveConfirmed(connectionId, criteria) => typesFactory.createReserveConfirmed(new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria))
+      case ReserveFailed(failure)                   => typesFactory.createReserveFailed(failure)
+      case ReserveCommitConfirmed(connectionId)     => typesFactory.createReserveCommitConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case ReserveCommitFailed(failure)             => typesFactory.createReserveCommitFailed(failure)
+      case ReserveAbortConfirmed(connectionId)      => typesFactory.createReserveAbortConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case ReserveTimeout(timeout)                  => typesFactory.createReserveTimeout(timeout)
+      case ProvisionConfirmed(connectionId)         => typesFactory.createProvisionConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case ReleaseConfirmed(connectionId)           => typesFactory.createReleaseConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case TerminateConfirmed(connectionId)         => typesFactory.createTerminateConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
+      case QuerySummaryConfirmed(reservations)      => typesFactory.createQuerySummaryConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava))
+      case QuerySummaryFailed(failed)               => typesFactory.createQuerySummaryFailed(failed)
+      case QueryRecursiveConfirmed(reservations)    => typesFactory.createQueryRecursiveConfirmed(new QueryRecursiveConfirmedType().withReservation(reservations.asJava))
+      case QueryRecursiveFailed(failed)             => typesFactory.createQueryRecursiveFailed(failed)
+      case DataPlaneStateChange(notification)       => typesFactory.createDataPlaneStateChange(notification)
+      case ErrorEvent(error)                        => typesFactory.createErrorEvent(error)
+      case MessageDeliveryTimeout(timeout)          => typesFactory.createMessageDeliveryTimeout(timeout)
     })
   } {
     messageFactories(Map[String, NsiMessageParser[NsiRequesterOperation]](
@@ -137,10 +137,7 @@ object NsiSoapConversions {
       "queryRecursiveFailed" -> NsiMessageParser { (body: QueryFailedType) => Right(QueryRecursiveFailed(body)) },
       "dataPlaneStateChange" -> NsiMessageParser { (body: DataPlaneStateChangeRequestType) => Right(DataPlaneStateChange(body)) },
       "errorEvent" -> NsiMessageParser { (body: ErrorEventType) => Right(ErrorEvent(body)) },
-      "messageDeliveryTimeout" -> NsiMessageParser { (body: MessageDeliveryTimeoutRequestType) =>
-        val correlationId = CorrelationId.fromString(body.getCorrelationId()).toRight(s"bad correlation id ${body.getCorrelationId()}")
-        correlationId.right.map(MessageDeliveryTimeout(_, body.getTimeStamp()))
-      }))
+      "messageDeliveryTimeout" -> NsiMessageParser { (body: MessageDeliveryTimeoutRequestType) => Right(MessageDeliveryTimeout(body)) }))
   }
 
   private implicit val NsiHeadersToCommonHeaderType = Conversion.build[NsiHeaders, CommonHeaderType] { headers =>
