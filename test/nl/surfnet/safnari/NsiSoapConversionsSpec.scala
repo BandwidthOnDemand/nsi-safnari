@@ -89,6 +89,39 @@ class NsiSoapConversionsSpec extends helpers.Specification {
 
       requesterMessage must beRight
     }
+
+    "parse dataPlaneStateChange operation" in {
+      val message = """<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Header>
+        <ns6:nsiHeader xmlns:ns8="http://schemas.ogf.org/nsi/2013/07/services/point2point" xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/headers"
+            xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types" xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#" xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion">
+            <protocolVersion>application/vdn.ogf.nsi.cs.v2.provider+soap</protocolVersion>
+            <correlationId>urn:uuid:88bbe366-4af7-40bf-8edb-2ad9a980f402</correlationId>
+            <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-safnari</requesterNSA>
+            <providerNSA>urn:ogf:network:nsa:es.net</providerNSA>
+        </ns6:nsiHeader>
+    </soap:Header>
+    <soap:Body>
+        <ns5:dataPlaneStateChange xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#" xmlns:ns4="http://www.w3.org/2000/09/xmldsig#"
+            xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/types"
+            xmlns:ns8="http://schemas.ogf.org/nsi/2013/07/services/point2point">
+            <connectionId>2ac54e1f-3ce6-44af-9356-b0d4e31f3c42</connectionId>
+            <notificationId>1</notificationId>
+            <timeStamp>2013-09-26T06:19:49.311-07:00</timeStamp>
+            <dataPlaneStatus>
+                <active>true</active>
+                <version>0</version>
+                <versionConsistent>true</versionConsistent>
+            </dataPlaneStatus>
+        </ns5:dataPlaneStateChange>
+    </soap:Body>
+</soap:Envelope>"""
+
+      val requestOperationToStringConversion = NsiRequesterMessageToDocument(NsiRequesterOperationToJaxbElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))
+          val requesterMessage = requestOperationToStringConversion.invert(message)
+
+          requesterMessage must beRight
+    }
   }
 
   "DOM to byte array conversion" should {
