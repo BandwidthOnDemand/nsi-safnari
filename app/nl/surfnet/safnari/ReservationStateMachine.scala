@@ -47,7 +47,6 @@ case class ReservationStateMachineData(
     else throw new IllegalStateException(s"cannot determine aggregated state from ${childConnectionStates.values.mkString(",")}")
 
   def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = {
-    require(!childConnectionStates.contains(connectionId), s"duplicate connectionId: $connectionId, already have $childConnectionStates")
     copy(connections = connections.updated(connectionId, correlationId))
   }
 
@@ -101,7 +100,9 @@ class ReservationStateMachine(
 
   when(CheckingReservationState) {
     case Event(AckFromProvider(NsiProviderMessage(headers, ReserveResponse(connectionId))), data) if data.childHasState(connectionId, CheckingReservationState) =>
-      stay using data.receivedConnectionId(headers.correlationId, connectionId)
+      stay using data
+        .receivedConnectionId(headers.correlationId, connectionId)
+        .updateChild(connectionId, CheckingReservationState)
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveConfirmed)), data) if data.childHasState(message.connectionId, CheckingReservationState) =>
       val newData = data
         .receivedConnectionId(headers.correlationId, message.connectionId)
@@ -219,7 +220,7 @@ class ReservationStateMachine(
   }
 
   def segmentKnown(connectionId: ConnectionId) = stateData.childConnectionStates.contains(connectionId)
-  def childConnectionState(connectionId: ConnectionId): ReservationStateEnumType = stateData.childConnectionStates.get(connectionId).map(_.jaxb).getOrElse(ReservationStateEnumType.RESERVE_CHECKING)
+  def childConnectionState(connectionId: ConnectionId): ReservationStateEnumType = stateData.childConnectionStates(connectionId).jaxb
   def childConnections: Map[ConnectionId, ComputedSegment] = stateData.children
   def reservationState = stateName.jaxb
   def criteria = stateData.criteria

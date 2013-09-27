@@ -114,7 +114,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       case FromRequester(NsiProviderMessage(headers, message)) => ServiceException(NsiError.InvalidState.toServiceException("NSA-ID"))
       case FromProvider(NsiRequesterMessage(headers, message)) => ServiceException(NsiError.InvalidState.toServiceException("NSA-ID"))
       case FromPce(message)                                    => 400
-      case AckFromProvider(_)                                      => 500
+      case AckFromProvider(_)                                  => 500
     }
   }
 }

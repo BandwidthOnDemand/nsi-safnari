@@ -55,6 +55,7 @@ class ConnectionSpec extends helpers.Specification {
     }
 
     def connectionData = connection.query
+    def segments = connection.segments
 
     def reservationState = connectionData.getConnectionStates().getReservationState()
     def provisionState = connectionData.getConnectionStates().getProvisionState()
@@ -180,15 +181,23 @@ class ConnectionSpec extends helpers.Specification {
     "be in reservation held state when both segments are confirmed" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))))
+        FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))),
+        upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
+        upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB"))
+      )
 
       when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", Criteria)))
       messages must beEmpty
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdA", _, ReservationStateEnumType.RESERVE_HELD, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdB", _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _) => ok}
 
       when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", Criteria)))
       messages must contain(ToRequester(NsiRequesterMessage(InitialReserveHeaders.forAsyncReply, ReserveConfirmed(ConnectionId, Criteria))))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdA", _, ReservationStateEnumType.RESERVE_HELD, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdB", _, ReservationStateEnumType.RESERVE_HELD, _, _, _) => ok}
     }
 
     "fail the reservation with a single path segment" in new fixture {
