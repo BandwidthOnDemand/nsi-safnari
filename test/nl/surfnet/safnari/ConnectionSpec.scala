@@ -591,6 +591,22 @@ class ConnectionSpec extends helpers.Specification {
 
     "pass ErrorEvent notifications to requester" in new ReservedConnection {
       val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+
+      when(upa.notification(newCorrelationId, ErrorEvent(new ErrorEventType()
+        .withConnectionId("ConnectionIdA")
+        .withNotificationId(12)
+        .withEvent(EventEnumType.DATAPLANE_ERROR)
+        .withTimeStamp(TimeStamp))))
+
+      messages must contain(agg.notification(CorrelationId(0, 8), ErrorEvent(new ErrorEventType()
+        .withConnectionId(ConnectionId)
+        .withNotificationId(1)
+        .withEvent(EventEnumType.DATAPLANE_ERROR)
+        .withTimeStamp(TimeStamp))))
+    }
+
+    "pass ErrorEvent notifications to requester with child exceptions" in new ReservedConnection {
+      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
       val ChildException = new ServiceExceptionType()
         .withConnectionId("ConnectionIdA")
         .withNsaId(A.provider.nsa)
@@ -618,7 +634,7 @@ class ConnectionSpec extends helpers.Specification {
           .withServiceType("SERVICE_TYPE")
           .withChildException(ChildException)))))
     }
-  }
+}
 
   private def dataPlaneStatusType(active: Boolean) = new DataPlaneStatusType().withActive(active).withVersion(0).withVersionConsistent(true)
 }
