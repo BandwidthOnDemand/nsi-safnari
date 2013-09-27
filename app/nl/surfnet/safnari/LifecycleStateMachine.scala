@@ -19,6 +19,9 @@ case class LifecycleStateMachineData(
     else throw new IllegalStateException(s"cannot determine aggregated status from ${childConnectionStates.values}")
   }
 
+  def startCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: LifecycleStateEnumType) =
+    copy(command = Some(command), childConnectionStates = childConnectionStates.map(_._1 -> transitionalState))
+
   def updateChild(connectionId: ConnectionId, state: LifecycleStateEnumType) =
     copy(childConnectionStates = childConnectionStates.updated(connectionId, state))
 
@@ -31,13 +34,13 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   when(CREATED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
-      goto(TERMINATING) using (data.copy(command = Some(message)))
+      goto(TERMINATING) using (data.startCommand(message, TERMINATING))
     case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.error.getEvent() == EventEnumType.FORCED_END =>
       goto(FAILED) using data.updateChild(errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
   }
 
   when(TERMINATING) {
-    case Event(FromProvider(NsiRequesterMessage(headers, message: TerminateConfirmed)), data) if data.childHasState(message.connectionId, CREATED) =>
+    case Event(FromProvider(NsiRequesterMessage(headers, message: TerminateConfirmed)), data) if data.childHasState(message.connectionId, TERMINATING) =>
       val newData = data.updateChild(message.connectionId, TERMINATED)
       goto(newData.aggregatedLifecycleStatus) using (newData)
   }
@@ -50,14 +53,14 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   }
 
   onTransition {
-    case _ -> TERMINATING =>
+    case (CREATED | FAILED) -> TERMINATING =>
       stateData.children.map {
         case (connectionId, provider) =>
           ToProvider(NsiProviderMessage(newNsiHeaders(provider), Terminate(connectionId)), provider)
       }.toVector
     case TERMINATING -> TERMINATED =>
       Seq(ToRequester(stateData.command.get reply TerminateConfirmed(connectionId)))
-    case _ -> FAILED =>
+    case CREATED -> FAILED =>
       val original = nextStateData.errorEvent.get
       val headers = newNotifyHeaders()
       val event = ErrorEvent(new ErrorEventType()

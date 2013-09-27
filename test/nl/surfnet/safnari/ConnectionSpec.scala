@@ -395,6 +395,7 @@ class ConnectionSpec extends helpers.Specification {
 
       when(upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")))
 
+      messages must beEmpty
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
       segments must haveOneElementLike { case ConnectionData("ConnectionIdA", _, _, _, ProvisionStateEnumType.PROVISIONED, _) => ok}
       segments must haveOneElementLike { case ConnectionData("ConnectionIdB", _, _, _, ProvisionStateEnumType.PROVISIONING, _) => ok}
@@ -404,6 +405,7 @@ class ConnectionSpec extends helpers.Specification {
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
       segments must haveOneElementLike { case ConnectionData("ConnectionIdA", _, _, _, ProvisionStateEnumType.PROVISIONED, _) => ok}
       segments must haveOneElementLike { case ConnectionData("ConnectionIdB", _, _, _, ProvisionStateEnumType.PROVISIONED, _) => ok}
+      messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = ProvisionCorrelationId).forAsyncReply, ProvisionConfirmed(ConnectionId))))
     }
 
     "become releasing on release request" in new ReservedConnection with Provisioned {
@@ -455,6 +457,26 @@ class ConnectionSpec extends helpers.Specification {
       when(upa.response(CorrelationId(0, 8), TerminateConfirmed("ConnectionIdA")))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
+      messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = TerminateCorrelationId).forAsyncReply, TerminateConfirmed(ConnectionId))))
+    }
+
+    "send a terminate for a multi segment reservation" in new ReservedConnectionWithTwoSegments {
+      val TerminateCorrelationId = newCorrelationId
+
+      given(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
+
+      when(upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA")))
+
+      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdA", _, _, LifecycleStateEnumType.TERMINATED, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdB", _, _, LifecycleStateEnumType.TERMINATING, _, _) => ok}
+      messages must beEmpty
+
+      when(upa.response(CorrelationId(0, 12), TerminateConfirmed("ConnectionIdB")))
+
+      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdA", _, _, LifecycleStateEnumType.TERMINATED, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData("ConnectionIdB", _, _, LifecycleStateEnumType.TERMINATED, _, _) => ok}
       messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = TerminateCorrelationId).forAsyncReply, TerminateConfirmed(ConnectionId))))
     }
 

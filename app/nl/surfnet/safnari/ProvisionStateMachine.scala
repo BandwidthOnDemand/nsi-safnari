@@ -13,7 +13,7 @@ case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     else throw new IllegalStateException(s"cannot determine aggregated status from ${childStates.values}")
 
   def startCommand(newCommand: NsiProviderMessage[NsiProviderOperation], transitionalState: ProvisionStateEnumType) =
-    copy(command = Some(newCommand), childStates = childStates.map( _._1 -> transitionalState))
+    copy(command = Some(newCommand), childStates = childStates.map(_._1 -> transitionalState))
 
   def updateChild(connectionId: ConnectionId, state: ProvisionStateEnumType) =
     copy(childStates = childStates.updated(connectionId, state))
