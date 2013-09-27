@@ -11,6 +11,12 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion)
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
+  private var nextNotificationId: Int = 1
+  private def newNotificationId() = {
+    val r = nextNotificationId
+    nextNotificationId += 1
+    r
+  }
 
   val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
     new GenericFailedType().
@@ -43,6 +49,11 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
       case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout)) => Some(rsm)
       case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm
+      case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) if error.error.getEvent() == EventEnumType.FORCED_END =>
+        lsm
+      case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) => Some(rsm)
+      case FromProvider(NsiRequesterMessage(_, _: MessageDeliveryTimeout)) => Some(rsm)
+
       case FromProvider(NsiRequesterMessage(headers, _)) =>
         val stateMachine = providerConversations.get(headers.correlationId)
         if (stateMachine.isEmpty) Logger.debug(s"No active conversation for ${message.toShortString}")
@@ -71,7 +82,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       }.foreach { children =>
         otherStateMachines = Some((
           new ProvisionStateMachine(id, newNsiHeaders, children),
-          new LifecycleStateMachine(id, newNsiHeaders, children),
+          new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children),
           new DataPlaneStateMachine(id, newNotifyHeaders, children)))
       }
     }

@@ -433,6 +433,64 @@ class ConnectionSpec extends helpers.Specification {
       messages must contain(
         agg.notification(CorrelationId(0, 12), DataPlaneStateChange(ConnectionId, dataPlaneStatusType(false), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:15"))))
     }
+
+    "become failed on ForcedEnd error event" in new ReservedConnection {
+      val ProviderErrorEventCorrelationId = newCorrelationId
+      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+      val ChildException = new ServiceExceptionType()
+          .withConnectionId("ConnectionIdA")
+          .withNsaId(A.provider.nsa)
+          .withErrorId("FORCED_END")
+          .withText("ERROR_TEXT")
+          .withServiceType("SERVICE_TYPE")
+
+      when(upa.notification(ProviderErrorEventCorrelationId, ErrorEvent(new ErrorEventType()
+        .withConnectionId("ConnectionIdA")
+        .withNotificationId(4)
+        .withTimeStamp(TimeStamp)
+        .withEvent(EventEnumType.FORCED_END)
+        .withServiceException(ChildException))))
+
+      lifecycleState must beEqualTo(LifecycleStateEnumType.FAILED)
+      // TODO check child connection lifecycle state?
+      messages must contain(agg.notification(CorrelationId(0, 9), ErrorEvent(new ErrorEventType()
+        .withConnectionId("ConnectionId")
+        .withNotificationId(1)
+        .withTimeStamp(TimeStamp)
+        .withEvent(EventEnumType.FORCED_END)
+        .withServiceException(new ServiceExceptionType()
+          .withConnectionId("ConnectionId")
+          .withNsaId(AggregatorNsa)
+          .withErrorId("FORCED_END")
+          .withText("ERROR_TEXT")
+          .withServiceType("SERVICE_TYPE")
+          .withChildException(ChildException)))))
+    }
+
+    "become terminating on terminate after failed" in new ReservedConnection {
+      val ProviderErrorEventCorrelationId = newCorrelationId
+      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+      val ChildException = new ServiceExceptionType()
+        .withConnectionId("ConnectionIdA")
+        .withNsaId(A.provider.nsa)
+        .withErrorId("FORCED_END")
+        .withText("ERROR_TEXT")
+        .withServiceType("SERVICE_TYPE")
+
+      given(upa.notification(ProviderErrorEventCorrelationId, ErrorEvent(new ErrorEventType()
+        .withConnectionId("ConnectionIdA")
+        .withNotificationId(4)
+        .withTimeStamp(TimeStamp)
+        .withEvent(EventEnumType.FORCED_END)
+        .withServiceException(ChildException))))
+
+      val TerminateCorrelationId = newCorrelationId
+
+      when(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
+
+      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+      messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 11)), Terminate("ConnectionIdA")), A.provider))
+    }
   }
 
   private def dataPlaneStatusType(active: Boolean) = new DataPlaneStatusType().withActive(active).withVersion(0).withVersionConsistent(true)

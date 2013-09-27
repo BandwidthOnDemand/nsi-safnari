@@ -1,17 +1,20 @@
 package nl.surfnet
 
+import java.math.BigInteger
 import java.net.URI
+import javax.xml.bind.JAXBElement
+import javax.xml.namespace.QName
+import javax.xml.datatype.DatatypeFactory
+import javax.xml.datatype.DatatypeConfigurationException
 import javax.xml.datatype.XMLGregorianCalendar
 import nl.surfnet.safnari.{ Conversion, CorrelationId, Uuid }
 import org.ogf.schemas.nsi._2013._07.connection.types.{ ReservationConfirmCriteriaType, ReservationRequestCriteriaType }
 import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
-import scala.util.{ Failure, Success, Try }
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
-import javax.xml.bind.JAXBElement
-import collection.JavaConverters._
 import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetVlanType
 import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetBaseType
-import javax.xml.namespace.QName
+import scala.collection.JavaConverters._
+import scala.util.{ Failure, Success, Try }
 
 package object safnari {
   type ConnectionId = String
@@ -45,6 +48,23 @@ package object safnari {
 
   implicit object XmlGregorianCalendarOrdering extends Ordering[XMLGregorianCalendar] {
     def compare(x: XMLGregorianCalendar, y: XMLGregorianCalendar): Int = x compare y
+  }
+
+  implicit class DateTimeXmlOps(dt: org.joda.time.DateTime) {
+    def toXmlGregorianCalendar = try {
+      DatatypeFactory.newInstance().newXMLGregorianCalendar(
+          BigInteger.valueOf(dt.getYear()),
+          dt.getMonthOfYear(),
+          dt.getDayOfMonth(),
+          dt.getHourOfDay(),
+          dt.getMinuteOfHour(),
+          dt.getSecondOfMinute(),
+          null,
+          (dt.getZone().getOffset(dt.getMillis()) / (60 * 1000)))
+    } catch {
+      case e: DatatypeConfigurationException =>
+        throw new AssertionError(e)
+    }
   }
 
   implicit val ReservationCriteriaConversion = Conversion.build[ReservationConfirmCriteriaType, ReservationRequestCriteriaType] { a =>
