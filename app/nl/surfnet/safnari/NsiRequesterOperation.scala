@@ -31,7 +31,9 @@ case class QueryRecursiveFailed(failed: QueryFailedType) extends NsiRequesterOpe
 case class ErrorEvent(error: ErrorEventType) extends NsiNotification {
   override def connectionId = error.getConnectionId()
 }
-case class DataPlaneStateChange(connectionId: ConnectionId, status: DataPlaneStatusType, timeStamp: XMLGregorianCalendar) extends NsiNotification
+case class DataPlaneStateChange(notification: DataPlaneStateChangeRequestType) extends NsiNotification {
+  def connectionId: ConnectionId = notification.getConnectionId()
+}
 case class ReserveTimeout(timeout: ReserveTimeoutRequestType) extends NsiNotification {
   def connectionId: ConnectionId = timeout.getConnectionId()
 }

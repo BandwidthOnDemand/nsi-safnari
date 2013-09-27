@@ -6,10 +6,10 @@ import javax.xml.datatype.DatatypeFactory
 import scala.collection.JavaConverters._
 import org.specs2.specification.Scope
 import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.services.types.StpType
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._07.services.types.StpType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionSpec extends helpers.Specification {
@@ -463,23 +463,40 @@ class ConnectionSpec extends helpers.Specification {
     }
 
     "have a data plane active on data plane change" in new ReservedConnection with Provisioned {
-      when(upa.notification(newCorrelationId, DataPlaneStateChange("ConnectionIdA", dataPlaneStatusType(true), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
+      when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+        .withConnectionId("ConnectionIdA")
+        .withDataPlaneStatus(dataPlaneStatusType(true))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00")))))
 
       dataPlaneStatus.isActive() must beTrue
       dataPlaneStatus.isVersionConsistent() must beTrue
       messages must contain(
-        agg.notification(CorrelationId(0, 10), DataPlaneStateChange(ConnectionId, dataPlaneStatusType(true), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
+        agg.notification(CorrelationId(0, 10), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+          .withConnectionId(ConnectionId)
+          .withNotificationId(1)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))
+          .withDataPlaneStatus(dataPlaneStatusType(true)))))
     }
 
     "have a data plane inactive on data plane change" in new ReservedConnection with Provisioned {
-      given(upa.notification(newCorrelationId, DataPlaneStateChange("ConnectionIdA", dataPlaneStatusType(true), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))))
+      given(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+        .withConnectionId("ConnectionIdA")
+        .withDataPlaneStatus(dataPlaneStatusType(true))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00")))))
 
-      when(upa.notification(newCorrelationId, DataPlaneStateChange("ConnectionIdA", dataPlaneStatusType(false), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:15"))))
+      when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+        .withConnectionId("ConnectionIdA")
+        .withDataPlaneStatus(dataPlaneStatusType(false))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:15")))))
 
       dataPlaneStatus.isActive() must beFalse
       dataPlaneStatus.isVersionConsistent() must beTrue
       messages must contain(
-        agg.notification(CorrelationId(0, 12), DataPlaneStateChange(ConnectionId, dataPlaneStatusType(false), DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:15"))))
+        agg.notification(CorrelationId(0, 12), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+          .withConnectionId(ConnectionId)
+          .withNotificationId(2)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:15"))
+          .withDataPlaneStatus(dataPlaneStatusType(false)))))
     }
 
     "become failed on ForcedEnd error event" in new ReservedConnection {

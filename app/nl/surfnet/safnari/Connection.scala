@@ -83,7 +83,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         otherStateMachines = Some((
           new ProvisionStateMachine(id, newNsiHeaders, children),
           new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children),
-          new DataPlaneStateMachine(id, newNotifyHeaders, children)))
+          new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children)))
       }
     }
 

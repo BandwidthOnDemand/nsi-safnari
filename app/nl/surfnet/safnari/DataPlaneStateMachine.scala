@@ -1,7 +1,8 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._07.connection.types.DataPlaneStatusType
 import javax.xml.datatype.XMLGregorianCalendar
+import org.ogf.schemas.nsi._2013._07.connection.types.DataPlaneStateChangeRequestType
+import org.ogf.schemas.nsi._2013._07.connection.types.DataPlaneStatusType
 
 case class DataPlaneStateMachineData(providers: Map[ConnectionId, ProviderEndPoint], childStates: Map[ConnectionId, Boolean], timeStamp: Option[XMLGregorianCalendar]) {
 
@@ -13,7 +14,7 @@ case class DataPlaneStateMachineData(providers: Map[ConnectionId, ProviderEndPoi
   }
 }
 
-class DataPlaneStateMachine(connectionId: ConnectionId, newNsiHeaders: () => NsiHeaders, children: Map[ConnectionId, ProviderEndPoint])
+class DataPlaneStateMachine(connectionId: ConnectionId, newNotificationHeaders: () => NsiHeaders, newNotificationId: () => Int, children: Map[ConnectionId, ProviderEndPoint])
   extends FiniteStateMachine[Boolean, DataPlaneStateMachineData, InboundMessage, OutboundMessage](false, DataPlaneStateMachineData(children, children.map(_._1 -> false), None)) {
 
   when(false)(PartialFunction.empty)
@@ -21,15 +22,17 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newNsiHeaders: () => Nsi
 
   whenUnhandled {
     case Event(FromProvider(NsiRequesterMessage(headers, message: DataPlaneStateChange)), data) =>
-      val newData = data.updateState(message.connectionId, message.status.isActive(), message.timeStamp)
+      val newData = data.updateState(message.connectionId, message.notification.getDataPlaneStatus().isActive(), message.notification.getTimeStamp())
       goto(newData.aggregatedProvisionStatus) using newData
   }
 
   onTransition {
     case false -> true | true -> false =>
-      Seq(ToRequester(NsiRequesterMessage(newNsiHeaders(), DataPlaneStateChange(
-        connectionId,
-        new DataPlaneStatusType().withVersion(0).withActive(nextStateName).withVersionConsistent(true), nextStateData.timeStamp.get))))
+      Seq(ToRequester(NsiRequesterMessage(newNotificationHeaders(), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+        .withConnectionId(connectionId)
+        .withNotificationId(newNotificationId())
+        .withDataPlaneStatus(new DataPlaneStatusType().withVersion(0).withActive(nextStateName).withVersionConsistent(true))
+        .withTimeStamp(nextStateData.timeStamp.get)))))
   }
 
   def dataPlaneStatus(version: Int) = new DataPlaneStatusType().withVersion(version).withActive(stateName).withVersionConsistent(true)
