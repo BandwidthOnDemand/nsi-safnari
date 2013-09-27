@@ -78,8 +78,10 @@ object ExtraBodyParsers {
     BodyParser { requestHeader =>
       val parsedMessage = conversion.invert(soapMessage)
 
+      Logger.debug(s"Received (${requestHeader.uri}): $parsedMessage")
+
       Done(parsedMessage.left.map { error =>
-        Logger.warn(s"Failed to parse $soapMessage with $error")
+        Logger.warn(s"Failed to parse $soapMessage with $error on ${requestHeader.uri}")
         Results.BadRequest(error)
       })
     }

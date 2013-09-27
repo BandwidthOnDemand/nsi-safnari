@@ -71,6 +71,8 @@ object ConnectionRequester extends Controller with SoapWebService {
           case _                                       => request
         }
 
+        Logger.debug(s"Sending (${request.url}): $message")
+
         request.post(message).onComplete {
           case Failure(e) =>
             Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $e", e)
