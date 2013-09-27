@@ -557,19 +557,12 @@ class ConnectionSpec extends helpers.Specification {
     "become terminating on terminate after failed" in new ReservedConnection {
       val ProviderErrorEventCorrelationId = newCorrelationId
       val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
-      val ChildException = new ServiceExceptionType()
-        .withConnectionId("ConnectionIdA")
-        .withNsaId(A.provider.nsa)
-        .withErrorId("FORCED_END")
-        .withText("ERROR_TEXT")
-        .withServiceType("SERVICE_TYPE")
 
       given(upa.notification(ProviderErrorEventCorrelationId, ErrorEvent(new ErrorEventType()
         .withConnectionId("ConnectionIdA")
         .withNotificationId(4)
         .withTimeStamp(TimeStamp)
-        .withEvent(EventEnumType.FORCED_END)
-        .withServiceException(ChildException))))
+        .withEvent(EventEnumType.FORCED_END))))
 
       val TerminateCorrelationId = newCorrelationId
 

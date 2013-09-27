@@ -67,8 +67,10 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
         .withConnectionId(connectionId)
         .withNotificationId(newNotificationId())
         .withTimeStamp(original.error.getTimeStamp())
-        .withEvent(EventEnumType.FORCED_END)
-        .withServiceException(new ServiceExceptionType()
+        // TODO additional info?
+        .withEvent(EventEnumType.FORCED_END))
+      if (original.error.getServiceException() ne null) {
+        event.error.withServiceException(new ServiceExceptionType()
           .withConnectionId(connectionId)
           // TODO error id?
           .withErrorId(original.error.getServiceException().getErrorId())
@@ -77,7 +79,8 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
           .withNsaId(headers.providerNSA)
           // TODO service type?
           .withServiceType(original.error.getServiceException().getServiceType())
-          .withChildException(original.error.getServiceException())))
+          .withChildException(original.error.getServiceException()))
+      }
       Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event)))
   }
 

@@ -97,14 +97,16 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         .withNotificationId(newNotificationId())
         .withTimeStamp(error.error.getTimeStamp())
         .withEvent(error.error.getEvent())
-        .withAdditionalInfo(error.error.getAdditionalInfo())
-        .withServiceException(new ServiceExceptionType()
+        .withAdditionalInfo(error.error.getAdditionalInfo()))
+      if (error.error.getServiceException() ne null) {
+        event.error.withServiceException(new ServiceExceptionType()
           .withConnectionId(id)
           .withNsaId(aggregatorNsa)
           .withErrorId(error.error.getServiceException().getErrorId())
           .withText(error.error.getServiceException().getText())
           .withServiceType(error.error.getServiceException().getServiceType()) // FIXME own service type?
-          .withChildException(error.error.getServiceException())))
+          .withChildException(error.error.getServiceException()))
+      }
       Some(Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event))))
     case FromProvider(NsiRequesterMessage(_, timeout: MessageDeliveryTimeout)) =>
       None
