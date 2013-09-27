@@ -1,5 +1,7 @@
 package nl.surfnet.safnari
 
+import play.api.Logger
+
 /**
  * Simplified re-implementation of Akka's finite state machine [[akka.actor.FSM]]
  * DSL, without the dependencies on actors.
@@ -15,6 +17,7 @@ abstract class FiniteStateMachine[S, D, I, O](initialStateName: S, initialStateD
     nextState map { nextState =>
       _nextStateName = nextState.name
       _nextStateData = nextState.data
+      Logger.debug(s"state change from ${_stateName} to ${_nextStateName}")
       val output = _transitionHandler.applyOrElse((_stateName, _nextStateName), (_: (S, S)) => Vector.empty)
       _stateName = _nextStateName
       _stateData = _nextStateData
