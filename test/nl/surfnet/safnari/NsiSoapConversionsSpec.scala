@@ -43,23 +43,6 @@ class NsiSoapConversionsSpec extends helpers.Specification {
     </soapenv:Body>
   </soapenv:Envelope>"""
 
-  val soapFault = """<S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
-    <S:Body>
-        <S:Fault xmlns:ns4="http://www.w3.org/2003/05/soap-envelope">
-            <faultcode>S:Server</faultcode>
-            <faultstring>This operation is not supported by this provider</faultstring>
-            <detail>
-                <ns5:serviceException
-                xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns4="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2000/09/xmldsig#" xmlns:ns2="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types">
-                    <nsaId>urn:ogf:network:netherlight.net:2013:nsa:bod</nsaId>
-                    <errorId>103</errorId>
-                    <text>Not Implemented</text>
-                </ns5:serviceException>
-            </detail>
-        </S:Fault>
-    </S:Body>
-  </S:Envelope>"""
-
   val reserveFailed = """<?xml version="1.0" encoding="UTF-8"?>
     <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
       <SOAP-ENV:Header>
@@ -135,9 +118,49 @@ class NsiSoapConversionsSpec extends helpers.Specification {
 </soap:Envelope>"""
 
       val requestOperationToStringConversion = NsiRequesterMessageToDocument(NsiRequesterOperationToJaxbElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))
-          val requesterMessage = requestOperationToStringConversion.invert(message)
+      val requesterMessage = requestOperationToStringConversion.invert(message)
 
-          requesterMessage must beRight
+      requesterMessage must beRight
+    }
+
+    "parse serviceException" in {
+      val soapFault = """
+          |<S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+          |  <S:Header>
+          |      <head:nsiHeader xmlns:head="http://schemas.ogf.org/nsi/2013/07/framework/headers">
+          |          <protocolVersion>application/vdn.ogf.nsi.cs.v2.provider+soap</protocolVersion>
+          |          <correlationId>urn:uuid:5c716e15-c17c-481e-885d-c9a5c06e0436</correlationId>
+          |          <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
+          |          <providerNSA>urn:ogf:network:nsa:surfnet.nl</providerNSA>
+          |          <replyTo>http://localhost:9000/reply</replyTo>
+          |      </head:nsiHeader>
+          |  </S:Header>
+          |  <S:Body>
+          |      <S:Fault xmlns:ns4="http://www.w3.org/2003/05/soap-envelope">
+          |          <faultcode>S:Server</faultcode>
+          |          <faultstring>This operation is not supported by this provider</faultstring>
+          |          <detail>
+          |              <ns5:serviceException xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns4="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2000/09/xmldsig#" xmlns:ns2="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types">
+          |                  <nsaId>urn:ogf:network:netherlight.net:2013:nsa:bod</nsaId>
+          |                  <errorId>103</errorId>
+          |                  <text>Not Implemented</text>
+          |              </ns5:serviceException>
+          |          </detail>
+          |      </S:Fault>
+          |  </S:Body>
+          |</S:Envelope>""".stripMargin
+
+      val requestOperationToStringConversion = NsiRequesterMessageToDocument(NsiAcknowledgementOperationToJaxbElement).andThen(NsiXmlDocumentConversion).andThen(ByteArrayToString)
+      val requesterMessage = requestOperationToStringConversion.invert(soapFault)
+
+      requesterMessage must beLike {
+        case Right(NsiRequesterMessage(headers, ServiceException(exception))) =>
+          exception.getErrorId() must_== "103"
+      }
+
+      requestOperationToStringConversion(requesterMessage.right.get) must beLike {
+        case Right(xml) => xml must contain("<S:Fault") and contain("<errorId>103</errorId>")
+      }
     }
   }
 

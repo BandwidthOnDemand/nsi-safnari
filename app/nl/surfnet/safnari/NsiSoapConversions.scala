@@ -55,12 +55,26 @@ object NsiSoapConversions {
   }
 
   implicit val NsiAcknowledgementOperationToJaxbElement = Conversion.build[NsiAcknowledgement, Element] { ack =>
-    marshal(ack match {
-      case GenericAck()                            => typesFactory.createAcknowledgment(new GenericAcknowledgmentType())
-      case ReserveResponse(connectionId)           => typesFactory.createReserveResponse(new ReserveResponseType().withConnectionId(connectionId))
-      case ServiceException(exception)             => typesFactory.createServiceException(exception)
-      case QuerySummarySyncConfirmed(reservations) => typesFactory.createQuerySummarySyncConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava))
-    })
+    ack match {
+      case GenericAck() =>
+        marshal(typesFactory.createAcknowledgment(new GenericAcknowledgmentType()))
+      case ReserveResponse(connectionId) =>
+        marshal(typesFactory.createReserveResponse(new ReserveResponseType().withConnectionId(connectionId)))
+      case QuerySummarySyncConfirmed(reservations) =>
+        marshal(typesFactory.createQuerySummarySyncConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava)))
+      case ServiceException(exception) =>
+        // Wrap the service exception in a SOAP Fault element using the Java DOM API.
+        marshal(typesFactory.createServiceException(exception)).right.flatMap { detailBody =>
+          tryEither {
+            val doc = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
+            val fault = doc.createElementNS("http://www.w3.org/2003/05/soap-envelope", "S:Fault").tap(doc.appendChild)
+            fault.appendChild(doc.createElement("faultcode")).appendChild(doc.createTextNode("S:Server")) // FIXME or S:Client?
+            fault.appendChild(doc.createElement("faultstring")).appendChild(doc.createTextNode(exception.getText()))
+            fault.appendChild(doc.createElement("detail")).appendChild(doc.adoptNode(detailBody))
+            doc.getDocumentElement()
+          }
+        }
+    }
   } {
     messageFactories(Map[String, NsiMessageParser[NsiAcknowledgement]](
       "acknowledgment" -> NsiMessageParser { (body: GenericAcknowledgmentType) => Right(GenericAck()) },
