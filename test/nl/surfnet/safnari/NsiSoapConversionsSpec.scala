@@ -84,7 +84,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
 
   "NSI requester operation to string" should {
     "parse reserveFailed operation" in {
-      val requestOperationToStringConversion = NsiRequesterMessageToDocument(NsiRequesterOperationToJaxbElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))
+      val requestOperationToStringConversion = NsiRequesterMessageToDocument(NsiRequesterOperationToElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))
       val requesterMessage = requestOperationToStringConversion.invert(reserveFailed)
 
       requesterMessage must beRight
@@ -117,7 +117,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
     </soap:Body>
 </soap:Envelope>"""
 
-      val requestOperationToStringConversion = NsiRequesterMessageToDocument(NsiRequesterOperationToJaxbElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))
+      val requestOperationToStringConversion = NsiRequesterMessageToDocument(NsiRequesterOperationToElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))
       val requesterMessage = requestOperationToStringConversion.invert(message)
 
       requesterMessage must beRight
@@ -150,7 +150,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
           |  </S:Body>
           |</S:Envelope>""".stripMargin
 
-      val requestOperationToStringConversion = NsiRequesterMessageToDocument(NsiAcknowledgementOperationToJaxbElement).andThen(NsiXmlDocumentConversion).andThen(ByteArrayToString)
+      val requestOperationToStringConversion = NsiRequesterMessageToDocument(NsiAcknowledgementOperationToElement).andThen(NsiXmlDocumentConversion).andThen(ByteArrayToString)
       val requesterMessage = requestOperationToStringConversion.invert(soapFault)
 
       requesterMessage must beLike {

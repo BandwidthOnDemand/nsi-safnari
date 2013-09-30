@@ -54,7 +54,7 @@ object NsiSoapConversions {
     result.getNode().asInstanceOf[Document].getDocumentElement()
   }
 
-  implicit val NsiAcknowledgementOperationToJaxbElement = Conversion.build[NsiAcknowledgement, Element] { ack =>
+  implicit val NsiAcknowledgementOperationToElement = Conversion.build[NsiAcknowledgement, Element] { ack =>
     ack match {
       case GenericAck() =>
         marshal(typesFactory.createAcknowledgment(new GenericAcknowledgmentType()))
@@ -66,7 +66,7 @@ object NsiSoapConversions {
         // Wrap the service exception in a SOAP Fault element using the Java DOM API.
         marshal(typesFactory.createServiceException(exception)).right.flatMap { detailBody =>
           tryEither {
-            val doc = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
+            val doc = createDocument
             val fault = doc.createElementNS("http://www.w3.org/2003/05/soap-envelope", "S:Fault").tap(doc.appendChild)
             fault.appendChild(doc.createElement("faultcode")).appendChild(doc.createTextNode("S:Server")) // FIXME or S:Client?
             fault.appendChild(doc.createElement("faultstring")).appendChild(doc.createTextNode(exception.getText()))
@@ -83,7 +83,7 @@ object NsiSoapConversions {
       "querySummarySyncConfirmed" -> NsiMessageParser { (body: QuerySummaryConfirmedType) => Right(QuerySummarySyncConfirmed(body.getReservation().asScala.to[Vector])) }))
   }
 
-  implicit val NsiProviderOperationToJaxbElement = Conversion.build[NsiProviderOperation, Element] { operation =>
+  implicit val NsiProviderOperationToElement = Conversion.build[NsiProviderOperation, Element] { operation =>
     marshal(operation match {
       case InitialReserve(body, _, _)      => typesFactory.createReserve(body)
       case ReserveCommit(connectionId)     => typesFactory.createReserveCommit(new GenericRequestType().withConnectionId(connectionId))
@@ -115,7 +115,7 @@ object NsiSoapConversions {
       "querySummarySync" -> NsiMessageParser { (body: QueryType) => Right(QuerySummarySync(body.getConnectionId().asScala)) }))
   }
 
-  implicit val NsiRequesterOperationToJaxbElement = Conversion.build[NsiRequesterOperation, Element] { operation =>
+  implicit val NsiRequesterOperationToElement = Conversion.build[NsiRequesterOperation, Element] { operation =>
     marshal(operation match {
       case ReserveConfirmed(connectionId, criteria) => typesFactory.createReserveConfirmed(new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria))
       case ReserveFailed(failure)                   => typesFactory.createReserveFailed(failure)
@@ -242,21 +242,22 @@ object NsiSoapConversions {
 
   private def NsiHeadersAndBodyToDocument[T](implicit bodyConversion: Conversion[T, Element]): Conversion[(NsiHeaders, T), Document] = Conversion.build[(NsiHeaders, T), Document] {
     case (headers, body) =>
-      tryEither {
-        val document = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
-        val soapEnvelope = document.createElementNS(SoapNamespaceUri, "soapenv:Envelope").tap(document.appendChild)
-        val soapHeader = document.createElementNS(SoapNamespaceUri, "soapenv:Header").tap(soapEnvelope.appendChild)
-        val soapBody = document.createElementNS(SoapNamespaceUri, "soapenv:Body").tap(soapEnvelope.appendChild)
+      for {
+        headersJaxb <- Conversion[NsiHeaders, CommonHeaderType].apply(headers).right
+        headersElement <- marshal(headersFactory.createNsiHeader(headersJaxb)).right
+        bodyElement <- bodyConversion(body).right
+        document <- tryEither {
+          val document = createDocument
+          val soapEnvelope = document.appendChild(document.createElementNS(SoapNamespaceUri, "soapenv:Envelope"))
+          val soapHeader = soapEnvelope.appendChild(document.createElementNS(SoapNamespaceUri, "soapenv:Header"))
+          val soapBody = soapEnvelope.appendChild(document.createElementNS(SoapNamespaceUri, "soapenv:Body"))
 
-        val marshaller = jaxbContext.createMarshaller()
-        val headersJaxb = Conversion[NsiHeaders, CommonHeaderType].apply(headers).right.get
-        marshaller.marshal(headersFactory.createNsiHeader(headersJaxb), soapHeader)
+          soapHeader.appendChild(document.adoptNode(headersElement))
+          soapBody.appendChild(document.adoptNode(bodyElement))
 
-        val bodyElement = bodyConversion(body).right.get
-        soapBody.appendChild(document.importNode(bodyElement, true))
-
-        document
-      }
+          document
+        }.right
+      } yield document
   } { document =>
     val unmarshaller = jaxbContext.createUnmarshaller()
     for {
@@ -272,6 +273,8 @@ object NsiSoapConversions {
       (header, body)
     }
   }
+
+  private def createDocument: Document = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
 
   private def findSingleChildElement(namespaceUri: String, localName: String, parent: Element): Either[String, Element] = {
     val childNodes = parent.getElementsByTagNameNS(namespaceUri, localName)
