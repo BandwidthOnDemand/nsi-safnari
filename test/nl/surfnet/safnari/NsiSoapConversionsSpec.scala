@@ -41,7 +41,24 @@ class NsiSoapConversionsSpec extends helpers.Specification {
             </criteria>
         </type:reserve>
     </soapenv:Body>
-</soapenv:Envelope>"""
+  </soapenv:Envelope>"""
+
+  val soapFault = """<S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+    <S:Body>
+        <S:Fault xmlns:ns4="http://www.w3.org/2003/05/soap-envelope">
+            <faultcode>S:Server</faultcode>
+            <faultstring>This operation is not supported by this provider</faultstring>
+            <detail>
+                <ns5:serviceException
+                xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns4="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2000/09/xmldsig#" xmlns:ns2="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types">
+                    <nsaId>urn:ogf:network:netherlight.net:2013:nsa:bod</nsaId>
+                    <errorId>103</errorId>
+                    <text>Not Implemented</text>
+                </ns5:serviceException>
+            </detail>
+        </S:Fault>
+    </S:Body>
+  </S:Envelope>"""
 
   val reserveFailed = """<?xml version="1.0" encoding="UTF-8"?>
     <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
