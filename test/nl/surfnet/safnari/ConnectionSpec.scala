@@ -122,12 +122,25 @@ class ConnectionSpec extends helpers.Specification {
   trait Released { this: ReservedConnection =>
   }
 
+  trait ReleasedSegments { this: ReservedConnectionWithTwoSegments =>
+  }
+
   trait Provisioned { this: ReservedConnection =>
     val ProvisionCorrelationId = newCorrelationId
 
     given(
       ura.request(ProvisionCorrelationId, Provision(ConnectionId)),
       upa.response(CorrelationId(0, 8), ProvisionConfirmed("ConnectionIdA")))
+  }
+
+  trait ProvisionedSegments { this: ReservedConnectionWithTwoSegments =>
+    val ProvisionCorrelationId = newCorrelationId
+
+    given(
+      ura.request(ProvisionCorrelationId, Provision(ConnectionId)),
+      upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")),
+      upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB"))
+    )
   }
 
   "A connection" should {
@@ -384,7 +397,7 @@ class ConnectionSpec extends helpers.Specification {
       messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = ProvisionCorrelationId).forAsyncReply, ProvisionConfirmed(ConnectionId))))
     }
 
-    "send a provision confirmed with multiple segments" in new ReservedConnectionWithTwoSegments {
+    "send a provision confirmed with multiple segments" in new ReservedConnectionWithTwoSegments with ReleasedSegments {
       val ProvisionCorrelationId = newCorrelationId
 
       given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
@@ -498,6 +511,29 @@ class ConnectionSpec extends helpers.Specification {
           .withNotificationId(1)
           .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))
           .withDataPlaneStatus(dataPlaneStatusType(true)))))
+    }
+
+    "have a data plane active on data plane change of all segments" in new ReservedConnectionWithTwoSegments with ProvisionedSegments {
+      when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+        .withConnectionId("ConnectionIdA")
+        .withDataPlaneStatus(dataPlaneStatusType(true))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00")))))
+
+      dataPlaneStatus.isActive() must beFalse
+      messages must beEmpty
+
+      when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+        .withConnectionId("ConnectionIdB")
+        .withDataPlaneStatus(dataPlaneStatusType(true))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:10")))))
+
+      dataPlaneStatus.isActive() must beTrue
+      messages must contain(agg.notification(CorrelationId(0, 15), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+          .withConnectionId(ConnectionId)
+          .withNotificationId(1)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:10"))
+          .withDataPlaneStatus(dataPlaneStatusType(true))
+      )))
     }
 
     "have a data plane inactive on data plane change" in new ReservedConnection with Provisioned {
