@@ -245,22 +245,15 @@ object NsiSoapConversions {
       tryEither {
         val document = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
         val soapEnvelope = document.createElementNS(SoapNamespaceUri, "soapenv:Envelope").tap(document.appendChild)
-        soapEnvelope.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:head", NsiHeadersQName.getNamespaceURI())
-        soapEnvelope.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:type", NsiConnectionTypesNamespace)
-        soapEnvelope.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:saml", "urn:oasis:names:tc:SAML:2.0:assertion")
-        soapEnvelope.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:xmlenc", "http://www.w3.org/2001/04/xmlenc#")
-        soapEnvelope.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:xmldsig", "http://www.w3.org/2000/09/xmldsig#")
         val soapHeader = document.createElementNS(SoapNamespaceUri, "soapenv:Header").tap(soapEnvelope.appendChild)
         val soapBody = document.createElementNS(SoapNamespaceUri, "soapenv:Body").tap(soapEnvelope.appendChild)
 
         val marshaller = jaxbContext.createMarshaller()
         val headersJaxb = Conversion[NsiHeaders, CommonHeaderType].apply(headers).right.get
         marshaller.marshal(headersFactory.createNsiHeader(headersJaxb), soapHeader)
-        Option(soapHeader.getFirstChild()).collect { case element: Element => element.removeAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns") }
 
         val bodyElement = bodyConversion(body).right.get
         soapBody.appendChild(document.importNode(bodyElement, true))
-        Option(soapBody.getFirstChild()).collect { case element: Element => element.removeAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns") }
 
         document
       }
