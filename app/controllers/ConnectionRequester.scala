@@ -79,6 +79,7 @@ object ConnectionRequester extends Controller with SoapWebService {
           case Failure(e) =>
             Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $e", e)
           case Success(ack) if ack.status == 200 || ack.status == 500 =>
+            Logger.debug(s"Parsing ack (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
             Conversion[NsiProviderMessage[NsiAcknowledgement], String].invert(ack.body) match {
               case Left(error) =>
                 Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error")
