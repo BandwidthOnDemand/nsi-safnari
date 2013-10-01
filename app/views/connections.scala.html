@@ -104,7 +104,7 @@
 }
 
 @stp(stp: org.ogf.schemas.nsi._2013._07.services.types.StpType) = {
-    @stp.getNetworkId():@stp.getLocalId()
+    @stp.getNetworkId() @@ @stp.getLocalId()
 }
 @nullable(field: Any) = @{
     if (field == null) "-" else field
