@@ -57,7 +57,7 @@ object ConnectionRequester extends Controller with SoapWebService {
 
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
     def receive = {
-      case ToProvider(message @ NsiProviderMessage(headers, _: NsiProviderOperation), provider) =>
+      case ToProvider(message @ NsiProviderMessage(headers, operation: NsiProviderOperation), provider) =>
         val connection = sender
         ConnectionRequester.expectReplyFor(headers.correlationId).onSuccess {
           case reply => connection ! FromProvider(reply)
@@ -70,6 +70,8 @@ object ConnectionRequester extends Controller with SoapWebService {
           case BasicAuthentication(username, password) => request.withAuth(username, password, AuthScheme.BASIC)
           case _                                       => request
         }
+
+        request = request.withHeaders("SOAPAction" -> s"${operation.soapActionUrl}")
 
         Logger.debug(s"Sending (${request.url}): $message")
 
