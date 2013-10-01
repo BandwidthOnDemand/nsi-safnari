@@ -46,7 +46,7 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
     requestHeaders.replyTo.foreach { replyTo =>
-      val request = WS.url(replyTo.toASCIIString()).withHeaders("SOAPAction" -> s"${response.soapActionUrl}")
+      val request = WS.url(replyTo.toASCIIString()).withHeaders("SOAPAction" -> ('"' + response.soapActionUrl + '"'))
 
       request.post(NsiRequesterMessage(requestHeaders.forAsyncReply, response)).onComplete {
         case Failure(error)           => Logger.info(s"Replying to $replyTo: $error", error)

@@ -71,7 +71,7 @@ object ConnectionRequester extends Controller with SoapWebService {
           case _                                       => request
         }
 
-        request = request.withHeaders("SOAPAction" -> s"${operation.soapActionUrl}")
+        request = request.withHeaders("SOAPAction" -> ('"' + operation.soapActionUrl + '"'))
 
         Logger.debug(s"Sending (${request.url}): $message")
 
