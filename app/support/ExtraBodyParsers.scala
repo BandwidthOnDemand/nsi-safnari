@@ -29,14 +29,12 @@ import javax.xml.soap.SOAPConstants
 import scala.language.higherKinds
 
 object ExtraBodyParsers {
-  private val logger = Logger("ExtraBodyParsers")
-
   implicit def NsiMessageContentType[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): ContentTypeOf[T] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
   implicit def NsiMessageWriteable[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): Writeable[T] = Writeable { message =>
     conversion.andThen(NsiXmlDocumentConversion)(message).fold({ error =>
       // Exceptions from writeable are swallowed by Play, so log these here.
-      logger.error(error)
+      Logger.error(error)
       throw new java.io.IOException(error)
     }, bytes => bytes)
   }
@@ -59,13 +57,24 @@ object ExtraBodyParsers {
   def tolerantSoap(parser: Conversion[Document, Array[Byte]], maxLength: Int): BodyParser[Document] = BodyParser("SOAP, maxLength=" + maxLength) { request =>
     import scala.language.reflectiveCalls
     Traversable.takeUpTo[Array[Byte]](maxLength)
-      .apply(Iteratee.consume[Array[Byte]]().map(parser.invert.apply))
-      .flatMap(Iteratee.eofOrElse(Results.EntityTooLarge))
+      .apply(
+        Iteratee.consume[Array[Byte]]().map { bytes =>
+          Logger.debug(s"received SOAP message ${request.uri} from ${request.remoteAddress} with content-type ${request.contentType} ${new String(bytes, "UTF-8")}")
+          bytes
+        }.map { bytes =>
+          parser.invert.apply(bytes)
+        }.map { parsed =>
+          Logger.debug(s"SOAP message parse result ${parsed}")
+          parsed
+        }).flatMap(Iteratee.eofOrElse(Results.EntityTooLarge))
       .flatMap {
         case Left(b) => Done(Left(b), Empty)
         case Right(it) => it.flatMap {
-          case Left(error) => Done(Left(Results.BadRequest(error)), Empty)
-          case Right(xml)  => Done(Right(xml), Empty)
+          case Left(error) =>
+            Logger.warn(s"SOAP parsing failed ${request.uri} from ${request.remoteAddress} with content-type ${request.contentType}: $error")
+            Done(Left(Results.BadRequest(error)), Empty)
+          case Right(xml) =>
+            Done(Right(xml), Empty)
         }
       }
   }
