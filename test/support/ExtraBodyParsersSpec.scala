@@ -34,12 +34,12 @@ class ExtraBodyParsersSpec extends helpers.Specification {
       result must beLeft.like { case result => status(result) must beEqualTo(415) }
     }
 
-    "give BadRequest with a SOAP fault when the soap message is not valid" in {
+    "give InternalServerError with a SOAP fault when the soap message is not valid" in {
       val result = run(Enumerator("<nonSoap></nonSoap>".getBytes) |>>> soap(NsiXmlDocumentConversion).apply(FakeSoapRequest()))
 
       result must beLeft.like { case result =>
-        status(result) must beEqualTo(400)
-        contentType(result) must beEqualTo(Some("text/xml"))
+        status(result) must beEqualTo(500)
+        contentType(result) must beEqualTo(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
         contentAsString(result) must contain("<S:Fault")
       }
     }
@@ -65,34 +65,35 @@ class ExtraBodyParsersSpec extends helpers.Specification {
       result must beRight.like { case NsiProviderMessage(_, _: InitialReserve) => ok }
     }
 
-    "give Badrequest when NSI Reserve contains extra xml" in {
+    "give InternalServerError when NSI Reserve contains extra xml" in {
       val result = run(Enumerator.fromFile(new File("test/reserve_additional_xml.xml")) |>>> nsiProviderOperation.apply(FakeSoapRequest()))
 
       result must beLeft.like {
         case result =>
-          status(result) must beEqualTo(400)
-          contentAsString(result) must contain("Invalid content was found starting with element 'test'")
+          status(result) must beEqualTo(500)
+          contentType(result) must beEqualTo(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+          contentAsString(result) must contain("<faultstring>Error parsing SOAP request: org.xml.sax.SAXParseException; lineNumber: 13; columnNumber: 19; cvc-complex-type.2.4.a: Invalid content was found starting with element 'test'. One of '{connectionId, globalReservationId, description, criteria}' is expected.</faultstring>")
       }
     }
 
-    "give BadRequest when the NSI headers are missing" in {
+    "give InternalServerError when the NSI headers are missing" in {
       val result = run(Enumerator.fromFile(new File("test/reserve_without_headers.xml")) |>>> nsiProviderOperation.apply(FakeSoapRequest()))
 
       result must beLeft.like {
         case result =>
-          status(result) must beEqualTo(400)
-          contentType(result) must beEqualTo(Some("text/xml"))
+          status(result) must beEqualTo(500)
+          contentType(result) must beEqualTo(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
           contentAsString(result) must contain("<faultstring>Error parsing NSI message in SOAP request: missing element 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one</faultstring>")
       }
     }
 
-    "give BadRequest when there are multiple NSI headers" in {
+    "give InternalServerError when there are multiple NSI headers" in {
       val result = run(Enumerator.fromFile(new File("test/reserve_with_duplicate_headers.xml")) |>>> nsiProviderOperation.apply(FakeSoapRequest()))
 
       result must beLeft.like {
         case result =>
-          status(result) must beEqualTo(400)
-          contentType(result) must beEqualTo(Some("text/xml"))
+          status(result) must beEqualTo(500)
+          contentType(result) must beEqualTo(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
           contentAsString(result) must contain("<faultstring>Error parsing NSI message in SOAP request: multiple elements 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one</faultstring>")
       }
     }
@@ -109,7 +110,7 @@ class ExtraBodyParsersSpec extends helpers.Specification {
 
   object FakeSoapRequest {
     def apply(): FakeRequest[AnyContentAsEmpty.type] = {
-      FakeRequest("POST", "/", FakeHeaders(), AnyContentAsEmpty).withHeaders(CONTENT_TYPE -> "text/xml")
+      FakeRequest("POST", "/", FakeHeaders(), AnyContentAsEmpty).withHeaders(CONTENT_TYPE -> SOAPConstants.SOAP_1_1_CONTENT_TYPE)
     }
   }
 }

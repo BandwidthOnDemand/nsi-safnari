@@ -74,7 +74,7 @@ object ExtraBodyParsers {
           it.flatMap {
             case Left(error) =>
               Logger.warn(s"SOAP parsing failed ${request.uri} from ${request.remoteAddress} with content-type ${request.contentType}: $error")
-              Done(Left(Results.BadRequest(
+              Done(Left(Results.InternalServerError(
                 <S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
                   <S:Body>
                     <S:Fault xmlns:ns4="http://www.w3.org/2003/05/soap-envelope">
@@ -101,7 +101,7 @@ object ExtraBodyParsers {
 
       Done(parsedMessage.left.map { error =>
         Logger.warn(s"Failed to parse $soapMessage with $error on ${requestHeader.uri}")
-        Results.BadRequest(
+        Results.InternalServerError(
           <S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
             <S:Body>
               <S:Fault xmlns:ns4="http://www.w3.org/2003/05/soap-envelope">
