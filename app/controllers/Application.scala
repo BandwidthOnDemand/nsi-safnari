@@ -9,9 +9,11 @@ import scala.concurrent.duration._
 import akka.pattern.ask
 import akka.util.Timeout
 import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
+import org.joda.time.DateTime
 import nl.surfnet.safnari.ConnectionId
 import nl.surfnet.safnari.ReservationState
 import nl.surfnet.safnari.ConnectionData
+import nl.surfnet.safnari._
 
 object Application extends Controller {
   implicit val timeout = Timeout(2.seconds)
@@ -28,7 +30,12 @@ object Application extends Controller {
         (c ? 'querySegments).mapTo[Seq[ConnectionData]] map (summary -> _)
       }
     }.map { cs =>
-      Ok(views.html.connections(cs))
+      val timeBound = DateTime.now().minusWeeks(1).toXmlGregorianCalendar
+      val connections = cs.filter {
+        case (con, segments) => con.getCriteria().get(0).getSchedule().getEndTime().compare(timeBound) > 0
+      }.sortBy(_._1.getCriteria().get(0).getSchedule().getStartTime())(XmlGregorianCalendarOrdering.reverse)
+
+      Ok(views.html.connections(connections))
     }
   }
 
