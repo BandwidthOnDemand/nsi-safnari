@@ -44,6 +44,10 @@ package object safnari {
     }
   }
 
+  implicit class RichString(str: String) {
+    def deCapitalize: String = str.take(1).toLowerCase + str.drop(1)
+  }
+
   def tryEither[A](f: => A): Either[String, A] = Try(f).toEither.left.map(_.toString)
 
   implicit object XmlGregorianCalendarOrdering extends Ordering[XMLGregorianCalendar] {

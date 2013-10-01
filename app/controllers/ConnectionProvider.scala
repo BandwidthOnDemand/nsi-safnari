@@ -18,6 +18,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
+import SoapRequests._
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -46,7 +47,7 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
     requestHeaders.replyTo.foreach { replyTo =>
-      val request = WS.url(replyTo.toASCIIString()).withHeaders("SOAPAction" -> ('"' + response.soapActionUrl + '"'))
+      val request = WS.url(replyTo.toASCIIString()).withSoapActionHeader(response.soapActionUrl)
 
       request.post(NsiRequesterMessage(requestHeaders.forAsyncReply, response)).onComplete {
         case Failure(error)           => Logger.info(s"Replying to $replyTo: $error", error)

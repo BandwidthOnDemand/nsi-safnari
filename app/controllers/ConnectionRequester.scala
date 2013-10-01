@@ -16,6 +16,7 @@ import play.api.libs.concurrent.Akka
 import akka.actor.Props
 import play.api.Logger
 import scala.util.{ Failure, Success }
+import SoapRequests._
 
 object ConnectionRequester extends Controller with SoapWebService {
 
@@ -71,7 +72,7 @@ object ConnectionRequester extends Controller with SoapWebService {
           case _                                       => request
         }
 
-        request = request.withHeaders("SOAPAction" -> ('"' + operation.soapActionUrl + '"'))
+        request = request.withSoapActionHeader(operation.soapActionUrl)
 
         Logger.debug(s"Sending (${request.url}): $message")
 
