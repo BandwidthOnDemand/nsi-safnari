@@ -27,20 +27,24 @@ class ExtraBodyParsersSpec extends helpers.Specification {
 
   "SoapBodyParser" should {
 
-    "give BadRequest when wrong content-type is set" in {
+    "give UnsupportedMediaType when wrong content-type is set" in {
       val request = FakeRequest().withHeaders(CONTENT_TYPE -> "text/html")
       val result = run(soap(NsiXmlDocumentConversion).apply(request).run)
 
-      result must beLeft.like { case result => status(result) must beEqualTo(400) }
+      result must beLeft.like { case result => status(result) must beEqualTo(415) }
     }
 
-    "give BadRequest when the soap message is not valid" in {
+    "give BadRequest with a SOAP fault when the soap message is not valid" in {
       val result = run(Enumerator("<nonSoap></nonSoap>".getBytes) |>>> soap(NsiXmlDocumentConversion).apply(FakeSoapRequest()))
 
-      result must beLeft.like { case result => status(result) must beEqualTo(400) }
+      result must beLeft.like { case result =>
+        status(result) must beEqualTo(400)
+        contentType(result) must beEqualTo(Some("text/xml"))
+        contentAsString(result) must contain("<S:Fault")
+      }
     }
 
-    "give EntityToLarge when the input is to large" in {
+    "give EntityTooLarge when the input is to large" in {
       val result = run(Enumerator("<test></test>".getBytes) |>>> soap(NsiXmlDocumentConversion, 10).apply(FakeSoapRequest()))
 
       result must beLeft.like { case result => status(result) must beEqualTo(413) }
@@ -77,7 +81,8 @@ class ExtraBodyParsersSpec extends helpers.Specification {
       result must beLeft.like {
         case result =>
           status(result) must beEqualTo(400)
-          contentAsString(result) must beEqualTo("missing element 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one")
+          contentType(result) must beEqualTo(Some("text/xml"))
+          contentAsString(result) must contain("<faultstring>Error parsing NSI message in SOAP request: missing element 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one</faultstring>")
       }
     }
 
@@ -87,7 +92,8 @@ class ExtraBodyParsersSpec extends helpers.Specification {
       result must beLeft.like {
         case result =>
           status(result) must beEqualTo(400)
-          contentAsString(result) must beEqualTo("multiple elements 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one")
+          contentType(result) must beEqualTo(Some("text/xml"))
+          contentAsString(result) must contain("<faultstring>Error parsing NSI message in SOAP request: multiple elements 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one</faultstring>")
       }
     }
 

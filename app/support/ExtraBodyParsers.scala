@@ -52,7 +52,7 @@ object ExtraBodyParsers {
   def soap(parser: Conversion[Document, Array[Byte]], maxLength: Int = BodyParsers.parse.DEFAULT_MAX_TEXT_LENGTH): BodyParser[Document] = when(
     predicate = _.contentType.exists(_ == SOAPConstants.SOAP_1_1_CONTENT_TYPE),
     parser = tolerantSoap(parser: Conversion[Document, Array[Byte]], maxLength),
-    badResult = _ => Future.successful(Results.BadRequest("Expecting " + SOAPConstants.SOAP_1_1_CONTENT_TYPE)))
+    badResult = _ => Future.successful(Results.UnsupportedMediaType("Expecting Content-Type " + SOAPConstants.SOAP_1_1_CONTENT_TYPE)))
 
   def tolerantSoap(parser: Conversion[Document, Array[Byte]], maxLength: Int): BodyParser[Document] = BodyParser("SOAP, maxLength=" + maxLength) { request =>
     import scala.language.reflectiveCalls
@@ -68,14 +68,24 @@ object ExtraBodyParsers {
           parsed
         }).flatMap(Iteratee.eofOrElse(Results.EntityTooLarge))
       .flatMap {
-        case Left(b) => Done(Left(b), Empty)
-        case Right(it) => it.flatMap {
-          case Left(error) =>
-            Logger.warn(s"SOAP parsing failed ${request.uri} from ${request.remoteAddress} with content-type ${request.contentType}: $error")
-            Done(Left(Results.BadRequest(error)), Empty)
-          case Right(xml) =>
-            Done(Right(xml), Empty)
-        }
+        case Left(b) =>
+          Done(Left(b), Empty)
+        case Right(it) =>
+          it.flatMap {
+            case Left(error) =>
+              Logger.warn(s"SOAP parsing failed ${request.uri} from ${request.remoteAddress} with content-type ${request.contentType}: $error")
+              Done(Left(Results.BadRequest(
+                <S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+                  <S:Body>
+                    <S:Fault xmlns:ns4="http://www.w3.org/2003/05/soap-envelope">
+                      <faultcode>S:Client</faultcode>
+                      <faultstring>Error parsing SOAP request: { error }</faultstring>
+                    </S:Fault>
+                  </S:Body>
+                </S:Envelope>).as(SOAPConstants.SOAP_1_1_CONTENT_TYPE)), Empty)
+            case Right(xml) =>
+              Done(Right(xml), Empty)
+          }
       }
   }
 
@@ -91,7 +101,15 @@ object ExtraBodyParsers {
 
       Done(parsedMessage.left.map { error =>
         Logger.warn(s"Failed to parse $soapMessage with $error on ${requestHeader.uri}")
-        Results.BadRequest(error)
+        Results.BadRequest(
+          <S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+            <S:Body>
+              <S:Fault xmlns:ns4="http://www.w3.org/2003/05/soap-envelope">
+                <faultcode>S:Client</faultcode>
+                <faultstring>Error parsing NSI message in SOAP request: { error }</faultstring>
+              </S:Fault>
+            </S:Body>
+          </S:Envelope>).as(SOAPConstants.SOAP_1_1_CONTENT_TYPE)
       })
     }
   }
