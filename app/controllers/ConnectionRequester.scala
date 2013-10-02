@@ -1,12 +1,15 @@
 package controllers
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import nl.surfnet.safnari._
 import nl.surfnet.safnari.NsiSoapConversions._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc.Controller
 import support.ExtraBodyParsers.NsiRequesterEndPoint
-import akka.actor.Actor
+import akka.actor._
+import akka.pattern.ask
+import akka.util.Timeout
 import java.net.URI
 import play.api.libs.ws.WS
 import com.ning.http.client.Realm.AuthScheme
@@ -19,6 +22,8 @@ import scala.util.{ Failure, Success }
 import SoapRequests._
 
 object ConnectionRequester extends Controller with SoapWebService {
+  implicit val timeout = Timeout(2.seconds)
+  implicit def actorSystem = Akka.system
 
   val BaseWsdlFilename = "ogf_nsi_connection_requester_v2_0.wsdl"
 
@@ -29,9 +34,12 @@ object ConnectionRequester extends Controller with SoapWebService {
   def request = NsiRequesterEndPoint {
     case message @ NsiRequesterMessage(headers, notification: NsiNotification) =>
       val connection = ConnectionProvider.connectionManager.findByChildConnectionId(notification.connectionId)
-      connection foreach { _ ! FromProvider(NsiRequesterMessage(headers, notification)) }
-      val acknowledgement = connection map (_ => GenericAck()) getOrElse ServiceException(NsiError.DoesNotExist.toServiceException(Configuration.Nsa))
-      Future.successful(message.ack(acknowledgement))
+
+      val ack = connection.map { c =>
+        (c ? FromProvider(NsiRequesterMessage(headers, notification))).mapTo[NsiAcknowledgement]
+      } getOrElse Future.successful(ServiceException(NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
+
+      ack.map(message.ack)
     case response =>
       continuations.replyReceived(response.headers.correlationId, response)
       Future.successful(response.ack(GenericAck()))
