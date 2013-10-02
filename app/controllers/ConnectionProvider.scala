@@ -82,7 +82,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
     connectionManager.findOrCreateConnection(request) match {
       case None =>
-        Future.successful(ServiceException(NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
+        Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))
       case Some(connectionActor) =>
         requesterContinuations.register(request.headers.correlationId).onSuccess {
           case reply => replyTo(reply.body)

@@ -111,8 +111,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     }
 
     private def messageNotApplicable(message: InboundMessage): Any = message match {
-      case FromRequester(NsiProviderMessage(headers, message)) => ServiceException(NsiError.InvalidState.toServiceException("NSA-ID"))
-      case FromProvider(NsiRequesterMessage(headers, message)) => ServiceException(NsiError.InvalidState.toServiceException("NSA-ID"))
+      case FromRequester(NsiProviderMessage(headers, message)) => ServiceException(NsiError.InvalidTransition.toServiceException(Configuration.Nsa))
+      case FromProvider(NsiRequesterMessage(headers, message)) => ServiceException(NsiError.InvalidTransition.toServiceException(Configuration.Nsa))
       case FromPce(message)                                    => 400
       case AckFromProvider(_)                                  => 500
     }

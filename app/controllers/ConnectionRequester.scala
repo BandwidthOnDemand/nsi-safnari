@@ -37,7 +37,7 @@ object ConnectionRequester extends Controller with SoapWebService {
 
       val ack = connection.map { c =>
         (c ? FromProvider(NsiRequesterMessage(headers, notification))).mapTo[NsiAcknowledgement]
-      } getOrElse Future.successful(ServiceException(NsiError.DoesNotExist.toServiceException(Configuration.Nsa)))
+      } getOrElse Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))
 
       ack.map(message.ack)
     case response =>

@@ -185,7 +185,7 @@ class ReservationStateMachine(
           ToProvider(NsiProviderMessage(newNsiHeaders(segment.provider).copy(correlationId = correlationId), InitialReserve(reserveType, Conversion.invert(criteria).right.get, service)), segment.provider)
       }
     case PathComputationState -> FailedReservationState =>
-      respond(ReserveFailed(failed(NsiError.PathComputationNoPath)))
+      respond(ReserveFailed(failed(NsiError.NoPathFound)))
     case CheckingReservationState -> FailedReservationState =>
       respond(ReserveFailed(failed(NsiError.ChildError).tap(_.getServiceException().withChildException(nextStateData.childExceptions.values.toSeq.asJava))))
     case CheckingReservationState -> HeldReservationState =>

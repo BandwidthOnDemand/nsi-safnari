@@ -176,7 +176,7 @@ class ConnectionSpec extends helpers.Specification {
         case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
           headers must beEqualTo(Headers.copy(correlationId = ReserveCorrelationId).forAsyncReply)
           failed.getConnectionId() must beEqualTo(ConnectionId)
-          failed.getServiceException().getErrorId() must beEqualTo(NsiError.PathComputationNoPath.id)
+          failed.getServiceException().getErrorId() must beEqualTo(NsiError.NoPathFound.id)
       }
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
@@ -234,7 +234,7 @@ class ConnectionSpec extends helpers.Specification {
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
         FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A))))
 
-      when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthNotAvailable.toServiceException(A.provider.nsa)))))
+      when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
 
       messages must haveSize(1)
       messages must haveOneElementLike {
@@ -243,7 +243,7 @@ class ConnectionSpec extends helpers.Specification {
           failed.getConnectionId() must beEqualTo(ConnectionId)
           failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
           failed.getServiceException().getChildException().asScala must haveSize(1)
-          failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.BandwidthNotAvailable.id)
+          failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.BandwidthUnavailable.id)
       }
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
@@ -252,7 +252,7 @@ class ConnectionSpec extends helpers.Specification {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
         FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A, B))),
-        upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthNotAvailable.toServiceException(A.provider.nsa)))))
+        upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
 
@@ -273,11 +273,11 @@ class ConnectionSpec extends helpers.Specification {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
         FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A, B))),
-        upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthNotAvailable.toServiceException(A.provider.nsa)))))
+        upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
 
-      when(upa.response(CorrelationId(0, 5), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdB").withServiceException(NsiError.BandwidthNotAvailable.toServiceException(B.provider.nsa)))))
+      when(upa.response(CorrelationId(0, 5), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdB").withServiceException(NsiError.BandwidthUnavailable.toServiceException(B.provider.nsa)))))
 
       messages must haveSize(1)
       messages must haveOneElementLike {
