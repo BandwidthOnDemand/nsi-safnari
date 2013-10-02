@@ -32,6 +32,8 @@ case class QuerySummaryFailed(failed: QueryFailedType) extends NsiRequesterOpera
 case class QueryRecursiveConfirmed(reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
 case class QueryRecursiveFailed(failed: QueryFailedType) extends NsiRequesterOperation
 
+case class QueryNotificationConfirmed(notifications: Seq[NotificationBaseType]) extends NsiRequesterOperation
+
 case class ErrorEvent(error: ErrorEventType) extends NsiNotification {
   override def connectionId = error.getConnectionId()
 }

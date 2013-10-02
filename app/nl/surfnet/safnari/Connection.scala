@@ -12,6 +12,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion)
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
   private var nextNotificationId: Int = 1
+  private var nsiNotifications: List[NsiNotification] = Nil
   private def newNotificationId() = {
     val r = nextNotificationId
     nextNotificationId += 1
@@ -67,6 +68,11 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     }
 
     stateMachine.flatMap(applyMessageToStateMachine(_, message)).orElse(handleUnhandledProviderNotifications(message))
+  }
+
+  def process(message: OutboundMessage): Unit = message match {
+    case ToRequester(NsiRequesterMessage(headers, notification: NsiNotification)) => nsiNotifications = notification :: nsiNotifications
+    case _ =>
   }
 
   private def applyMessageToStateMachine(stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage], message: InboundMessage): Option[Seq[OutboundMessage]] = {
@@ -165,5 +171,12 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
       id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(false))
   }.toSeq
+
+  def notifications: Seq[NotificationBaseType] = nsiNotifications.map {
+    case ErrorEvent(event) => event
+    case DataPlaneStateChange(event) => event
+    case ReserveTimeout(event) => event
+    case MessageDeliveryTimeout(event) => event
+  }
 
 }

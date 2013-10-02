@@ -32,3 +32,4 @@ case class QuerySummarySync(connectionIds: Seq[ConnectionId]) extends NsiProvide
 case class QueryRecursive(connectionIds: Seq[ConnectionId]) extends NsiProviderQuery
 
 case class QueryNotification(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery
+case class QueryNotificationSync(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery

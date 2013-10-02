@@ -21,7 +21,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
   def get(connectionId: ConnectionId): Option[ActorRef] = connections.single.get(connectionId)
 
-  def find(connectionIds: Seq[String]): Seq[ActorRef] = connections.single.filterKeys(connectionIds.contains).values.toSeq
+  def find(connectionIds: Seq[ConnectionId]): Seq[ActorRef] = connections.single.filterKeys(connectionIds.contains).values.toSeq
 
   private def addChildConnectionId(connection: ActorRef, childConnectionId: ConnectionId) {
     childConnections.single(childConnectionId) = connection
@@ -64,8 +64,9 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
     override def receive = LoggingReceive {
-      case 'query         => sender ! connection.query
-      case 'querySegments => sender ! connection.segments
+      case 'query              => sender ! connection.query
+      case 'querySegments      => sender ! connection.segments
+      case 'queryNotifications => sender ! connection.notifications
 
       case inbound: InboundMessage =>
         val result = connection.process(inbound)
@@ -76,6 +77,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
           case Some(outbound) =>
             messageStore.storeAll(connection.id, inbound +: outbound)
             updateChildConnection(inbound)
+            outbound.foreach(connection.process)
 
             outbound.foreach(output ! _)
 
@@ -97,8 +99,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
             connection.process(inbound).getOrElse {
               Logger.warn(s"Connection ${connection.id} failed to replay message $inbound")
             }
-          case _: OutboundMessage =>
-            // Ignore.
+          case outbound: OutboundMessage =>
+            connection.process(outbound)
         }
         sender ! (())
     }

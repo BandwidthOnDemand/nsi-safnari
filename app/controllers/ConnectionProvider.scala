@@ -7,6 +7,8 @@ import java.net.URI
 import nl.surfnet.safnari._
 import nl.surfnet.safnari.NsiSoapConversions._
 import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
+import org.ogf.schemas.nsi._2013._07.connection.types.QueryNotificationConfirmedType
+import org.ogf.schemas.nsi._2013._07.connection.types.NotificationBaseType
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import play.api._
 import play.api.Play.current
@@ -59,8 +61,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     case q: QuerySummary =>
       val connectionStates = queryConnections(q.connectionIds)
       connectionStates.onSuccess {
-        case reservations =>
-          replyTo(QuerySummaryConfirmed(reservations))
+        case reservations => replyTo(QuerySummaryConfirmed(reservations))
       }
       Future.successful(GenericAck())
     case q: QuerySummarySync =>
@@ -71,10 +72,28 @@ object ConnectionProvider extends Controller with SoapWebService {
     case q: QueryRecursive =>
       Future.successful(ServiceException(NsiError.NotImplemented.toServiceException(Configuration.Nsa)))
     case q: QueryNotification =>
-      Future.successful(ServiceException(NsiError.NotImplemented.toServiceException(Configuration.Nsa)))
+      val connection = connectionManager.get(q.connectionId)
+      connection.map { con =>
+        queryNotifications(con, q.start, q.end) onSuccess {
+          case n => replyTo(QueryNotificationConfirmed(n))
+        }
+      }
+      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))(_ => GenericAck()))
+    case q: QueryNotificationSync =>
+      val connection = connectionManager.get(q.connectionId)
+      val ack = connection.map(queryNotifications(_, q.start, q.end).map(QueryNotificationSyncConfirmed))
+
+      // or QueryNotificationSyncFailed
+      ack.getOrElse(Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa))))
   }
 
-  private def queryConnections(connectionIds: Seq[ConnectionId]) = {
+  private def queryNotifications(connection: ActorRef, start: Option[Int], end: Option[Int]): Future[Seq[NotificationBaseType]] = {
+    val range = start.getOrElse(1) to end.getOrElse(Int.MaxValue)
+    val notifications = (connection ? 'queryNotifications).mapTo[Seq[NotificationBaseType]]
+    notifications.map(ns => ns.filter(n => range.contains(n.getNotificationId())))
+  }
+
+  private def queryConnections(connectionIds: Seq[ConnectionId]): Future[Seq[QuerySummaryResultType]] = {
     val cs = if (connectionIds.isEmpty) connectionManager.all else connectionManager.find(connectionIds)
     Future.traverse(cs)(c => (c ? 'query).mapTo[QuerySummaryResultType])
   }
