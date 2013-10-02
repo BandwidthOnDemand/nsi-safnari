@@ -85,15 +85,19 @@ object NsiSoapConversions {
 
   implicit val NsiProviderOperationToElement = Conversion.build[NsiProviderOperation, Element] { operation =>
     marshal(operation match {
-      case InitialReserve(body, _, _)      => typesFactory.createReserve(body)
-      case ReserveCommit(connectionId)     => typesFactory.createReserveCommit(new GenericRequestType().withConnectionId(connectionId))
-      case ReserveAbort(connectionId)      => typesFactory.createReserveAbort(new GenericRequestType().withConnectionId(connectionId))
-      case Provision(connectionId)         => typesFactory.createProvision(new GenericRequestType().withConnectionId(connectionId))
-      case Release(connectionId)           => typesFactory.createRelease(new GenericRequestType().withConnectionId(connectionId))
-      case Terminate(connectionId)         => typesFactory.createTerminate(new GenericRequestType().withConnectionId(connectionId))
-      case QuerySummary(connectionIds)     => typesFactory.createQuerySummary(new QueryType().withConnectionId(connectionIds.asJava))
-      case QuerySummarySync(connectionIds) => typesFactory.createQuerySummarySync(new QueryType().withConnectionId(connectionIds.asJava))
-      case QueryRecursive(connectionIds)   => typesFactory.createQueryRecursive(new QueryType().withConnectionId(connectionIds.asJava))
+      case InitialReserve(body, _, _)                  => typesFactory.createReserve(body)
+      case ReserveCommit(connectionId)                 => typesFactory.createReserveCommit(new GenericRequestType().withConnectionId(connectionId))
+      case ReserveAbort(connectionId)                  => typesFactory.createReserveAbort(new GenericRequestType().withConnectionId(connectionId))
+      case Provision(connectionId)                     => typesFactory.createProvision(new GenericRequestType().withConnectionId(connectionId))
+      case Release(connectionId)                       => typesFactory.createRelease(new GenericRequestType().withConnectionId(connectionId))
+      case Terminate(connectionId)                     => typesFactory.createTerminate(new GenericRequestType().withConnectionId(connectionId))
+      case QuerySummary(connectionIds)                 => typesFactory.createQuerySummary(new QueryType().withConnectionId(connectionIds.asJava))
+      case QuerySummarySync(connectionIds)             => typesFactory.createQuerySummarySync(new QueryType().withConnectionId(connectionIds.asJava))
+      case QueryRecursive(connectionIds)               => typesFactory.createQueryRecursive(new QueryType().withConnectionId(connectionIds.asJava))
+      case QueryNotification(connectionId, start, end) => typesFactory.createQueryNotification(new QueryNotificationType()
+                                                            .withConnectionId(connectionId)
+                                                            .withStartNotificationId(start.map(x => x: Integer).orNull)
+                                                            .withEndNotificationId(end.map(x => x: Integer).orNull))
     })
   } {
     messageFactories(Map[String, NsiMessageParser[NsiProviderOperation]](
@@ -106,13 +110,18 @@ object NsiSoapConversions {
           InitialReserve(body, criteria, service)
         }
       },
-      "reserveCommit" -> NsiMessageParser { (body: GenericRequestType) => Right(ReserveCommit(body.getConnectionId())) },
-      "reserveAbort" -> NsiMessageParser { (body: GenericRequestType) => Right(ReserveAbort(body.getConnectionId())) },
-      "provision" -> NsiMessageParser { (body: GenericRequestType) => Right(Provision(body.getConnectionId())) },
-      "release" -> NsiMessageParser { (body: GenericRequestType) => Right(Release(body.getConnectionId())) },
-      "terminate" -> NsiMessageParser { (body: GenericRequestType) => Right(Terminate(body.getConnectionId())) },
-      "querySummary" -> NsiMessageParser { (body: QueryType) => Right(QuerySummary(body.getConnectionId().asScala)) },
-      "querySummarySync" -> NsiMessageParser { (body: QueryType) => Right(QuerySummarySync(body.getConnectionId().asScala)) }))
+      "reserveCommit" -> NsiMessageParser { body: GenericRequestType => Right(ReserveCommit(body.getConnectionId())) },
+      "reserveAbort" -> NsiMessageParser { body: GenericRequestType => Right(ReserveAbort(body.getConnectionId())) },
+      "provision" -> NsiMessageParser { body: GenericRequestType => Right(Provision(body.getConnectionId())) },
+      "release" -> NsiMessageParser { body: GenericRequestType => Right(Release(body.getConnectionId())) },
+      "terminate" -> NsiMessageParser { body: GenericRequestType => Right(Terminate(body.getConnectionId())) },
+      "querySummary" -> NsiMessageParser { body: QueryType => Right(QuerySummary(body.getConnectionId().asScala)) },
+      "querySummarySync" -> NsiMessageParser { body: QueryType => Right(QuerySummarySync(body.getConnectionId().asScala)) },
+      "queryRecursive" -> NsiMessageParser { body: QueryType => Right(QueryRecursive(body.getConnectionId().asScala)) },
+      "queryNotification" -> NsiMessageParser { body: QueryNotificationType =>
+        Right(QueryNotification(body.getConnectionId,
+          Option(body.getStartNotificationId()).map(_.toInt),
+          Option(body.getEndNotificationId()).map(_.toInt))) }))
   }
 
   implicit val NsiRequesterOperationToElement = Conversion.build[NsiRequesterOperation, Element] { operation =>

@@ -69,7 +69,9 @@ object ConnectionProvider extends Controller with SoapWebService {
         QuerySummarySyncConfirmed(states)
       }
     case q: QueryRecursive =>
-      ???
+      Future.successful(ServiceException(NsiError.NotImplemented.toServiceException(Configuration.Nsa)))
+    case q: QueryNotification =>
+      Future.successful(ServiceException(NsiError.NotImplemented.toServiceException(Configuration.Nsa)))
   }
 
   private def queryConnections(connectionIds: Seq[ConnectionId]) = {

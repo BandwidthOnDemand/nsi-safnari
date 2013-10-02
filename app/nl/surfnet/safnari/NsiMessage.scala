@@ -47,5 +47,7 @@ object NsiError {
   val StpAlreadyInUse = NsiError("SVC0012", "STP_ALREADY_IN_USE", "Specified STP already in use")
   val BandwidthNotAvailable = NsiError("SVC0012", "BANDWIDTH_NOT_AVAILABLE", "Insufficient bandwidth available for reservation")
 
+  val NotImplemented = NsiError("103", "NOT_IMPLEMENTED", "This operation is not implemented yet")
+
   val ChildError = NsiError("SVC????", "CHILD_ERROR", "One or more children reported an error. See the child exceptions for details.")
 }

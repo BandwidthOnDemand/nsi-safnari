@@ -30,3 +30,5 @@ case class Terminate(connectionId: ConnectionId) extends NsiProviderUpdateComman
 case class QuerySummary(connectionIds: Seq[ConnectionId]) extends NsiProviderQuery
 case class QuerySummarySync(connectionIds: Seq[ConnectionId]) extends NsiProviderQuery
 case class QueryRecursive(connectionIds: Seq[ConnectionId]) extends NsiProviderQuery
+
+case class QueryNotification(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery
