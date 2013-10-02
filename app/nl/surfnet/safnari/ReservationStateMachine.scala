@@ -24,13 +24,13 @@ case class ReservationStateMachineData(
   globalReservationId: Option[String],
   description: Option[String],
   criteria: ReservationConfirmCriteriaType,
-  segments: Map[CorrelationId, ComputedSegment] = Map.empty,
-  connections: Map[ConnectionId, CorrelationId] = Map.empty,
+  segments: Vector[(CorrelationId, ComputedSegment)] = Vector.empty,
+  connections: Map[CorrelationId, ConnectionId] = Map.empty,
   childConnectionStates: Map[ConnectionId, ReservationState] = Map.empty,
   childExceptions: Map[ConnectionId, ServiceExceptionType] = Map.empty,
   childTimeouts: Map[ConnectionId, ReserveTimeoutRequestType] = Map.empty) {
 
-  def awaitingConnectionId = segments.keySet -- connections.values
+  def awaitingConnectionId = segments.map(_._1).toSet -- connections.keySet
 
   def aggregatedReservationState: ReservationState =
     if (awaitingConnectionId.isEmpty && childConnectionStates.isEmpty) CheckingReservationState
@@ -47,7 +47,7 @@ case class ReservationStateMachineData(
     else throw new IllegalStateException(s"cannot determine aggregated state from ${childConnectionStates.values.mkString(",")}")
 
   def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = {
-    copy(connections = connections.updated(connectionId, correlationId))
+    copy(connections = connections.updated(correlationId, connectionId))
   }
 
   def updateChild(connectionId: ConnectionId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None, childTimeout: Option[ReserveTimeoutRequestType] = None) =
@@ -65,9 +65,10 @@ case class ReservationStateMachineData(
   def childHasState(connectionId: ConnectionId, state: ReservationState) =
     childConnectionStates.getOrElse(connectionId, CheckingReservationState) == state
 
-  def children: Map[ConnectionId, ComputedSegment] = connections.map {
-    case (connectionId, correlationId) => connectionId -> segments(correlationId)
-  }
+  def segmentByCorrelationId(correlationId: CorrelationId): ComputedSegment =
+    segments.find(_._1 == correlationId).map(_._2).getOrElse {
+      throw new IllegalStateException(s"correlationId $correlationId doesn't map to a computed segment $segments")
+    }
 }
 
 class ReservationStateMachine(
@@ -93,7 +94,7 @@ class ReservationStateMachine(
   when(PathComputationState) {
     case Event(FromPce(message: PathComputationConfirmed), data) =>
       val segments = message.segments.map(newCorrelationId() -> _)
-      goto(CheckingReservationState) using data.copy(segments = segments.toMap)
+      goto(CheckingReservationState) using data.copy(segments = segments.toVector)
     case Event(FromPce(message: PathComputationFailed), _) =>
       goto(FailedReservationState)
   }
@@ -182,7 +183,7 @@ class ReservationStateMachine(
             withCriteria(criteria)
 
           ToProvider(NsiProviderMessage(newNsiHeaders(segment.provider).copy(correlationId = correlationId), InitialReserve(reserveType, Conversion.invert(criteria).right.get, service)), segment.provider)
-      }.toVector
+      }
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(failed(NsiError.PathComputationNoPath)))
     case CheckingReservationState -> FailedReservationState =>
@@ -191,14 +192,14 @@ class ReservationStateMachine(
       respond(ReserveConfirmed(id, nextStateData.criteria))
     case HeldReservationState -> CommittingReservationState =>
       nextStateData.connections.map {
-        case (connectionId, correlationId) =>
-          val seg = nextStateData.segments(correlationId)
+        case (correlationId, connectionId) =>
+          val seg = nextStateData.segmentByCorrelationId(correlationId)
           ToProvider(NsiProviderMessage(newNsiHeaders(seg.provider), ReserveCommit(connectionId)), seg.provider)
       }.toVector
     case HeldReservationState -> AbortingReservationState =>
       nextStateData.connections.map {
-        case (connectionId, correlationId) =>
-          val seg = nextStateData.segments(correlationId)
+        case (correlationId, connectionId) =>
+          val seg = nextStateData.segmentByCorrelationId(correlationId)
           ToProvider(NsiProviderMessage(newNsiHeaders(seg.provider), ReserveAbort(connectionId)), seg.provider)
       }.toVector
     case HeldReservationState -> TimeoutReservationState =>
@@ -221,7 +222,10 @@ class ReservationStateMachine(
 
   def segmentKnown(connectionId: ConnectionId) = stateData.childConnectionStates.contains(connectionId)
   def childConnectionState(connectionId: ConnectionId): ReservationStateEnumType = stateData.childConnectionStates(connectionId).jaxb
-  def childConnections: Map[ConnectionId, ComputedSegment] = stateData.children
+  def childConnections: Seq[(ComputedSegment, Option[ConnectionId])] = stateData.segments.map {
+    case (correlationId, segment) =>
+      (segment, stateData.connections.get(correlationId))
+  }
   def reservationState = stateName.jaxb
   def criteria = stateData.criteria
   def version = stateData.criteria.getVersion()

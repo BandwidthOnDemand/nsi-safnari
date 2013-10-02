@@ -78,7 +78,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       }
 
       messages.collectFirst {
-        case ToRequester(NsiRequesterMessage(_, confirmed: ReserveCommitConfirmed)) => rsm.childConnections.map(kv => kv._1 -> kv._2.provider)
+        case ToRequester(NsiRequesterMessage(_, confirmed: ReserveCommitConfirmed)) =>
+          rsm.childConnections.map(kv => kv._2.getOrElse(throw new IllegalStateException("reserveConfirmed with unknown child connectionId")) -> kv._1.provider).toMap
       }.foreach { children =>
         otherStateMachines = Some((
           new ProvisionStateMachine(id, newNsiHeaders, children),
@@ -121,8 +122,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def query = {
-    val children = rsm.childConnections.zipWithIndex.map {
-      case ((id, segment), order) => new ChildSummaryType().
+    val children = rsm.childConnections.zipWithIndex.collect {
+      case ((segment, Some(id)), order) => new ChildSummaryType().
         withConnectionId(id).
         withProviderNSA(segment.provider.nsa).
         withPointToPointService(segment.serviceType.service).
@@ -154,13 +155,13 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def segments: Seq[ConnectionData] = rsm.childConnections.map {
-    case (id, segment) => ConnectionData(
+    case (segment, id) => ConnectionData(
       id,
       segment.provider.nsa,
-      rsm.childConnectionState(id),
-      lsm.map(_.childConnectionState(id)).getOrElse(LifecycleStateEnumType.CREATED),
-      psm.map(_.childConnectionState(id)).getOrElse(ProvisionStateEnumType.RELEASED),
-      dsm.map(_.childConnectionState(id)).getOrElse(false))
+      id.map(rsm.childConnectionState).getOrElse(ReservationStateEnumType.RESERVE_CHECKING),
+      id.flatMap(id => lsm.map(_.childConnectionState(id))).getOrElse(LifecycleStateEnumType.CREATED),
+      id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
+      id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(false))
   }.toSeq
 
 }
