@@ -20,6 +20,7 @@ import akka.actor.Props
 import play.api.Logger
 import scala.util.{ Failure, Success }
 import SoapRequests._
+import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 
 object ConnectionRequester extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -87,11 +88,16 @@ object ConnectionRequester extends Controller with SoapWebService {
         request.post(message).onComplete {
           case Failure(e) =>
             Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $e", e)
+            connection ! ErrorFromProvider(headers, None, s"$e", None)
           case Success(ack) if ack.status == 200 || ack.status == 500 =>
             Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
             Conversion[NsiProviderMessage[NsiAcknowledgement], String].invert(ack.body) match {
               case Left(error) =>
                 Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error")
+                connection ! ErrorFromProvider(headers, None, error, None)
+              case Right(ack @ NsiProviderMessage(ackHeaders, exception: ServiceExceptionType)) =>
+                Logger.debug(s"Received failed ack from ${provider.nsa} at ${provider.url}: $ack")
+                connection ! ErrorFromProvider(headers, Some(ackHeaders), exception.getText, Some(exception))
               case Right(ack) =>
                 Logger.debug(s"Received ack from ${provider.nsa} at ${provider.url}: $ack")
                 connection ! AckFromProvider(ack)

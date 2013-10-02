@@ -80,11 +80,10 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
             outbound.foreach(output ! _)
 
             inbound match {
-              case FromRequester(NsiProviderMessage(headers, reserve: InitialReserve)) => ReserveResponse(connection.id)
-              case FromRequester(request) => GenericAck()
-              case FromProvider(request) => GenericAck()
-              case FromPce(request) => 200
-              case AckFromProvider(_) => ()
+              case FromRequester(NsiProviderMessage(_, _: InitialReserve)) => ReserveResponse(connection.id)
+              case FromRequester(_) | FromProvider(_) => GenericAck()
+              case FromPce(_) => 200
+              case _: AckFromProvider | _: ErrorFromProvider => ()
             }
         }
 
@@ -114,7 +113,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       case FromRequester(NsiProviderMessage(headers, message)) => ServiceException(NsiError.InvalidTransition.toServiceException(Configuration.Nsa))
       case FromProvider(NsiRequesterMessage(headers, message)) => ServiceException(NsiError.InvalidTransition.toServiceException(Configuration.Nsa))
       case FromPce(message)                                    => 400
-      case AckFromProvider(_)                                  => 500
+      case _: AckFromProvider | _: ErrorFromProvider           => 500
     }
   }
 }

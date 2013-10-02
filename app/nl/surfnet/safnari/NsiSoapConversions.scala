@@ -249,11 +249,44 @@ object NsiSoapConversions {
 
   val jaxbContext = JAXBContext.newInstance(SchemaPackages.mkString(":"))
 
+  private implicit val NsiHeadersToElement: Conversion[NsiHeaders, Element] = Conversion.build[NsiHeaders, Element] {
+    headers =>
+      for {
+        commonHeaderType <- Conversion[NsiHeaders, CommonHeaderType].apply(headers).right
+        headersElement <- marshal(headersFactory.createNsiHeader(commonHeaderType)).right
+      } yield headersElement
+  } {
+    headersElement =>
+      val unmarshaller = jaxbContext.createUnmarshaller()
+      for {
+        commonHeaderType <- tryEither(unmarshaller.unmarshal(headersElement, classOf[CommonHeaderType]).getValue).right
+        headers <- Conversion[NsiHeaders, CommonHeaderType].invert(commonHeaderType).right
+      } yield headers
+  }
+
+  private def NsiJaxbElementToString[T](jaxb: JAXBElement[T]): Conversion[T, String] = Conversion.build[T, String] { value =>
+    tryEither {
+      val wrapped = new JAXBElement(jaxb.getName(), jaxb.getDeclaredType(), value)
+      val marshaller = jaxbContext.createMarshaller()
+      val baos = new ByteArrayOutputStream()
+      marshaller.marshal(wrapped, baos)
+      baos.toString("UTF-8")
+    }
+  } { s =>
+    tryEither {
+      val unmarshaller = jaxbContext.createUnmarshaller()
+      val source = new StreamSource(new ByteArrayInputStream(s.getBytes("UTF-8")))
+      unmarshaller.unmarshal(source, jaxb.getDeclaredType()).getValue()
+    }
+  }
+
+  implicit val NsiHeadersToXmlString: Conversion[NsiHeaders, String] = Conversion[NsiHeaders, CommonHeaderType] andThen NsiJaxbElementToString(headersFactory.createNsiHeader(null))
+  implicit val ServiceExceptionTypeToXmlString: Conversion[ServiceExceptionType, String] = NsiJaxbElementToString(typesFactory.createServiceException(null))
+
   private def NsiHeadersAndBodyToDocument[T](implicit bodyConversion: Conversion[T, Element]): Conversion[(NsiHeaders, T), Document] = Conversion.build[(NsiHeaders, T), Document] {
     case (headers, body) =>
       for {
-        headersJaxb <- Conversion[NsiHeaders, CommonHeaderType].apply(headers).right
-        headersElement <- marshal(headersFactory.createNsiHeader(headersJaxb)).right
+        headersElement <- Conversion[NsiHeaders, Element].apply(headers).right
         bodyElement <- bodyConversion(body).right
         document <- tryEither {
           val document = createDocument
@@ -268,15 +301,13 @@ object NsiSoapConversions {
         }.right
       } yield document
   } { document =>
-    val unmarshaller = jaxbContext.createUnmarshaller()
     for {
       soapEnvelope <- Option(document.getDocumentElement).toRight("missing document root").right
       soapHeader <- findSingleChildElement(SoapNamespaceUri, "Header", soapEnvelope).right
       headerNode <- findSingleChildElement(NsiHeadersQName.getNamespaceURI(), NsiHeadersQName.getLocalPart(), soapHeader).right
       soapBody <- findSingleChildElement(SoapNamespaceUri, "Body", soapEnvelope).right
       bodyNode <- findSingleChildElement(NsiConnectionTypesNamespace, "*", soapBody).right
-      commonHeaderType <- tryEither(unmarshaller.unmarshal(headerNode, classOf[CommonHeaderType]).getValue).right
-      header <- Conversion[NsiHeaders, CommonHeaderType].invert(commonHeaderType).right
+      header <- Conversion[NsiHeaders, Element].invert(headerNode).right
       body <- bodyConversion.invert(bodyNode).right
     } yield {
       (header, body)
