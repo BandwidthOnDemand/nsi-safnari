@@ -25,19 +25,26 @@ object Application extends Controller {
   }
 
   def connections(page: Int) = Action.async {
-    Future.traverse(ConnectionProvider.connectionManager.all) { c =>
-      (c ? 'query).mapTo[QuerySummaryResultType].flatMap { summary =>
+    val timeBound = DateTime.now().minusWeeks(1).toXmlGregorianCalendar
+
+    val queryResult = Future.traverse(ConnectionProvider.connectionManager.all) { c =>
+      (c ? 'query).mapTo[QuerySummaryResultType] flatMap { summary =>
         (c ? 'querySegments).mapTo[Seq[ConnectionData]] map (summary -> _)
       }
-    }.map { cs =>
-      val timeBound = DateTime.now().minusWeeks(1).toXmlGregorianCalendar
-      val connections = cs.filter {
-        case (con, segments) => con.getCriteria().get(0).getSchedule().getEndTime().compare(timeBound) > 0
-      }.sortBy(_._1.getCriteria().get(0).getSchedule().getStartTime())(XmlGregorianCalendarOrdering.reverse)
+    }
 
-      Ok(views.html.connections(connections))
+    queryResult map { cs =>
+      val connections =
+        cs filter {
+          case (con, _) =>
+            val endTime = Option(con.getCriteria().get(0).getSchedule().getEndTime())
+            endTime.map(_.compare(timeBound) > 0).getOrElse(true)
+        } sortBy {
+          case (con, _) => Option(con.getCriteria().get(0).getSchedule().getStartTime())
+        }
+
+      Ok(views.html.connections(connections.reverse))
     }
   }
 
 }
-
