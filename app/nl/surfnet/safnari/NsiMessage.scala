@@ -4,8 +4,8 @@ import java.net.URI
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 
 object NsiHeaders {
-  val ProviderProtocolVersion: URI = URI.create("application/vdn.ogf.nsi.cs.v2.provider+soap")
-  val RequesterProtocolVersion: URI = URI.create("application/vdn.ogf.nsi.cs.v2.requester+soap")
+  val ProviderProtocolVersion: URI = URI.create("application/vnd.ogf.nsi.cs.v2.provider+soap")
+  val RequesterProtocolVersion: URI = URI.create("application/vnd.ogf.nsi.cs.v2.requester+soap")
 }
 case class NsiHeaders(correlationId: CorrelationId, requesterNSA: String, providerNSA: String, replyTo: Option[URI], protocolVersion: URI) {
   def forSyncAck: NsiHeaders = copy(replyTo = None)
