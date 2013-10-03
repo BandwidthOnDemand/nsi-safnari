@@ -1,26 +1,25 @@
 package controllers
 
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
-import nl.surfnet.safnari._
-import nl.surfnet.safnari.NsiSoapConversions._
-import play.api.libs.concurrent.Execution.Implicits._
-import play.api.mvc.Controller
-import support.ExtraBodyParsers.NsiRequesterEndPoint
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
-import java.net.URI
-import play.api.libs.ws.WS
 import com.ning.http.client.Realm.AuthScheme
-import support.ExtraBodyParsers._
-import play.api.Play.current
-import play.api.libs.concurrent.Akka
-import akka.actor.Props
-import play.api.Logger
-import scala.util.{ Failure, Success }
-import SoapRequests._
+import controllers.SoapRequests._
+import java.net.URI
+import nl.surfnet.safnari._
+import nl.surfnet.safnari.NsiSoapConversions._
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import play.api.Logger
+import play.api.Play.current
+import play.api.http.Status._
+import play.api.libs.concurrent.Akka
+import play.api.libs.concurrent.Execution.Implicits._
+import play.api.libs.ws.WS
+import play.api.mvc.Controller
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.util.{ Failure, Success }
+import support.ExtraBodyParsers._
 
 object ConnectionRequester extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -88,22 +87,29 @@ object ConnectionRequester extends Controller with SoapWebService {
         request.post(message).onComplete {
           case Failure(e) =>
             Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $e", e)
-            connection ! ErrorFromProvider(headers, None, s"$e", None)
-          case Success(ack) if ack.status == 200 || ack.status == 500 =>
-            Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
-            Conversion[NsiProviderMessage[NsiAcknowledgement], String].invert(ack.body) match {
-              case Left(error) =>
-                Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error")
-                connection ! ErrorFromProvider(headers, None, error, None)
-              case Right(ack @ NsiProviderMessage(ackHeaders, exception: ServiceExceptionType)) =>
-                Logger.debug(s"Received failed ack from ${provider.nsa} at ${provider.url}: $ack")
-                connection ! ErrorFromProvider(headers, Some(ackHeaders), exception.getText, Some(exception))
-              case Right(ack) =>
-                Logger.debug(s"Received ack from ${provider.nsa} at ${provider.url}: $ack")
-                connection ! AckFromProvider(ack)
-            }
+            connection ! ErrorFromProvider(headers, None, NsiError.ChildError.toServiceException(provider.nsa))
           case Success(ack) =>
-            Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
+            ack.status match {
+              case OK | CREATED | ACCEPTED | INTERNAL_SERVER_ERROR =>
+                Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
+                Conversion[NsiProviderMessage[NsiAcknowledgement], String].invert(ack.body) match {
+                  case Left(error) =>
+                    Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error")
+                    connection ! ErrorFromProvider(headers, None, NsiError.ChildError.copy(text = error).toServiceException(provider.nsa))
+                  case Right(ack @ NsiProviderMessage(ackHeaders, exception: ServiceExceptionType)) =>
+                    Logger.debug(s"Received failed ack from ${provider.nsa} at ${provider.url}: $ack")
+                    connection ! ErrorFromProvider(headers, Some(ackHeaders), exception)
+                  case Right(ack) =>
+                    Logger.debug(s"Received ack from ${provider.nsa} at ${provider.url}: $ack")
+                    connection ! AckFromProvider(ack)
+                }
+              case FORBIDDEN =>
+                Logger.warn(s"Authentication failed (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
+                connection ! ErrorFromProvider(headers, None, NsiError.AuthenticationFailure.toServiceException(provider.nsa))
+              case _ =>
+                Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
+                connection ! ErrorFromProvider(headers, None, NsiError.ChildError.copy(text = s"Communication error: ${ack.status} ${ack.statusText}").toServiceException(provider.nsa))
+            }
         }
     }
   }

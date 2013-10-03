@@ -35,8 +35,8 @@ final case class AckFromProvider(message: NsiProviderMessage[NsiAcknowledgement]
   override def toShortString = Message.shortString(getClass(), message.body.getClass(), correlationId)
   override def correlationId = message.headers.correlationId
 }
-final case class ErrorFromProvider(requestHeaders: NsiHeaders, ackHeaders: Option[NsiHeaders], errorMessage: String, serviceException: Option[ServiceExceptionType]) extends InboundMessage {
-  override def toShortString = s"ErrorFromProvider(cid=$correlationId, $errorMessage, ${serviceException.map(_.getClass().getSimpleName())})"
+final case class ErrorFromProvider(requestHeaders: NsiHeaders, ackHeaders: Option[NsiHeaders], serviceException: ServiceExceptionType) extends InboundMessage {
+  override def toShortString = s"ErrorFromProvider(cid=$correlationId, ${serviceException.getErrorId()}, ${serviceException.getText()})"
   override def correlationId = ackHeaders.map(_.correlationId).getOrElse(requestHeaders.correlationId)
 }
 

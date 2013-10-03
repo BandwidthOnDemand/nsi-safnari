@@ -73,6 +73,10 @@ class ConnectionSpec extends helpers.Specification {
         val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.ProviderProtocolVersion)
         AckFromProvider(NsiProviderMessage(headers, acknowledgment))
       }
+      def error(correlationId: CorrelationId, exception: ServiceExceptionType) = {
+        val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.ProviderProtocolVersion)
+        ErrorFromProvider(headers, Some(headers), exception)
+      }
       def response(correlationId: CorrelationId, operation: NsiRequesterOperation) = {
         val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.RequesterProtocolVersion)
         FromProvider(NsiRequesterMessage(headers, operation))
@@ -253,6 +257,27 @@ class ConnectionSpec extends helpers.Specification {
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
         FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A, B))),
         upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+
+      when(upa.response(CorrelationId(0, 5), ReserveConfirmed("connectionIdB", Criteria)))
+
+      messages must haveSize(1)
+      messages must haveOneElementLike {
+        case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
+          headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
+          failed.getConnectionId() must beEqualTo(ConnectionId)
+          failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+          failed.getServiceException().getChildException().asScala must haveSize(1)
+      }
+      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
+    }
+
+    "fail the reservation with two segments and one downstream communication fails" in new fixture {
+      given(
+        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
+        FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A, B))),
+        upa.error(CorrelationId(0, 4), new ServiceExceptionType().withText("communication error")))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
 
