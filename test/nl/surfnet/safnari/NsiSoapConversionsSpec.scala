@@ -10,7 +10,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
   val input = """<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:head="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:type="http://schemas.ogf.org/nsi/2013/07/connection/types">
     <soapenv:Header>
         <head:nsiHeader>
-            <protocolVersion>application/vdn.ogf.nsi.cs.v2.provider+soap</protocolVersion>
+            <protocolVersion>application/vnd.ogf.nsi.cs.v2.provider+soap</protocolVersion>
             <correlationId>urn:uuid:5c716e15-c17c-481e-885d-c9a5c06e0436</correlationId>
             <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
             <providerNSA>urn:ogf:network:nsa:surfnet.nl</providerNSA>
@@ -50,7 +50,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
           xmlns:ns3="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns4="http://www.w3.org/2001/04/xmlenc#"
           xmlns:ns5="http://www.w3.org/2000/09/xmldsig#" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/types"
           xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/headers">
-          <protocolVersion>application/vdn.ogf.nsi.cs.v2.requester+soap</protocolVersion>
+          <protocolVersion>application/vnd.ogf.nsi.cs.v2.requester+soap</protocolVersion>
           <correlationId>urn:uuid:fc15890f-3118-442f-8482-da50a303689e</correlationId>
           <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-safnari</requesterNSA>
           <providerNSA>urn:ogf:network:netherlight.net:2013:nsa:bod</providerNSA>
@@ -95,7 +95,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
     <soap:Header>
         <ns6:nsiHeader xmlns:ns8="http://schemas.ogf.org/nsi/2013/07/services/point2point" xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/headers"
             xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types" xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#" xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion">
-            <protocolVersion>application/vdn.ogf.nsi.cs.v2.provider+soap</protocolVersion>
+            <protocolVersion>application/vnd.ogf.nsi.cs.v2.provider+soap</protocolVersion>
             <correlationId>urn:uuid:88bbe366-4af7-40bf-8edb-2ad9a980f402</correlationId>
             <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-safnari</requesterNSA>
             <providerNSA>urn:ogf:network:nsa:es.net</providerNSA>
@@ -128,7 +128,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
           |<S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
           |  <S:Header>
           |      <head:nsiHeader xmlns:head="http://schemas.ogf.org/nsi/2013/07/framework/headers">
-          |          <protocolVersion>application/vdn.ogf.nsi.cs.v2.provider+soap</protocolVersion>
+          |          <protocolVersion>application/vnd.ogf.nsi.cs.v2.provider+soap</protocolVersion>
           |          <correlationId>urn:uuid:5c716e15-c17c-481e-885d-c9a5c06e0436</correlationId>
           |          <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
           |          <providerNSA>urn:ogf:network:nsa:surfnet.nl</providerNSA>
