@@ -82,13 +82,13 @@ object ConnectionRequester extends Controller with SoapWebService {
 
         request = request.withSoapActionHeader(operation.soapActionUrl)
 
-        Logger.debug(s"Sending (${request.url}): $message")
+        Logger.debug(s"Sending provider ${provider.nsa} at ${request.url} the SOAP message: ${Conversion[NsiProviderMessage[NsiProviderOperation], String].apply(message)}")
 
         request.post(message).onComplete {
           case Failure(e) =>
             Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $e", e)
           case Success(ack) if ack.status == 200 || ack.status == 500 =>
-            Logger.debug(s"Parsing ack (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
+            Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
             Conversion[NsiProviderMessage[NsiAcknowledgement], String].invert(ack.body) match {
               case Left(error) =>
                 Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error")
