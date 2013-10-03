@@ -46,7 +46,10 @@ object ExtraBodyParsers {
     NsiEndPoint(nsiRequesterOperation)(action)
 
   def NsiEndPoint[M, T[_] <: NsiMessage[_]](parser: BodyParser[T[M]])(action: T[M] => Future[T[NsiAcknowledgement]])(implicit conversion: Conversion[T[NsiAcknowledgement], Document]) = Action.async(parser) { request =>
-    action(request.body).map(Results.Ok(_))
+    action(request.body).map { ack =>
+      Logger.debug(s"Ack ${request.remoteAddress} with ${Conversion[T[NsiAcknowledgement], String].apply(ack)}")
+      ack
+    }.map(Results.Ok(_))
   }
 
   def soap(parser: Conversion[Document, Array[Byte]], maxLength: Int = BodyParsers.parse.DEFAULT_MAX_TEXT_LENGTH): BodyParser[Document] = when(
