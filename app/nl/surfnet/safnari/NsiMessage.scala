@@ -18,11 +18,11 @@ sealed trait NsiMessage[+T] {
   def correlationId: CorrelationId = headers.correlationId
 }
 final case class NsiProviderMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
-  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiProviderMessage(headers.forSyncAck, ack)
+  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiProviderMessage(headers.forSyncAck.copy(protocolVersion = NsiHeaders.ProviderProtocolVersion), ack)
   def reply(reply: NsiRequesterOperation) = NsiRequesterMessage(headers.forAsyncReply, reply)
 }
 final case class NsiRequesterMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
-  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiRequesterMessage(headers.forSyncAck, ack)
+  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiRequesterMessage(headers.forSyncAck.copy(protocolVersion = NsiHeaders.RequesterProtocolVersion), ack)
 }
 
 final case class NsiError(id: String, description: String, text: String) {
