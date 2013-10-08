@@ -64,6 +64,8 @@ object NsiSoapConversions {
         marshal(typesFactory.createQuerySummarySyncConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava)))
       case QueryNotificationSyncConfirmed(notifications) =>
         marshal(typesFactory.createQueryNotificationSyncConfirmed(new QueryNotificationConfirmedType().withErrorEventOrReserveTimeoutOrDataPlaneStateChange(notifications.asJava)))
+      case QueryNotificationSyncFailed(fault) =>
+        marshal(typesFactory.createQueryNotificationSyncFailed(fault))
       case ServiceException(exception) =>
         // Wrap the service exception in a SOAP Fault element using the Java DOM API.
         marshal(typesFactory.createServiceException(exception)).right.flatMap { detailBody =>
@@ -85,8 +87,10 @@ object NsiSoapConversions {
         Right(ReserveResponse(body.getConnectionId())) },
       "querySummarySyncConfirmed" -> NsiMessageParser { (body: QuerySummaryConfirmedType) =>
         Right(QuerySummarySyncConfirmed(body.getReservation().asScala.toVector)) },
-      "queryNotificationSyncConfirmed" -> NsiMessageParser { body: QueryNotificationConfirmedType =>
+      "queryNotificationSyncConfirmed" -> NsiMessageParser { (body: QueryNotificationConfirmedType) =>
         Right(QueryNotificationSyncConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector)) },
+      "queryNotificationSyncFailed" -> NsiMessageParser { (body: org.ogf.schemas.nsi._2013._07.connection.provider.QueryNotificationSyncFailed) =>
+        Right(QueryNotificationSyncFailed(body.getFaultInfo())) },
       "serviceException" -> NsiMessageParser { (body: ServiceExceptionType) =>
         Right(ServiceException(body)) }))
   }

@@ -9,6 +9,7 @@ import nl.surfnet.safnari.NsiSoapConversions._
 import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
 import org.ogf.schemas.nsi._2013._07.connection.types.QueryNotificationConfirmedType
 import org.ogf.schemas.nsi._2013._07.connection.types.NotificationBaseType
+import org.ogf.schemas.nsi._2013._07.connection.types.QueryFailedType
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import play.api._
 import play.api.Play.current
@@ -83,8 +84,7 @@ object ConnectionProvider extends Controller with SoapWebService {
       val connection = connectionManager.get(q.connectionId)
       val ack = connection.map(queryNotifications(_, q.start, q.end).map(QueryNotificationSyncConfirmed))
 
-      // or QueryNotificationSyncFailed
-      ack.getOrElse(Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa))))
+      ack.getOrElse(Future.successful(QueryNotificationSyncFailed(new QueryFailedType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
   }
 
   private def queryNotifications(connection: ActorRef, start: Option[Int], end: Option[Int]): Future[Seq[NotificationBaseType]] = {
