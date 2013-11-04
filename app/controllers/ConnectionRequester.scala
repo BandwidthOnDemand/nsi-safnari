@@ -8,7 +8,6 @@ import controllers.SoapRequests._
 import java.net.URI
 import nl.surfnet.safnari._
 import nl.surfnet.safnari.NsiSoapConversions._
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import play.api.Logger
 import play.api.Play.current
 import play.api.http.Status._
@@ -96,7 +95,7 @@ object ConnectionRequester extends Controller with SoapWebService {
                   case Left(error) =>
                     Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error")
                     connection ! ErrorFromProvider(headers, None, NsiError.ChildError.copy(text = error).toServiceException(provider.nsa))
-                  case Right(ack @ NsiProviderMessage(ackHeaders, exception: ServiceExceptionType)) =>
+                  case Right(ack @ NsiProviderMessage(ackHeaders, ServiceException(exception))) =>
                     Logger.debug(s"Received failed ack from ${provider.nsa} at ${provider.url}: $ack")
                     connection ! ErrorFromProvider(headers, Some(ackHeaders), exception)
                   case Right(ack) =>

@@ -10,7 +10,6 @@ import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
 import org.ogf.schemas.nsi._2013._07.connection.types.QueryNotificationConfirmedType
 import org.ogf.schemas.nsi._2013._07.connection.types.NotificationBaseType
 import org.ogf.schemas.nsi._2013._07.connection.types.QueryFailedType
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import play.api._
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
