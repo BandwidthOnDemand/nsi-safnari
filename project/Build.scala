@@ -25,8 +25,8 @@ object ApplicationBuild extends Build {
     scalaVersion := "2.10.3",
     scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
     resolvers ++= Seq(
-        "SURFnet BoD Snapshots" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-snapshots",
-        "SURFnet BoD Releases" at "http://atlas.dlp.surfnet.nl/nexus/content/repositories/public-releases"
+        "SURFnet BoD Snapshots" at "https://atlas.dlp.surfnet.nl/nexus/content/repositories/public-snapshots",
+        "SURFnet BoD Releases" at "https://atlas.dlp.surfnet.nl/nexus/content/repositories/public-releases"
     ),
     javaOptions in Test += "-Dconfig.file=conf/test.conf",
     testFrameworks in Test := Seq(TestFrameworks.Specs2),
