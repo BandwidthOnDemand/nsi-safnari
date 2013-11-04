@@ -20,13 +20,15 @@ object ApplicationBuild extends Build {
   lazy val mavenCommand = settingKey[String]("Command to run maven")
   lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
+  val nexusBaseUri = "https://atlas.dlp.surfnet.nl/nexus/content/repositories"
+
   val main = play.Project(appName, appVersion, appDependencies).settings(
     organization := "nl.surfnet.bod",
     scalaVersion := "2.10.3",
     scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
     resolvers ++= Seq(
-        "SURFnet BoD Snapshots" at "https://atlas.dlp.surfnet.nl/nexus/content/repositories/public-snapshots",
-        "SURFnet BoD Releases" at "https://atlas.dlp.surfnet.nl/nexus/content/repositories/public-releases"
+        "SURFnet BoD Snapshots" at s"$nexusBaseUri/public-snapshots",
+        "SURFnet BoD Releases" at s"$nexusBaseUri/public-releases"
     ),
     javaOptions in Test += "-Dconfig.file=conf/test.conf",
     testFrameworks in Test := Seq(TestFrameworks.Specs2),
@@ -38,9 +40,8 @@ object ApplicationBuild extends Build {
 
     deployDist := {
       val distFile = com.typesafe.sbt.packager.Keys.dist.value
-      val nexus = "http://atlas.dlp.surfnet.nl/nexus/content/repositories/"
       val version = Keys.version.value
-      val (repoId, repoUrl) = if (version.trim.endsWith("-SNAPSHOT")) ("surfnet-snapshots", nexus + "snapshots") else ("surfnet-releases", nexus + "releases")
+      val (repoId, repoUrl) = if (version.trim.endsWith("-SNAPSHOT")) ("surfnet-snapshots", s"$nexusBaseUri/snapshots") else ("surfnet-releases", s"$nexusBaseUri/releases")
       val groupId = organization.value
       val artifactId = artifact.value.name
       val maven = mavenCommand.value
