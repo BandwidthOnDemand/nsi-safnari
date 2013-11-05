@@ -14,13 +14,11 @@ import play.api._
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
-import play.api.libs.ws.WS
 import play.api.mvc._
 import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
-import SoapRequests._
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -49,11 +47,12 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
     requestHeaders.replyTo.foreach { replyTo =>
-      val request = WS.url(replyTo.toASCIIString()).withSoapActionHeader(response.soapActionUrl)
+      val ack = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))
 
-      request.post(NsiRequesterMessage(requestHeaders.forAsyncReply, response)).onComplete {
-        case Failure(error)           => Logger.info(s"Replying to $replyTo: $error", error)
-        case Success(acknowledgement) => Logger.debug(s"Replying $response to $replyTo")
+      ack.onComplete {
+        case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
+        case Success(NsiRequesterMessage(headers, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
+        case Success(acknowledgement)                                       => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
       }
     }
 

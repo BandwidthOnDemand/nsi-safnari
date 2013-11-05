@@ -85,7 +85,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
               case FromRequester(NsiProviderMessage(_, _: InitialReserve)) => ReserveResponse(connection.id)
               case FromRequester(_) | FromProvider(_) => GenericAck()
               case FromPce(_) => 200
-              case _: AckFromProvider | _: ErrorFromProvider => ()
+              case _: AckFromProvider => ()
             }
         }
 
@@ -115,7 +115,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       case FromRequester(NsiProviderMessage(headers, message)) => ServiceException(NsiError.InvalidTransition.toServiceException(Configuration.Nsa))
       case FromProvider(NsiRequesterMessage(headers, message)) => ServiceException(NsiError.InvalidTransition.toServiceException(Configuration.Nsa))
       case FromPce(message)                                    => 400
-      case _: AckFromProvider | _: ErrorFromProvider           => 500
+      case _: AckFromProvider                                  => 500
     }
   }
 }

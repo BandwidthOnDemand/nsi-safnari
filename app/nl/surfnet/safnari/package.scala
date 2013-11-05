@@ -71,6 +71,14 @@ package object safnari {
     }
   }
 
+  implicit class OptionEitherOps[A, B](value: scala.Option[Either[A, B]]) {
+    def sequence: Either[A, scala.Option[B]] = value match {
+      case None           => Right(None)
+      case Some(Left(a))  => Left(a)
+      case Some(Right(b)) => Right(Some(b))
+    }
+  }
+
   implicit val ReservationCriteriaConversion = Conversion.build[ReservationConfirmCriteriaType, ReservationRequestCriteriaType] { a =>
     Right(new ReservationRequestCriteriaType().
       withSchedule(a.getSchedule()).

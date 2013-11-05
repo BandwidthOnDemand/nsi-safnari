@@ -29,7 +29,7 @@ import javax.xml.soap.SOAPConstants
 import scala.language.higherKinds
 
 object ExtraBodyParsers {
-  implicit def NsiMessageContentType[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): ContentTypeOf[T] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
+  implicit val NsiMessageContentType: ContentTypeOf[NsiMessage[_]] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
   implicit def NsiMessageWriteable[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): Writeable[T] = Writeable { message =>
     conversion.andThen(NsiXmlDocumentConversion)(message).fold({ error =>
@@ -40,10 +40,10 @@ object ExtraBodyParsers {
   }
 
   def NsiProviderEndPoint(action: NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]): Action[NsiProviderMessage[NsiProviderOperation]] =
-    NsiEndPoint(nsiProviderOperation)(action)
+    NsiEndPoint(nsiProviderOperation)(action)(NsiProviderMessageToDocument[NsiAcknowledgement](None))
 
   def NsiRequesterEndPoint(action: NsiRequesterMessage[NsiRequesterOperation] => Future[NsiRequesterMessage[NsiAcknowledgement]]): Action[NsiRequesterMessage[NsiRequesterOperation]] =
-    NsiEndPoint(nsiRequesterOperation)(action)
+    NsiEndPoint(nsiRequesterOperation)(action)(NsiRequesterMessageToDocument[NsiAcknowledgement](None))
 
   def NsiEndPoint[M, T[_] <: NsiMessage[_]](parser: BodyParser[T[M]])(action: T[M] => Future[T[NsiAcknowledgement]])(implicit conversion: Conversion[T[NsiAcknowledgement], Document]) = Action.async(parser) { request =>
     action(request.body).map { ack =>
@@ -92,9 +92,9 @@ object ExtraBodyParsers {
       }
   }
 
-  private[support] def nsiProviderOperation = nsiBodyParser[NsiProviderMessage[NsiProviderOperation]]
+  private[support] def nsiProviderOperation = nsiBodyParser(NsiProviderMessageToDocument[NsiProviderOperation](None))
 
-  private[support] def nsiRequesterOperation = nsiBodyParser[NsiRequesterMessage[NsiRequesterOperation]]
+  private[support] def nsiRequesterOperation = nsiBodyParser(NsiRequesterMessageToDocument[NsiRequesterOperation](None))
 
   private def nsiBodyParser[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): BodyParser[T] = soap(NsiXmlDocumentConversion).flatMap { soapMessage =>
     BodyParser { requestHeader =>

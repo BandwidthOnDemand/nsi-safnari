@@ -25,9 +25,9 @@ object StoredMessage {
     override def writes(a: A): JsValue = Json.toJson(conversion(a).right.get)
   }
 
-  implicit val NsiProviderOperationFormat: Format[NsiProviderMessage[NsiProviderOperation]] = conversionToFormat(Conversion[NsiProviderMessage[NsiProviderOperation], String])
-  implicit val NsiProviderAckFormat: Format[NsiProviderMessage[NsiAcknowledgement]] = conversionToFormat(Conversion[NsiProviderMessage[NsiAcknowledgement], String])
-  implicit val NsiRequesterOperationFormat: Format[NsiRequesterMessage[NsiRequesterOperation]] = conversionToFormat(Conversion[NsiRequesterMessage[NsiRequesterOperation], String])
+  implicit val NsiProviderOperationFormat: Format[NsiProviderMessage[NsiProviderOperation]] = conversionToFormat(NsiProviderMessageToDocument[NsiProviderOperation](None).andThen(DocumentToString))
+  implicit val NsiProviderAckFormat: Format[NsiProviderMessage[NsiAcknowledgement]] = conversionToFormat(NsiProviderMessageToDocument[NsiAcknowledgement](None).andThen(DocumentToString))
+  implicit val NsiRequesterOperationFormat: Format[NsiRequesterMessage[NsiRequesterOperation]] = conversionToFormat(NsiRequesterMessageToDocument[NsiRequesterOperation](None).andThen(DocumentToString))
 
   import PceMessage.ProviderEndPointFormat
 
@@ -39,30 +39,24 @@ object StoredMessage {
   private implicit val ToRequesterFormat = ((__ \ 'message).format[NsiRequesterMessage[NsiRequesterOperation]]).inmap(ToRequester.apply, unlift(ToRequester.unapply))
   private implicit val FromProviderFormat = ((__ \ 'message).format[NsiRequesterMessage[NsiRequesterOperation]]).inmap(FromProvider.apply, unlift(FromProvider.unapply))
   private implicit val AckFromProviderFormat = ((__ \ 'message).format[NsiProviderMessage[NsiAcknowledgement]]).inmap(AckFromProvider.apply, unlift(AckFromProvider.unapply))
-  private implicit val ErrorFromProviderFormat = (
-      (__ \ 'requestHeaders).format[NsiHeaders] and
-      (__ \ 'errorHeaders).formatNullable[NsiHeaders] and
-      (__ \ 'serviceException).format[ServiceExceptionType])(ErrorFromProvider.apply, unlift(ErrorFromProvider.unapply))
   private implicit val ToProviderFormat = Json.format[ToProvider]
   private implicit val FromPceFormat = Json.format[FromPce]
   private implicit val ToPceFormat = Json.format[ToPce]
 
   implicit val MessageToStoredMessage = Conversion.build[Message, StoredMessage] {
-    case message @ FromRequester(nsi)               => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "FromRequester", formatJson(message)))
-    case message @ ToRequester(nsi)                 => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "ToRequester", formatJson(message)))
-    case message @ FromProvider(nsi)                => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "FromProvider", formatJson(message)))
-    case message @ AckFromProvider(nsi)             => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "ProviderAck", formatJson(message)))
-    case message @ ErrorFromProvider(headers, _, _) => Right(StoredMessage(headers.correlationId, "NSIv2", "ProviderError", formatJson(message)))
-    case message @ ToProvider(nsi, _)               => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "ToProvider", formatJson(message)))
-    case message @ FromPce(pce)                     => Right(StoredMessage(pce.correlationId, "PCEv1", "FromPce", formatJson(message)))
-    case message @ ToPce(pce)                       => Right(StoredMessage(pce.correlationId, "PCEv1", "ToPce", formatJson(message)))
+    case message @ FromRequester(nsi)   => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "FromRequester", formatJson(message)))
+    case message @ ToRequester(nsi)     => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "ToRequester", formatJson(message)))
+    case message @ FromProvider(nsi)    => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "FromProvider", formatJson(message)))
+    case message @ AckFromProvider(nsi) => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "ProviderAck", formatJson(message)))
+    case message @ ToProvider(nsi, _)   => Right(StoredMessage(nsi.headers.correlationId, "NSIv2", "ToProvider", formatJson(message)))
+    case message @ FromPce(pce)         => Right(StoredMessage(pce.correlationId, "PCEv1", "FromPce", formatJson(message)))
+    case message @ ToPce(pce)           => Right(StoredMessage(pce.correlationId, "PCEv1", "ToPce", formatJson(message)))
   } { stored =>
     stored.tpe match {
       case "FromRequester" => parseJson[FromRequester](stored.content)
       case "ToRequester"   => parseJson[ToRequester](stored.content)
       case "FromProvider"  => parseJson[FromProvider](stored.content)
       case "ProviderAck"   => parseJson[AckFromProvider](stored.content)
-      case "ProviderError" => parseJson[ErrorFromProvider](stored.content)
       case "ToProvider"    => parseJson[ToProvider](stored.content)
       case "FromPce"       => parseJson[FromPce](stored.content)
       case "ToPce"         => parseJson[ToPce](stored.content)

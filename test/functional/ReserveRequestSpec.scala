@@ -26,6 +26,7 @@ import javax.xml.bind.JAXBElement
 import org.w3c.dom.Element
 import javax.xml.transform.dom.DOMResult
 import org.w3c.dom.Document
+import controllers.NsiWebService
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ReserveRequestSpec extends helpers.Specification {
@@ -47,7 +48,9 @@ class ReserveRequestSpec extends helpers.Specification {
         case message @ NsiProviderMessage(headers, reserve: InitialReserve) =>
           val connectionId = newConnectionId
           headers.replyTo.foreach { replyTo =>
-            WS.url(replyTo.toASCIIString()).post(message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
+            NsiWebService.callRequester(
+              ProviderEndPoint(headers.requesterNSA, replyTo, NoAuthentication),
+              message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
           }
           Future.successful(message.ack(ReserveResponse(connectionId)))
         case wtf =>
@@ -100,10 +103,10 @@ class ReserveRequestSpec extends helpers.Specification {
       withSchedule(new ScheduleType()).
       withServiceType("ServiceType").
       withAny(marshal(new P2PServiceBaseType().
-          withCapacity(100).
-          withDirectionality(DirectionalityType.BIDIRECTIONAL).
-          withSourceSTP(new StpType().withNetworkId("networkId").withLocalId("source-localId")).
-          withDestSTP(new StpType().withNetworkId("networkId").withLocalId("dest-localId"))))
+        withCapacity(100).
+        withDirectionality(DirectionalityType.BIDIRECTIONAL).
+        withSourceSTP(new StpType().withNetworkId("networkId").withLocalId("source-localId")).
+        withDestSTP(new StpType().withNetworkId("networkId").withLocalId("dest-localId"))))
 
     "send a reserve request to the ultimate provider agent" in new WithServer(Application, ServerPort) {
       val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))

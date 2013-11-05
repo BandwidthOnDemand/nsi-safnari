@@ -120,11 +120,11 @@ class ReservationStateMachine(
       stay using data
         .receivedConnectionId(headers.correlationId, connectionId)
         .updateChildStatus(headers.correlationId, CheckingReservationState)
-    case Event(ErrorFromProvider(requestHeaders, responseHeaders, serviceException), data) if data.childHasState(requestHeaders.correlationId, CheckingReservationState) =>
+    case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
       val connectionId = Option(serviceException.getConnectionId())
-      val newData = connectionId.fold(data)(data.receivedConnectionId(requestHeaders.correlationId, _))
-        .receivedReserveReply(requestHeaders.correlationId)
-        .updateChildStatus(requestHeaders.correlationId, FailedReservationState, Some(serviceException))
+      val newData = connectionId.fold(data)(data.receivedConnectionId(headers.correlationId, _))
+        .receivedReserveReply(headers.correlationId)
+        .updateChildStatus(headers.correlationId, FailedReservationState, Some(serviceException))
       goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveConfirmed)), data) if data.childHasState(message.connectionId, CheckingReservationState) =>
       val newData = data

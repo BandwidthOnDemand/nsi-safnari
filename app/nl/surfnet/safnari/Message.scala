@@ -27,17 +27,13 @@ final case class ToProvider(message: NsiProviderMessage[NsiProviderOperation], p
   override def toShortString = Message.shortString(getClass(), message.body.getClass(), correlationId)
   override def correlationId = message.headers.correlationId
 }
+final case class AckFromProvider(message: NsiProviderMessage[NsiAcknowledgement]) extends InboundMessage {
+  override def toShortString = Message.shortString(getClass(), message.body.getClass(), correlationId)
+      override def correlationId = message.headers.correlationId
+}
 final case class FromProvider(message: NsiRequesterMessage[NsiRequesterOperation]) extends InboundMessage {
   override def toShortString = Message.shortString(getClass(), message.body.getClass(), correlationId)
   override def correlationId = message.headers.correlationId
-}
-final case class AckFromProvider(message: NsiProviderMessage[NsiAcknowledgement]) extends InboundMessage {
-  override def toShortString = Message.shortString(getClass(), message.body.getClass(), correlationId)
-  override def correlationId = message.headers.correlationId
-}
-final case class ErrorFromProvider(requestHeaders: NsiHeaders, ackHeaders: Option[NsiHeaders], serviceException: ServiceExceptionType) extends InboundMessage {
-  override def toShortString = s"ErrorFromProvider(cid=$correlationId, ${serviceException.getErrorId()}, ${serviceException.getText()})"
-  override def correlationId = ackHeaders.map(_.correlationId).getOrElse(requestHeaders.correlationId)
 }
 
 final case class FromPce(message: PceResponse) extends InboundMessage {

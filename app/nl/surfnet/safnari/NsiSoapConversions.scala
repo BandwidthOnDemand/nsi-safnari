@@ -29,6 +29,10 @@ object NsiSoapConversions {
     tryEither(string.getBytes("UTF-8"))
   }
 
+  val NsiXmlDocumentConversion = XmlDocumentConversion("wsdl/soap/soap-envelope-1.1.xsd", "wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
+
+  implicit val DocumentToString: Conversion[Document, String] = NsiXmlDocumentConversion.andThen(ByteArrayToString)
+
   implicit def NsiToString[T](implicit conversion: Conversion[T, Document]): Conversion[T, String] = conversion.andThen(NsiXmlDocumentConversion).andThen(ByteArrayToString)
 
   private val typesFactory = new org.ogf.schemas.nsi._2013._07.connection.types.ObjectFactory()
@@ -36,16 +40,18 @@ object NsiSoapConversions {
   private val pointToPointServiceFactory = new org.ogf.schemas.nsi._2013._07.services.point2point.ObjectFactory()
   private val SchemaPackages = Seq(typesFactory, headersFactory, pointToPointServiceFactory).map(_.getClass().getPackage().getName())
 
-  implicit def NsiProviderMessageToDocument[T](implicit bodyConversion: Conversion[T, Element]): Conversion[NsiProviderMessage[T], Document] = (Conversion.build[NsiProviderMessage[T], (NsiHeaders, T)] {
-    message => Right((message.headers, message.body))
+  def NsiProviderMessageToDocument[T](defaultHeaders: Option[NsiHeaders])(implicit bodyConversion: Conversion[T, Element]): Conversion[NsiProviderMessage[T], Document] = (Conversion.build[NsiProviderMessage[T], (Option[NsiHeaders], T)] {
+    message => Right((Some(message.headers), message.body))
   } {
-    case (headers, body) => Right(NsiProviderMessage(headers, body))
+    case (headers, body) =>
+      headers.orElse(defaultHeaders).toRight("missing NSI headers").right.map(NsiProviderMessage(_, body))
   }).andThen(NsiHeadersAndBodyToDocument[T](bodyConversion))
 
-  implicit def NsiRequesterMessageToDocument[T](implicit bodyConversion: Conversion[T, Element]): Conversion[NsiRequesterMessage[T], Document] = (Conversion.build[NsiRequesterMessage[T], (NsiHeaders, T)] {
-    message => Right((message.headers, message.body))
+  def NsiRequesterMessageToDocument[T](defaultHeaders: Option[NsiHeaders])(implicit bodyConversion: Conversion[T, Element]): Conversion[NsiRequesterMessage[T], Document] = (Conversion.build[NsiRequesterMessage[T], (Option[NsiHeaders], T)] {
+    message => Right((Some(message.headers), message.body))
   } {
-    case (headers, body) => Right(NsiRequesterMessage(headers, body))
+    case (headers, body) =>
+      headers.orElse(defaultHeaders).toRight("missing NSI headers").right.map(NsiRequesterMessage(_, body))
   }).andThen(NsiHeadersAndBodyToDocument[T](bodyConversion))
 
   private def marshal[T](jaxb: JAXBElement[T]): Either[String, Element] = tryEither {
@@ -227,8 +233,6 @@ object NsiSoapConversions {
   private val NsiHeadersQName = headersFactory.createNsiHeader(null).getName()
   private val NsiConnectionTypesNamespace = typesFactory.createAcknowledgment(null).getName().getNamespaceURI()
 
-  val NsiXmlDocumentConversion = XmlDocumentConversion("wsdl/soap/soap-envelope-1.1.xsd", "wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
-
   private def XmlDocumentConversion(schemaLocations: String*): Conversion[Document, Array[Byte]] = {
     val schemaSources = schemaLocations.map(location => new StreamSource(classpathResourceUri(location).toASCIIString()))
     val schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
@@ -305,10 +309,10 @@ object NsiSoapConversions {
   implicit val NsiHeadersToXmlString: Conversion[NsiHeaders, String] = Conversion[NsiHeaders, CommonHeaderType] andThen NsiJaxbElementToString(headersFactory.createNsiHeader(null))
   implicit val ServiceExceptionTypeToXmlString: Conversion[ServiceExceptionType, String] = NsiJaxbElementToString(typesFactory.createServiceException(null))
 
-  private def NsiHeadersAndBodyToDocument[T](implicit bodyConversion: Conversion[T, Element]): Conversion[(NsiHeaders, T), Document] = Conversion.build[(NsiHeaders, T), Document] {
+  private def NsiHeadersAndBodyToDocument[T](implicit bodyConversion: Conversion[T, Element]) = Conversion.build[(Option[NsiHeaders], T), Document] {
     case (headers, body) =>
       for {
-        headersElement <- Conversion[NsiHeaders, Element].apply(headers).right
+        headersElement <- headers.map(Conversion[NsiHeaders, Element].apply).sequence.right
         bodyElement <- bodyConversion(body).right
         document <- tryEither {
           val document = createDocument
@@ -316,7 +320,7 @@ object NsiSoapConversions {
           val soapHeader = soapEnvelope.appendChild(document.createElementNS(SoapNamespaceUri, "soapenv:Header"))
           val soapBody = soapEnvelope.appendChild(document.createElementNS(SoapNamespaceUri, "soapenv:Body"))
 
-          soapHeader.appendChild(document.adoptNode(headersElement))
+          headersElement.foreach(it => soapHeader.appendChild(document.adoptNode(it)))
           soapBody.appendChild(document.adoptNode(bodyElement))
 
           document
@@ -325,27 +329,39 @@ object NsiSoapConversions {
   } { document =>
     for {
       soapEnvelope <- Option(document.getDocumentElement).toRight("missing document root").right
-      soapHeader <- findSingleChildElement(SoapNamespaceUri, "Header", soapEnvelope).right
-      headerNode <- findSingleChildElement(NsiHeadersQName.getNamespaceURI(), NsiHeadersQName.getLocalPart(), soapHeader).right
+      header <- parseNsiHeaders(soapEnvelope).right
       soapBody <- findSingleChildElement(SoapNamespaceUri, "Body", soapEnvelope).right
       bodyNode <- findSingleChildElement(NsiConnectionTypesNamespace, "*", soapBody).right
-      header <- Conversion[NsiHeaders, Element].invert(headerNode).right
       body <- bodyConversion.invert(bodyNode).right
     } yield {
       (header, body)
     }
   }
 
+  private def parseNsiHeaders(soapEnvelope: Element): Either[String, Option[NsiHeaders]] = for {
+      soapHeader <- findOptionalChildElement(SoapNamespaceUri, "Header", soapEnvelope).right
+      headerNode <- soapHeader.map(it => findOptionalChildElement(NsiHeadersQName.getNamespaceURI(), NsiHeadersQName.getLocalPart(), it)).getOrElse(Right(None)).right
+      header <- headerNode.map(Conversion[NsiHeaders, Element].invert.apply).sequence.right
+  } yield header
+
   private def createDocument: Document = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
 
   private def findSingleChildElement(namespaceUri: String, localName: String, parent: Element): Either[String, Element] = {
+    findOptionalChildElement(namespaceUri, localName, parent) match {
+      case Right(None)    => Left(s"missing element '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one")
+      case Right(Some(x)) => Right(x)
+      case Left(x)        => Left(x)
+    }
+  }
+
+  private def findOptionalChildElement(namespaceUri: String, localName: String, parent: Element): Either[String, scala.Option[Element]] = {
     val childNodes = parent.getElementsByTagNameNS(namespaceUri, localName)
     val children = Vector.tabulate(childNodes.getLength)(childNodes.item)
     children.collect {
       case e: Element => e
     } match {
-      case Vector(e) => Right(e)
-      case Vector()  => Left(s"missing element '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one")
+      case Vector(e) => Right(Some(e))
+      case Vector()  => Right(None)
       case _         => Left(s"multiple elements '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one")
     }
   }

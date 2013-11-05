@@ -63,8 +63,6 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
       case AckFromProvider(NsiProviderMessage(headers, _)) =>
         providerConversations.get(headers.correlationId)
-      case ErrorFromProvider(headers, _, _) =>
-        providerConversations.get(headers.correlationId)
     }
 
     stateMachine.flatMap(applyMessageToStateMachine(_, message)).orElse(handleUnhandledProviderNotifications(message))

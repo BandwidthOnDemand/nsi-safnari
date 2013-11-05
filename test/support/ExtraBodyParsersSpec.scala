@@ -83,7 +83,7 @@ class ExtraBodyParsersSpec extends helpers.Specification {
         case result =>
           status(result) must beEqualTo(500)
           contentType(result) must beEqualTo(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
-          contentAsString(result) must contain("<faultstring>Error parsing NSI message in SOAP request: missing element 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one</faultstring>")
+          contentAsString(result) must contain("<faultstring>Error parsing NSI message in SOAP request: missing NSI headers</faultstring>")
       }
     }
 
@@ -97,7 +97,6 @@ class ExtraBodyParsersSpec extends helpers.Specification {
           contentAsString(result) must contain("<faultstring>Error parsing NSI message in SOAP request: multiple elements 'http://schemas.ogf.org/nsi/2013/07/framework/headers:nsiHeader' in 'Header', expected exactly one</faultstring>")
       }
     }
-
   }
 
   "NsiRequesterParser" should {

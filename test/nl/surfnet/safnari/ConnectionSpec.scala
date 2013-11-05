@@ -75,7 +75,7 @@ class ConnectionSpec extends helpers.Specification {
       }
       def error(correlationId: CorrelationId, exception: ServiceExceptionType) = {
         val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.ProviderProtocolVersion)
-        ErrorFromProvider(headers, Some(headers), exception)
+        AckFromProvider(NsiProviderMessage(headers, ServiceException(exception)))
       }
       def response(correlationId: CorrelationId, operation: NsiRequesterOperation) = {
         val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.RequesterProtocolVersion)
