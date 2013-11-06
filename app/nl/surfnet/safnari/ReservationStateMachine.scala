@@ -181,10 +181,7 @@ class ReservationStateMachine(
   when(CommitFailedReservationState)(PartialFunction.empty)
 
   whenUnhandled {
-    case Event(AckFromProvider(NsiProviderMessage(_, _: ReserveResponse)), _) => stay
-    case Event(AckFromProvider(NsiProviderMessage(_, _: GenericAck)), _) => stay
-    case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(exception))), data) =>
-      ???
+    case Event(AckFromProvider(_), _) => stay
   }
 
   onTransition {

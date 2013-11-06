@@ -52,6 +52,10 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
       goto(TERMINATING) using (data.copy(command = Some(message)))
   }
 
+  whenUnhandled {
+    case Event(AckFromProvider(_), _) => stay
+  }
+
   onTransition {
     case (CREATED | FAILED) -> TERMINATING =>
       stateData.children.map {

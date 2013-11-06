@@ -13,14 +13,15 @@ sealed trait NsiNotification extends NsiRequesterOperation {
 }
 
 case class ReserveConfirmed(connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiRequesterOperation
-
 case class ReserveFailed(failed: GenericFailedType) extends NsiRequesterOperation {
   def connectionId: ConnectionId = failed.getConnectionId()
 }
+
 case class ReserveCommitConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
 case class ReserveCommitFailed(failed: GenericFailedType) extends NsiRequesterOperation {
   def connectionId: ConnectionId = failed.getConnectionId()
 }
+
 case class ReserveAbortConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
 
 case class ProvisionConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
@@ -31,7 +32,6 @@ case class QuerySummaryConfirmed(reservations: Seq[QuerySummaryResultType]) exte
 case class QuerySummaryFailed(failed: QueryFailedType) extends NsiRequesterOperation
 case class QueryRecursiveConfirmed(reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
 case class QueryRecursiveFailed(failed: QueryFailedType) extends NsiRequesterOperation
-
 case class QueryNotificationConfirmed(notifications: Seq[NotificationBaseType]) extends NsiRequesterOperation
 
 case class ErrorEvent(error: ErrorEventType) extends NsiNotification {

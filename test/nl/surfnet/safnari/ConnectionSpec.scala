@@ -46,7 +46,9 @@ class ConnectionSpec extends helpers.Specification {
 
     val connection = new ConnectionEntity(ConnectionId, InitialReserveMessage, () => newCorrelationId, AggregatorNsa, NsiReplyToUri, PceReplyToUri)
 
-    def given(messages: InboundMessage*): Unit = messages.foreach(connection.process)
+    def given(messages: InboundMessage*): Unit = messages.foreach { message =>
+      connection.process(message) aka s"given message $message must be processed" must beSome
+    }
 
     var messages: Seq[Message] = Nil
     def when(message: InboundMessage): Option[Seq[Message]] = {
@@ -458,7 +460,9 @@ class ConnectionSpec extends helpers.Specification {
     "send release confirmed to requester" in new ReservedConnection with Provisioned {
       val ReleaseCorrelationId = newCorrelationId
 
-      given(ura.request(ReleaseCorrelationId, Release(ConnectionId)))
+      given(
+          ura.request(ReleaseCorrelationId, Release(ConnectionId)),
+          upa.acknowledge(CorrelationId(0, 10), GenericAck()))
 
       when(upa.response(CorrelationId(0, 10), ReleaseConfirmed("ConnectionIdA")))
 
@@ -490,7 +494,9 @@ class ConnectionSpec extends helpers.Specification {
     "send a terminate confirmed to requester" in new ReservedConnection {
       val TerminateCorrelationId = newCorrelationId
 
-      given(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
+      given(
+          ura.request(TerminateCorrelationId, Terminate(ConnectionId)),
+          upa.acknowledge(CorrelationId(0, 8), GenericAck()))
 
       when(upa.response(CorrelationId(0, 8), TerminateConfirmed("ConnectionIdA")))
 

@@ -47,6 +47,10 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
       goto(newData.aggregatedProvisionStatus) using newData
   }
 
+  whenUnhandled {
+    case Event(AckFromProvider(_), _) => stay
+  }
+
   onTransition {
     case RELEASED -> PROVISIONING =>
       stateData.children.map {

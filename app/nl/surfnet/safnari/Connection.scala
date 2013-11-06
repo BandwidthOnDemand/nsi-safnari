@@ -66,12 +66,14 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
       case FromProvider(NsiRequesterMessage(headers, _)) =>
         val stateMachine = providerConversations.get(headers.correlationId)
-        if (stateMachine.isEmpty) Logger.debug(s"No active conversation for ${message.toShortString}")
+        if (stateMachine.isEmpty) Logger.debug(s"No active conversation for reply ${message.toShortString}")
         providerConversations -= headers.correlationId
         stateMachine
 
       case AckFromProvider(NsiProviderMessage(headers, _)) =>
-        providerConversations.get(headers.correlationId)
+        val stateMachine = providerConversations.get(headers.correlationId)
+        if (stateMachine.isEmpty) Logger.debug(s"No active conversation for ack ${message.toShortString}")
+        stateMachine
     }
 
     stateMachine.flatMap(applyMessageToStateMachine(_, message)).orElse(handleUnhandledProviderNotifications(message))
