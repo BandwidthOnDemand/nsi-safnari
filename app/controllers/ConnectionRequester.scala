@@ -55,9 +55,19 @@ object ConnectionRequester extends Controller with SoapWebService {
   class DummyNsiRequesterActor extends Actor {
     def receive = {
       case ToProvider(message @ NsiProviderMessage(headers, reserve: InitialReserve), _) =>
-        sender ! FromProvider(message reply ReserveConfirmed(newConnectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
+        val connectionId = newConnectionId
+        sender ! AckFromProvider(message ack ReserveResponse(connectionId))
+        sender ! FromProvider(message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
       case ToProvider(message @ NsiProviderMessage(headers, commit: ReserveCommit), _) =>
+        sender ! AckFromProvider(message ack GenericAck())
         sender ! FromProvider(message reply ReserveCommitConfirmed(commit.connectionId))
+      case ToProvider(message @ NsiProviderMessage(headers, provision: Provision), _) =>
+        sender ! AckFromProvider(message ack GenericAck())
+        sender ! FromProvider(message reply ProvisionConfirmed(provision.connectionId))
+      case ToProvider(message @ NsiProviderMessage(headers, update: NsiProviderUpdateCommand), provider) =>
+        sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa).withConnectionId(update.connectionId)))
+      case ToProvider(message @ NsiProviderMessage(headers, query: NsiProviderQuery), provider) =>
+        sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa)))
     }
   }
 

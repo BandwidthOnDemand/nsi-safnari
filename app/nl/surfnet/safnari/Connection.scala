@@ -18,6 +18,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     nextNotificationId += 1
     r
   }
+  private var mostRecentChildExceptions = Map.empty[ConnectionId, ServiceExceptionType]
 
   val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
     new GenericFailedType().
@@ -37,6 +38,14 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   private var providerConversations: Map[CorrelationId, FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = Map.empty
 
   def process(message: InboundMessage): Option[Seq[OutboundMessage]] = {
+    message match {
+      case AckFromProvider(NsiProviderMessage(headers, ServiceException(exception))) =>
+        Option(exception.getConnectionId()).foreach { connectionId =>
+          mostRecentChildExceptions += connectionId -> exception;
+        }
+      case _ =>
+    }
+
     val stateMachine: Option[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
       case FromRequester(NsiProviderMessage(_, _: InitialReserve)) => Some(rsm)
       case FromRequester(NsiProviderMessage(_, _: ReserveCommit)) => Some(rsm)
@@ -167,7 +176,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       id.map(rsm.childConnectionState).getOrElse(ReservationStateEnumType.RESERVE_CHECKING),
       id.flatMap(id => lsm.map(_.childConnectionState(id))).getOrElse(LifecycleStateEnumType.CREATED),
       id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
-      id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(false))
+      id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(false),
+      id.flatMap(mostRecentChildExceptions.get))
   }.toSeq
 
   def notifications: Seq[NotificationBaseType] = nsiNotifications.map {

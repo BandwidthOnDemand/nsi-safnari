@@ -222,15 +222,15 @@ class ConnectionSpec extends helpers.Specification {
       when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", Criteria)))
       messages must beEmpty
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok}
 
       when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", Criteria)))
       messages must contain(ToRequester(NsiRequesterMessage(InitialReserveHeaders.forAsyncReply, ReserveConfirmed(ConnectionId, Criteria))))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok}
     }
 
     "fail the reservation with a single path segment" in new fixture {
@@ -428,21 +428,21 @@ class ConnectionSpec extends helpers.Specification {
       given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok}
 
       when(upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")))
 
       messages must beEmpty
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONING, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok}
 
       when(upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONED, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok}
       messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = ProvisionCorrelationId).forAsyncReply, ProvisionConfirmed(ConnectionId))))
     }
 
@@ -506,15 +506,15 @@ class ConnectionSpec extends helpers.Specification {
       when(upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA")))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATING, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok}
       messages must beEmpty
 
       when(upa.response(CorrelationId(0, 12), TerminateConfirmed("ConnectionIdB")))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok}
       messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = TerminateCorrelationId).forAsyncReply, TerminateConfirmed(ConnectionId))))
     }
 
