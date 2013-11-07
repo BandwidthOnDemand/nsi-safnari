@@ -21,7 +21,7 @@ case object TimeoutReservationState extends ReservationState(ReservationStateEnu
 
 case class ReservationStateMachineData(
   currentCommand: NsiProviderMessage[NsiProviderOperation],
-  globalReservationId: Option[String],
+  globalReservationId: Option[GlobalReservationId],
   description: Option[String],
   criteria: ReservationConfirmCriteriaType,
   segments: Vector[(CorrelationId, ComputedSegment)] = Vector.empty,
@@ -98,7 +98,7 @@ class ReservationStateMachine(
     InitialReservationState,
     ReservationStateMachineData(
       initialReserve,
-      Option(initialReserve.body.body.getGlobalReservationId()),
+      Option(initialReserve.body.body.getGlobalReservationId()).map(URI.create(_)),
       Option(initialReserve.body.body.getDescription()),
       initialReserve.body.criteria)) {
 
@@ -199,7 +199,7 @@ class ReservationStateMachine(
             withServiceType(data.criteria.getServiceType()).
             withVersion(data.criteria.getVersion())
           val reserveType = new ReserveType().
-            withGlobalReservationId(data.globalReservationId.orNull).
+            withGlobalReservationId(data.globalReservationId.map(_.toASCIIString()).orNull).
             withDescription(data.description.orNull).
             withCriteria(criteria)
 

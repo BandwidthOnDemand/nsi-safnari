@@ -18,6 +18,7 @@ import scala.util.{ Failure, Success, Try }
 
 package object safnari {
   type ConnectionId = String
+  type GlobalReservationId = URI
 
   private val UuidGenerator = Uuid.randomUuidGenerator
 

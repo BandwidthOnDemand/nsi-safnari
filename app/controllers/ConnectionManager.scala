@@ -9,19 +9,31 @@ import play.Logger
 import scala.concurrent._
 import scala.concurrent.duration.{ Duration, DurationInt }
 import scala.concurrent.stm._
+import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
+import java.net.URI
 
 class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity)) {
   implicit val timeout = Timeout(2.seconds)
 
   private val connections = TMap.empty[ConnectionId, ActorRef]
+  private val globalReservationIdsMap = TMap.empty[GlobalReservationId, ConnectionId]
+
   private val childConnections = TMap.empty[ConnectionId, ActorRef]
   private val messageStore = new MessageStore[Message]()
 
-  def add(connectionId: ConnectionId, connection: ActorRef) = connections.single(connectionId) = connection
+  def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: ActorRef) = {
+    connections.single(connectionId) = connection
+    globalReservationId map (globalReservationIdsMap.single(_) = connectionId)
+  }
 
   def get(connectionId: ConnectionId): Option[ActorRef] = connections.single.get(connectionId)
 
   def find(connectionIds: Seq[ConnectionId]): Seq[ActorRef] = connections.single.filterKeys(connectionIds.contains).values.toSeq
+
+  def findByGlobalReservationIds(globalReservationIds: Seq[GlobalReservationId]): Seq[ActorRef] = {
+    val connectionIds = globalReservationIdsMap.single.filterKeys(globalReservationIds.contains).values.toSeq
+    find(connectionIds)
+  }
 
   private def addChildConnectionId(connection: ActorRef, childConnectionId: ConnectionId) {
     childConnections.single(childConnectionId) = connection
@@ -56,7 +68,10 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     val (output, connection) = connectionFactory(connectionId, initialReserve)
 
     val storingActor = actorSystem.actorOf(Props(new ConnectionActor(connection, output)))
-    add(connectionId, storingActor)
+    val globalReservationId = Option(initialReserve.body.body.getGlobalReservationId()).map(URI.create)
+
+    add(connectionId, globalReservationId, storingActor)
+
     storingActor
   }
 

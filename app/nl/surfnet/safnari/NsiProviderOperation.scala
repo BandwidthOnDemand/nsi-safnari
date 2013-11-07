@@ -27,9 +27,9 @@ case class Release(connectionId: ConnectionId) extends NsiProviderUpdateCommand
 
 case class Terminate(connectionId: ConnectionId) extends NsiProviderUpdateCommand
 
-case class QuerySummary(connectionIds: Seq[ConnectionId]) extends NsiProviderQuery
-case class QuerySummarySync(connectionIds: Seq[ConnectionId]) extends NsiProviderQuery
-case class QueryRecursive(connectionIds: Seq[ConnectionId]) extends NsiProviderQuery
+case class QuerySummary(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]]) extends NsiProviderQuery
+case class QuerySummarySync(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]]) extends NsiProviderQuery
+case class QueryRecursive(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]]) extends NsiProviderQuery
 
 case class QueryNotification(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery
 case class QueryNotificationSync(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery

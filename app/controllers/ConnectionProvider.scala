@@ -58,13 +58,13 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private[controllers] def handleQuery(message: NsiProviderQuery)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = message match {
     case q: QuerySummary =>
-      val connectionStates = queryConnections(q.connectionIds)
+      val connectionStates = queryConnections(q.ids)
       connectionStates.onSuccess {
         case reservations => replyTo(QuerySummaryConfirmed(reservations))
       }
       Future.successful(GenericAck())
     case q: QuerySummarySync =>
-      val connectionStates = queryConnections(q.connectionIds)
+      val connectionStates = queryConnections(q.ids)
       connectionStates map { states =>
         QuerySummarySyncConfirmed(states)
       }
@@ -91,8 +91,13 @@ object ConnectionProvider extends Controller with SoapWebService {
     notifications.map(ns => ns.filter(n => range.contains(n.getNotificationId())))
   }
 
-  private def queryConnections(connectionIds: Seq[ConnectionId]): Future[Seq[QuerySummaryResultType]] = {
-    val cs = if (connectionIds.isEmpty) connectionManager.all else connectionManager.find(connectionIds)
+  private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]]): Future[Seq[QuerySummaryResultType]] = {
+    val cs = ids match {
+      case Some(Left(connectionIds))         => connectionManager.find(connectionIds)
+      case Some(Right(globalReservationIds)) => connectionManager.findByGlobalReservationIds(globalReservationIds)
+      case None                              => connectionManager.all
+    }
+
     Future.traverse(cs)(c => (c ? 'query).mapTo[QuerySummaryResultType])
   }
 

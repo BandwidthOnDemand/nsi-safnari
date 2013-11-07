@@ -31,7 +31,8 @@ class ConnectionProviderSpec extends helpers.Specification {
       await(requesterOperation.future) must beLike {
         case op: ReserveConfirmed =>
           val queryResult = Promise[NsiRequesterOperation]
-          await(ConnectionProvider.handleQuery(QuerySummary(Seq(op.connectionId))) { queryResult.success(_) })
+
+          await(ConnectionProvider.handleQuery(QuerySummary(Some(Left(Seq(op.connectionId))))) { queryResult.success(_) })
 
           await(queryResult.future) must beLike {
             case QuerySummaryConfirmed(Seq(reservation: QuerySummaryResultType)) =>

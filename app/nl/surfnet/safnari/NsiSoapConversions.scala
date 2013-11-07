@@ -109,9 +109,9 @@ object NsiSoapConversions {
       case Provision(connectionId)                         => typesFactory.createProvision(new GenericRequestType().withConnectionId(connectionId))
       case Release(connectionId)                           => typesFactory.createRelease(new GenericRequestType().withConnectionId(connectionId))
       case Terminate(connectionId)                         => typesFactory.createTerminate(new GenericRequestType().withConnectionId(connectionId))
-      case QuerySummary(connectionIds)                     => typesFactory.createQuerySummary(new QueryType().withConnectionId(connectionIds.asJava))
-      case QuerySummarySync(connectionIds)                 => typesFactory.createQuerySummarySync(new QueryType().withConnectionId(connectionIds.asJava))
-      case QueryRecursive(connectionIds)                   => typesFactory.createQueryRecursive(new QueryType().withConnectionId(connectionIds.asJava))
+      case QuerySummary(ids)                               => typesFactory.createQuerySummary(toQueryType(ids))
+      case QuerySummarySync(ids)                           => typesFactory.createQuerySummarySync(toQueryType(ids))
+      case QueryRecursive(ids)                             => typesFactory.createQueryRecursive(toQueryType(ids))
       case QueryNotification(connectionId, start, end)     => typesFactory.createQueryNotification(new QueryNotificationType()
                                                                 .withConnectionId(connectionId)
                                                                 .withStartNotificationId(start.map(x => x: Integer).orNull)
@@ -137,9 +137,9 @@ object NsiSoapConversions {
       "provision" -> NsiMessageParser { body: GenericRequestType => Right(Provision(body.getConnectionId())) },
       "release" -> NsiMessageParser { body: GenericRequestType => Right(Release(body.getConnectionId())) },
       "terminate" -> NsiMessageParser { body: GenericRequestType => Right(Terminate(body.getConnectionId())) },
-      "querySummary" -> NsiMessageParser { body: QueryType => Right(QuerySummary(body.getConnectionId().asScala)) },
-      "querySummarySync" -> NsiMessageParser { body: QueryType => Right(QuerySummarySync(body.getConnectionId().asScala)) },
-      "queryRecursive" -> NsiMessageParser { body: QueryType => Right(QueryRecursive(body.getConnectionId().asScala)) },
+      "querySummary" -> NsiMessageParser { body: QueryType => Right(QuerySummary(toIds(body))) },
+      "querySummarySync" -> NsiMessageParser { body: QueryType => Right(QuerySummarySync(toIds(body))) },
+      "queryRecursive" -> NsiMessageParser { body: QueryType => Right(QueryRecursive(toIds(body))) },
       "queryNotification" -> NsiMessageParser { body: QueryNotificationType =>
         Right(QueryNotification(body.getConnectionId,
           Option(body.getStartNotificationId()).map(_.toInt),
@@ -148,6 +148,20 @@ object NsiSoapConversions {
         Right(QueryNotificationSync(body.getConnectionId,
           Option(body.getStartNotificationId()).map(_.toInt),
           Option(body.getEndNotificationId()).map(_.toInt))) }))
+  }
+
+  private def toIds(query: QueryType): Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]] =
+    if (!query.getConnectionId().isEmpty())
+      Some(Left(query.getConnectionId().asScala))
+    else if (!query.getGlobalReservationId().isEmpty)
+      Some(Right(query.getGlobalReservationId().asScala.map(URI.create)))
+    else
+      None
+
+  private def toQueryType(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]]): QueryType = ids match {
+    case Some(Left(connectionIds))         => new QueryType().withConnectionId(connectionIds.asJava)
+    case Some(Right(globalReservationIds)) => new QueryType().withGlobalReservationId(globalReservationIds.map(_.toASCIIString()).asJava)
+    case None                              => new QueryType()
   }
 
   implicit val NsiRequesterOperationToElement = Conversion.build[NsiRequesterOperation, Element] { operation =>
