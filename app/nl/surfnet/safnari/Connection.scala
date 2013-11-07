@@ -39,9 +39,13 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
   def process(message: InboundMessage): Option[Seq[OutboundMessage]] = {
     message match {
-      case AckFromProvider(NsiProviderMessage(headers, ServiceException(exception))) =>
+      case AckFromProvider(NsiProviderMessage(_, ServiceException(exception))) =>
         Option(exception.getConnectionId()).foreach { connectionId =>
           mostRecentChildExceptions += connectionId -> exception;
+        }
+      case failed: MessageDeliveryFailure =>
+        failed.connectionId.foreach { connectionId =>
+          mostRecentChildExceptions += connectionId -> NsiError.ChildError.toServiceException("").withText(failed.toShortString)
         }
       case _ =>
     }
@@ -74,6 +78,9 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         val stateMachine = providerConversations.get(headers.correlationId)
         if (stateMachine.isEmpty) Logger.debug(s"No active conversation for ack ${message.toShortString}")
         stateMachine
+
+      case _: MessageDeliveryFailure =>
+        None
     }
 
     stateMachine.flatMap(applyMessageToStateMachine(_, message)).orElse(handleUnhandledProviderNotifications(message))
@@ -127,12 +134,18 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       }
       Some(Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event))))
     case FromProvider(NsiRequesterMessage(_, timeout: MessageDeliveryTimeout)) =>
-      None
       val event = MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
         .withConnectionId(id)
         .withNotificationId(newNotificationId())
         .withCorrelationId(timeout.timeout.getCorrelationId())
         .withTimeStamp(timeout.timeout.getTimeStamp()))
+      Some(Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event))))
+    case failure: MessageDeliveryFailure =>
+      val event = MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
+        .withConnectionId(id)
+        .withNotificationId(newNotificationId)
+        .withCorrelationId(failure.correlationId.toString)
+        .withTimeStamp(failure.timestamp.toXmlGregorianCalendar))
       Some(Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event))))
     case _ =>
       None

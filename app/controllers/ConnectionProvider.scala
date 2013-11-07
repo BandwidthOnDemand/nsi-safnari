@@ -24,8 +24,8 @@ object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
   implicit def actorSystem = Akka.system
 
-  private val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]]()
-  private val pceContinuations = new Continuations[PceResponse]()
+  private val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
+  private val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
 
   def connectionFactory(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
     val outbound = outboundActor(initialReserve)
@@ -106,7 +106,7 @@ object ConnectionProvider extends Controller with SoapWebService {
       case None =>
         Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))
       case Some(connectionActor) =>
-        requesterContinuations.register(request.headers.correlationId).onSuccess {
+        requesterContinuations.register(request.headers.correlationId, 120.seconds).onSuccess {
           case reply => replyTo(reply.body)
         }
         (connectionActor ? FromRequester(request)).mapTo[NsiAcknowledgement]

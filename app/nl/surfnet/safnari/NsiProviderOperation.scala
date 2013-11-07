@@ -11,13 +11,17 @@ sealed trait NsiProviderOperation {
 }
 
 sealed trait NsiProviderQuery extends NsiProviderOperation
-sealed trait NsiProviderCommand extends NsiProviderOperation
+sealed trait NsiProviderCommand extends NsiProviderOperation {
+  def optionalConnectionId: Option[ConnectionId]
+}
 sealed trait NsiProviderUpdateCommand extends NsiProviderCommand {
   def connectionId: ConnectionId
+  override def optionalConnectionId: Option[ConnectionId] = Some(connectionId)
 }
 
 case class InitialReserve(body: ReserveType, criteria: ReservationConfirmCriteriaType, service: P2PServiceBaseType) extends NsiProviderCommand {
   override def soapActionUrl = "http://schemas.ogf.org/nsi/2013/07/connection/service/reserve"
+  override def optionalConnectionId: Option[ConnectionId] = None
 }
 case class ReserveCommit(connectionId: ConnectionId) extends NsiProviderUpdateCommand
 case class ReserveAbort(connectionId: ConnectionId) extends NsiProviderUpdateCommand

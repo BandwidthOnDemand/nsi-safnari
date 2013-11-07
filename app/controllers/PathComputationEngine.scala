@@ -10,9 +10,10 @@ import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
 import play.api.Logger
+import scala.concurrent.duration._
 
 object PathComputationEngine extends Controller {
-  private val pceContinuations = new Continuations[PceResponse]()
+  private val pceContinuations = new Continuations[PceResponse](Akka.system.scheduler)
 
   def pceReplyUrl: String = s"${Application.baseUrl}${routes.PathComputationEngine.pceReply().url}"
 
@@ -40,7 +41,7 @@ object PathComputationEngine extends Controller {
     def receive = {
       case ToPce(request) =>
         val connection = sender
-        pceContinuations.register(request.correlationId).onSuccess {
+        pceContinuations.register(request.correlationId, Configuration.AsyncReplyTimeout).onSuccess {
           case reply => connection ! FromPce(reply)
         }
         Logger.info(s"Sending request to pce ($endPoint): ${Json.toJson(request)}")

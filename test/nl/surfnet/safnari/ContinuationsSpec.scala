@@ -1,17 +1,31 @@
 package nl.surfnet.safnari
 
-import play.api.test.Helpers._
+import akka.actor.ActorSystem
+import java.util.concurrent.TimeoutException
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.util.Failure
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ContinuationsSpec extends helpers.Specification {
-  trait fixture extends org.specs2.specification.Scope {
+  play.api.Logger("initialize-loggers-to-avoid-warnings")
+
+  trait fixture extends org.specs2.mutable.After {
+    val actorSystem = ActorSystem("test")
+
     val CorrelationId = newCorrelationId
-    val continuations = new Continuations[String]()
+    val continuations = new Continuations[String](actorSystem.scheduler)
+
+    override def after = {
+      actorSystem.shutdown
+      actorSystem.awaitTermination
+    }
   }
 
   "Continuations" should {
-    "invoke callback when reply is received" in new fixture {
-      val reply = continuations.register(CorrelationId)
+
+    "complete future successfully when reply is received" in new fixture {
+      val reply = continuations.register(CorrelationId, within = 120.seconds)
 
       continuations.replyReceived(CorrelationId, "reply")
 
@@ -23,12 +37,31 @@ class ContinuationsSpec extends helpers.Specification {
     }
 
     "remove callback after first reply is received" in new fixture {
-      val reply = continuations.register(CorrelationId)
+      val reply = continuations.register(CorrelationId, within = 120.seconds)
+
       continuations.replyReceived(CorrelationId, "first-reply")
 
-      continuations.replyReceived(CorrelationId, "second-reply")
+      continuations.unregister(CorrelationId) aka "registered" must beFalse
+    }
 
-      await(reply) must beEqualTo("first-reply")
+    "not complete unregistered futures" in new fixture {
+      val reply = continuations.register(CorrelationId, within = 50.milliseconds)
+      continuations.unregister(CorrelationId)
+      continuations.replyReceived(CorrelationId, "ignored-reply")
+
+      Thread.sleep(100)
+
+      reply.isCompleted aka "completed" must beFalse
+    }
+
+    "remove callback after timeout has been exceeded" in new fixture {
+      val reply = continuations.register(CorrelationId, within = 10.milliseconds)
+
+      Await.ready(reply, 100.milliseconds).value must beSome.like {
+        case Failure(e) => e must beAnInstanceOf[TimeoutException]
+      }
+
+      continuations.unregister(CorrelationId) aka "registered" must beFalse
     }
   }
 }

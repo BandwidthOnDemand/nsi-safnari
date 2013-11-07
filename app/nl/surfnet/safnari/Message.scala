@@ -1,5 +1,7 @@
 package nl.surfnet.safnari
 
+import java.net.URI
+import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 
 sealed trait Message {
@@ -43,4 +45,8 @@ final case class FromPce(message: PceResponse) extends InboundMessage {
 final case class ToPce(message: PceRequest) extends OutboundMessage {
   override def toShortString = Message.shortString(getClass(), message.getClass(), correlationId)
   override def correlationId = message.correlationId
+}
+
+final case class MessageDeliveryFailure(override val correlationId: CorrelationId, connectionId: Option[ConnectionId], uri: URI, timestamp: DateTime, message: String) extends InboundMessage {
+  override def toShortString = s"${getClass().getSimpleName()}(correlationId=$correlationId, connectionId=$connectionId, uri=$uri, timestamp=$timestamp, message=$message)"
 }

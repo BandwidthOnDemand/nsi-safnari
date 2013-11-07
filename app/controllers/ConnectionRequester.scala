@@ -3,13 +3,13 @@ package controllers
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
-import com.ning.http.client.Realm.AuthScheme
 import java.net.URI
+import java.util.concurrent.TimeoutException
 import nl.surfnet.safnari._
-import nl.surfnet.safnari.NsiSoapConversions._
+import org.joda.time.DateTime
+import org.ogf.schemas.nsi._2013._07.connection.types.MessageDeliveryTimeoutRequestType
 import play.api.Logger
 import play.api.Play.current
-import play.api.http.Status._
 import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc.Controller
@@ -26,8 +26,6 @@ object ConnectionRequester extends Controller with SoapWebService {
 
   override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionRequester.request().url}"
 
-  def expectReplyFor(correlationId: CorrelationId): Future[NsiRequesterMessage[NsiRequesterOperation]] = continuations.register(correlationId)
-
   def request = NsiRequesterEndPoint {
     case message @ NsiRequesterMessage(headers, notification: NsiNotification) =>
       val connection = ConnectionProvider.connectionManager.findByChildConnectionId(notification.connectionId)
@@ -39,6 +37,7 @@ object ConnectionRequester extends Controller with SoapWebService {
       ack.map(message.ack)
     case response =>
       continuations.replyReceived(response.headers.correlationId, response)
+      // FIXME return error when message cannot be handled?
       Future.successful(response.ack(GenericAck()))
   }
 
@@ -50,7 +49,7 @@ object ConnectionRequester extends Controller with SoapWebService {
     }
   }
 
-  private val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]]()
+  val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
   class DummyNsiRequesterActor extends Actor {
     def receive = {
@@ -74,15 +73,33 @@ object ConnectionRequester extends Controller with SoapWebService {
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
     def receive = {
       case ToProvider(message @ NsiProviderMessage(headers, operation: NsiProviderOperation), provider) =>
+        val connectionId = operation match {
+          case command: NsiProviderCommand => command.optionalConnectionId
+          case _ => None
+        }
+
         val connection = sender
-        ConnectionRequester.expectReplyFor(headers.correlationId).onSuccess {
-          case reply => connection ! FromProvider(reply)
+        ConnectionRequester.continuations.register(headers.correlationId, Configuration.AsyncReplyTimeout).onComplete {
+          case Success(reply) =>
+            connection ! FromProvider(reply)
+          case Failure(exception) =>
+            // FIXME maybe handle timeouts separately?
+            connection ! MessageDeliveryFailure(headers.correlationId, connectionId, provider.url, DateTime.now(), exception.toString)
         }
 
         val response = NsiWebService.callProvider(provider, message)
         response.onComplete {
-          case Failure(error) => Logger.error(s"error calling $provider: $error", error)
-          case Success(ack)   => connection ! AckFromProvider(ack)
+          case Failure(timeout: TimeoutException) =>
+            // Let the requester timeout as well (or receive an actual reply). No need to send an ack timeout!
+          case Failure(exception) =>
+            Logger.warn(s"communication failure calling $provider", exception)
+            ConnectionRequester.continuations.unregister(headers.correlationId)
+            connection ! MessageDeliveryFailure(headers.correlationId, connectionId, provider.url, DateTime.now(), exception.toString)
+          case Success(ack @ NsiProviderMessage(_, ServiceException(_))) =>
+            ConnectionRequester.continuations.unregister(headers.correlationId)
+            connection ! AckFromProvider(ack)
+          case Success(ack) =>
+            connection ! AckFromProvider(ack)
         }
     }
   }

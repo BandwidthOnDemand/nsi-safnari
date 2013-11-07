@@ -77,10 +77,6 @@ object NsiWebService {
           Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
           convertError(defaultAckHeaders, NsiError.ChildError.copy(text = s"Communication error: ${ack.status} ${ack.statusText}").toServiceException(provider.nsa))
       }
-    }.recover {
-      case e =>
-        Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $e", e)
-        convertError(defaultAckHeaders, NsiError.ChildError.toServiceException(provider.nsa))
     }
   }
 }

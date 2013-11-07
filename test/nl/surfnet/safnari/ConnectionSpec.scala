@@ -10,10 +10,11 @@ import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._07.services.types.StpType
+import org.joda.time.DateTime
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionSpec extends helpers.Specification {
-  trait fixture extends Scope {
+  abstract class fixture extends Scope {
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
 
@@ -46,8 +47,12 @@ class ConnectionSpec extends helpers.Specification {
 
     val connection = new ConnectionEntity(ConnectionId, InitialReserveMessage, () => newCorrelationId, AggregatorNsa, NsiReplyToUri, PceReplyToUri)
 
-    def given(messages: InboundMessage*): Unit = messages.foreach { message =>
-      connection.process(message) aka s"given message $message must be processed" must beSome
+    def given(messages: Message*): Unit = messages.foreach {
+      case inbound: InboundMessage =>
+        connection.process(inbound) aka s"given message $inbound must be processed" must beSome
+      case outbound: OutboundMessage =>
+        // FIXME compare against actual outbound messages?
+        connection.process(outbound)
     }
 
     var messages: Seq[Message] = Nil
@@ -87,8 +92,15 @@ class ConnectionSpec extends helpers.Specification {
         val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.RequesterProtocolVersion)
         FromProvider(NsiRequesterMessage(headers, operation))
       }
+      def timeout(correlationId: CorrelationId, timestamp: DateTime) = {
+        MessageDeliveryFailure(correlationId, None, URI.create("http://nsi.local/"), timestamp, "message-delivery-timeout")
+      }
     }
     object agg {
+      def request(correlationId: CorrelationId, operation: NsiProviderOperation, segment: ComputedSegment = A) = {
+        val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
+        ToProvider(NsiProviderMessage(headers, operation), segment.provider)
+      }
       def response(correlationId: CorrelationId, operation: NsiRequesterOperation) = {
         val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
         ToRequester(NsiRequesterMessage(headers, operation))
@@ -98,21 +110,33 @@ class ConnectionSpec extends helpers.Specification {
         ToRequester(NsiRequesterMessage(headers, operation))
       }
     }
+    object pce {
+      // PCE operations
+      def confirm(correlationId: CorrelationId, segments: ComputedSegment*) = {
+        FromPce(PathComputationConfirmed(correlationId, segments))
+      }
+      def fail(correlationId: CorrelationId, message: String = "error-message") = {
+        FromPce(PathComputationFailed(correlationId, message))
+      }
+      def timeout(correlationId: CorrelationId, timestamp: DateTime) = {
+        MessageDeliveryFailure(correlationId, None, URI.create("http://pce.local/"), timestamp, "message-delivery-timeout")
+      }
+    }
   }
 
-  trait ReservedConnection extends fixture {
+  abstract class ReservedConnection extends fixture {
     given(
       ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-      FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
+      pce.confirm(CorrelationId(0, 1), A),
       upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", Criteria)),
       ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)),
       upa.response(CorrelationId(0, 6), ReserveCommitConfirmed("ConnectionIdA")))
   }
 
-  trait ReservedConnectionWithTwoSegments extends fixture {
+  abstract class ReservedConnectionWithTwoSegments extends fixture {
     given(
       ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-      FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))),
+      pce.confirm(CorrelationId(0, 1), A, B),
 
       upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
       upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")),
@@ -163,7 +187,7 @@ class ConnectionSpec extends helpers.Specification {
     "send reserve request for each segment when path computation confirmed is received" in new fixture {
       given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)))
 
-      when(FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))))
+      when(pce.confirm(CorrelationId(0, 1), A, B))
 
       messages must haveSize(2)
       messages must haveAllElementsLike {
@@ -175,7 +199,7 @@ class ConnectionSpec extends helpers.Specification {
     "fail the connection when path computation fails" in new fixture {
       given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)))
 
-      when(FromPce(PathComputationFailed(CorrelationId(0, 1), "failed")))
+      when(pce.fail(CorrelationId(0, 1), "failed"))
 
       messages must haveSize(1)
       messages must haveOneElementLike {
@@ -187,10 +211,23 @@ class ConnectionSpec extends helpers.Specification {
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
 
+    "notify timeout when path computation times out" in new fixture {
+      val TimeoutTimestamp = DateTime.now().plusMinutes(2)
+      given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)))
+
+      when(pce.timeout(CorrelationId(0, 2), TimeoutTimestamp))
+
+      messages must contain(agg.notification(CorrelationId(0, 4), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
+        .withConnectionId(ConnectionId)
+        .withCorrelationId(CorrelationId(0, 2).toString)
+        .withNotificationId(1)
+        .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
+    }
+
     "confirm the reservation with a single path segment" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A))))
+        pce.confirm(CorrelationId(0, 3), A))
 
       when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
       when(upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, Criteria)))
@@ -201,10 +238,26 @@ class ConnectionSpec extends helpers.Specification {
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
     }
 
+    "notify timeout to requester when child times out" in new fixture {
+      val TimeoutTimestamp = DateTime.now().plusMinutes(2)
+      given(
+        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
+        agg.request(CorrelationId(0, 4), InitialReserve(InitialReserveType, Criteria, A.serviceType.service)),
+        pce.confirm(CorrelationId(0, 3), A))
+
+      when(upa.timeout(CorrelationId(0, 4), TimeoutTimestamp))
+
+      messages must contain(agg.notification(CorrelationId(0, 6), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
+        .withConnectionId(ConnectionId)
+        .withCorrelationId(CorrelationId(0, 4).toString)
+        .withNotificationId(1)
+        .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
+    }
+
     "ignore reserve response after async reserve confirm" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A))),
+        pce.confirm(CorrelationId(0, 3), A),
         upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, Criteria)))
 
       when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
@@ -216,7 +269,7 @@ class ConnectionSpec extends helpers.Specification {
     "be in reservation held state when both segments are confirmed" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A, B))),
+        pce.confirm(CorrelationId(0, 1), A, B),
         upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
         upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB"))
       )
@@ -238,7 +291,7 @@ class ConnectionSpec extends helpers.Specification {
     "fail the reservation with a single path segment" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A))))
+        pce.confirm(CorrelationId(0, 3), A))
 
       when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
 
@@ -257,7 +310,7 @@ class ConnectionSpec extends helpers.Specification {
     "fail the reservation with two segments and at least one fails" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A, B))),
+        pce.confirm(CorrelationId(0, 3), A, B),
         upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
@@ -278,7 +331,7 @@ class ConnectionSpec extends helpers.Specification {
     "fail the reservation with two segments and one downstream communication fails" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A, B))),
+        pce.confirm(CorrelationId(0, 3), A, B),
         upa.error(CorrelationId(0, 4), new ServiceExceptionType().withText("communication error")))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
@@ -299,7 +352,7 @@ class ConnectionSpec extends helpers.Specification {
     "fail the reservation with two segments when both fail" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A, B))),
+        pce.confirm(CorrelationId(0, 3), A, B),
         upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
@@ -320,7 +373,7 @@ class ConnectionSpec extends helpers.Specification {
     "be in committing state when reserve commit is received" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
+        pce.confirm(CorrelationId(0, 1), A),
         upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", Criteria)))
 
       when(ura.request(newCorrelationId, ReserveCommit(ConnectionId)))
@@ -332,7 +385,7 @@ class ConnectionSpec extends helpers.Specification {
     "be in reserved state when reserve commit confirmed is received" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
+        pce.confirm(CorrelationId(0, 1), A),
         upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", Criteria)),
         ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)))
 
@@ -351,7 +404,7 @@ class ConnectionSpec extends helpers.Specification {
     "be in aborting state when reserve abort is received" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))),
+        pce.confirm(CorrelationId(0, 1), A),
         upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", Criteria)))
 
       when(ura.request(newCorrelationId, ReserveAbort(ConnectionId)))
@@ -363,7 +416,7 @@ class ConnectionSpec extends helpers.Specification {
     "be in reserve timeout state when provider times out" in new fixture {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)),
-        FromPce(PathComputationConfirmed(CorrelationId(0, 3), Seq(A))),
+        pce.confirm(CorrelationId(0, 3), A),
         upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", Criteria)))
 
       when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType().withConnectionId("ConnectionIdA"))))
@@ -398,7 +451,7 @@ class ConnectionSpec extends helpers.Specification {
       given(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, Criteria, Service)))
 
-      when(FromPce(PathComputationConfirmed(CorrelationId(0, 1), Seq(A))))
+      when(pce.confirm(CorrelationId(0, 1), A))
 
       provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
     }
