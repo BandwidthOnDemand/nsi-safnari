@@ -4,13 +4,14 @@ import akka.actor._
 import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
+import java.net.URI
 import nl.surfnet.safnari._
 import play.Logger
 import scala.concurrent._
 import scala.concurrent.duration.{ Duration, DurationInt }
 import scala.concurrent.stm._
-import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
-import java.net.URI
+import scala.util.Failure
+import scala.util.Try
 
 class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity)) {
   implicit val timeout = Timeout(2.seconds)
@@ -43,16 +44,25 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
   def all: Seq[ActorRef] = connections.single.values.toSeq
 
-  def restore(implicit actorSystem: ActorSystem, executionContext: ExecutionContext) {
-    Logger.info("Start replaying of connection messages")
-    Await.ready(Future.sequence(for {
+  def restore(implicit actorSystem: ActorSystem, executionContext: ExecutionContext): Future[Unit] = {
+    val replayedConnections = Future.sequence(for {
       (connectionId, messages @ (FromRequester(NsiProviderMessage(headers, initialReserve: InitialReserve)) +: _)) <- messageStore.loadEverything()
-      connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
     } yield {
-      connection ? Replay(messages)
-    }), Duration.Inf)
+      val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
+      (connection ? Replay(messages)).mapTo[Try[Unit]]
+    }).map(_.collect {
+      case Failure(exception) => exception
+    })
 
-    Logger.info("Replay completed")
+    replayedConnections.flatMap { exceptions =>
+      if (exceptions.isEmpty) {
+        Future.successful(())
+      } else {
+        val exception = new Exception("replay failed")
+        exceptions.foreach(exception.addSuppressed)
+        Future.failed(exception)
+      }
+    }
   }
 
   def findOrCreateConnection(request: NsiProviderMessage[NsiProviderOperation])(implicit actorSystem: ActorSystem): Option[ActorRef] = request match {
@@ -108,16 +118,20 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
       case Replay(messages) =>
         Logger.info(s"Replaying ${messages.size} messages for connection ${connection.id}")
-        messages.foreach {
-          case inbound: InboundMessage =>
-            updateChildConnection(inbound)
-            connection.process(inbound).getOrElse {
-              Logger.warn(s"Connection ${connection.id} failed to replay message $inbound")
-            }
-          case outbound: OutboundMessage =>
-            connection.process(outbound)
+
+        val result = Try {
+          messages.foreach {
+            case inbound: InboundMessage =>
+              updateChildConnection(inbound)
+              connection.process(inbound).getOrElse {
+                Logger.warn(s"Connection ${connection.id} failed to replay message $inbound")
+              }
+            case outbound: OutboundMessage =>
+              connection.process(outbound)
+          }
         }
-        sender ! (())
+
+        sender ! result
     }
 
     private def updateChildConnection(message: InboundMessage): Unit = message match {
