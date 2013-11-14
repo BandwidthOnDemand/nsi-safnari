@@ -61,7 +61,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     val connections = message.body.ids match {
       case Some(Left(connectionIds)) => connectionManager.find(connectionIds)
       case Some(Right(globalReservationIds)) => connectionManager.findByGlobalReservationIds(globalReservationIds)
-      case None => connectionManager.all // should be all for requester NSA ...
+      case None => connectionManager.findByRequesterNsa(message.headers.requesterNSA)
     }
 
     val answers = Future.traverse(connections) { connection =>
@@ -119,7 +119,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     val cs = ids match {
       case Some(Left(connectionIds))         => connectionManager.find(connectionIds)
       case Some(Right(globalReservationIds)) => connectionManager.findByGlobalReservationIds(globalReservationIds)
-      case None                              => connectionManager.all
+      case None                              => connectionManager.all // FIXME...
     }
 
     Future.traverse(cs)(c => (c ? 'query).mapTo[QuerySummaryResultType])

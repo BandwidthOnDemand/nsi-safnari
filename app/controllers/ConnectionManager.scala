@@ -36,6 +36,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     find(connectionIds)
   }
 
+  def findByRequesterNsa(requesterNsa: String) = all // FIXME
+
   private def addChildConnectionId(connection: ActorRef, childConnectionId: ConnectionId) {
     childConnections.single(childConnectionId) = connection
   }
@@ -98,27 +100,21 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
       case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) =>
         queryRequesters += (query.correlationId -> sender)
-        val result = connection.queryRecursive(query)
 
-        result match {
-          case None => ???
-          case Some(outbound) =>
-            outbound foreach (output ! _)
-        }
-
-      case queryConfirmed @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) =>
         for {
-          messages <- connection.queryRecursiveResult(queryConfirmed)
+          outbounds <- connection.queryRecursive(query)
+          outbound <- outbounds
+        } output ! outbound
+
+      case inbound @ FromProvider(NsiRequesterMessage(_, _: NsiQueryRecursiveResponse)) =>
+        for {
+          messages <- connection.queryRecursiveResult(inbound)
           msg <- messages
           requester <- queryRequesters.get(msg.correlationId)
         } {
           queryRequesters -= msg.correlationId
-          println(s"Send: $msg to requester $requester")
           requester ! msg
         }
-
-      case queryFailed @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveFailed)) =>
-        ???
 
       case inbound: InboundMessage =>
         val result = connection.process(inbound)

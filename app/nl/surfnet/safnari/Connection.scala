@@ -40,7 +40,6 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
   private var providerConversations: Map[CorrelationId, FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = Map.empty
 
-
   def queryRecursive(message: FromRequester): Option[Seq[OutboundMessage]] = message match {
     case FromRequester(pm @ NsiProviderMessage(_, QueryRecursive(ids))) =>
       require(ids.fold(true) {
@@ -59,17 +58,9 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
       val output = qrsm.process(message)
 
-      output foreach { messages =>
-        providerConversations ++= messages.collect {
-          case message: ToProvider =>
-            Logger.trace(s"Registering conversation for ${message.toShortString}")
-            message.correlationId -> qrsm
-        }
-      }
+      output foreach (registerProviderConversations(_, qrsm))
 
       output
-
-    case _ => None
   }
 
   def queryRecursiveResult(message: FromProvider): Option[Seq[OutboundMessage]] = message match {
@@ -138,11 +129,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     val output = stateMachine.process(message)
 
     output.foreach { messages =>
-      providerConversations ++= messages.collect {
-        case message: ToProvider =>
-          Logger.trace(s"Registering conversation for ${message.toShortString}")
-          message.correlationId -> stateMachine
-      }
+      registerProviderConversations(messages, stateMachine)
 
       messages.collectFirst {
         case ToRequester(NsiRequesterMessage(_, confirmed: ReserveCommitConfirmed)) =>
@@ -156,6 +143,14 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     }
 
     output
+  }
+
+  private def registerProviderConversations(messages: Seq[OutboundMessage], stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage]): Unit = {
+      providerConversations ++= messages.collect {
+        case message: ToProvider =>
+          Logger.trace(s"Registering conversation for ${message.toShortString}")
+          message.correlationId -> stateMachine
+      }
   }
 
   private def handleUnhandledProviderNotifications(message: InboundMessage): Option[Seq[OutboundMessage]] = message match {
