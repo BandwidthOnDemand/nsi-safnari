@@ -6,6 +6,7 @@ import org.ogf.schemas.nsi._2013._07.connection.types._
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 import play.api.Logger
+import scala.util.Try
 
 class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
@@ -30,12 +31,54 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         withNsaId(aggregatorNsa))
   })
 
+  private val globalReservationId: Option[GlobalReservationId] = Try(URI.create(initialReserve.body.body.getGlobalReservationId())).toOption
+
   private var otherStateMachines: Option[(ProvisionStateMachine, LifecycleStateMachine, DataPlaneStateMachine)] = None
   def psm = otherStateMachines.map(_._1)
   def lsm = otherStateMachines.map(_._2)
   def dsm = otherStateMachines.map(_._3)
 
   private var providerConversations: Map[CorrelationId, FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = Map.empty
+
+
+  def queryRecursive(message: FromRequester): Option[Seq[OutboundMessage]] = message match {
+    case FromRequester(pm @ NsiProviderMessage(_, QueryRecursive(ids))) =>
+      require(ids.fold(true) {
+        case Left(connectionIds) => connectionIds.contains(id)
+        case Right(globalReservationIds) => globalReservationIds.contains(globalReservationId)
+      })
+
+      // FIXME - what if we got a query recursive when child connection ids are not known yet ?
+      val qrsm = new QueryRecursiveStateMachine(
+        id,
+        pm.asInstanceOf[NsiProviderMessage[QueryRecursive]],
+        initialReserve,
+        connectionStates,
+        rsm.childConnections.map(kv => kv._2.getOrElse(sys.error("Now what??")) -> kv._1.provider).toMap,
+        newNsiHeaders)
+
+      val output = qrsm.process(message)
+
+      output foreach { messages =>
+        providerConversations ++= messages.collect {
+          case message: ToProvider =>
+            Logger.trace(s"Registering conversation for ${message.toShortString}")
+            message.correlationId -> qrsm
+        }
+      }
+
+      output
+
+    case _ => None
+  }
+
+  def queryRecursiveResult(message: FromProvider): Option[Seq[OutboundMessage]] = message match {
+    case FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) | FromProvider(NsiRequesterMessage(_, _: QueryRecursiveFailed)) =>
+      val qrsm = providerConversations.get(message.correlationId)
+      providerConversations -= message.correlationId
+
+      qrsm.flatMap(_.process(message))
+  }
 
   def process(message: InboundMessage): Option[Seq[OutboundMessage]] = {
     message match {

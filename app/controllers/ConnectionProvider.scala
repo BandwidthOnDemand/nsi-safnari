@@ -19,6 +19,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
+import org.ogf.schemas.nsi._2013._07.connection.types.QueryRecursiveResultType
 
 object ConnectionProvider extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -41,6 +42,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.request().url}"
 
   def request = NsiProviderEndPoint {
+    case message @ NsiProviderMessage(headers, _: QueryRecursive)           => handleQueryRecursive(message.asInstanceOf[NsiProviderMessage[QueryRecursive]])(replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, query: NsiProviderQuery)     => handleQuery(query)(replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(message)(replyToClient(headers)).map(message.ack)
   }
@@ -56,20 +58,53 @@ object ConnectionProvider extends Controller with SoapWebService {
       }
     }
 
-  private[controllers] def handleQuery(message: NsiProviderQuery)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = message match {
+  private[controllers] def handleQueryRecursive(message: NsiProviderMessage[QueryRecursive])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
+    val ack = message.body.ids match {
+      case Some(Left(connectionIds)) =>
+        val answers = Future.traverse(connectionManager.find(connectionIds)) { connection =>
+          (connection ? FromRequester(message)).mapTo[ToRequester]
+        }
+
+        answers onComplete {
+          case Failure(e) => println(s"Answers Future failed: $e")
+          case Success(list) =>
+            println(s"Answers Success, list: $list")
+            val resultTypes = list.foldLeft(List[QueryRecursiveResultType]())((resultTypes, answer) => answer match {
+              case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultTypes ++ resultType
+              case ToRequester(NsiRequesterMessage(_, QueryRecursiveFailed(e))) => resultTypes // FIXME
+            })
+
+            replyTo(QueryRecursiveConfirmed(resultTypes))
+        }
+
+        GenericAck()
+      case Some(Right(globalReservationIds)) =>
+        connectionManager.findByGlobalReservationIds(globalReservationIds) foreach { connection =>
+          connection ! FromRequester(message)
+        }
+
+        requesterContinuations.register(message.headers.correlationId).onSuccess {
+          case reply => replyTo(reply.body)
+        }
+
+        GenericAck()
+      case None =>
+        ServiceException(NsiError.NotImplemented.toServiceException(Configuration.Nsa))
+    }
+
+    Future.successful(ack)
+  }
+
+  private[controllers] def handleQuery(query: NsiProviderQuery)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = query match {
     case q: QuerySummary =>
-      val connectionStates = queryConnections(q.ids)
-      connectionStates.onSuccess {
+      queryConnections(q.ids) onSuccess {
         case reservations => replyTo(QuerySummaryConfirmed(reservations))
       }
       Future.successful(GenericAck())
     case q: QuerySummarySync =>
-      val connectionStates = queryConnections(q.ids)
-      connectionStates map { states =>
+      queryConnections(q.ids) map { states =>
         QuerySummarySyncConfirmed(states)
       }
-    case q: QueryRecursive =>
-      Future.successful(ServiceException(NsiError.NotImplemented.toServiceException(Configuration.Nsa)))
     case q: QueryNotification =>
       val connection = connectionManager.get(q.connectionId)
       connection.map { con =>
@@ -83,6 +118,8 @@ object ConnectionProvider extends Controller with SoapWebService {
       val ack = connection.map(queryNotifications(_, q.start, q.end).map(QueryNotificationSyncConfirmed))
 
       ack.getOrElse(Future.successful(QueryNotificationSyncFailed(new QueryFailedType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
+    case q: QueryRecursive =>
+      sys.error("Should be handled by its own handler")
   }
 
   private def queryNotifications(connection: ActorRef, start: Option[Int], end: Option[Int]): Future[Seq[NotificationBaseType]] = {

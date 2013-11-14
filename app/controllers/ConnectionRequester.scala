@@ -17,6 +17,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
+import org.ogf.schemas.nsi._2013._07.connection.types.QueryRecursiveResultType
 
 object ConnectionRequester extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -65,6 +66,9 @@ object ConnectionRequester extends Controller with SoapWebService {
         sender ! FromProvider(message reply ProvisionConfirmed(provision.connectionId))
       case ToProvider(message @ NsiProviderMessage(headers, update: NsiProviderUpdateCommand), provider) =>
         sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa).withConnectionId(update.connectionId)))
+      case ToProvider(message @ NsiProviderMessage(headers, query: QueryRecursive), provider) =>
+        sender ! AckFromProvider(message ack GenericAck())
+        sender ! FromProvider(message reply QueryRecursiveConfirmed(new QueryRecursiveResultType() :: Nil))
       case ToProvider(message @ NsiProviderMessage(headers, query: NsiProviderQuery), provider) =>
         sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa)))
     }

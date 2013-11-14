@@ -88,10 +88,37 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   private[controllers] case class Replay(messages: Seq[Message])
 
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
+
+    var queryRequesters: Map[CorrelationId, ActorRef] = Map.empty
+
     override def receive = LoggingReceive {
       case 'query              => sender ! connection.query
       case 'querySegments      => sender ! connection.segments
       case 'queryNotifications => sender ! connection.notifications
+
+      case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) =>
+        queryRequesters += (query.correlationId -> sender)
+        val result = connection.queryRecursive(query)
+
+        result match {
+          case None => ???
+          case Some(outbound) =>
+            outbound foreach (output ! _)
+        }
+
+      case queryConfirmed @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) =>
+        for {
+          messages <- connection.queryRecursiveResult(queryConfirmed)
+          msg <- messages
+          requester <- queryRequesters.get(msg.correlationId)
+        } {
+          queryRequesters -= msg.correlationId
+          println(s"Send: $msg to requester $requester")
+          requester ! msg
+        }
+
+      case queryFailed @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveFailed)) =>
+        ???
 
       case inbound: InboundMessage =>
         val result = connection.process(inbound)
