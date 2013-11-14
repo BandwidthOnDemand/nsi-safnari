@@ -1,13 +1,21 @@
-@()(implicit request: play.api.mvc.RequestHeader)
+@(secure: Boolean)(implicit request: play.api.mvc.RequestHeader)
+
+@providerWsdl = { @routes.ConnectionProvider.wsdl("").absoluteURL(secure) }
+@requesterWsdl = { @routes.ConnectionRequester.wsdl("").absoluteURL(secure) }
 
 @main("Welcome to the NSI Safnari", "usage") {
-<section>
-    <h1>Welcome</h1>
-    <div class="content">
-        <h3>Using NSI Safnari</h3>
-        Safnari is a NSI Aggregator supporting the NSI v2 specification.<br/>
-        The location of the Connection Provider Service WSDL is <a href="@routes.ConnectionProvider.wsdl("")">@routes.ConnectionProvider.wsdl("").absoluteURL(false)</a>. This endpoint can be used to send NSI v2 request to.
-    </div>
-</section>
-}
+    <section>
+        <h1>Welcome</h1>
+        <div class="content">
+            <h3>Using NSI Safnari</h3>
 
+            <p>Safnari is a NSI Aggregator supporting the NSI v2 specification.</p>
+
+            <p>The following service end points are implemented:</p>
+            <ul>
+                <li>Connection Provider Service WSDL: <a href="@providerWsdl">@providerWsdl</a></li>
+                <li>Connection Requester Service WSDL: <a href="@requesterWsdl">@requesterWsdl</a></li>
+            </ul>
+        </div>
+    </section>
+}

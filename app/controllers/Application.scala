@@ -21,7 +21,8 @@ object Application extends Controller {
   def baseUrl = current.configuration.getString("nsi.base.url").getOrElse(sys.error("nsi.base.url option is not set"))
 
   def index = Action { implicit request =>
-    Ok(views.html.index())
+    val secure = request.headers.get("X-Forwarded-Proto") == Some("https")
+    Ok(views.html.index(secure))
   }
 
   def connections(page: Int) = Action.async {
