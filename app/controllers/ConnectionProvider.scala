@@ -26,7 +26,6 @@ object ConnectionProvider extends Controller with SoapWebService {
   implicit def actorSystem = Akka.system
 
   private val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
-  private val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
 
   def connectionFactory(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
     val outbound = outboundActor(initialReserve)
@@ -59,40 +58,28 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
 
   private[controllers] def handleQueryRecursive(message: NsiProviderMessage[QueryRecursive])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
-    val ack = message.body.ids match {
-      case Some(Left(connectionIds)) =>
-        val answers = Future.traverse(connectionManager.find(connectionIds)) { connection =>
-          (connection ? FromRequester(message)).mapTo[ToRequester]
-        }
-
-        answers onComplete {
-          case Failure(e) => println(s"Answers Future failed: $e")
-          case Success(list) =>
-            println(s"Answers Success, list: $list")
-            val resultTypes = list.foldLeft(List[QueryRecursiveResultType]())((resultTypes, answer) => answer match {
-              case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultTypes ++ resultType
-              case ToRequester(NsiRequesterMessage(_, QueryRecursiveFailed(e))) => resultTypes // FIXME
-            })
-
-            replyTo(QueryRecursiveConfirmed(resultTypes))
-        }
-
-        GenericAck()
-      case Some(Right(globalReservationIds)) =>
-        connectionManager.findByGlobalReservationIds(globalReservationIds) foreach { connection =>
-          connection ! FromRequester(message)
-        }
-
-        requesterContinuations.register(message.headers.correlationId).onSuccess {
-          case reply => replyTo(reply.body)
-        }
-
-        GenericAck()
-      case None =>
-        ServiceException(NsiError.NotImplemented.toServiceException(Configuration.Nsa))
+    val connections = message.body.ids match {
+      case Some(Left(connectionIds)) => connectionManager.find(connectionIds)
+      case Some(Right(globalReservationIds)) => connectionManager.findByGlobalReservationIds(globalReservationIds)
+      case None => connectionManager.all // should be all for requester NSA ...
     }
 
-    Future.successful(ack)
+    val answers = Future.traverse(connections) { connection =>
+      (connection ? FromRequester(message)).mapTo[ToRequester]
+    }
+
+    answers onComplete {
+      case Failure(e) => println(s"Answers Future failed: $e")
+      case Success(list) =>
+        val resultTypes = list.foldLeft(List[QueryRecursiveResultType]())((resultTypes, answer) => answer match {
+          case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultTypes ++ resultType
+          case ToRequester(NsiRequesterMessage(_, QueryRecursiveFailed(e))) => resultTypes // FIXME
+        })
+
+        replyTo(QueryRecursiveConfirmed(resultTypes))
+    }
+
+    Future.successful(GenericAck())
   }
 
   private[controllers] def handleQuery(query: NsiProviderQuery)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = query match {
