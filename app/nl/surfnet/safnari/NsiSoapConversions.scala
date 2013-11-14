@@ -345,8 +345,8 @@ object NsiSoapConversions {
       soapEnvelope <- Option(document.getDocumentElement).toRight("missing document root").right
       header <- parseNsiHeaders(soapEnvelope).right
       soapBody <- findSingleChildElement(SoapNamespaceUri, "Body", soapEnvelope).right
-      bodyNode <- findSingleChildElement(NsiConnectionTypesNamespace, "*", soapBody).right
-      body <- bodyConversion.invert(bodyNode).right
+      soapFaultNode <- findOptionalChildElement(SoapNamespaceUri, "Fault", soapBody).right
+      body <- soapFaultNode.map(n => parseSoapFault(n)(bodyConversion)).getOrElse(parseSoapBody(soapBody)(bodyConversion)).right
     } yield {
       (header, body)
     }
@@ -355,8 +355,22 @@ object NsiSoapConversions {
   private def parseNsiHeaders(soapEnvelope: Element): Either[String, Option[NsiHeaders]] = for {
       soapHeader <- findOptionalChildElement(SoapNamespaceUri, "Header", soapEnvelope).right
       headerNode <- soapHeader.map(it => findOptionalChildElement(NsiHeadersQName.getNamespaceURI(), NsiHeadersQName.getLocalPart(), it)).getOrElse(Right(None)).right
-      header <- headerNode.map(Conversion[NsiHeaders, Element].invert.apply).sequence.right
+      header <- headerNode.map(Conversion[NsiHeaders, Element].invert(_)).sequence.right
   } yield header
+
+  private def parseSoapBody[T](soapBody: Element)(implicit bodyConversion: Conversion[T, Element]): Either[String, T] = for {
+      bodyNode <- findSingleChildElement(NsiConnectionTypesNamespace, "*", soapBody).right
+      body <- bodyConversion.invert(bodyNode).right
+  } yield body
+
+  private val ServiceExceptionTypeName = typesFactory.createServiceException(null).getName()
+
+  private def parseSoapFault[T](soapFault: Element)(implicit bodyConversion: Conversion[T, Element]): Either[String, T] = for {
+    faultString <- findSingleChildElement("", "faultstring", soapFault).right
+    serviceExceptionNode <- findOptionalChildElement(ServiceExceptionTypeName.getNamespaceURI(), ServiceExceptionTypeName.getLocalPart(), soapFault).right
+    serviceException <- serviceExceptionNode.map(bodyConversion.invert(_)).sequence.right
+    result <- serviceException.toRight(s"SOAP fault without ${ServiceExceptionTypeName}. Fault string: ${faultString.getTextContent()}").right
+  } yield result
 
   private def createDocument: Document = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
 
