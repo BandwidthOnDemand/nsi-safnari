@@ -421,7 +421,10 @@ class ConnectionSpec extends helpers.Specification {
 
       when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType().withConnectionId("ConnectionIdA"))))
 
-      messages must contain(agg.response(ReserveCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType().withConnectionId(ConnectionId))))
+      messages must contain(agg.response(ReserveCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
+        .withConnectionId(ConnectionId)
+        .withOriginatingConnectionId("ConnectionIdA")
+        .withNotificationId(1))))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
     }

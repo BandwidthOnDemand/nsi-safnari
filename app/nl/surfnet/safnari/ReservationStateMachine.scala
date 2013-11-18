@@ -93,6 +93,7 @@ class ReservationStateMachine(
   pceReplyUri: URI,
   newCorrelationId: () => CorrelationId,
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
+  newNotificationId: () => Int,
   failed: NsiError => GenericFailedType)
   extends FiniteStateMachine[ReservationState, ReservationStateMachineData, InboundMessage, OutboundMessage](
     InitialReservationState,
@@ -224,14 +225,14 @@ class ReservationStateMachine(
           ToProvider(NsiProviderMessage(newNsiHeaders(seg.provider), ReserveAbort(connectionId)), seg.provider)
       }.toVector
     case HeldReservationState -> TimeoutReservationState =>
-      val (timedOutConnectionId, timeout) = nextStateData.childTimeouts.head
-      respond(ReserveTimeout(timeout.withConnectionId(id)))
-//          new ReserveTimeoutRequestType()
-//        .withConnectionId(id)
-//        .withTimeStamp(timeout.getTimeStamp())
-//        .withTimeoutValue(timeout.getTimeoutValue())
-//        .withOriginatingConnectionId(timedOutConnectionId)
-//        .withOriginatingNSA(timeout.getOriginatingNSA()))
+      val (_, timeout) = nextStateData.childTimeouts.head
+      respond(ReserveTimeout(new ReserveTimeoutRequestType()
+        .withConnectionId(id)
+        .withNotificationId(newNotificationId())
+        .withTimeStamp(timeout.getTimeStamp())
+        .withTimeoutValue(timeout.getTimeoutValue())
+        .withOriginatingConnectionId(timeout.getConnectionId())
+        .withOriginatingNSA(timeout.getOriginatingNSA())))
     case CommittingReservationState -> ReservedReservationState =>
       respond(ReserveCommitConfirmed(id))
     case CommittingReservationState -> CommitFailedReservationState =>

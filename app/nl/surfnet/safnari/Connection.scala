@@ -21,7 +21,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
   private var mostRecentChildExceptions = Map.empty[ConnectionId, ServiceExceptionType]
 
-  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, { error =>
+  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, newNotificationId, { error =>
     new GenericFailedType().
       withConnectionId(id).
       withConnectionStates(connectionStates).
