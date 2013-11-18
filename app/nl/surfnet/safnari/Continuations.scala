@@ -37,8 +37,10 @@ class Continuations[T](scheduler: => Scheduler) {
     promise.future
   }
 
-  def unregister(correlationId: CorrelationId): Boolean = continuations.remove(correlationId).fold(false) {
-    case (timeout, _) =>
+  def unregister(correlationId: CorrelationId): Boolean = continuations.remove(correlationId) match {
+    case None =>
+      false
+    case Some((timeout, _)) =>
       timeout.cancel()
       true
   }

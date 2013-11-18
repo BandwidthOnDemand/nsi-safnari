@@ -55,20 +55,20 @@ package object safnari {
     def compare(x: XMLGregorianCalendar, y: XMLGregorianCalendar): Int = x compare y
   }
 
-  implicit class DateTimeXmlOps(dt: org.joda.time.DateTime) {
-    def toXmlGregorianCalendar = try {
+  implicit class ReadableInstantOps(instant: org.joda.time.ReadableInstant) {
+    def toSqlTimestamp = new java.sql.Timestamp(instant.getMillis())
+  }
+  implicit class DateTimeOps(dt: org.joda.time.ReadableDateTime) {
+    def toXmlGregorianCalendar = {
       DatatypeFactory.newInstance().newXMLGregorianCalendar(
-          BigInteger.valueOf(dt.getYear()),
-          dt.getMonthOfYear(),
-          dt.getDayOfMonth(),
-          dt.getHourOfDay(),
-          dt.getMinuteOfHour(),
-          dt.getSecondOfMinute(),
-          null,
-          (dt.getZone().getOffset(dt.getMillis()) / (60 * 1000)))
-    } catch {
-      case e: DatatypeConfigurationException =>
-        throw new AssertionError(e)
+        BigInteger.valueOf(dt.getYear()),
+        dt.getMonthOfYear(),
+        dt.getDayOfMonth(),
+        dt.getHourOfDay(),
+        dt.getMinuteOfHour(),
+        dt.getSecondOfMinute(),
+        null,
+        (dt.getZone().getOffset(dt.getMillis()) / (60 * 1000)))
     }
   }
 
@@ -79,7 +79,13 @@ package object safnari {
       case Some(Right(b)) => Right(Some(b))
     }
   }
-
+  implicit class EitherOptionOps[A, B](value: Either[A, Option[B]]) {
+    def sequence: Option[Either[A, B]] = value match {
+      case Left(a)        => Some(Left(a))
+      case Right(None)    => None
+      case Right(Some(b)) => Some(Right(b))
+    }
+  }
   implicit val ReservationCriteriaConversion = Conversion.build[ReservationConfirmCriteriaType, ReservationRequestCriteriaType] { a =>
     Right(new ReservationRequestCriteriaType().
       withSchedule(a.getSchedule()).

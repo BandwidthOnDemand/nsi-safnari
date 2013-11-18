@@ -119,13 +119,12 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
         }
 
       case inbound: InboundMessage =>
-        val result = connection.process(inbound)
+        val result = IdempotentProvider(PersistMessages(connection.process))(inbound)
 
         val response = result match {
-          case None =>
-            messageNotApplicable(inbound)
-          case Some(outbound) =>
-            messageStore.storeAll(connection.id, inbound +: outbound)
+          case Left(error) =>
+            error
+          case Right(outbound) =>
             updateChildConnection(inbound)
             outbound.foreach(connection.process)
 
@@ -159,9 +158,54 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
         sender ! result
     }
 
+    private def IdempotentProvider(wrapped: InboundMessage => Option[Seq[OutboundMessage]]): InboundMessage => Either[Any, Seq[OutboundMessage]] = {
+      case inbound @ FromRequester(NsiProviderMessage(headers, command: NsiProviderCommand)) =>
+        val originalMessages = messageStore.findByCorrelationId(headers.correlationId)
+        val originalRequest = originalMessages.collectFirst {
+          case request @ FromRequester(_) => request
+        }
+
+        originalRequest.fold {
+          wrapped(inbound).toRight(messageNotApplicable(inbound))
+        } { request =>
+          if (!sameMessage(inbound.message, request.message)) {
+            Left(NsiError.PayloadError.toServiceException("FIXME-NSA-ID").withText(s"request with existing correlation id ${headers.correlationId} does not match the original request"))
+          } else {
+            val asyncReply = originalMessages.collectFirst {
+              case reply @ ToRequester(_) => reply
+            }
+
+            asyncReply.fold {
+              // FIXME no async reply yet. Resend child requests w/o async reply
+              wrapped(inbound).toRight(messageNotApplicable(inbound))
+            } { reply =>
+              Right(Seq(reply))
+            }
+          }
+        }
+      case inbound =>
+        wrapped(inbound).toRight(messageNotApplicable(inbound))
+    }
+
+    private def sameMessage(a: NsiProviderMessage[NsiProviderOperation], b: NsiProviderMessage[NsiProviderOperation]): Boolean = {
+      // JAXB documents cannot be compared directly due to broken equals implementation of the DOM tree.
+      // Serialize both messages to XML and compare the resulting strings instead.
+      import NsiSoapConversions._
+      val conversion = NsiProviderMessageToDocument[NsiProviderOperation](None).andThen(DocumentToString)
+      conversion(a) == conversion(b)
+    }
+
+    private def PersistMessages(wrapped: InboundMessage => Option[Seq[OutboundMessage]]): InboundMessage => Option[Seq[OutboundMessage]] = { inbound =>
+      val result = wrapped(inbound)
+      result.foreach { outbound =>
+        messageStore.storeAll(connection.id, inbound +: outbound)
+      }
+      result
+    }
+
     private def updateChildConnection(message: InboundMessage): Unit = message match {
       case FromProvider(NsiRequesterMessage(_, ReserveConfirmed(connectionId, _))) => addChildConnectionId(self, connectionId)
-      case FromProvider(NsiRequesterMessage(_, ReserveFailed(body)))               => addChildConnectionId(self, body.getConnectionId)
+      case FromProvider(NsiRequesterMessage(_, ReserveFailed(body))) => addChildConnectionId(self, body.getConnectionId)
       case _ =>
     }
 

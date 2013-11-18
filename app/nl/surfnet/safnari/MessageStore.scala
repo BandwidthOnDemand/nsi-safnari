@@ -49,7 +49,7 @@ object StoredMessage {
     override def reads(json: JsValue): JsResult[URI] = json match {
       case JsString(s) => Try(URI.create(s)) match {
         case Success(uri) => JsSuccess(uri)
-        case Failure(_)  => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.uri", s))))
+        case Failure(_)   => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.uri", s))))
       }
       case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.jsstring"))))
     }
@@ -114,11 +114,20 @@ class MessageStore[T]()(implicit conversion: Conversion[T, StoredMessage]) {
       'protocol -> stored.protocol,
       'type -> stored.tpe,
       'content -> stored.content,
-      'created_at -> new java.sql.Timestamp(stored.createdAt.getMillis())).executeInsert()
+      'created_at -> stored.createdAt.toSqlTimestamp).executeInsert()
   }
 
   def storeAll(aggregatedConnectionId: ConnectionId, messages: Seq[T]) = DB.withTransaction { implicit connection =>
     messages.foreach(store(aggregatedConnectionId, _))
+  }
+
+  def findByCorrelationId(correlationId: CorrelationId): Seq[T] = DB.withConnection { implicit connection =>
+    SQL("""
+        SELECT correlation_id, protocol, type, content, created_at
+          FROM messages
+         WHERE correlation_id = {correlation_id}
+         ORDER BY id ASC""").on(
+      'correlation_id -> correlationId.value).as(messageParser.*).map(message => conversion.invert(message).fold(sys.error, identity)) // FIXME error handling
   }
 
   def loadAll(aggregatedConnectionId: ConnectionId): Seq[T] = DB.withConnection { implicit connection =>
@@ -146,6 +155,6 @@ class MessageStore[T]()(implicit conversion: Conversion[T, StoredMessage]) {
   }
 
   private def messageParser = (get[UUID]("correlation_id") ~ str("protocol") ~ str("type") ~ str("content") ~ get[java.util.Date]("created_at")).map {
-    case correlationId ~ protocol ~ tpe ~ content ~ createdAt => StoredMessage(CorrelationId.fromUuid(correlationId), protocol, tpe, content, new Instant(createdAt.getTime()))
+    case correlationId ~ protocol ~ tpe ~ content ~ createdAt => StoredMessage(CorrelationId.fromUuid(correlationId), protocol, tpe, content, new Instant(createdAt))
   }
 }
