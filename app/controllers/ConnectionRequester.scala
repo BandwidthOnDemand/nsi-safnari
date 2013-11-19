@@ -67,8 +67,7 @@ object ConnectionRequester extends Controller with SoapWebService {
       case ToProvider(message @ NsiProviderMessage(headers, update: NsiProviderUpdateCommand), provider) =>
         sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa).withConnectionId(update.connectionId)))
       case ToProvider(message @ NsiProviderMessage(headers, query: QueryRecursive), provider) =>
-        sender ! AckFromProvider(message ack GenericAck())
-        sender ! FromProvider(message reply QueryRecursiveConfirmed(new QueryRecursiveResultType() :: Nil))
+        sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa)))
       case ToProvider(message @ NsiProviderMessage(headers, query: NsiProviderQuery), provider) =>
         sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa)))
     }
