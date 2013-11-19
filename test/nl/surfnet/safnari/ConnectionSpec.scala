@@ -48,6 +48,10 @@ class ConnectionSpec extends helpers.Specification {
     val connection = new ConnectionEntity(ConnectionId, InitialReserveMessage, () => newCorrelationId, AggregatorNsa, NsiReplyToUri, PceReplyToUri)
 
     def given(messages: Message*): Unit = messages.foreach {
+      case inbound @ FromProvider(NsiRequesterMessage(_, _: NsiQueryRecursiveResponse)) =>
+        connection.queryRecursiveResult(inbound)
+      case inbound @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) =>
+        connection.queryRecursive(inbound)
       case inbound: InboundMessage =>
         connection.process(inbound) aka s"given message $inbound must be processed" must beSome
       case outbound: OutboundMessage =>
@@ -58,7 +62,11 @@ class ConnectionSpec extends helpers.Specification {
     var messages: Seq[Message] = Nil
     def when(message: InboundMessage): Option[Seq[Message]] = {
       messages = Nil
-      connection.process(message).tap(_.foreach(messages = _))
+      val response = message match {
+        case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) => connection.queryRecursive(query)
+        case _ => connection.process(message)
+      }
+      response.tap(_.foreach(messages = _))
     }
 
     def connectionData = connection.query
@@ -756,6 +764,29 @@ class ConnectionSpec extends helpers.Specification {
           .withText("TEXT")
           .withServiceType("SERVICE_TYPE")
           .withChildException(ChildException)))))
+    }
+
+    "send query recursive to all child providers" in new ReservedConnectionWithTwoSegments {
+      when(ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)))))
+
+      messages must haveSize(2)
+      messages must haveAllElementsLike {
+        case ToProvider(NsiProviderMessage(_, QueryRecursive(Some(Left("ConnectionIdA" :: Nil)))), A.provider) => ok
+        case ToProvider(NsiProviderMessage(_, QueryRecursive(Some(Left("ConnectionIdB" :: Nil)))), B.provider) => ok
+      }
+    }
+
+    "send query recursive confirm to requester when all child providers replied" in new ReservedConnectionWithTwoSegments {
+      given(
+          ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)))),
+          upa.response(CorrelationId(0, 11), QueryRecursiveConfirmed(Nil)))
+
+      when(upa.response(CorrelationId(0, 12), QueryRecursiveConfirmed(Nil)))
+
+      messages must haveSize(1)
+      messages must haveAllElementsLike {
+        case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(results))) => results must haveSize(1)
+      }
     }
 }
 

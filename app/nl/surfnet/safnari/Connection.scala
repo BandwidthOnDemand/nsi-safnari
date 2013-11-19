@@ -55,6 +55,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         initialReserve,
         connectionStates,
         rsm.childConnections.map { case (segment, id) => segment.provider -> id }.toMap,
+        newCorrelationId,
         newNsiHeaders)
 
       val output = qrsm.process(message)

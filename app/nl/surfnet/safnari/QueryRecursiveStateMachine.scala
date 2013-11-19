@@ -23,10 +23,8 @@ case class QueryRecursiveStateMachineData(
       if (childStates.values.exists(_ == Failed)) Failed else Collected
     else throw new IllegalStateException(s"cannot determine aggregated status from ${childStates.values}")
 
-  def start: QueryRecursiveStateMachineData =
-    this.copy(
-      childStates = childStates.map(_._1 -> Collecting),
-      segments = childStates.map(newCorrelationId -> _._1))
+  def start(segs: Map[CorrelationId, ConnectionId]): QueryRecursiveStateMachineData =
+    this.copy(childStates = childStates.map(_._1 -> Collecting), segments = segs)
 
   def updateChild(correlationId: CorrelationId, state: QueryRecursiveState, answer: NsiRequesterOperation): QueryRecursiveStateMachineData =
     this.copy(
@@ -40,6 +38,7 @@ class QueryRecursiveStateMachine(
     initialReserve: NsiProviderMessage[InitialReserve],
     connectionStates: => ConnectionStatesType,
     children: Map[ProviderEndPoint, Option[ConnectionId]],
+    newCorrelationId: () => CorrelationId,
     newNsiHeaders: ProviderEndPoint => NsiHeaders)
   extends FiniteStateMachine[QueryRecursiveState, QueryRecursiveStateMachineData, InboundMessage, OutboundMessage](
     Initial,
@@ -49,7 +48,8 @@ class QueryRecursiveStateMachine(
 
   when(Initial) {
     case Event(FromRequester(NsiProviderMessage(_, _: QueryRecursive)), data) =>
-      val newData = data.start
+      val segments = data.providers.map(newCorrelationId() -> _._1)
+      val newData = data.start(segments)
       goto(newData.aggregatedState) using newData
   }
 
