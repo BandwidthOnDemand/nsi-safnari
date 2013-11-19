@@ -11,31 +11,46 @@ object QueryRecursiveState extends Enumeration {
 import QueryRecursiveState._
 
 case class QueryRecursiveStateMachineData(
+    providers: Map[ConnectionId, ProviderEndPoint],
     childStates: Map[ConnectionId, QueryRecursiveState],
     answers: Map[ConnectionId, NsiRequesterOperation] = Map.empty,
     segments: Map[CorrelationId, ConnectionId] = Map.empty) {
 
   def aggregatedState: QueryRecursiveState =
-    if (childStates.values.exists(_ == Collecting)) Collecting
+    if (childStates.isEmpty) Collected
+    else if (childStates.values.exists(_ == Collecting)) Collecting
     else if (childStates.values.forall(s => s == Failed || s == Collected))
       if (childStates.values.exists(_ == Failed)) Failed else Collected
     else throw new IllegalStateException(s"cannot determine aggregated status from ${childStates.values}")
 
   def start: QueryRecursiveStateMachineData =
-    this.copy(childStates = childStates.map(_._1 -> Collecting), segments = childStates.map(newCorrelationId -> _._1))
+    this.copy(
+      childStates = childStates.map(_._1 -> Collecting),
+      segments = childStates.map(newCorrelationId -> _._1))
 
   def updateChild(correlationId: CorrelationId, state: QueryRecursiveState, answer: NsiRequesterOperation): QueryRecursiveStateMachineData =
-    this.copy(childStates.updated(segments(correlationId), state), answers.updated(segments(correlationId), answer))
+    this.copy(
+      childStates = childStates.updated(segments(correlationId), state),
+      answers = answers.updated(segments(correlationId), answer))
 }
 
-class QueryRecursiveStateMachine(id: ConnectionId, query: NsiProviderMessage[QueryRecursive], initialReserve: NsiProviderMessage[InitialReserve], connectionStates: => ConnectionStatesType, children: Map[ConnectionId, ProviderEndPoint], newNsiHeaders: ProviderEndPoint => NsiHeaders)
+class QueryRecursiveStateMachine(
+    id: ConnectionId,
+    query: NsiProviderMessage[QueryRecursive],
+    initialReserve: NsiProviderMessage[InitialReserve],
+    connectionStates: => ConnectionStatesType,
+    children: Map[ProviderEndPoint, Option[ConnectionId]],
+    newNsiHeaders: ProviderEndPoint => NsiHeaders)
   extends FiniteStateMachine[QueryRecursiveState, QueryRecursiveStateMachineData, InboundMessage, OutboundMessage](
     Initial,
-    QueryRecursiveStateMachineData(children.map(_._1 -> Initial))) {
+    QueryRecursiveStateMachineData(
+      children.collect(QueryRecursiveStateMachine.toConnectionIdProviderMap),
+      children.collect(QueryRecursiveStateMachine.toConnectionIdStateMap))) {
 
   when(Initial) {
     case Event(FromRequester(NsiProviderMessage(_, _: QueryRecursive)), data) =>
-      goto(Collecting) using data.start
+      val newData = data.start
+      goto(newData.aggregatedState) using newData
   }
 
   when(Collecting) {
@@ -54,37 +69,52 @@ class QueryRecursiveStateMachine(id: ConnectionId, query: NsiProviderMessage[Que
     case Initial -> Collecting =>
       nextStateData.segments.map {
         case (correlationId, connectionId) =>
+          val provider = nextStateData.providers(connectionId)
           ToProvider(NsiProviderMessage(
-            newNsiHeaders(children(connectionId)).copy(correlationId = correlationId),
+            newNsiHeaders(provider).copy(correlationId = correlationId),
             QueryRecursive(Some(Left(connectionId :: Nil)))),
-            children(connectionId))
+            provider)
       }.toSeq
 
+    case Initial -> Collected =>
+      Seq(ToRequester(query reply QueryRecursiveConfirmed(queryRecursiveResultType(Nil) :: Nil)))
     case Collecting -> Collected =>
       val childRecursiveTypes = nextStateData.answers.collect {
         case (connectionId, QueryRecursiveConfirmed(Seq(result))) =>
           new ChildRecursiveType()
             .withConnectionId(result.getConnectionId())
             .withConnectionStates(result.getConnectionStates())
-            .withProviderNSA(children(connectionId).nsa)
+            .withProviderNSA(nextStateData.providers(connectionId).nsa)
             .withCriteria(result.getCriteria())
-      }
+      }.toList
 
-      val resultType = new QueryRecursiveResultType()
-        .withRequesterNSA(initialReserve.headers.requesterNSA)
-        .withConnectionId(id)
-        .withConnectionStates(connectionStates)
-        .withCriteria(new QueryRecursiveResultCriteriaType()
-          .withSchedule(initialReserve.body.criteria.getSchedule())
-          .withServiceType(initialReserve.body.criteria.getServiceType())
-          .withVersion(initialReserve.body.criteria.getVersion())
-          .withChildren(new ChildRecursiveListType()
-            .withChild(childRecursiveTypes.toList.asJava)))
-
-      Seq(ToRequester(query reply QueryRecursiveConfirmed(resultType :: Nil)))
+      Seq(ToRequester(query reply QueryRecursiveConfirmed(queryRecursiveResultType(childRecursiveTypes) :: Nil)))
     case Collecting -> Failed =>
       // TODO
       val body = QueryRecursiveFailed(new QueryFailedType())
       Seq(ToRequester(query reply body))
+  }
+
+  private def queryRecursiveResultType(childs: List[ChildRecursiveType]): QueryRecursiveResultType = {
+    new QueryRecursiveResultType()
+      .withRequesterNSA(initialReserve.headers.requesterNSA)
+      .withConnectionId(id)
+      .withConnectionStates(connectionStates)
+      .withCriteria(new QueryRecursiveResultCriteriaType()
+        .withSchedule(initialReserve.body.criteria.getSchedule())
+        .withServiceType(initialReserve.body.criteria.getServiceType())
+        .withVersion(initialReserve.body.criteria.getVersion())
+        .withChildren(new ChildRecursiveListType().withChild(childs.asJava)))
+  }
+
+}
+
+object QueryRecursiveStateMachine {
+  val toConnectionIdProviderMap: PartialFunction[Pair[ProviderEndPoint, Option[ConnectionId]], Pair[ConnectionId, ProviderEndPoint]] = {
+    case (provider, Some(connectionId)) => connectionId -> provider
+  }
+
+  val toConnectionIdStateMap: PartialFunction[Pair[ProviderEndPoint, Option[ConnectionId]], Pair[ConnectionId, QueryRecursiveState]] = {
+    case (provider, Some(connectionId)) => connectionId -> Initial
   }
 }

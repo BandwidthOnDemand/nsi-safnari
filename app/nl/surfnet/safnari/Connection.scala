@@ -43,17 +43,18 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   def queryRecursive(message: FromRequester): Option[Seq[OutboundMessage]] = message match {
     case FromRequester(pm @ NsiProviderMessage(_, QueryRecursive(ids))) =>
       require(ids.fold(true) {
-        case Left(connectionIds) => connectionIds.contains(id)
+        case Left(connectionIds)         => connectionIds.contains(id)
         case Right(globalReservationIds) => globalReservationIds.contains(globalReservationId)
       })
 
-      // FIXME - what if we got a query recursive when child connection ids are not known yet ?
+      val done = rsm.childConnections.forall { case (_, connectionId) => connectionId.isDefined }
+
       val qrsm = new QueryRecursiveStateMachine(
         id,
         pm.asInstanceOf[NsiProviderMessage[QueryRecursive]],
         initialReserve,
         connectionStates,
-        rsm.childConnections.map(kv => kv._2.getOrElse(sys.error("Now what??")) -> kv._1.provider).toMap,
+        rsm.childConnections.map { case (segment, id) => segment.provider -> id }.toMap,
         newNsiHeaders)
 
       val output = qrsm.process(message)
@@ -99,7 +100,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm
       case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) if error.error.getEvent() == EventEnumType.FORCED_END =>
         lsm
-      case FromProvider(NsiRequesterMessage(_, _: ErrorEvent)) => None
+      case FromProvider(NsiRequesterMessage(_, _: ErrorEvent))             => None
       case FromProvider(NsiRequesterMessage(_, _: MessageDeliveryTimeout)) => None
 
       case FromProvider(NsiRequesterMessage(headers, _)) =>
@@ -146,11 +147,11 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   private def registerProviderConversations(messages: Seq[OutboundMessage], stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage]): Unit = {
-      providerConversations ++= messages.collect {
-        case message: ToProvider =>
-          Logger.trace(s"Registering conversation for ${message.toShortString}")
-          message.correlationId -> stateMachine
-      }
+    providerConversations ++= messages.collect {
+      case message: ToProvider =>
+        Logger.trace(s"Registering conversation for ${message.toShortString}")
+        message.correlationId -> stateMachine
+    }
   }
 
   private def handleUnhandledProviderNotifications(message: InboundMessage): Option[Seq[OutboundMessage]] = message match {
@@ -234,9 +235,9 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }.toSeq
 
   def notifications: Seq[NotificationBaseType] = nsiNotifications.map {
-    case ErrorEvent(event) => event
-    case DataPlaneStateChange(event) => event
-    case ReserveTimeout(event) => event
+    case ErrorEvent(event)             => event
+    case DataPlaneStateChange(event)   => event
+    case ReserveTimeout(event)         => event
     case MessageDeliveryTimeout(event) => event
   }
 
