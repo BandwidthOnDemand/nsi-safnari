@@ -12,6 +12,7 @@ import scala.concurrent.duration.{ Duration, DurationInt }
 import scala.concurrent.stm._
 import scala.util.Failure
 import scala.util.Try
+import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
 
 class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity)) {
   implicit val timeout = Timeout(2.seconds)
@@ -36,7 +37,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     find(connectionIds)
   }
 
-  def findByRequesterNsa(requesterNsa: String) = all // FIXME
+  def findByRequesterNsa(requesterNsa: String)(implicit executionContext: ExecutionContext) =
+    all filter(a => Await.result((a ? 'query).mapTo[QuerySummaryResultType].map(_.getRequesterNSA().equals(requesterNsa)), 20.seconds))
 
   private def addChildConnectionId(connection: ActorRef, childConnectionId: ConnectionId) {
     childConnections.single(childConnectionId) = connection
