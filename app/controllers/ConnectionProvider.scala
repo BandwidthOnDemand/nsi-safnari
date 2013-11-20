@@ -27,6 +27,11 @@ object ConnectionProvider extends Controller with SoapWebService {
 
   private val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
+  def connectionManager(implicit app: Application): ConnectionManager =
+    app.plugin[ConnectionManagerPlugin].map(_.connectionManager).getOrElse {
+      sys.error("Connection Manager plugin is not registered.")
+    }
+
   def connectionFactory(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
     val outbound = outboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
@@ -34,15 +39,13 @@ object ConnectionProvider extends Controller with SoapWebService {
     (outbound, new ConnectionEntity(connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), Configuration.Nsa, URI.create(ConnectionRequester.serviceUrl), URI.create(PathComputationEngine.pceReplyUrl)))
   }
 
-  val connectionManager = new ConnectionManager(connectionFactory)
-
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
   override def serviceUrl: String = s"${Application.baseUrl}${routes.ConnectionProvider.request().url}"
 
   def request = NsiProviderEndPoint {
     case message @ NsiProviderMessage(headers, _: QueryRecursive)           => handleQueryRecursive(message.asInstanceOf[NsiProviderMessage[QueryRecursive]])(replyToClient(headers)).map(message.ack)
-    case message @ NsiProviderMessage(headers, query: NsiProviderQuery)     => handleQuery(query)(replyToClient(headers)).map(message.ack)
+    case message @ NsiProviderMessage(headers, query: NsiProviderQuery)     => handleQuery(query, headers.requesterNSA)(replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(message)(replyToClient(headers)).map(message.ack)
   }
 
