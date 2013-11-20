@@ -61,11 +61,7 @@ object ConnectionProvider extends Controller with SoapWebService {
     }
 
   private[controllers] def handleQueryRecursive(message: NsiProviderMessage[QueryRecursive])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
-    val connections = message.body.ids match {
-      case Some(Left(connectionIds)) => connectionManager.find(connectionIds)
-      case Some(Right(globalReservationIds)) => connectionManager.findByGlobalReservationIds(globalReservationIds)
-      case None => connectionManager.findByRequesterNsa(message.headers.requesterNSA)
-    }
+    val connections = connectionIdsToConnections(message.body.ids, message.headers.requesterNSA)
 
     val answers = Future.traverse(connections) { connection =>
       (connection ? FromRequester(message)).mapTo[ToRequester]
@@ -76,7 +72,7 @@ object ConnectionProvider extends Controller with SoapWebService {
       case Success(list) =>
         val resultTypes = list.foldLeft(List[QueryRecursiveResultType]())((resultTypes, answer) => answer match {
           case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultTypes ++ resultType
-          case ToRequester(NsiRequesterMessage(_, QueryRecursiveFailed(e))) => resultTypes // FIXME
+          case ToRequester(NsiRequesterMessage(_, QueryRecursiveFailed(e))) => resultTypes
         })
 
         replyTo(QueryRecursiveConfirmed(resultTypes))
@@ -85,14 +81,14 @@ object ConnectionProvider extends Controller with SoapWebService {
     Future.successful(GenericAck())
   }
 
-  private[controllers] def handleQuery(query: NsiProviderQuery)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = query match {
+  private[controllers] def handleQuery(query: NsiProviderQuery, nsaRequester: String)(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = query match {
     case q: QuerySummary =>
-      queryConnections(q.ids) onSuccess {
+      queryConnections(q.ids, nsaRequester) onSuccess {
         case reservations => replyTo(QuerySummaryConfirmed(reservations))
       }
       Future.successful(GenericAck())
     case q: QuerySummarySync =>
-      queryConnections(q.ids) map { states =>
+      queryConnections(q.ids, nsaRequester) map { states =>
         QuerySummarySyncConfirmed(states)
       }
     case q: QueryNotification =>
@@ -118,14 +114,16 @@ object ConnectionProvider extends Controller with SoapWebService {
     notifications.map(ns => ns.filter(n => range.contains(n.getNotificationId())))
   }
 
-  private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]]): Future[Seq[QuerySummaryResultType]] = {
-    val cs = ids match {
-      case Some(Left(connectionIds))         => connectionManager.find(connectionIds)
-      case Some(Right(globalReservationIds)) => connectionManager.findByGlobalReservationIds(globalReservationIds)
-      case None                              => connectionManager.all // FIXME...
-    }
+  private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String): Future[Seq[QuerySummaryResultType]] = {
+    val cs = connectionIdsToConnections(ids, requesterNsa)
 
     Future.traverse(cs)(c => (c ? 'query).mapTo[QuerySummaryResultType])
+  }
+
+  private def connectionIdsToConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String) = ids match {
+    case Some(Left(connectionIds))         => connectionManager.find(connectionIds)
+    case Some(Right(globalReservationIds)) => connectionManager.findByGlobalReservationIds(globalReservationIds)
+    case None                              => connectionManager.findByRequesterNsa(requesterNsa)
   }
 
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
