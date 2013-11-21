@@ -34,7 +34,7 @@ class ReserveRequestSpec extends helpers.Specification {
 
   val reserveConfirmed = Promise[NsiRequesterMessage[ReserveConfirmed]]
 
-  object Global extends play.api.GlobalSettings {
+  object Global extends controllers.GlobalSettings {
     override def onRouteRequest(request: RequestHeader): Option[Handler] = request.path match {
       case "/fake/requester" => Some(NsiRequesterEndPoint {
         case message @ NsiRequesterMessage(headers, confirm: ReserveConfirmed) =>

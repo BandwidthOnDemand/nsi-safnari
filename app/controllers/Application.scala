@@ -15,10 +15,8 @@ import nl.surfnet.safnari.ReservationState
 import nl.surfnet.safnari.ConnectionData
 import nl.surfnet.safnari._
 
-object Application extends Controller {
+class Application(connectionManager: ConnectionManager) extends Controller {
   implicit val timeout = Timeout(2.seconds)
-
-  def baseUrl = current.configuration.getString("nsi.base.url").getOrElse(sys.error("nsi.base.url option is not set"))
 
   def index = Action { implicit request =>
     val secure = request.headers.get("X-Forwarded-Proto") == Some("https")
@@ -28,7 +26,7 @@ object Application extends Controller {
   def connections(page: Int) = Action.async {
     val timeBound = DateTime.now().minusWeeks(1).toXmlGregorianCalendar
 
-    val queryResult = Future.traverse(ConnectionProvider.connectionManager.all) { c =>
+    val queryResult = Future.traverse(connectionManager.all) { c =>
       (c ? 'query).mapTo[QuerySummaryResultType] flatMap { summary =>
         (c ? 'querySegments).mapTo[Seq[ConnectionData]] map (summary -> _)
       }

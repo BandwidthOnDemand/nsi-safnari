@@ -15,7 +15,7 @@ import scala.concurrent.duration._
 object PathComputationEngine extends Controller {
   private val pceContinuations = new Continuations[PceResponse](Akka.system.scheduler)
 
-  def pceReplyUrl: String = s"${Application.baseUrl}${routes.PathComputationEngine.pceReply().url}"
+  def pceReplyUrl: String = s"${Configuration.BaseUrl}${routes.PathComputationEngine.pceReply().url}"
 
   def pceReply = Action(parse.json) { implicit request =>
     Json.fromJson[PceResponse](request.body) match {
