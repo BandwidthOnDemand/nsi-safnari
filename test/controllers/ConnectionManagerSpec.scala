@@ -33,11 +33,12 @@ class ConnectionManagerSpec extends helpers.Specification {
   class DummyConnectionFixture extends WithApplication() {
     implicit lazy val system = Akka.system
 
+    lazy val mockUuidGenerator = Uuid.mockUuidGenerator(1)
+    def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
+
     lazy val outbound = TestActorRef(new RecordingActor)
 
-    lazy val connectionManager = new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, "agg-nsa-id", URI.create("http://localhost"), URI.create("http://localhost")) {
-      override def process(message: InboundMessage) = Some(Seq.empty)
-    }))
+    lazy val connectionManager = new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, "agg-nsa-id", URI.create("http://localhost"), URI.create("http://localhost"))))
   }
 
   "Connection manager" should {
@@ -49,31 +50,46 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     "add child connection id" in new DummyConnectionFixture {
-      val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
+      val initialReserve = ura.request(CorrelationId(0, 0), initialReserveMessage.body)
+      val Some(actor) = connectionManager.findOrCreateConnection(initialReserve.message.asInstanceOf[NsiProviderMessage[NsiProviderCommand]])
+      await(actor ? initialReserve)
+      await(actor ? pce.confirm(CorrelationId(0, 1), A))
+      await(actor ? upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionId", initialReserveMessage.body.criteria)))
 
-      await(actor ? FromProvider(reserveConfirmed))
-
-      connectionManager.findByChildConnectionId(reserveConfirmed.body.connectionId) must beSome(actor)
+      connectionManager.findByChildConnectionId("ChildConnectionId") must beSome(actor)
     }
 
     "add child connection id during replay" in new DummyConnectionFixture {
       val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
 
-      await(actor ? connectionManager.Replay(Seq(FromProvider(reserveConfirmed))))
+      await(actor ? connectionManager.Replay(Seq(FromRequester(initialReserveMessage), pce.confirm(CorrelationId(0, 1), A), upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria)))))
 
-      connectionManager.findByChildConnectionId(reserveConfirmed.body.connectionId) must beSome(actor)
+      connectionManager.findByChildConnectionId("ChildConnection") must beSome(actor)
+    }
+
+    "find connection by requester correlationId for idempotent command handling" in new DummyConnectionFixture {
+      val Some(actor1) = connectionManager.findOrCreateConnection(initialReserveMessage)
+      val Some(actor2) = connectionManager.findOrCreateConnection(initialReserveMessage)
+
+      actor1 must_== actor2
     }
   }
 
   class SingleConnectionActorFixture extends WithApplication() {
     implicit lazy val system = Akka.system
+    implicit lazy val executionContext = system.dispatcher
 
-    lazy val mockUuidGenerator = Uuid.mockUuidGenerator(1)
-    def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
+    def createConnectionManager = {
+      val mockUuidGenerator = Uuid.mockUuidGenerator(1)
+      def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
+      new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, "agg-nsa-id", URI.create("http://localhost"), URI.create("http://localhost"))))
+    }
 
     lazy val outbound = TestActorRef(new RecordingActor)
-    lazy val connectionManager = new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, "agg-nsa-id", URI.create("http://localhost"), URI.create("http://localhost"))))
+    lazy val connectionManager = createConnectionManager
     lazy val Some(connection) = connectionManager.findOrCreateConnection(initialReserveMessage)
+
+    lazy val connectionId = await((connection ? 'query).mapTo[QuerySummaryResultType]).getConnectionId
 
     def output[A](f: => A): Vector[Any] = {
       outbound.underlyingActor.messages = Vector.empty
@@ -84,7 +100,18 @@ class ConnectionManagerSpec extends helpers.Specification {
   }
 
   "Connection actor" should {
-    "ensure resend message is exactly the same as the original" in new SingleConnectionActorFixture {
+    "persist and restore from the database" in new SingleConnectionActorFixture {
+      Seq(FromRequester(initialReserveMessage), pce.confirm(CorrelationId(0, 1), A), upa.response(CorrelationId(0, 1), ReserveConfirmed("ChildConnection", ConfirmCriteria))).foreach(message => await(connection ? message))
+      val restoredConnectionManager = createConnectionManager
+      await(restoredConnectionManager.restore)
+
+      val restoredConnection = restoredConnectionManager.get(connectionId)
+
+      restoredConnection aka "restored connection" must beSome
+      await(restoredConnection.get ? 'query) must_== await(connection ? 'query)
+    }
+
+    "ensure retransmitted message is exactly the same as the original" in new SingleConnectionActorFixture {
       val OriginalReserve = InitialReserveType.withDescription("original")
       val ModifiedReserve = InitialReserveType.withDescription("modified")
 
@@ -92,38 +119,67 @@ class ConnectionManagerSpec extends helpers.Specification {
       val error = await(connection ? FromRequester(NsiProviderMessage(initialReserveMessage.headers, InitialReserve(ModifiedReserve, ConfirmCriteria, Service))))
 
       error must beLike {
-        case details: ServiceExceptionType =>
-          details must_== NsiError.PayloadError.toServiceException("FIXME-NSA-ID").withText(s"request with existing correlation id ${initialReserveMessage.headers.correlationId} does not match the original request")
+        case ServiceException(details) =>
+          details must_== NsiError.PayloadError.toServiceException("FIXME-NSA-ID").withText(s"duplicate request with existing correlation id ${initialReserveMessage.headers.correlationId} does not match the original")
       }
     }
 
-    "resend original async reply when original request is resend" in new SingleConnectionActorFixture {
+    "retransmit original async reply on duplicate request" in new SingleConnectionActorFixture {
       val ack = await(connection ? FromRequester(initialReserveMessage))
       await(connection ? pce.confirm(CorrelationId(0, 1), A))
 
-      val originalOutbound = output {
+      val original = output {
         await(connection ? upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria)))
       }
 
-      val resendOutbound = output {
+      val retransmitted = output {
         await(connection ? FromRequester(initialReserveMessage))
       }
 
-      resendOutbound must_== originalOutbound
+      retransmitted must_== original
     }
 
-    "resend ToProvider messages when no async replay has been received" in new SingleConnectionActorFixture {
-      pending
-
-      val originalOutbound = output {
+    "retransmit PCE message when no async reply has been received" in new SingleConnectionActorFixture {
+      val original = output {
         await(connection ? FromRequester(initialReserveMessage))
       }
 
-      val resendOutbound = output {
+      val retransmitted = output {
         await(connection ? FromRequester(initialReserveMessage))
       }
 
-      resendOutbound.pp("resend") must_== originalOutbound.pp("original")
+      retransmitted aka "retransmitted" must_== original
+    }
+
+    "retransmit ToProvider messages without async reply" in new SingleConnectionActorFixture {
+      await(connection ? FromRequester(initialReserveMessage))
+      val original = output {
+        await(connection ? pce.confirm(CorrelationId(0, 1), A, B))
+      }
+      val retransmitted = output {
+        await(connection ? FromRequester(initialReserveMessage))
+      }
+      retransmitted aka "retransmitted" must_== original
+
+      await(connection ? upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionA", initialReserveMessage.body.criteria)))
+
+      val retransmitted2 = output {
+        await(connection ? FromRequester(initialReserveMessage))
+      }
+
+      retransmitted2 aka "retransmitted 2" must_== (original.collect {
+        case message @ ToProvider(NsiProviderMessage(_, _), provider) if provider == B.provider => message
+      })
+    }
+
+    "restore state from replayed messages" in new SingleConnectionActorFixture {
+      await(connection ? connectionManager.Replay(Seq(FromRequester(initialReserveMessage), pce.confirm(CorrelationId(0, 1), A), upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria)))))
+
+      val retransmitted = output {
+        await(connection ? FromRequester(initialReserveMessage))
+      }
+
+      retransmitted must_== Vector(agg.response(initialReserveMessage.headers.correlationId, ReserveConfirmed(connectionId, initialReserveMessage.body.criteria)))
     }
   }
 }

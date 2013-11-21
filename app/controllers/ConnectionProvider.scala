@@ -46,7 +46,7 @@ object ConnectionProvider extends Controller with SoapWebService {
   def request = NsiProviderEndPoint {
     case message @ NsiProviderMessage(headers, _: QueryRecursive)           => handleQueryRecursive(message.asInstanceOf[NsiProviderMessage[QueryRecursive]])(replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, query: NsiProviderQuery)     => handleQuery(query, headers.requesterNSA)(replyToClient(headers)).map(message.ack)
-    case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(message)(replyToClient(headers)).map(message.ack)
+    case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(replyToClient(headers)).map(message.ack)
   }
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
@@ -126,12 +126,12 @@ object ConnectionProvider extends Controller with SoapWebService {
     case None                              => connectionManager.findByRequesterNsa(requesterNsa)
   }
 
-  private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderOperation])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
+  private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderCommand])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
     connectionManager.findOrCreateConnection(request) match {
       case None =>
         Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))
       case Some(connectionActor) =>
-        requesterContinuations.register(request.headers.correlationId, 120.seconds).onSuccess {
+        requesterContinuations.register(request.headers.correlationId, Configuration.AsyncReplyTimeout).onSuccess {
           case reply => replyTo(reply.body)
         }
         (connectionActor ? FromRequester(request)).mapTo[NsiAcknowledgement]

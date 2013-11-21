@@ -17,12 +17,12 @@ class MessageStoreSpec extends helpers.Specification {
 
     "store a to PCE message" in new WithApplication(Application) {
       val aggregatedConnectionId = newConnectionId
-      val message = PceMessageSpec.pathComputationRequest
-      messageStore.store(aggregatedConnectionId, ToPce(message)) must not(beNull)
+      val message = PceMessageSpec.pathComputationResponse
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromPce(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
       loaded must haveOneElementLike {
-        case ToPce(request) => request must beEqualTo(message)
+        case FromPce(request) => request must beEqualTo(message)
       }
     }
 
@@ -30,7 +30,7 @@ class MessageStoreSpec extends helpers.Specification {
       val aggregatedConnectionId = newConnectionId
       val message = PceMessageSpec.pathComputationResponse
 
-      messageStore.store(aggregatedConnectionId, FromPce(message)) must not(beNull)
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromPce(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
       loaded must haveOneElementLike {
@@ -41,7 +41,7 @@ class MessageStoreSpec extends helpers.Specification {
     "store a fromRequester NSI message" in new WithApplication(Application) {
       val aggregatedConnectionId = newConnectionId
       val message = NsiMessageSpec.initialReserveMessage
-      messageStore.store(aggregatedConnectionId, FromRequester(message)) must beSome
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromRequester(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
       loaded must haveOneElementLike {
@@ -53,7 +53,7 @@ class MessageStoreSpec extends helpers.Specification {
       val aggregatedConnectionId = newConnectionId
       val message = NsiRequesterMessage(NsiMessageSpec.headers(newCorrelationId, NsiHeaders.RequesterProtocolVersion), ReserveConfirmed(newConnectionId, NsiMessageSpec.ConfirmCriteria))
 
-      messageStore.store(aggregatedConnectionId, FromProvider(message)) must not(beNull)
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromProvider(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
       loaded must haveOneElementLike {
@@ -66,7 +66,7 @@ class MessageStoreSpec extends helpers.Specification {
       val message = NsiMessageSpec.initialReserveMessage
       val endPoint = ProviderEndPoint("urn:nsa:surf", URI.create("http://localhost"), NoAuthentication)
 
-      messageStore.store(aggregatedConnectionId, ToProvider(message, endPoint)) must not(beNull)
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, ToProvider(message, endPoint), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
       loaded must haveOneElementLike {

@@ -17,6 +17,7 @@ import scala.collection.JavaConverters._
 import scala.util.{ Failure, Success, Try }
 
 package object safnari {
+  type RequesterNsa = String
   type ConnectionId = String
   type GlobalReservationId = URI
 
