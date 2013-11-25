@@ -71,17 +71,14 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
         .withConnectionId(connectionId)
         .withNotificationId(newNotificationId())
         .withTimeStamp(original.error.getTimeStamp())
-        // TODO additional info?
+        .withAdditionalInfo(original.error.getAdditionalInfo())
         .withEvent(EventEnumType.FORCED_END))
       if (original.error.getServiceException() ne null) {
         event.error.withServiceException(new ServiceExceptionType()
           .withConnectionId(connectionId)
-          // TODO error id?
           .withErrorId(original.error.getServiceException().getErrorId())
-          // TODO error text?
           .withText(original.error.getServiceException().getText())
           .withNsaId(headers.providerNSA)
-          // TODO service type?
           .withServiceType(original.error.getServiceException().getServiceType())
           .withChildException(original.error.getServiceException()))
       }
