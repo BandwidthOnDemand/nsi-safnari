@@ -30,7 +30,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
   override def serviceUrl: String = ConnectionProvider.serviceUrl
 
   def request = NsiProviderEndPoint {
-    case message @ NsiProviderMessage(headers, _: QueryRecursive)           => handleQueryRecursive(message.asInstanceOf[NsiProviderMessage[QueryRecursive]])(ConnectionProvider.replyToClient(headers)).map(message.ack)
+    case message @ NsiProviderMessage(headers, query: QueryRecursive)       => handleQueryRecursive(NsiProviderMessage(headers, query))(ConnectionProvider.replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, query: NsiProviderQuery)     => handleQuery(query, headers.requesterNSA)(ConnectionProvider.replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(ConnectionProvider.replyToClient(headers)).map(message.ack)
   }
@@ -49,8 +49,8 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
   private[controllers] def handleQueryRecursive(message: NsiProviderMessage[QueryRecursive])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] = {
     val connections = connectionIdsToConnections(message.body.ids, message.headers.requesterNSA)
 
-    val answers = Future.traverse(connections) { connection =>
-      (connection ? FromRequester(message)).mapTo[ToRequester]
+    val answers = connections.flatMap { cs =>
+      Future.traverse(cs)(c => (c ? FromRequester(message)).mapTo[ToRequester])
     }
 
     answers onComplete {
@@ -101,14 +101,16 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
   }
 
   private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String): Future[Seq[QuerySummaryResultType]] = {
-    val cs = connectionIdsToConnections(ids, requesterNsa)
+    val connections = connectionIdsToConnections(ids, requesterNsa)
 
-    Future.traverse(cs)(c => (c ? 'query).mapTo[QuerySummaryResultType])
+    connections flatMap { cs =>
+      Future.traverse(cs)(c => (c ? 'query).mapTo[QuerySummaryResultType])
+    }
   }
 
-  private def connectionIdsToConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String) = ids match {
-    case Some(Left(connectionIds))         => connectionManager.find(connectionIds)
-    case Some(Right(globalReservationIds)) => connectionManager.findByGlobalReservationIds(globalReservationIds)
+  private def connectionIdsToConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String): Future[Seq[ActorRef]] = ids match {
+    case Some(Left(connectionIds))         => Future.successful(connectionManager.find(connectionIds))
+    case Some(Right(globalReservationIds)) => Future.successful(connectionManager.findByGlobalReservationIds(globalReservationIds))
     case None                              => connectionManager.findByRequesterNsa(requesterNsa)
   }
 

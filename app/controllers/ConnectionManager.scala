@@ -39,8 +39,13 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     find(connectionIds)
   }
 
-  def findByRequesterNsa(requesterNsa: RequesterNsa)(implicit executionContext: ExecutionContext) =
-    all filter(a => Await.result((a ? 'query).mapTo[QuerySummaryResultType].map(_.getRequesterNSA().equals(requesterNsa)), 20.seconds))
+  def findByRequesterNsa(requesterNsa: RequesterNsa)(implicit executionContext: ExecutionContext): Future[Seq[ActorRef]] = {
+    val futures = all map { actor => (actor ? 'query).mapTo[QuerySummaryResultType].map(actor -> _) }
+    Future.fold(futures)(List[ActorRef]()) {
+      case (actors, (actor, queryResult)) if (queryResult.getRequesterNSA() == requesterNsa) => actor :: actors
+      case (actors, _) => actors
+    }
+  }
 
   def findByRequesterCorrelationId(requesterNsa: RequesterNsa, correlationId: CorrelationId): Option[ActorRef] =
     connectionsByRequesterCorrelationId.single.get((requesterNsa, correlationId))
