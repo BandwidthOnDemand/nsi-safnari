@@ -46,7 +46,7 @@ class ConnectionRequester(connectionManager: ConnectionManager) extends Controll
 object ConnectionRequester {
   implicit def actorSystem = Akka.system
 
-  lazy val serviceUrl: String = s"${Configuration.BaseUrl}${routes.ConnectionRequester.request().url}"
+  def serviceUrl: String = s"${Configuration.BaseUrl}${routes.ConnectionRequester.request().url}"
   val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
   def nsiRequester: ActorRef = {

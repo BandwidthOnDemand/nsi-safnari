@@ -121,7 +121,7 @@ object ConnectionProvider {
 
   private val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
-  lazy val serviceUrl: String = s"${Configuration.BaseUrl}${routes.ConnectionProvider.request().url}"
+  def serviceUrl: String = s"${Configuration.BaseUrl}${routes.ConnectionProvider.request().url}"
 
   def connectionFactory(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
     val outbound = outboundActor(initialReserve)
