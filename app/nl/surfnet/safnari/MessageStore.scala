@@ -72,6 +72,7 @@ object StoredMessage {
   private implicit val FromPceFormat = Json.format[FromPce]
   private implicit val ToPceFormat = Json.format[ToPce]
   private implicit val MessageDeliveryFailureFormat = Json.format[MessageDeliveryFailure]
+  private implicit val PassedEndTimeFormat = Json.format[PassedEndTime]
 
   implicit val MessageToStoredMessage = Conversion.build[Message, StoredMessage] {
     case message @ FromRequester(nsi)    => Right(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromRequester", formatJson(message)))
@@ -82,6 +83,7 @@ object StoredMessage {
     case message @ FromPce(pce)          => Right(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "FromPce", formatJson(message)))
     case message @ ToPce(pce)            => Right(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "ToPce", formatJson(message)))
     case message: MessageDeliveryFailure => Right(StoredMessage(message.correlationId, directionOf(message), "", "MessageDeliveryFailure", formatJson(message)))
+    case message: PassedEndTime          => Right(StoredMessage(message.correlationId, directionOf(message), "", "PassedEndTime", formatJson(message)))
   } { stored =>
     stored.tpe match {
       case "FromRequester"          => parseJson[FromRequester](stored.content)
@@ -92,6 +94,7 @@ object StoredMessage {
       case "FromPce"                => parseJson[FromPce](stored.content)
       case "ToPce"                  => parseJson[ToPce](stored.content)
       case "MessageDeliveryFailure" => parseJson[MessageDeliveryFailure](stored.content)
+      case "PassedEndTime"          => parseJson[PassedEndTime](stored.content)
     }
   }
 

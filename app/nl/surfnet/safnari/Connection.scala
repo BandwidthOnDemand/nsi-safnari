@@ -117,6 +117,13 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
       case _: MessageDeliveryFailure =>
         None
+
+      case message: PassedEndTime =>
+        for {
+          lifecycleStateMachine <- lsm
+          scheduledEndTime <- rsm.criteria.getSchedule().endTime
+          if !scheduledEndTime.isAfterNow
+        } yield lifecycleStateMachine
     }
 
     stateMachine.flatMap(applyMessageToStateMachine(_, message)).orElse(handleUnhandledProviderNotifications(message))

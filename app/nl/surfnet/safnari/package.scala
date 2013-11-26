@@ -8,7 +8,9 @@ import javax.xml.datatype.DatatypeFactory
 import javax.xml.datatype.DatatypeConfigurationException
 import javax.xml.datatype.XMLGregorianCalendar
 import nl.surfnet.safnari.{ Conversion, CorrelationId, Uuid }
+import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._07.connection.types.{ ReservationConfirmCriteriaType, ReservationRequestCriteriaType }
+import org.ogf.schemas.nsi._2013._07.connection.types.ScheduleType
 import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetVlanType
@@ -24,7 +26,6 @@ package object safnari {
   private val UuidGenerator = Uuid.randomUuidGenerator
 
   def newConnectionId: ConnectionId = UuidGenerator().toString
-  def newCorrelationId: CorrelationId = CorrelationId.fromUuid(UuidGenerator())
 
   implicit class AnyOps[A](a: A) {
     def tap(f: A => Unit): A = { f(a); a }
@@ -71,6 +72,13 @@ package object safnari {
         null,
         (dt.getZone().getOffset(dt.getMillis()) / (60 * 1000)))
     }
+  }
+  implicit class XmlGregorianCalendarOps(dt: XMLGregorianCalendar) {
+    def toDateTime = new DateTime(dt.toGregorianCalendar())
+  }
+  implicit class ScheduleTypeOps(schedule: ScheduleType) {
+    def startTime = Option(schedule.getStartTime).map(_.toDateTime)
+    def endTime = Option(schedule.getEndTime).map(_.toDateTime)
   }
 
   implicit class OptionEitherOps[A, B](value: scala.Option[Either[A, B]]) {

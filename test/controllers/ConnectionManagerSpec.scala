@@ -14,6 +14,7 @@ import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._07.services.types.DirectionalityType
 import org.ogf.schemas.nsi._2013._07.services.types.StpType
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.joda.time.DateTime
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionManagerSpec extends helpers.Specification {
@@ -89,7 +90,20 @@ class ConnectionManagerSpec extends helpers.Specification {
     lazy val connectionManager = createConnectionManager
     lazy val Some(connection) = connectionManager.findOrCreateConnection(initialReserveMessage)
 
-    lazy val connectionId = await((connection ? 'query).mapTo[QuerySummaryResultType]).getConnectionId
+    def query = await((connection ? 'query).mapTo[QuerySummaryResultType])
+    lazy val connectionId = query.getConnectionId
+
+    def reserveWithEndTime(endTime: DateTime): Unit = {
+      val reserve = initialReserveMessage.tap(_.body.body.getCriteria().getSchedule().withEndTime(endTime.toXmlGregorianCalendar))
+      Seq(
+        FromRequester(reserve),
+        pce.confirm(CorrelationId(0, 1), A),
+        upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria)),
+        ura.request(CorrelationId(1, 1), ReserveCommit(connectionId)),
+        upa.response(CorrelationId(0, 4), ReserveCommitConfirmed("ChildConnection"))).foreach {
+          message => await(connection ? message)
+        }
+    }
 
     def output[A](f: => A): Vector[Any] = {
       outbound.underlyingActor.messages = Vector.empty
@@ -180,6 +194,20 @@ class ConnectionManagerSpec extends helpers.Specification {
       }
 
       retransmitted must_== Vector(agg.response(initialReserveMessage.headers.correlationId, ReserveConfirmed(connectionId, initialReserveMessage.body.criteria)))
+    }
+
+    "send PassedEndTime message after reservation end time" in new SingleConnectionActorFixture {
+      reserveWithEndTime(DateTime.now())
+
+      eventually(query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.PASSED_END_TIME)
+    }
+
+    "ignore PassedEndTime message received before end time" in new SingleConnectionActorFixture {
+      reserveWithEndTime(DateTime.now().plusDays(1))
+
+      await(connection ? PassedEndTime(newCorrelationId, connectionId, DateTime.now()))
+
+      query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.CREATED
     }
   }
 }

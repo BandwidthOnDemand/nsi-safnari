@@ -23,7 +23,7 @@ object NsiMessageSpec {
   val RequestCriteria = Conversion.convert(ConfirmCriteria).right.get
 
   def InitialReserveType = new ReserveType().withCriteria(RequestCriteria)
-  val InitialReserveCorrelationId = newCorrelationId
+  val InitialReserveCorrelationId = helpers.Specification.newCorrelationId
 
   def initialReserveMessage = NsiProviderMessage(headers(InitialReserveCorrelationId, NsiHeaders.ProviderProtocolVersion), InitialReserve(InitialReserveType, ConfirmCriteria, Service))
   val reserveConfirmed = NsiRequesterMessage(headers(InitialReserveCorrelationId, NsiHeaders.RequesterProtocolVersion), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))

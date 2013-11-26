@@ -31,7 +31,7 @@ final case class ToProvider(message: NsiProviderMessage[NsiProviderOperation], p
 }
 final case class AckFromProvider(message: NsiProviderMessage[NsiAcknowledgement]) extends InboundMessage {
   override def toShortString = Message.shortString(getClass(), message.body.getClass(), correlationId)
-      override def correlationId = message.headers.correlationId
+  override def correlationId = message.headers.correlationId
 }
 final case class FromProvider(message: NsiRequesterMessage[NsiRequesterOperation]) extends InboundMessage {
   override def toShortString = Message.shortString(getClass(), message.body.getClass(), correlationId)
@@ -49,4 +49,7 @@ final case class ToPce(message: PceRequest) extends OutboundMessage {
 
 final case class MessageDeliveryFailure(override val correlationId: CorrelationId, connectionId: Option[ConnectionId], uri: URI, timestamp: DateTime, message: String) extends InboundMessage {
   override def toShortString = s"${getClass().getSimpleName()}(correlationId=$correlationId, connectionId=$connectionId, uri=$uri, timestamp=$timestamp, message=$message)"
+}
+final case class PassedEndTime(override val correlationId: CorrelationId, connectionId: ConnectionId, timestamp: DateTime) extends InboundMessage {
+  override def toShortString = s"${getClass().getSimpleName()}(correlationId=$correlationId, connectionId=$connectionId, timestamp=$timestamp)"
 }

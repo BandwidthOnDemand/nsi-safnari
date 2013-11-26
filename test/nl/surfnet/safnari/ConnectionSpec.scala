@@ -37,24 +37,33 @@ class ConnectionSpec extends helpers.Specification {
 
     val connection = new ConnectionEntity(ConnectionId, InitialReserveMessage, () => newCorrelationId, AggregatorNsa, NsiReplyToUri, PceReplyToUri)
 
+    val processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
+
     def given(messages: Message*): Unit = messages.foreach {
       case inbound @ FromProvider(NsiRequesterMessage(_, _: NsiQueryRecursiveResponse)) =>
         connection.queryRecursiveResult(inbound)
       case inbound @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) =>
         connection.queryRecursive(inbound)
       case inbound: InboundMessage =>
-        connection.process(inbound) aka s"given message $inbound must be processed" must beSome
+        processInbound(inbound) aka s"given message $inbound must be processed" must beRight
       case outbound: OutboundMessage =>
         // FIXME compare against actual outbound messages?
         connection.process(outbound)
     }
 
     var messages: Seq[Message] = Nil
-    def when(message: InboundMessage): Option[Seq[Message]] = {
+    def when(message: InboundMessage): Option[Seq[OutboundMessage]] = {
       messages = Nil
+
       val response = message match {
         case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) => connection.queryRecursive(query)
-        case _ => connection.process(message)
+        case message: FromRequester =>
+          val first = processInbound(message).right.toOption.map(_._2)
+          val second = processInbound(message).right.toOption.map(_._2)
+          second aka "idempotent retransmit" must beEqualTo(first)
+          first
+        case other: InboundMessage =>
+          processInbound(message).right.toOption.map(_._2)
       }
       response.tap(_.foreach(messages = _))
     }
@@ -89,8 +98,7 @@ class ConnectionSpec extends helpers.Specification {
 
       ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)),
       upa.response(CorrelationId(0, 8), ReserveCommitConfirmed("ConnectionIdA")),
-      upa.response(CorrelationId(0, 9), ReserveCommitConfirmed("ConnectionIdB"))
-    )
+      upa.response(CorrelationId(0, 9), ReserveCommitConfirmed("ConnectionIdB")))
   }
 
   trait Released { this: ReservedConnection =>
@@ -113,8 +121,7 @@ class ConnectionSpec extends helpers.Specification {
     given(
       ura.request(ProvisionCorrelationId, Provision(ConnectionId)),
       upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")),
-      upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB"))
-    )
+      upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
   }
 
   "A connection" should {
@@ -189,11 +196,11 @@ class ConnectionSpec extends helpers.Specification {
         agg.request(CorrelationId(0, 4), InitialReserve(InitialReserveType, ConfirmCriteria, A.serviceType.service)),
         pce.confirm(CorrelationId(0, 3), A))
 
-      when(upa.timeout(CorrelationId(0, 4), TimeoutTimestamp))
+      when(upa.timeout(CorrelationId(2, 7), TimeoutTimestamp))
 
       messages must contain(agg.notification(CorrelationId(0, 6), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
         .withConnectionId(ConnectionId)
-        .withCorrelationId(CorrelationId(0, 4).toString)
+        .withCorrelationId(CorrelationId(2, 7).toString)
         .withNotificationId(1)
         .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
     }
@@ -215,21 +222,20 @@ class ConnectionSpec extends helpers.Specification {
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
         pce.confirm(CorrelationId(0, 1), A, B),
         upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
-        upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB"))
-      )
+        upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
 
       when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
       messages must beEmpty
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok }
 
       when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
       messages must contain(ToRequester(NsiRequesterMessage(InitialReserveHeaders.forAsyncReply, ReserveConfirmed(ConnectionId, ConfirmCriteria))))
 
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
     }
 
     "fail the reservation with a single path segment" in new fixture {
@@ -430,21 +436,21 @@ class ConnectionSpec extends helpers.Specification {
       given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok }
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok }
 
       when(upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")))
 
       messages must beEmpty
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok }
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok }
 
       when(upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok }
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok }
       messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = ProvisionCorrelationId).forAsyncReply, ProvisionConfirmed(ConnectionId))))
     }
 
@@ -461,8 +467,8 @@ class ConnectionSpec extends helpers.Specification {
       val ReleaseCorrelationId = newCorrelationId
 
       given(
-          ura.request(ReleaseCorrelationId, Release(ConnectionId)),
-          upa.acknowledge(CorrelationId(0, 10), GenericAck()))
+        ura.request(ReleaseCorrelationId, Release(ConnectionId)),
+        upa.acknowledge(CorrelationId(0, 10), GenericAck()))
 
       when(upa.response(CorrelationId(0, 10), ReleaseConfirmed("ConnectionIdA")))
 
@@ -495,8 +501,8 @@ class ConnectionSpec extends helpers.Specification {
       val TerminateCorrelationId = newCorrelationId
 
       given(
-          ura.request(TerminateCorrelationId, Terminate(ConnectionId)),
-          upa.acknowledge(CorrelationId(0, 8), GenericAck()))
+        ura.request(TerminateCorrelationId, Terminate(ConnectionId)),
+        upa.acknowledge(CorrelationId(0, 8), GenericAck()))
 
       when(upa.response(CorrelationId(0, 8), TerminateConfirmed("ConnectionIdA")))
 
@@ -512,15 +518,15 @@ class ConnectionSpec extends helpers.Specification {
       when(upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA")))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok }
       messages must beEmpty
 
       when(upa.response(CorrelationId(0, 12), TerminateConfirmed("ConnectionIdB")))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok}
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok}
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
+      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
       messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = TerminateCorrelationId).forAsyncReply, TerminateConfirmed(ConnectionId))))
     }
 
@@ -560,11 +566,10 @@ class ConnectionSpec extends helpers.Specification {
 
       dataPlaneStatus.isActive() must beTrue
       messages must contain(agg.notification(CorrelationId(0, 15), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
-          .withConnectionId(ConnectionId)
-          .withNotificationId(1)
-          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:10"))
-          .withDataPlaneStatus(dataPlaneStatusType(true))
-      )))
+        .withConnectionId(ConnectionId)
+        .withNotificationId(1)
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:10"))
+        .withDataPlaneStatus(dataPlaneStatusType(true)))))
     }
 
     "have a data plane inactive on data plane change" in new ReservedConnection with Provisioned {
@@ -714,8 +719,8 @@ class ConnectionSpec extends helpers.Specification {
 
     "send query recursive confirm to requester when all child providers replied" in new ReservedConnectionWithTwoSegments {
       given(
-          ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)))),
-          upa.response(CorrelationId(0, 11), QueryRecursiveConfirmed(Nil)))
+        ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)))),
+        upa.response(CorrelationId(0, 11), QueryRecursiveConfirmed(Nil)))
 
       when(upa.response(CorrelationId(0, 12), QueryRecursiveConfirmed(Nil)))
 
@@ -724,7 +729,7 @@ class ConnectionSpec extends helpers.Specification {
         case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(results))) => results must haveSize(1)
       }
     }
-}
+  }
 
   private def dataPlaneStatusType(active: Boolean) = new DataPlaneStatusType().withActive(active).withVersion(0).withVersionConsistent(true)
 }

@@ -28,7 +28,7 @@ object PceMessageSpec {
   val Schedule = new ScheduleType()
   val ServiceTypeUrl = "http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE"
 
-  val correlationId = newCorrelationId
+  val correlationId = helpers.Specification.newCorrelationId
 
   val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType))
 

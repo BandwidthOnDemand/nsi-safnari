@@ -1,6 +1,7 @@
 package helpers
 
 import akka.util.Timeout
+import nl.surfnet.safnari.{ CorrelationId, Uuid }
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 abstract class Specification
@@ -10,4 +11,12 @@ abstract class Specification
     with org.specs2.time.NoTimeConversions
     with org.specs2.ScalaCheck
     with play.api.test.DefaultAwaitTimeout
-    with play.api.test.FutureAwaits
+    with play.api.test.FutureAwaits {
+  def newCorrelationId = Specification.newCorrelationId
+}
+
+object Specification {
+  private val UuidGenerator = Uuid.randomUuidGenerator
+
+  def newCorrelationId: CorrelationId = CorrelationId.fromUuid(UuidGenerator())
+}

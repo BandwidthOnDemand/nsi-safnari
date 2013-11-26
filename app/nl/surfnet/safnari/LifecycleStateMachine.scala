@@ -7,10 +7,10 @@ import org.ogf.schemas.nsi._2013._07.connection.types.ErrorEventType
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 
 case class LifecycleStateMachineData(
-    children: Map[ConnectionId, ProviderEndPoint],
-    childConnectionStates: Map[ConnectionId, LifecycleStateEnumType],
-    command: Option[NsiProviderMessage[NsiProviderOperation]] = None,
-    errorEvent: Option[ErrorEvent] = None) {
+  children: Map[ConnectionId, ProviderEndPoint],
+  childConnectionStates: Map[ConnectionId, LifecycleStateEnumType],
+  command: Option[NsiProviderMessage[NsiProviderOperation]] = None,
+  errorEvent: Option[ErrorEvent] = None) {
 
   def aggregatedLifecycleStatus: LifecycleStateEnumType = {
     if (childConnectionStates.values.forall(_ == CREATED)) CREATED
@@ -37,6 +37,8 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
       goto(TERMINATING) using (data.startCommand(message, TERMINATING))
     case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.error.getEvent() == EventEnumType.FORCED_END =>
       goto(FAILED) using data.updateChild(errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
+    case Event(PassedEndTime(_, _, _), data) =>
+      goto(PASSED_END_TIME)
   }
 
   when(TERMINATING) {
@@ -52,8 +54,11 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
       goto(TERMINATING) using (data.copy(command = Some(message)))
   }
 
+  when(PASSED_END_TIME)(PartialFunction.empty)
+
   whenUnhandled {
-    case Event(AckFromProvider(_), _) => stay
+    case Event(AckFromProvider(_), _)     => stay
+    case Event(PassedEndTime(_, _, _), _) => stay
   }
 
   onTransition {
@@ -83,6 +88,8 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
           .withChildException(original.error.getServiceException()))
       }
       Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event)))
+    case CREATED -> PASSED_END_TIME =>
+      Seq.empty
   }
 
   def lifecycleState = stateName
