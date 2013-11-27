@@ -12,22 +12,23 @@ sealed trait NsiNotification extends NsiRequesterOperation {
   def connectionId: ConnectionId
 }
 sealed trait NsiQueryRecursiveResponse extends NsiRequesterOperation
+sealed trait NsiCommandReply extends NsiRequesterOperation
 
-case class ReserveConfirmed(connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiRequesterOperation
-case class ReserveFailed(failed: GenericFailedType) extends NsiRequesterOperation {
+case class ReserveConfirmed(connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiCommandReply
+case class ReserveFailed(failed: GenericFailedType) extends NsiCommandReply {
   def connectionId: ConnectionId = failed.getConnectionId()
 }
 
-case class ReserveCommitConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
-case class ReserveCommitFailed(failed: GenericFailedType) extends NsiRequesterOperation {
+case class ReserveCommitConfirmed(connectionId: ConnectionId) extends NsiCommandReply
+case class ReserveCommitFailed(failed: GenericFailedType) extends NsiCommandReply {
   def connectionId: ConnectionId = failed.getConnectionId()
 }
 
-case class ReserveAbortConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
+case class ReserveAbortConfirmed(connectionId: ConnectionId) extends NsiCommandReply
 
-case class ProvisionConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
-case class ReleaseConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
-case class TerminateConfirmed(connectionId: ConnectionId) extends NsiRequesterOperation
+case class ProvisionConfirmed(connectionId: ConnectionId) extends NsiCommandReply
+case class ReleaseConfirmed(connectionId: ConnectionId) extends NsiCommandReply
+case class TerminateConfirmed(connectionId: ConnectionId) extends NsiCommandReply
 
 case class QuerySummaryConfirmed(reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
 case class QuerySummaryFailed(failed: QueryFailedType) extends NsiRequesterOperation

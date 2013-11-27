@@ -26,25 +26,28 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Option[
             }))
           }
       }
-    case inbound =>
-      val originalRequest = fromRequesterByDownstreamCorrelationId.get(inbound.correlationId)
+    case _: FromProvider | _: FromPce =>
+      val originalRequest = fromRequesterByDownstreamCorrelationId.get(message.correlationId)
       val result = originalRequest match {
         case None =>
-          wrapped(inbound)
+          wrapped(message)
         case Some(originalRequest) =>
-          val result = wrapped(inbound)
+          val result = wrapped(message)
           result.foreach { output =>
             recordOutput(originalRequest, output)
-            downstreamRequestsByFromRequesterCorrelationId += originalRequest.correlationId -> (downstreamRequestsByFromRequesterCorrelationId(originalRequest.correlationId) - inbound.correlationId)
+            downstreamRequestsByFromRequesterCorrelationId += originalRequest.correlationId -> (downstreamRequestsByFromRequesterCorrelationId(originalRequest.correlationId) - message.correlationId)
           }
           result
       }
-      result.map((false, _)).toRight(messageNotApplicable(inbound))
+      result.map((false, _)).toRight(messageNotApplicable(message))
+    case _: MessageDeliveryFailure | _: PassedEndTime | _: AckFromProvider | _: FromRequester =>
+      val result = wrapped(message)
+      result.map((false, _)).toRight(messageNotApplicable(message))
   }
 
   private def recordOutput(inbound: FromRequester, output: Seq[OutboundMessage]): Unit = {
     val toRequester = output.collectFirst {
-      case outbound @ ToRequester(_) =>
+      case outbound @ ToRequester(NsiRequesterMessage(_, _: NsiCommandReply)) =>
         assert(inbound.correlationId == outbound.correlationId, s"reply correlationId ${outbound.correlationId} did not match request correlationId ${inbound.correlationId}")
         outbound
     }
