@@ -16,7 +16,7 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Option[
           result.map((false, _)).toRight(messageNotApplicable(inbound))
         case Some((original, result)) =>
           if (!sameMessage(inbound.message, original.message)) {
-            Left(NsiError.PayloadError.toServiceException("FIXME-NSA-ID").withText(s"duplicate request with existing correlation id ${inbound.correlationId} does not match the original"))
+            Left(NsiError.PayloadError.toServiceException(providerNsa).withText(s"duplicate request with existing correlation id ${inbound.correlationId} does not match the original"))
           } else {
             Right((true, result.fold {
               val downstreamMessages = downstreamRequestsByFromRequesterCorrelationId(inbound.correlationId)

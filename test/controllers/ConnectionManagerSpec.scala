@@ -39,7 +39,7 @@ class ConnectionManagerSpec extends helpers.Specification {
 
     lazy val outbound = TestActorRef(new RecordingActor)
 
-    lazy val connectionManager = new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, "agg-nsa-id", URI.create("http://localhost"), URI.create("http://localhost"))))
+    lazy val connectionManager = new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, AggregatorNsa, URI.create("http://localhost"), URI.create("http://localhost"))))
   }
 
   "Connection manager" should {
@@ -83,7 +83,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     def createConnectionManager = {
       val mockUuidGenerator = Uuid.mockUuidGenerator(1)
       def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
-      new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, "agg-nsa-id", URI.create("http://localhost"), URI.create("http://localhost"))))
+      new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, AggregatorNsa, URI.create("http://localhost"), URI.create("http://localhost"))))
     }
 
     lazy val outbound = TestActorRef(new RecordingActor)
@@ -134,7 +134,7 @@ class ConnectionManagerSpec extends helpers.Specification {
 
       error must beLike {
         case ServiceException(details) =>
-          details must_== NsiError.PayloadError.toServiceException("FIXME-NSA-ID").withText(s"duplicate request with existing correlation id ${initialReserveMessage.headers.correlationId} does not match the original")
+          details must_== NsiError.PayloadError.toServiceException(AggregatorNsa).withText(s"duplicate request with existing correlation id ${initialReserveMessage.headers.correlationId} does not match the original")
       }
     }
 

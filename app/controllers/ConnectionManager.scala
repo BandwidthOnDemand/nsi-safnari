@@ -113,7 +113,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   private[controllers] case class Replay(messages: Seq[Message])
 
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
-    private val process = new IdempotentProvider(Configuration.Nsa, ManageChildConnections(connection.process))
+    private val process = new IdempotentProvider(connection.aggregatorNsa, ManageChildConnections(connection.process))
 
     private val uuidGenerator = Uuid.randomUuidGenerator()
     private def newPassedEndTimeCorrelationId = CorrelationId.fromUuid(uuidGenerator())

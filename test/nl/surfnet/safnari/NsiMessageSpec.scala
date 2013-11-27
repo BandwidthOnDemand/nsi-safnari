@@ -9,7 +9,7 @@ import java.net.URI
 import org.joda.time.DateTime
 
 object NsiMessageSpec {
-  val AggregatorNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
+  val AggregatorNsa = "urn:ogf:network:nsa:aggregator-nsa"
 
   def headers(correlationId: CorrelationId, protocolVersion: URI) = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, protocolVersion)
   val Service = new P2PServiceBaseType().
