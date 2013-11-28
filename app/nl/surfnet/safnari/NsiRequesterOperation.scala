@@ -31,10 +31,10 @@ case class ReleaseConfirmed(connectionId: ConnectionId) extends NsiCommandReply
 case class TerminateConfirmed(connectionId: ConnectionId) extends NsiCommandReply
 
 case class QuerySummaryConfirmed(reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
-case class QuerySummaryFailed(failed: QueryFailedType) extends NsiRequesterOperation
 case class QueryRecursiveConfirmed(reservations: Seq[QueryRecursiveResultType]) extends NsiQueryRecursiveResponse
-case class QueryRecursiveFailed(failed: QueryFailedType) extends NsiQueryRecursiveResponse
 case class QueryNotificationConfirmed(notifications: Seq[NotificationBaseType]) extends NsiRequesterOperation
+
+case class Error(error: GenericErrorType) extends NsiRequesterOperation
 
 case class ErrorEvent(error: ErrorEventType) extends NsiNotification {
   override def connectionId = error.getConnectionId()

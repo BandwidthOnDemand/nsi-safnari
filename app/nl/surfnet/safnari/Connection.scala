@@ -66,7 +66,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def queryRecursiveResult(message: FromProvider): Option[Seq[OutboundMessage]] = message match {
-    case FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) | FromProvider(NsiRequesterMessage(_, _: QueryRecursiveFailed)) =>
+    case FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) =>
       val qrsm = providerConversations.get(message.correlationId)
       providerConversations -= message.correlationId
 
@@ -165,6 +165,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   private def handleUnhandledProviderNotifications(message: InboundMessage): Option[Seq[OutboundMessage]] = message match {
     case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) =>
       val event = ErrorEvent(new ErrorEventType()
+        .withOriginatingConnectionId(error.error.getOriginatingConnectionId())
+        .withOriginatingNSA(error.error.getOriginatingNSA())
         .withConnectionId(id)
         .withNotificationId(newNotificationId())
         .withTimeStamp(error.error.getTimeStamp())
