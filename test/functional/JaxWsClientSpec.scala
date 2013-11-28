@@ -39,7 +39,7 @@ class JaxWsClientSpec extends helpers.Specification {
       .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
       .withProtocolVersion("2")
       .withRequesterNSA("urn:ogf:network:surfnet")
-      .withProviderNSA("urn:ogf:network:safnari"))
+      .withProviderNSA("urn:ogf:network:nsa:surfnet-nsi-safnari"))
 
     "be able to talk to the connection provider endpoint" in new WithServer(Application, ServerPort) {
       val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))
@@ -54,7 +54,7 @@ class JaxWsClientSpec extends helpers.Specification {
         .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
         .withProtocolVersion("2")
         .withRequesterNSA("urn:ogf:network:surfnet")
-        .withProviderNSA("urn:ogf:network:safnari"))
+        .withProviderNSA("urn:ogf:network:nsa:surfnet-nsi-safnari"))
 
       service.getConnectionServiceRequesterPort().reserveCommitConfirmed("123-abc", NsiHeader)
     }

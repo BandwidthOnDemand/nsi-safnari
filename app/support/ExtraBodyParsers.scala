@@ -39,8 +39,17 @@ object ExtraBodyParsers {
     }, bytes => bytes)
   }
 
-  def NsiProviderEndPoint(action: NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]): Action[NsiProviderMessage[NsiProviderOperation]] =
-    NsiEndPoint(nsiProviderOperation)(action)(NsiProviderMessageToDocument[NsiAcknowledgement](None))
+  def NsiProviderEndPoint(providerNsa: String)(action: NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]): Action[NsiProviderMessage[NsiProviderOperation]] =
+    NsiEndPoint(nsiProviderOperation)(validateProviderNsa(providerNsa, action))(NsiProviderMessageToDocument[NsiAcknowledgement](None))
+
+  private def validateProviderNsa(providerNsa: String, action: NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]) : NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]] = { message =>
+    if (message.headers.providerNSA == providerNsa) action(message)
+    else {
+      Logger.debug(s"The providerNSA '${message.headers.providerNSA}' does not match the expected providerNSA '$providerNsa'")
+      val response = message ackWithCorrectedProviderNsa (providerNsa, ServiceException(NsiError.UnsupportedParameter.toServiceException(providerNsa)))
+      Future.successful(response)
+    }
+  }
 
   def NsiRequesterEndPoint(action: NsiRequesterMessage[NsiRequesterOperation] => Future[NsiRequesterMessage[NsiAcknowledgement]]): Action[NsiRequesterMessage[NsiRequesterOperation]] =
     NsiEndPoint(nsiRequesterOperation)(action)(NsiRequesterMessageToDocument[NsiAcknowledgement](None))

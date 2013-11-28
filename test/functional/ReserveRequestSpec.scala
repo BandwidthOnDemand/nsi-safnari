@@ -44,7 +44,7 @@ class ReserveRequestSpec extends helpers.Specification {
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
           Future.successful(response.ack(ServiceException(new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response"))))
       })
-      case "/fake/provider" => Some(NsiProviderEndPoint {
+      case "/fake/provider" => Some(NsiProviderEndPoint("provider-nsa") {
         case message @ NsiProviderMessage(headers, reserve: InitialReserve) =>
           val connectionId = newConnectionId
           headers.replyTo.foreach { replyTo =>
@@ -96,7 +96,7 @@ class ReserveRequestSpec extends helpers.Specification {
       .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
       .withProtocolVersion("2")
       .withRequesterNSA("urn:ogf:network:surfnet")
-      .withProviderNSA("urn:ogf:network:safnari")
+      .withProviderNSA("urn:ogf:network:nsa:surfnet-nsi-safnari")
       .withReplyTo(FakeRequesterUri))
     val ConnectionId = new Holder[String]()
     val Criteria = new ReservationRequestCriteriaType().
