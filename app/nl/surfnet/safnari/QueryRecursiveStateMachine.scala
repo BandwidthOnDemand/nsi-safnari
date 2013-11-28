@@ -55,12 +55,14 @@ class QueryRecursiveStateMachine(
 
   when(Collecting) {
     case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))), data) =>
-      ???
+      val newData = data.updateChild(headers.correlationId, Failed, Error(new GenericErrorType().withServiceException(serviceException)))
+      goto(newData.aggregatedState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, queryResult: QueryRecursiveConfirmed)), data) =>
       val newData = data.updateChild(headers.correlationId, Collected, queryResult)
       goto(newData.aggregatedState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, error: Error)), data) =>
-      ???
+      val newData = data.updateChild(headers.correlationId, Failed, error)
+      goto(newData.aggregatedState) using newData
   }
 
   when(Collected)(PartialFunction.empty)

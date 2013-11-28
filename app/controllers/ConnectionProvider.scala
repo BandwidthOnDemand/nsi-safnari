@@ -136,10 +136,10 @@ object ConnectionProvider {
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiNotification => Unit) extends Actor {
     def receive = {
-      case pceRequest: ToPce                     => pceRequester forward pceRequest
-      case nsiRequest: ToProvider                => nsiRequester forward nsiRequest
-      case ToRequester(NsiRequesterMessage(headers, message: NsiNotification)) => notify(message)
-      case ToRequester(response)                 => handleResponse(response)
+      case pceRequest: ToPce                                             => pceRequester forward pceRequest
+      case nsiRequest: ToProvider                                        => nsiRequester forward nsiRequest
+      case ToRequester(NsiRequesterMessage(_, message: NsiNotification)) => notify(message)
+      case ToRequester(response)                                         => handleResponse(response)
     }
   }
 

@@ -11,7 +11,6 @@ sealed trait NsiRequesterOperation {
 sealed trait NsiNotification extends NsiRequesterOperation {
   def connectionId: ConnectionId
 }
-sealed trait NsiQueryRecursiveResponse extends NsiRequesterOperation
 sealed trait NsiCommandReply extends NsiRequesterOperation
 
 case class ReserveConfirmed(connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiCommandReply
@@ -31,7 +30,7 @@ case class ReleaseConfirmed(connectionId: ConnectionId) extends NsiCommandReply
 case class TerminateConfirmed(connectionId: ConnectionId) extends NsiCommandReply
 
 case class QuerySummaryConfirmed(reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
-case class QueryRecursiveConfirmed(reservations: Seq[QueryRecursiveResultType]) extends NsiQueryRecursiveResponse
+case class QueryRecursiveConfirmed(reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
 case class QueryNotificationConfirmed(notifications: Seq[NotificationBaseType]) extends NsiRequesterOperation
 
 case class Error(error: GenericErrorType) extends NsiRequesterOperation

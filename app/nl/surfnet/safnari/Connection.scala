@@ -66,11 +66,11 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def queryRecursiveResult(message: FromProvider): Option[Seq[OutboundMessage]] = message match {
-    case FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) =>
+    case FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) | FromProvider(NsiRequesterMessage(_, _: Error)) =>
       val qrsm = providerConversations.get(message.correlationId)
       providerConversations -= message.correlationId
 
-      qrsm.flatMap(_.process(message))
+      qrsm flatMap (_.process(message))
   }
 
   def process(message: InboundMessage): Option[Seq[OutboundMessage]] = {
