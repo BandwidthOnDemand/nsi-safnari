@@ -18,7 +18,7 @@ object NsiMessageSpec {
     withSourceSTP(new StpType().withNetworkId("networkId").withLocalId("A")).
     withDestSTP(new StpType().withNetworkId("networkId").withLocalId("B"))
 
-  val Schedule = new ScheduleType()
+  val Schedule = new ScheduleType().withStartTime(DateTime.now().plusMinutes(5).toXmlGregorianCalendar).withEndTime(DateTime.now().plusMinutes(30).toXmlGregorianCalendar)
   val ConfirmCriteria = new ReservationConfirmCriteriaType().withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
   val RequestCriteria = Conversion.convert(ConfirmCriteria).right.get
 

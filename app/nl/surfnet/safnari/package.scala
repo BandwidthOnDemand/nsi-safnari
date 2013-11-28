@@ -56,6 +56,9 @@ package object safnari {
   implicit object XmlGregorianCalendarOrdering extends Ordering[XMLGregorianCalendar] {
     def compare(x: XMLGregorianCalendar, y: XMLGregorianCalendar): Int = x compare y
   }
+  implicit object DateTimeOrdering extends Ordering[DateTime] {
+    def compare(x: DateTime, y: DateTime): Int = x compareTo y
+  }
 
   implicit class ReadableInstantOps(instant: org.joda.time.ReadableInstant) {
     def toSqlTimestamp = new java.sql.Timestamp(instant.getMillis())

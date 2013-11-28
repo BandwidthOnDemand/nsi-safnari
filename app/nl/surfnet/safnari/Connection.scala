@@ -2,10 +2,12 @@ package nl.surfnet.safnari
 
 import akka.actor._
 import java.net.URI
+import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._07.connection.types._
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 import play.api.Logger
+import scala.math.Ordering.Implicits._
 import scala.util.Try
 
 class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, val aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
@@ -119,10 +121,16 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         None
 
       case message: PassedEndTime =>
+        /*
+         * Only accept PassedEndTime messages that are at or after the scheduled end time.
+         * In some (rare) cases it may be possible to receive a scheduled PassedEndTime message
+         * earlier (e.g. when the end time is modified just as the scheduler sends a
+         * PassedEndTime message).
+         */
         for {
           lifecycleStateMachine <- lsm
           scheduledEndTime <- rsm.criteria.getSchedule().endTime
-          if !scheduledEndTime.isAfterNow
+          if scheduledEndTime <= DateTime.now()
         } yield lifecycleStateMachine
     }
 

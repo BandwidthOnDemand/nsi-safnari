@@ -11,12 +11,18 @@ import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._07.services.types.StpType
 import org.joda.time.DateTime
+import org.joda.time.DateTimeUtils
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionSpec extends helpers.Specification {
+  // These tests modify global state through joda time mocking.
+  sequential
+
   import NsiMessageSpec._
 
-  abstract class fixture extends Scope {
+  abstract class fixture extends org.specs2.mutable.After {
+    override def after = DateTimeUtils.setCurrentMillisSystem()
+
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
 
@@ -36,6 +42,7 @@ class ConnectionSpec extends helpers.Specification {
     def toRequesterHeaders(correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, "RequesterNSA", None, NsiHeaders.RequesterProtocolVersion)
 
     val connection = new ConnectionEntity(ConnectionId, InitialReserveMessage, () => newCorrelationId, AggregatorNsa, NsiReplyToUri, PceReplyToUri)
+    def schedule = connection.rsm.criteria.getSchedule()
 
     val processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
 
@@ -642,6 +649,32 @@ class ConnectionSpec extends helpers.Specification {
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
       messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 11)), Terminate("ConnectionIdA")), A.provider))
+    }
+
+    "become PassedEndTime on PassedEndTime event" in new ReservedConnection {
+      DateTimeUtils.setCurrentMillisFixed(schedule.endTime.get.getMillis)
+
+      when(PassedEndTime(CorrelationId(3, 0), connection.id, schedule.endTime.get))
+
+      lifecycleState must beEqualTo(LifecycleStateEnumType.PASSED_END_TIME)
+    }
+
+    "ignore PassedEndTime message before scheduled end time" in new ReservedConnection {
+      DateTimeUtils.setCurrentMillisFixed(schedule.endTime.get.minusMinutes(5).getMillis)
+
+      when(PassedEndTime(CorrelationId(3, 0), connection.id, schedule.endTime.get))
+
+      lifecycleState must beEqualTo(LifecycleStateEnumType.CREATED)
+    }
+
+    "become terminating on terminate after PassedEndTime" in new ReservedConnection {
+      DateTimeUtils.setCurrentMillisFixed(schedule.endTime.get.getMillis)
+      given(PassedEndTime(CorrelationId(3, 0), connection.id, schedule.endTime.get))
+
+      when(ura.request(CorrelationId(1, 0), Terminate(ConnectionId)))
+
+      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+      messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 7)), Terminate("ConnectionIdA")), A.provider))
     }
 
     "pass MessageDeliveryTimeout notifications to requester" in new ReservedConnection {

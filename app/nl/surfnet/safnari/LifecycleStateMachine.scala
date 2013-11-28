@@ -54,7 +54,10 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
       goto(TERMINATING) using (data.copy(command = Some(message)))
   }
 
-  when(PASSED_END_TIME)(PartialFunction.empty)
+  when(PASSED_END_TIME) {
+    case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
+      goto(TERMINATING) using (data.copy(command = Some(message)))
+  }
 
   whenUnhandled {
     case Event(AckFromProvider(_), _)     => stay
@@ -62,7 +65,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   }
 
   onTransition {
-    case (CREATED | FAILED) -> TERMINATING =>
+    case (CREATED | FAILED | PASSED_END_TIME) -> TERMINATING =>
       stateData.children.map {
         case (connectionId, provider) =>
           ToProvider(NsiProviderMessage(newNsiHeaders(provider), Terminate(connectionId)), provider)
