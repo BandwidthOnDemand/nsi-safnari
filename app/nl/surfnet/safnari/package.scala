@@ -1,14 +1,12 @@
 package nl.surfnet
 
-import java.math.BigInteger
 import java.net.URI
 import javax.xml.bind.JAXBElement
 import javax.xml.namespace.QName
 import javax.xml.datatype.DatatypeFactory
-import javax.xml.datatype.DatatypeConfigurationException
 import javax.xml.datatype.XMLGregorianCalendar
-import nl.surfnet.safnari.{ Conversion, CorrelationId, Uuid }
 import org.joda.time.DateTime
+import org.joda.time.DateTimeZone
 import org.ogf.schemas.nsi._2013._07.connection.types.{ ReservationConfirmCriteriaType, ReservationRequestCriteriaType }
 import org.ogf.schemas.nsi._2013._07.connection.types.ScheduleType
 import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
@@ -63,21 +61,28 @@ package object safnari {
   implicit class ReadableInstantOps(instant: org.joda.time.ReadableInstant) {
     def toSqlTimestamp = new java.sql.Timestamp(instant.getMillis())
   }
+
+  private[this] val datatypeFactory = DatatypeFactory.newInstance()
   implicit class DateTimeOps(dt: org.joda.time.ReadableDateTime) {
     def toXmlGregorianCalendar = {
-      DatatypeFactory.newInstance().newXMLGregorianCalendar(
-        BigInteger.valueOf(dt.getYear()),
+      val timezoneInMinutes = dt.getZone().getOffset(dt.getMillis()) / (60 * 1000)
+      datatypeFactory.newXMLGregorianCalendar(
+        dt.getYear(),
         dt.getMonthOfYear(),
         dt.getDayOfMonth(),
         dt.getHourOfDay(),
         dt.getMinuteOfHour(),
         dt.getSecondOfMinute(),
-        null,
-        (dt.getZone().getOffset(dt.getMillis()) / (60 * 1000)))
+        dt.getMillisOfSecond(),
+        timezoneInMinutes)
     }
   }
+
   implicit class XmlGregorianCalendarOps(dt: XMLGregorianCalendar) {
-    def toDateTime = new DateTime(dt.toGregorianCalendar())
+    def toDateTime = {
+      val calendar = dt.toGregorianCalendar()
+      new DateTime(calendar.getTimeInMillis(), DateTimeZone.forTimeZone(dt.toGregorianCalendar().getTimeZone()))
+    }
   }
   implicit class ScheduleTypeOps(schedule: ScheduleType) {
     def startTime = Option(schedule.getStartTime).map(_.toDateTime)
