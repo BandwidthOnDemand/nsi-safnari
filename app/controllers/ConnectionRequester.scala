@@ -59,6 +59,8 @@ object ConnectionRequester {
 
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
     def receive = {
+      case 'healthCheck =>
+        sender ! Future.successful("NSI requester (Real)" -> true)
       case ToProvider(message @ NsiProviderMessage(headers, operation: NsiProviderOperation), provider) =>
         val connectionId = operation match {
           case command: NsiProviderCommand => command.optionalConnectionId
@@ -93,6 +95,8 @@ object ConnectionRequester {
 
   class DummyNsiRequesterActor extends Actor {
     def receive = {
+      case 'healthCheck =>
+        sender ! Future.successful("NSI requester (Dummy)" -> true)
       case ToProvider(message @ NsiProviderMessage(headers, reserve: InitialReserve), _) =>
         val connectionId = newConnectionId
         sender ! AckFromProvider(message ack ReserveResponse(connectionId))

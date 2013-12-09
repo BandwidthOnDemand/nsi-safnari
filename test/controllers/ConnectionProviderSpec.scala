@@ -21,7 +21,7 @@ class ConnectionProviderSpec extends helpers.Specification {
 
     "return the connection id and confirm the reservation" in new WithApplication(Application) {
       val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory))
-      val requesterOperation: Promise[NsiRequesterOperation] = Promise()
+      val requesterOperation = Promise[NsiRequesterOperation]()
 
       val response = await(connectionProvider.handleCommand(initialReserveMessage) { requesterOperation.success(_) })
 

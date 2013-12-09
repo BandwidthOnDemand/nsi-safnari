@@ -1,0 +1,24 @@
+@(serviceStates: Map[String, Boolean], version: String)
+
+@main("Healthcheck", "healthcheck") {
+    <div class="modal modal-relative">
+        <div class="modal-header">
+            <h3>Health Check <span class="header-right">@version</span></h3>
+        </div>
+        <div class="modal-body">
+            <table class="table" id="healthcheck">
+                <thead>
+                    <tr><td>System</td><td>Status</td></tr>
+                </thead>
+                <tbody>
+                    @for((service, up) <- serviceStates) {
+                        <tr>
+                            <td>@service</td>
+                            <td>@if(up) { <i class="icon-ok-sign"></i> } else { <i class="icon-remove-sign"></i> }</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
