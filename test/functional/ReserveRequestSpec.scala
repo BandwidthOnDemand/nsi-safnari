@@ -57,7 +57,7 @@ class ReserveRequestSpec extends helpers.Specification {
           wtf.pp
           ???
       })
-      case "/fake/pce" =>
+      case "/paths/find" =>
         Some(Action(BodyParsers.parse.json) { request =>
           val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
@@ -74,7 +74,7 @@ class ReserveRequestSpec extends helpers.Specification {
   }
 
   val ServerPort = Helpers.testServerPort
-  val FakePceUri = s"http://localhost:$ServerPort/fake/pce"
+  val FakePceUri = s"http://localhost:$ServerPort"
   val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
   val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"
   val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"

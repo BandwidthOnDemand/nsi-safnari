@@ -10,7 +10,9 @@ import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
 import play.api.Logger
+import scala.util.{ Success, Failure }
 import scala.concurrent.duration._
+import scala.concurrent.Future
 
 object PathComputationEngine extends Controller {
   private val pceContinuations = new Continuations[PceResponse](Akka.system.scheduler)
@@ -29,7 +31,7 @@ object PathComputationEngine extends Controller {
     }
   }
 
-  def pceRequester = {
+  def pceRequester: ActorRef = {
     val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
     current.configuration.getString("pce.actor") match {
       case None | Some("dummy") => Akka.system.actorOf(Props[DummyPceRequesterActor])
@@ -39,13 +41,24 @@ object PathComputationEngine extends Controller {
 
   class PceRequesterActor(endPoint: String) extends Actor {
     def receive = {
+      case 'healthCheck =>
+        val topologyHealth = WS.url(s"$endPoint/topology/ping").get()
+        val pathsHealth = WS.url(s"$endPoint/paths").get()
+        topologyHealth onFailure { case e => Logger.warn(s"Failed to access PCE topology service: $e") }
+        pathsHealth onFailure { case e => Logger.warn(s"Failed to access PCE path finding service: $e") }
+
+        val healthy = Future.sequence(List(topologyHealth, pathsHealth)).map(_.forall(_.status == 200)).recover { case t => false }
+
+        sender ! healthy.map("PCE (Real)" -> _)
+
       case ToPce(request) =>
         val connection = sender
         pceContinuations.register(request.correlationId, Configuration.AsyncReplyTimeout).onSuccess {
           case reply => connection ! FromPce(reply)
         }
-        Logger.info(s"Sending request to pce ($endPoint): ${Json.toJson(request)}")
-        WS.url(endPoint).post(Json.toJson(request)).onFailure{
+        val findPathEndPoint = s"$endPoint/paths/find"
+        Logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
+        WS.url(findPathEndPoint).post(Json.toJson(request)).onFailure {
           case e => Logger.error(s"Could not reach the pce ($endPoint): $e")
         }
     }
@@ -53,6 +66,9 @@ object PathComputationEngine extends Controller {
 
   class DummyPceRequesterActor extends Actor {
     def receive = {
+      case 'healthCheck =>
+        sender ! Future.successful("PCE (Dummy)" -> true)
+
       case ToPce(pce: PathComputationRequest) =>
         sender !
           FromPce(PathComputationConfirmed(
