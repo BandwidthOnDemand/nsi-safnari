@@ -31,20 +31,21 @@ class JaxWsClientSpec extends helpers.Specification {
   sequential
 
   val ServerPort = Helpers.testServerPort
-  def Application = FakeApplication(additionalConfiguration = Map("nsi.base.url" -> s"http://localhost:$ServerPort"))
+  val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
+  def Application = FakeApplication(additionalConfiguration = Map("nsi.base.url" -> s"http://localhost:$ServerPort", "safnari.nsa" -> SafnariNsa))
 
   "A JAX WS client" should {
-
-    val NsiHeader = new Holder(new CommonHeaderType()
-      .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
-      .withProtocolVersion("2")
-      .withRequesterNSA("urn:ogf:network:surfnet")
-      .withProviderNSA("urn:ogf:network:safnari"))
 
     "be able to talk to the connection provider endpoint" in new WithServer(Application, ServerPort) {
       val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))
 
-      service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String], NsiHeader)
+      val header = new Holder(new CommonHeaderType()
+        .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
+        .withProtocolVersion("2")
+        .withRequesterNSA("urn:ogf:network:surfnet-fake-requester")
+        .withProviderNSA(SafnariNsa))
+
+      service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String], header)
     }
 
     "be able to talk to the connection requester endpoint" in new WithServer(Application, ServerPort) {
@@ -53,10 +54,10 @@ class JaxWsClientSpec extends helpers.Specification {
       val header = new Holder(new CommonHeaderType()
         .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
         .withProtocolVersion("2")
-        .withRequesterNSA("urn:ogf:network:surfnet")
-        .withProviderNSA("urn:ogf:network:safnari"))
+        .withRequesterNSA(SafnariNsa)
+        .withProviderNSA("urn:ogf:network:surfnet-fake-provider"))
 
-      service.getConnectionServiceRequesterPort().reserveCommitConfirmed("123-abc", NsiHeader)
+      service.getConnectionServiceRequesterPort().reserveCommitConfirmed("123-abc", header)
     }
   }
 

@@ -2,7 +2,6 @@ package support
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream }
 import javax.xml.bind.{ JAXBContext, Unmarshaller }
-import scala.collection.JavaConverters.asScalaIteratorConverter
 import scala.util.{ Failure, Success, Try }
 import play.api.http.{ ContentTypeOf, Writeable }
 import play.api.libs.iteratee._
@@ -17,7 +16,6 @@ import javax.xml.transform.Source
 import java.util.UUID
 import java.net.URI
 import play.api.Logger
-import scala.collection.JavaConverters._
 import nl.surfnet.safnari._
 import nl.surfnet.safnari.NsiSoapConversions._
 import scala.reflect.ClassTag
@@ -29,6 +27,10 @@ import javax.xml.soap.SOAPConstants
 import scala.language.higherKinds
 
 object ExtraBodyParsers {
+
+  type NsiRequesterAction = NsiRequesterMessage[NsiRequesterOperation] => Future[NsiRequesterMessage[NsiAcknowledgement]]
+  type NsiProviderAction = NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]
+
   implicit val NsiMessageContentType: ContentTypeOf[NsiMessage[_]] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
   implicit def NsiMessageWriteable[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): Writeable[T] = Writeable { message =>
@@ -39,11 +41,31 @@ object ExtraBodyParsers {
     }, bytes => bytes)
   }
 
-  def NsiProviderEndPoint(action: NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]): Action[NsiProviderMessage[NsiProviderOperation]] =
-    NsiEndPoint(nsiProviderOperation)(action)(NsiProviderMessageToDocument[NsiAcknowledgement](None))
+  def NsiProviderEndPoint(providerNsa: String)(action: NsiProviderAction): Action[NsiProviderMessage[NsiProviderOperation]] =
+    NsiEndPoint(nsiProviderOperation)(validateProviderNsa(providerNsa, action))(NsiProviderMessageToDocument[NsiAcknowledgement](None))
 
-  def NsiRequesterEndPoint(action: NsiRequesterMessage[NsiRequesterOperation] => Future[NsiRequesterMessage[NsiAcknowledgement]]): Action[NsiRequesterMessage[NsiRequesterOperation]] =
-    NsiEndPoint(nsiRequesterOperation)(action)(NsiRequesterMessageToDocument[NsiAcknowledgement](None))
+  def NsiRequesterEndPoint(requesterNsa: String)(action: NsiRequesterAction): Action[NsiRequesterMessage[NsiRequesterOperation]] =
+    NsiEndPoint(nsiRequesterOperation)(validateRequesterNsa(requesterNsa, action))(NsiRequesterMessageToDocument[NsiAcknowledgement](None))
+
+  private def validateProviderNsa(providerNsa: String, action: NsiProviderAction) : NsiProviderAction = { message =>
+    if (message.headers.providerNSA == providerNsa) action(message)
+    else {
+      Logger.info(s"The providerNSA '${message.headers.providerNSA}' does not match the expected providerNSA '$providerNsa'")
+      val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(providerNsa, "providerNSA" -> message.headers.providerNSA))
+      val response = message ackWithCorrectedProviderNsa (providerNsa, serviceException)
+      Future.successful(response)
+    }
+  }
+
+  private def validateRequesterNsa(requesterNsa: String, action: NsiRequesterAction): NsiRequesterAction = { message =>
+    if (message.headers.requesterNSA == requesterNsa) action(message)
+    else {
+      Logger.info(s"The requesterNSA '${message.headers.requesterNSA}' does not match the expected requesterNSA '$requesterNsa'")
+      val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(requesterNsa, "requesterNSA" -> message.headers.requesterNSA))
+      val response = message ackWithCorrectedRequesterNsa (requesterNsa, serviceException)
+      Future.successful(response)
+    }
+  }
 
   def NsiEndPoint[M, T[_] <: NsiMessage[_]](parser: BodyParser[T[M]])(action: T[M] => Future[T[NsiAcknowledgement]])(implicit conversion: Conversion[T[NsiAcknowledgement], Document]) = Action.async(parser) { request =>
     action(request.body).map { ack =>

@@ -2,6 +2,9 @@ package nl.surfnet.safnari
 
 import java.net.URI
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._07.framework.types.VariablesType
+import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairType
+import scala.collection.JavaConverters._
 
 object NsiHeaders {
   val ProviderProtocolVersion: URI = URI.create("application/vnd.ogf.nsi.cs.v2.provider+soap")
@@ -18,17 +21,38 @@ sealed trait NsiMessage[+T] {
   def correlationId: CorrelationId = headers.correlationId
 }
 final case class NsiProviderMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
-  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiProviderMessage(headers.forSyncAck.copy(protocolVersion = NsiHeaders.ProviderProtocolVersion), ack)
+  def ack(acknowledgement: NsiAcknowledgement = GenericAck()): NsiProviderMessage[NsiAcknowledgement] = ack(headers, acknowledgement)
+
+  def ackWithCorrectedProviderNsa(providerNsa: String, acknowledgement: NsiAcknowledgement = GenericAck()): NsiProviderMessage[NsiAcknowledgement] =
+    ack(headers.copy(providerNSA = providerNsa), acknowledgement)
+
+  private def ack(ackHeaders: NsiHeaders, ack: NsiAcknowledgement) =
+    NsiProviderMessage(ackHeaders.forSyncAck.copy(protocolVersion = NsiHeaders.ProviderProtocolVersion), ack)
+
   def reply(reply: NsiRequesterOperation) = NsiRequesterMessage(headers.forAsyncReply, reply)
 }
 final case class NsiRequesterMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
-  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiRequesterMessage(headers.forSyncAck.copy(protocolVersion = NsiHeaders.RequesterProtocolVersion), ack)
+  def ack(acknowledgement: NsiAcknowledgement = GenericAck()): NsiRequesterMessage[NsiAcknowledgement] = ack(headers, acknowledgement)
+
+  def ackWithCorrectedRequesterNsa(requesterNsa: String, acknowledgement: NsiAcknowledgement = GenericAck()): NsiRequesterMessage[NsiAcknowledgement] =
+    ack(headers.copy(requesterNSA = requesterNsa), acknowledgement)
+
+  private def ack(ackHeaders: NsiHeaders, ack: NsiAcknowledgement) =
+    NsiRequesterMessage(ackHeaders.forSyncAck.copy(protocolVersion = NsiHeaders.RequesterProtocolVersion), ack)
 }
 
 final case class NsiError(id: String, description: String, text: String) {
   override def toString = s"$id: $description: $text"
 
-  def toServiceException(nsaId: String) = new ServiceExceptionType().withErrorId(id).withText(text).withNsaId(nsaId)
+  def toServiceException(nsaId: String, args: (String, String)*) = {
+    val variables = args.map { case (t, v) => new TypeValuePairType().withType(t).withValue(v) }
+
+    new ServiceExceptionType()
+      .withErrorId(id)
+      .withText(text)
+      .withNsaId(nsaId)
+      .withVariables(new VariablesType().withVariable(variables.asJava))
+  }
 }
 object NsiError {
   val PayloadError = NsiError("100", "PAYLOAD_ERROR", "")

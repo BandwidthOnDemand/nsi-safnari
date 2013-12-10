@@ -29,7 +29,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
 
   override def serviceUrl: String = ConnectionProvider.serviceUrl
 
-  def request = NsiProviderEndPoint {
+  def request = NsiProviderEndPoint(Configuration.Nsa) {
     case message @ NsiProviderMessage(headers, query: QueryRecursive)       => handleQueryRecursive(NsiProviderMessage(headers, query))(ConnectionProvider.replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, query: NsiProviderQuery)     => handleQuery(query, headers.requesterNSA)(ConnectionProvider.replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(ConnectionProvider.replyToClient(headers)).map(message.ack)
