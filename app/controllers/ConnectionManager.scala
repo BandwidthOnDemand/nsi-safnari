@@ -128,21 +128,17 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
       case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) =>
         queryRequesters += (query.correlationId -> sender)
-
         for {
           outbounds <- connection.queryRecursive(query)
           outbound <- outbounds
         } output ! outbound
 
-      case inbound @ FromProvider(NsiRequesterMessage(_, _: NsiQueryRecursiveResponse)) =>
-        for {
-          messages <- connection.queryRecursiveResult(inbound)
-          msg <- messages
-          requester <- queryRequesters.get(msg.correlationId)
-        } {
-          queryRequesters -= msg.correlationId
-          requester ! msg
-        }
+      case queryRecursiveResponse @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) =>
+        receivedQueryRecursiveResponse(queryRecursiveResponse)
+
+      case queryRecursiveResponse @ FromProvider(NsiRequesterMessage(_, _: Error)) =>
+        // the only error we can receive as a requester is a response to a query recursive request
+        receivedQueryRecursiveResponse(queryRecursiveResponse)
 
       case inbound: InboundMessage =>
         val result = PersistMessages(process)(inbound)
@@ -183,6 +179,16 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
         sender ! result
     }
+
+    private def receivedQueryRecursiveResponse(inbound: FromProvider): Unit =
+      for {
+        messages <- connection.queryRecursiveResult(inbound)
+        msg <- messages
+        requester <- queryRequesters.get(msg.correlationId)
+      } {
+        queryRequesters -= msg.correlationId
+        requester ! msg
+      }
 
     private def schedulePassedEndTimeMessage(): Unit = {
       endTimeCancellable.foreach(_.cancel())

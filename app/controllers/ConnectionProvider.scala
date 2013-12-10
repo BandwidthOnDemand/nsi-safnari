@@ -20,6 +20,7 @@ import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
 import org.ogf.schemas.nsi._2013._07.connection.types.QueryRecursiveResultType
+import org.ogf.schemas.nsi._2013._07.connection.types.GenericErrorType
 
 class ConnectionProvider(connectionManager: ConnectionManager) extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -53,12 +54,12 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       Future.traverse(cs)(c => (c ? FromRequester(message)).mapTo[ToRequester])
     }
 
+    // FIXME remove println, add error type
     answers onComplete {
       case Failure(e) => println(s"Answers Future failed: $e")
       case Success(list) =>
         val resultTypes = list.foldLeft(List[QueryRecursiveResultType]())((resultTypes, answer) => answer match {
           case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultTypes ++ resultType
-          case ToRequester(NsiRequesterMessage(_, QueryRecursiveFailed(e))) => resultTypes
         })
 
         replyTo(QueryRecursiveConfirmed(resultTypes))
@@ -89,7 +90,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       val connection = connectionManager.get(q.connectionId)
       val ack = connection.map(queryNotifications(_, q.start, q.end).map(QueryNotificationSyncConfirmed))
 
-      ack.getOrElse(Future.successful(QueryNotificationSyncFailed(new QueryFailedType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
     case q: QueryRecursive =>
       sys.error("Should be handled by its own handler")
   }
@@ -135,10 +136,10 @@ object ConnectionProvider {
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiNotification => Unit) extends Actor {
     def receive = {
-      case pceRequest: ToPce                     => pceRequester forward pceRequest
-      case nsiRequest: ToProvider                => nsiRequester forward nsiRequest
-      case ToRequester(NsiRequesterMessage(headers, message: NsiNotification)) => notify(message)
-      case ToRequester(response)                 => handleResponse(response)
+      case pceRequest: ToPce                                             => pceRequester forward pceRequest
+      case nsiRequest: ToProvider                                        => nsiRequester forward nsiRequest
+      case ToRequester(NsiRequesterMessage(_, message: NsiNotification)) => notify(message)
+      case ToRequester(response)                                         => handleResponse(response)
     }
   }
 

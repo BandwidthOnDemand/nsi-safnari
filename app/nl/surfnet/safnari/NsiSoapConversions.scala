@@ -70,8 +70,8 @@ object NsiSoapConversions {
         marshal(typesFactory.createQuerySummarySyncConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava)))
       case QueryNotificationSyncConfirmed(notifications) =>
         marshal(typesFactory.createQueryNotificationSyncConfirmed(new QueryNotificationConfirmedType().withErrorEventOrReserveTimeoutOrDataPlaneStateChange(notifications.asJava)))
-      case QueryNotificationSyncFailed(fault) =>
-        marshal(typesFactory.createQueryNotificationSyncFailed(fault))
+      case ErrorAck(error) =>
+        marshal(typesFactory.createError(error))
       case ServiceException(exception) =>
         // Wrap the service exception in a SOAP Fault element using the Java DOM API.
         marshal(typesFactory.createServiceException(exception)).right.flatMap { detailBody =>
@@ -95,8 +95,8 @@ object NsiSoapConversions {
         Right(QuerySummarySyncConfirmed(body.getReservation().asScala.toVector)) },
       "queryNotificationSyncConfirmed" -> NsiMessageParser { (body: QueryNotificationConfirmedType) =>
         Right(QueryNotificationSyncConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector)) },
-      "queryNotificationSyncFailed" -> NsiMessageParser { (body: org.ogf.schemas.nsi._2013._07.connection.provider.QueryNotificationSyncFailed) =>
-        Right(QueryNotificationSyncFailed(body.getFaultInfo())) },
+      "error" -> NsiMessageParser { (body: GenericErrorType) =>
+        Right(ErrorAck(body)) },
       "serviceException" -> NsiMessageParser { (body: ServiceExceptionType) =>
         Right(ServiceException(body)) }))
   }
@@ -176,10 +176,9 @@ object NsiSoapConversions {
       case ReleaseConfirmed(connectionId)            => typesFactory.createReleaseConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
       case TerminateConfirmed(connectionId)          => typesFactory.createTerminateConfirmed(new GenericConfirmedType().withConnectionId(connectionId))
       case QuerySummaryConfirmed(reservations)       => typesFactory.createQuerySummaryConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava))
-      case QuerySummaryFailed(failed)                => typesFactory.createQuerySummaryFailed(failed)
       case QueryRecursiveConfirmed(reservations)     => typesFactory.createQueryRecursiveConfirmed(new QueryRecursiveConfirmedType().withReservation(reservations.asJava))
-      case QueryRecursiveFailed(failed)              => typesFactory.createQueryRecursiveFailed(failed)
       case QueryNotificationConfirmed(notifications) => typesFactory.createQueryNotificationConfirmed(new QueryNotificationConfirmedType().withErrorEventOrReserveTimeoutOrDataPlaneStateChange(notifications.asJava))
+      case Error(error)                              => typesFactory.createError(error)
       case DataPlaneStateChange(notification)        => typesFactory.createDataPlaneStateChange(notification)
       case ErrorEvent(error)                         => typesFactory.createErrorEvent(error)
       case MessageDeliveryTimeout(timeout)           => typesFactory.createMessageDeliveryTimeout(timeout)
@@ -196,10 +195,9 @@ object NsiSoapConversions {
       "releaseConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ReleaseConfirmed(body.getConnectionId)) },
       "terminateConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(TerminateConfirmed(body.getConnectionId)) },
       "querySummaryConfirmed" -> NsiMessageParser { (body: QuerySummaryConfirmedType) => Right(QuerySummaryConfirmed(body.getReservation().asScala.toVector)) },
-      "querySummaryFailed" -> NsiMessageParser { (body: QueryFailedType) => Right(QuerySummaryFailed(body)) },
       "queryRecursiveConfirmed" -> NsiMessageParser { (body: QueryRecursiveConfirmedType) => Right(QueryRecursiveConfirmed(body.getReservation().asScala.toVector)) },
-      "queryRecursiveFailed" -> NsiMessageParser { (body: QueryFailedType) => Right(QueryRecursiveFailed(body)) },
-      "queryNotificationConfirmed" -> NsiMessageParser { body: QueryNotificationConfirmedType => Right(QueryNotificationConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector)) },
+      "queryNotificationConfirmed" -> NsiMessageParser { (body: QueryNotificationConfirmedType) => Right(QueryNotificationConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector)) },
+      "error" -> NsiMessageParser { (body: GenericErrorType) => Right(Error(body)) },
       "dataPlaneStateChange" -> NsiMessageParser { (body: DataPlaneStateChangeRequestType) => Right(DataPlaneStateChange(body)) },
       "errorEvent" -> NsiMessageParser { (body: ErrorEventType) => Right(ErrorEvent(body)) },
       "messageDeliveryTimeout" -> NsiMessageParser { (body: MessageDeliveryTimeoutRequestType) => Right(MessageDeliveryTimeout(body)) }))

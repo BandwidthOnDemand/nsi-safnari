@@ -54,12 +54,14 @@ class QueryRecursiveStateMachine(
   }
 
   when(Collecting) {
-    case Event(FromProvider(NsiRequesterMessage(headers, queryResult: NsiQueryRecursiveResponse)), data) =>
-      val childState = queryResult match {
-        case QueryRecursiveConfirmed(_) => Collected
-        case QueryRecursiveFailed(_) => Failed
-      }
-      val newData = data.updateChild(headers.correlationId, childState, queryResult)
+    case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))), data) =>
+      val newData = data.updateChild(headers.correlationId, Failed, Error(new GenericErrorType().withServiceException(serviceException)))
+      goto(newData.aggregatedState) using newData
+    case Event(FromProvider(NsiRequesterMessage(headers, queryResult: QueryRecursiveConfirmed)), data) =>
+      val newData = data.updateChild(headers.correlationId, Collected, queryResult)
+      goto(newData.aggregatedState) using newData
+    case Event(FromProvider(NsiRequesterMessage(headers, error: Error)), data) =>
+      val newData = data.updateChild(headers.correlationId, Failed, error)
       goto(newData.aggregatedState) using newData
   }
 
@@ -92,7 +94,7 @@ class QueryRecursiveStateMachine(
       Seq(ToRequester(query reply QueryRecursiveConfirmed(queryRecursiveResultType(childRecursiveTypes) :: Nil)))
     case Collecting -> Failed =>
       val queryFailed = nextStateData.answers.collectFirst {
-        case (connectionId, failed: QueryRecursiveFailed) => failed
+        case (connectionId, failed: Error) => failed
       }
 
       Seq(ToRequester(query reply queryFailed.get))

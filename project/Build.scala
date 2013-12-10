@@ -10,7 +10,7 @@ object ApplicationBuild extends Build {
   val appDependencies = Seq(
     jdbc,
     anorm,
-    "nl.surfnet.bod" % "bod-nsi" % "0.2.4",
+    "nl.surfnet.bod" % "bod-nsi" % "0.3.0-SNAPSHOT",
     "org.scala-stm" %% "scala-stm" % "0.7",
     "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
     "org.scalacheck" %% "scalacheck" % "1.10.1" % "test",
