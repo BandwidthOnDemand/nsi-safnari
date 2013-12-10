@@ -2,6 +2,9 @@ package nl.surfnet.safnari
 
 import java.net.URI
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._07.framework.types.VariablesType
+import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairType
+import scala.collection.JavaConverters._
 
 object NsiHeaders {
   val ProviderProtocolVersion: URI = URI.create("application/vnd.ogf.nsi.cs.v2.provider+soap")
@@ -41,7 +44,15 @@ final case class NsiRequesterMessage[+T](headers: NsiHeaders, body: T) extends N
 final case class NsiError(id: String, description: String, text: String) {
   override def toString = s"$id: $description: $text"
 
-  def toServiceException(nsaId: String) = new ServiceExceptionType().withErrorId(id).withText(text).withNsaId(nsaId)
+  def toServiceException(nsaId: String, args: (String, String)*) = {
+    val variables = args.map { case (t, v) => new TypeValuePairType().withType(t).withValue(v) }
+
+    new ServiceExceptionType()
+      .withErrorId(id)
+      .withText(text)
+      .withNsaId(nsaId)
+      .withVariables(new VariablesType().withVariable(variables.asJava))
+  }
 }
 object NsiError {
   val PayloadError = NsiError("100", "PAYLOAD_ERROR", "")

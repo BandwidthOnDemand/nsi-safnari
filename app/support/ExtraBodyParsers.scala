@@ -2,7 +2,6 @@ package support
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream }
 import javax.xml.bind.{ JAXBContext, Unmarshaller }
-import scala.collection.JavaConverters.asScalaIteratorConverter
 import scala.util.{ Failure, Success, Try }
 import play.api.http.{ ContentTypeOf, Writeable }
 import play.api.libs.iteratee._
@@ -17,7 +16,6 @@ import javax.xml.transform.Source
 import java.util.UUID
 import java.net.URI
 import play.api.Logger
-import scala.collection.JavaConverters._
 import nl.surfnet.safnari._
 import nl.surfnet.safnari.NsiSoapConversions._
 import scala.reflect.ClassTag
@@ -53,7 +51,8 @@ object ExtraBodyParsers {
     if (message.headers.providerNSA == providerNsa) action(message)
     else {
       Logger.info(s"The providerNSA '${message.headers.providerNSA}' does not match the expected providerNSA '$providerNsa'")
-      val response = message ackWithCorrectedProviderNsa (providerNsa, ServiceException(NsiError.UnsupportedParameter.toServiceException(providerNsa)))
+      val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(providerNsa, "providerNSA" -> message.headers.providerNSA))
+      val response = message ackWithCorrectedProviderNsa (providerNsa, serviceException)
       Future.successful(response)
     }
   }
@@ -62,7 +61,8 @@ object ExtraBodyParsers {
     if (message.headers.requesterNSA == requesterNsa) action(message)
     else {
       Logger.info(s"The requesterNSA '${message.headers.requesterNSA}' does not match the expected requesterNSA '$requesterNsa'")
-      val response = message ackWithCorrectedRequesterNsa (requesterNsa, ServiceException(NsiError.UnsupportedParameter.toServiceException(requesterNsa)))
+      val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(requesterNsa, "requesterNSA" -> message.headers.requesterNSA))
+      val response = message ackWithCorrectedRequesterNsa (requesterNsa, serviceException)
       Future.successful(response)
     }
   }
