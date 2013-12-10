@@ -29,6 +29,10 @@ import javax.xml.soap.SOAPConstants
 import scala.language.higherKinds
 
 object ExtraBodyParsers {
+
+  type NsiRequesterAction = NsiRequesterMessage[NsiRequesterOperation] => Future[NsiRequesterMessage[NsiAcknowledgement]]
+  type NsiProviderAction = NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]
+
   implicit val NsiMessageContentType: ContentTypeOf[NsiMessage[_]] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
   implicit def NsiMessageWriteable[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): Writeable[T] = Writeable { message =>
@@ -39,20 +43,29 @@ object ExtraBodyParsers {
     }, bytes => bytes)
   }
 
-  def NsiProviderEndPoint(providerNsa: String)(action: NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]): Action[NsiProviderMessage[NsiProviderOperation]] =
+  def NsiProviderEndPoint(providerNsa: String)(action: NsiProviderAction): Action[NsiProviderMessage[NsiProviderOperation]] =
     NsiEndPoint(nsiProviderOperation)(validateProviderNsa(providerNsa, action))(NsiProviderMessageToDocument[NsiAcknowledgement](None))
 
-  private def validateProviderNsa(providerNsa: String, action: NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]]) : NsiProviderMessage[NsiProviderOperation] => Future[NsiProviderMessage[NsiAcknowledgement]] = { message =>
+  def NsiRequesterEndPoint(requesterNsa: String)(action: NsiRequesterAction): Action[NsiRequesterMessage[NsiRequesterOperation]] =
+    NsiEndPoint(nsiRequesterOperation)(validateRequesterNsa(requesterNsa, action))(NsiRequesterMessageToDocument[NsiAcknowledgement](None))
+
+  private def validateProviderNsa(providerNsa: String, action: NsiProviderAction) : NsiProviderAction = { message =>
     if (message.headers.providerNSA == providerNsa) action(message)
     else {
-      Logger.debug(s"The providerNSA '${message.headers.providerNSA}' does not match the expected providerNSA '$providerNsa'")
+      Logger.info(s"The providerNSA '${message.headers.providerNSA}' does not match the expected providerNSA '$providerNsa'")
       val response = message ackWithCorrectedProviderNsa (providerNsa, ServiceException(NsiError.UnsupportedParameter.toServiceException(providerNsa)))
       Future.successful(response)
     }
   }
 
-  def NsiRequesterEndPoint(action: NsiRequesterMessage[NsiRequesterOperation] => Future[NsiRequesterMessage[NsiAcknowledgement]]): Action[NsiRequesterMessage[NsiRequesterOperation]] =
-    NsiEndPoint(nsiRequesterOperation)(action)(NsiRequesterMessageToDocument[NsiAcknowledgement](None))
+  private def validateRequesterNsa(requesterNsa: String, action: NsiRequesterAction): NsiRequesterAction = { message =>
+    if (message.headers.requesterNSA == requesterNsa) action(message)
+    else {
+      Logger.info(s"The requesterNSA '${message.headers.requesterNSA}' does not match the expected requesterNSA '$requesterNsa'")
+      val response = message ackWithCorrectedRequesterNsa (requesterNsa, ServiceException(NsiError.UnsupportedParameter.toServiceException(requesterNsa)))
+      Future.successful(response)
+    }
+  }
 
   def NsiEndPoint[M, T[_] <: NsiMessage[_]](parser: BodyParser[T[M]])(action: T[M] => Future[T[NsiAcknowledgement]])(implicit conversion: Conversion[T[NsiAcknowledgement], Document]) = Action.async(parser) { request =>
     action(request.body).map { ack =>

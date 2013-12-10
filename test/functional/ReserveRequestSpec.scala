@@ -36,7 +36,7 @@ class ReserveRequestSpec extends helpers.Specification {
 
   object Global extends controllers.GlobalSettings {
     override def onRouteRequest(request: RequestHeader): Option[Handler] = request.path match {
-      case "/fake/requester" => Some(NsiRequesterEndPoint {
+      case "/fake/requester" => Some(NsiRequesterEndPoint("fake-requester-nsa") {
         case message @ NsiRequesterMessage(headers, confirm: ReserveConfirmed) =>
           reserveConfirmed.success(NsiRequesterMessage(headers, confirm))
           Future.successful(message.ack())
@@ -44,7 +44,7 @@ class ReserveRequestSpec extends helpers.Specification {
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
           Future.successful(response.ack(ServiceException(new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response"))))
       })
-      case "/fake/provider" => Some(NsiProviderEndPoint("provider-nsa") {
+      case "/fake/provider" => Some(NsiProviderEndPoint("fake-provider-nsa") {
         case message @ NsiProviderMessage(headers, reserve: InitialReserve) =>
           val connectionId = newConnectionId
           headers.replyTo.foreach { replyTo =>
@@ -62,7 +62,7 @@ class ReserveRequestSpec extends helpers.Specification {
           val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
             case JsSuccess(request: PathComputationRequest, _) =>
-              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("provider-nsa", URI.create(FakeProviderUri), NoAuthentication), request.serviceType) :: Nil)
+              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri), NoAuthentication), request.serviceType) :: Nil)
               WS.url(request.replyTo.toASCIIString()).post(Json.toJson(response))
               Results.Ok
             case _ =>
@@ -77,11 +77,13 @@ class ReserveRequestSpec extends helpers.Specification {
   val FakePceUri = s"http://localhost:$ServerPort/fake/pce"
   val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
   val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"
+  val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
   def Application = FakeApplication(additionalConfiguration = Map(
     "nsi.actor" -> "real",
     "pce.actor" -> "real",
     "pce.endpoint" -> FakePceUri,
-    "nsi.base.url" -> s"http://localhost:$ServerPort"), withGlobal = Some(Global))
+    "nsi.base.url" -> s"http://localhost:$ServerPort",
+    "safnari.nsa" -> SafnariNsa), withGlobal = Some(Global))
 
   def marshal(p2ps: P2PServiceBaseType): Element = {
     val jaxb = new org.ogf.schemas.nsi._2013._07.services.point2point.ObjectFactory().createP2Ps(p2ps)
@@ -95,8 +97,8 @@ class ReserveRequestSpec extends helpers.Specification {
     val NsiHeader = new Holder(new CommonHeaderType()
       .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
       .withProtocolVersion("2")
-      .withRequesterNSA("urn:ogf:network:surfnet")
-      .withProviderNSA("urn:ogf:network:nsa:surfnet-nsi-safnari")
+      .withRequesterNSA("fake-requester-nsa")
+      .withProviderNSA(SafnariNsa)
       .withReplyTo(FakeRequesterUri))
     val ConnectionId = new Holder[String]()
     val Criteria = new ReservationRequestCriteriaType().

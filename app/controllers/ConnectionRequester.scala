@@ -26,7 +26,7 @@ class ConnectionRequester(connectionManager: ConnectionManager) extends Controll
 
   override def serviceUrl: String = ConnectionRequester.serviceUrl
 
-  def request = NsiRequesterEndPoint {
+  def request = NsiRequesterEndPoint(Configuration.Nsa) {
     case message @ NsiRequesterMessage(headers, notification: NsiNotification) =>
       val connection = connectionManager.findByChildConnectionId(notification.connectionId)
 

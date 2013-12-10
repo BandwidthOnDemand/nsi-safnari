@@ -18,12 +18,24 @@ sealed trait NsiMessage[+T] {
   def correlationId: CorrelationId = headers.correlationId
 }
 final case class NsiProviderMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
-  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiProviderMessage(headers.forSyncAck.copy(protocolVersion = NsiHeaders.ProviderProtocolVersion), ack)
-  def ackWithCorrectedProviderNsa(providerNsa: String, ack: NsiAcknowledgement = GenericAck()) = NsiProviderMessage(headers.forSyncAck.copy(protocolVersion = NsiHeaders.ProviderProtocolVersion, providerNSA = providerNsa), ack)
+  def ack(acknowledgement: NsiAcknowledgement = GenericAck()): NsiProviderMessage[NsiAcknowledgement] = ack(headers, acknowledgement)
+
+  def ackWithCorrectedProviderNsa(providerNsa: String, acknowledgement: NsiAcknowledgement = GenericAck()): NsiProviderMessage[NsiAcknowledgement] =
+    ack(headers.copy(providerNSA = providerNsa), acknowledgement)
+
+  private def ack(ackHeaders: NsiHeaders, ack: NsiAcknowledgement) =
+    NsiProviderMessage(ackHeaders.forSyncAck.copy(protocolVersion = NsiHeaders.ProviderProtocolVersion), ack)
+
   def reply(reply: NsiRequesterOperation) = NsiRequesterMessage(headers.forAsyncReply, reply)
 }
 final case class NsiRequesterMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
-  def ack(ack: NsiAcknowledgement = GenericAck()) = NsiRequesterMessage(headers.forSyncAck.copy(protocolVersion = NsiHeaders.RequesterProtocolVersion), ack)
+  def ack(acknowledgement: NsiAcknowledgement = GenericAck()): NsiRequesterMessage[NsiAcknowledgement] = ack(headers, acknowledgement)
+
+  def ackWithCorrectedRequesterNsa(requesterNsa: String, acknowledgement: NsiAcknowledgement = GenericAck()): NsiRequesterMessage[NsiAcknowledgement] =
+    ack(headers.copy(requesterNSA = requesterNsa), acknowledgement)
+
+  private def ack(ackHeaders: NsiHeaders, ack: NsiAcknowledgement) =
+    NsiRequesterMessage(ackHeaders.forSyncAck.copy(protocolVersion = NsiHeaders.RequesterProtocolVersion), ack)
 }
 
 final case class NsiError(id: String, description: String, text: String) {
