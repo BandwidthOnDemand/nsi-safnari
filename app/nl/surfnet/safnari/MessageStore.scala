@@ -23,7 +23,7 @@ object StoredMessage {
     override def reads(js: JsValue): JsResult[A] = Json.fromJson[B](js).flatMap { b =>
       conversion.invert(b).fold(error => JsError(ValidationError("error.conversion.failed", error)), JsSuccess(_))
     }
-    override def writes(a: A): JsValue = Json.toJson(conversion(a).right.get)
+    override def writes(a: A): JsValue = Json.toJson(conversion(a).fold(error => sys.error(s"failed to write message $a: $error"), identity))
   }
 
   private val Inbound = "INBOUND"

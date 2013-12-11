@@ -58,8 +58,8 @@ object NsiMessageSpec {
       val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.RequesterProtocolVersion)
       FromProvider(NsiRequesterMessage(headers, operation))
     }
-    def timeout(correlationId: CorrelationId, timestamp: DateTime) = {
-      MessageDeliveryFailure(correlationId, None, URI.create("http://nsi.local/"), timestamp, "message-delivery-timeout")
+    def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: DateTime) = {
+      MessageDeliveryFailure(correlationId, None, originalCorrelationId, URI.create("http://nsi.local/"), timestamp, "message-delivery-timeout")
     }
   }
   object agg {
@@ -84,8 +84,8 @@ object NsiMessageSpec {
     def fail(correlationId: CorrelationId, message: String = "error-message") = {
       FromPce(PathComputationFailed(correlationId, message))
     }
-    def timeout(correlationId: CorrelationId, timestamp: DateTime) = {
-      MessageDeliveryFailure(correlationId, None, URI.create("http://pce.local/"), timestamp, "message-delivery-timeout")
+    def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: DateTime) = {
+      MessageDeliveryFailure(correlationId, None, originalCorrelationId, URI.create("http://pce.local/"), timestamp, "message-delivery-timeout")
     }
   }
 

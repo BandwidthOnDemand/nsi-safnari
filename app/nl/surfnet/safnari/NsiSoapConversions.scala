@@ -326,7 +326,7 @@ object NsiSoapConversions {
   private def NsiHeadersAndBodyToDocument[T](implicit bodyConversion: Conversion[T, Element]) = Conversion.build[(Option[NsiHeaders], T), Document] {
     case (headers, body) =>
       for {
-        headersElement <- headers.map(Conversion[NsiHeaders, Element].apply).sequence.right
+        headersElementOption <- headers.map(Conversion[NsiHeaders, Element].apply).sequence.right
         bodyElement <- bodyConversion(body).right
         document <- tryEither {
           val document = createDocument
@@ -334,8 +334,8 @@ object NsiSoapConversions {
           val soapHeader = soapEnvelope.appendChild(document.createElementNS(SoapNamespaceUri, "soapenv:Header"))
           val soapBody = soapEnvelope.appendChild(document.createElementNS(SoapNamespaceUri, "soapenv:Body"))
 
-          headersElement.foreach(it => soapHeader.appendChild(document.adoptNode(it)))
-          soapBody.appendChild(document.adoptNode(bodyElement))
+          headersElementOption.foreach(it => soapHeader.appendChild(document.importNode(it, true)))
+          soapBody.appendChild(document.importNode(bodyElement, true))
 
           document
         }.right

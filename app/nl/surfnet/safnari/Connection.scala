@@ -199,7 +199,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       val event = MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
         .withConnectionId(id)
         .withNotificationId(newNotificationId)
-        .withCorrelationId(failure.correlationId.toString)
+        .withCorrelationId(failure.originalCorrelationId.toString)
         .withTimeStamp(failure.timestamp.toXmlGregorianCalendar))
       Some(Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event))))
     case _ =>

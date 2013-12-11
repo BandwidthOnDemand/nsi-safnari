@@ -47,8 +47,8 @@ final case class ToPce(message: PceRequest) extends OutboundMessage {
   override def correlationId = message.correlationId
 }
 
-final case class MessageDeliveryFailure(override val correlationId: CorrelationId, connectionId: Option[ConnectionId], uri: URI, timestamp: DateTime, message: String) extends InboundMessage {
-  override def toShortString = s"${getClass().getSimpleName()}(correlationId=$correlationId, connectionId=$connectionId, uri=$uri, timestamp=$timestamp, message=$message)"
+final case class MessageDeliveryFailure(override val correlationId: CorrelationId, connectionId: Option[ConnectionId], originalCorrelationId: CorrelationId, uri: URI, timestamp: DateTime, message: String) extends InboundMessage {
+  override def toShortString = s"${getClass().getSimpleName()}(correlationId=$correlationId, connectionId=$connectionId, originalCorrelationId=$originalCorrelationId, uri=$uri, timestamp=$timestamp, message=$message)"
 }
 final case class PassedEndTime(override val correlationId: CorrelationId, connectionId: ConnectionId, timestamp: DateTime) extends InboundMessage {
   override def toShortString = s"${getClass().getSimpleName()}(correlationId=$correlationId, connectionId=$connectionId, timestamp=$timestamp)"

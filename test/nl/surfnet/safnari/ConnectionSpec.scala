@@ -173,7 +173,7 @@ class ConnectionSpec extends helpers.Specification {
       val TimeoutTimestamp = DateTime.now().plusMinutes(2)
       given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
-      when(pce.timeout(CorrelationId(0, 2), TimeoutTimestamp))
+      when(pce.timeout(CorrelationId(1, 1), CorrelationId(0, 2), TimeoutTimestamp))
 
       messages must contain(agg.notification(CorrelationId(0, 4), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
         .withConnectionId(ConnectionId)
@@ -203,11 +203,11 @@ class ConnectionSpec extends helpers.Specification {
         agg.request(CorrelationId(0, 4), InitialReserve(InitialReserveType, ConfirmCriteria, A.serviceType.service)),
         pce.confirm(CorrelationId(0, 3), A))
 
-      when(upa.timeout(CorrelationId(2, 7), TimeoutTimestamp))
+      when(upa.timeout(CorrelationId(2, 7), CorrelationId(0, 4), TimeoutTimestamp))
 
       messages must contain(agg.notification(CorrelationId(0, 6), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
         .withConnectionId(ConnectionId)
-        .withCorrelationId(CorrelationId(2, 7).toString)
+        .withCorrelationId(CorrelationId(0, 4).toString)
         .withNotificationId(1)
         .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
     }

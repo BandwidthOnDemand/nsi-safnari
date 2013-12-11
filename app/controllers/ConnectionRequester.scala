@@ -58,6 +58,9 @@ object ConnectionRequester {
   }
 
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
+    private val uuidGenerator = Uuid.randomUuidGenerator()
+    private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
+
     def receive = {
       case 'healthCheck =>
         sender ! Future.successful("NSI requester (Real)" -> true)
@@ -73,7 +76,7 @@ object ConnectionRequester {
             connection ! FromProvider(reply)
           case Failure(exception) =>
             // FIXME maybe handle timeouts separately?
-            connection ! MessageDeliveryFailure(headers.correlationId, connectionId, provider.url, DateTime.now(), exception.toString)
+            connection ! MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, DateTime.now(), exception.toString)
         }
 
         val response = NsiWebService.callProvider(provider, message)
@@ -83,7 +86,7 @@ object ConnectionRequester {
           case Failure(exception) =>
             Logger.warn(s"communication failure calling $provider", exception)
             continuations.unregister(headers.correlationId)
-            connection ! MessageDeliveryFailure(headers.correlationId, connectionId, provider.url, DateTime.now(), exception.toString)
+            connection ! MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, DateTime.now(), exception.toString)
           case Success(ack @ NsiProviderMessage(_, ServiceException(_))) =>
             continuations.unregister(headers.correlationId)
             connection ! AckFromProvider(ack)
