@@ -49,8 +49,6 @@ package object safnari {
     def deCapitalize: String = str.take(1).toLowerCase + str.drop(1)
   }
 
-  def tryEither[A](f: => A): Either[String, A] = Try(f).toEither.left.map(_.toString)
-
   implicit object XmlGregorianCalendarOrdering extends Ordering[XMLGregorianCalendar] {
     def compare(x: XMLGregorianCalendar, y: XMLGregorianCalendar): Int = x compare y
   }
@@ -88,23 +86,17 @@ package object safnari {
     def startTime = Option(schedule.getStartTime).map(_.toDateTime)
     def endTime = Option(schedule.getEndTime).map(_.toDateTime)
   }
-
-  implicit class OptionEitherOps[A, B](value: scala.Option[Either[A, B]]) {
-    def sequence: Either[A, scala.Option[B]] = value match {
-      case None           => Right(None)
-      case Some(Left(a))  => Left(a)
-      case Some(Right(b)) => Right(Some(b))
-    }
+  implicit class OptionOps[A](value: Option[A]) {
+    def toTry(ifNone: => Throwable): Try[A] = value.map(Success(_)).getOrElse(Failure(ifNone))
   }
-  implicit class EitherOptionOps[A, B](value: Either[A, Option[B]]) {
-    def sequence: Option[Either[A, B]] = value match {
-      case Left(a)        => Some(Left(a))
-      case Right(None)    => None
-      case Right(Some(b)) => Some(Right(b))
+  implicit class OptionTryOps[A](value: Option[Try[A]]) {
+    def sequence: Try[Option[A]] = value match {
+      case None => Success(None)
+      case Some(t) => t.map(Some(_))
     }
   }
   implicit val ReservationCriteriaConversion = Conversion.build[ReservationConfirmCriteriaType, ReservationRequestCriteriaType] { a =>
-    Right(new ReservationRequestCriteriaType().
+    Try(new ReservationRequestCriteriaType().
       withSchedule(a.getSchedule()).
       withAny(a.getAny()).
       withServiceType(a.getServiceType()).
@@ -112,8 +104,8 @@ package object safnari {
       tap(_.getOtherAttributes().putAll(a.getOtherAttributes())))
   } { b =>
     for {
-      schedule <- Option(b.getSchedule()).toRight("schedule is required").right
-      serviceType <- Option(b.getServiceType()).toRight("serviceType is required").right
+      schedule <- Option(b.getSchedule()).toTry(ErrorMessageException("schedule is required"))
+      serviceType <- Option(b.getServiceType()).toTry(ErrorMessageException("serviceType is required"))
     } yield {
       new ReservationConfirmCriteriaType().
         withSchedule(schedule).

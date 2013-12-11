@@ -2,6 +2,8 @@ package nl.surfnet.safnari
 
 import org.w3c.dom.Document
 import javax.xml.parsers.DocumentBuilderFactory
+import scala.util.Failure
+import scala.util.Success
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class NsiSoapConversionsSpec extends helpers.Specification {
@@ -84,7 +86,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
 
       val requesterMessage = requestOperationToStringConversion.invert(reserveFailed)
 
-      requesterMessage must beRight
+      requesterMessage must beSuccessfulTry
     }
 
     "parse dataPlaneStateChange operation" in {
@@ -114,7 +116,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
 
       val requesterMessage = requestOperationToStringConversion.invert(message)
 
-      requesterMessage must beRight
+      requesterMessage must beSuccessfulTry
     }
 
     "parse SOAP fault without serviceException" in {
@@ -130,7 +132,9 @@ class NsiSoapConversionsSpec extends helpers.Specification {
 
       val requesterMessage = requestOperationToStringConversion.invert(soapFault)
 
-      requesterMessage must beLeft("SOAP fault without {http://schemas.ogf.org/nsi/2013/07/connection/types}serviceException. Fault string: Fault occurred while processing.")
+      requesterMessage must beLike {
+        case Failure(ErrorMessageException("SOAP fault without {http://schemas.ogf.org/nsi/2013/07/connection/types}serviceException. Fault string: Fault occurred while processing.")) => ok
+      }
     }
 
     "parse serviceException" in {
@@ -162,7 +166,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
       val requesterMessage = requestAckToStringConversion.invert(soapFault)
 
       requesterMessage must beLike {
-        case Right(NsiRequesterMessage(headers, ServiceException(exception))) =>
+        case Success(NsiRequesterMessage(headers, ServiceException(exception))) =>
           headers must_== NsiHeaders(
               CorrelationId.fromString("urn:uuid:5c716e15-c17c-481e-885d-c9a5c06e0436").get,
               "urn:ogf:network:nsa:surfnet-nsi-requester",
@@ -172,8 +176,8 @@ class NsiSoapConversionsSpec extends helpers.Specification {
           exception.getErrorId() must_== "103"
       }
 
-      requestAckToStringConversion(requesterMessage.right.get) must beLike {
-        case Right(xml) => xml must contain("<S:Fault") and contain("<errorId>103</errorId>")
+      requestAckToStringConversion(requesterMessage.get) must beLike {
+        case Success(xml) => xml must contain("<S:Fault") and contain("<errorId>103</errorId>")
       }
     }
 
@@ -198,7 +202,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
       val requesterMessage = requestAckToStringConversion.invert(soapFault)
 
       requesterMessage must beLike {
-        case Right(NsiRequesterMessage(headers, _)) =>
+        case Success(NsiRequesterMessage(headers, _)) =>
           headers must_== DefaultAckHeaders
       }
     }
@@ -206,11 +210,11 @@ class NsiSoapConversionsSpec extends helpers.Specification {
 
   "DOM to byte array conversion" should {
     "validate and parse byte array" in {
-      val Right(dom) = NsiXmlDocumentConversion.invert(input.getBytes("UTF-8"))
+      val Success(dom) = NsiXmlDocumentConversion.invert(input.getBytes("UTF-8"))
       dom must not(beNull)
       dom.getDocumentElement().getLocalName() must beEqualTo("Envelope")
 
-      NsiXmlDocumentConversion(dom).right.map(new String(_, "UTF-8")).right.get must beEqualTo(input)
+      NsiXmlDocumentConversion(dom).map(new String(_, "UTF-8")).get must beEqualTo(input)
     }
   }
 }

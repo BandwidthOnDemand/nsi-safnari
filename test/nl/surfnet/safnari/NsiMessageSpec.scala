@@ -20,7 +20,7 @@ object NsiMessageSpec {
 
   val Schedule = new ScheduleType().withStartTime(DateTime.now().plusMinutes(5).toXmlGregorianCalendar).withEndTime(DateTime.now().plusMinutes(30).toXmlGregorianCalendar)
   val ConfirmCriteria = new ReservationConfirmCriteriaType().withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
-  val RequestCriteria = Conversion.convert(ConfirmCriteria).right.get
+  val RequestCriteria = Conversion.convert(ConfirmCriteria).get
 
   def InitialReserveType = new ReserveType().withCriteria(RequestCriteria)
   val InitialReserveCorrelationId = helpers.Specification.newCorrelationId

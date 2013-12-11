@@ -204,7 +204,7 @@ class ReservationStateMachine(
             withDescription(data.description.orNull).
             withCriteria(criteria)
 
-          ToProvider(NsiProviderMessage(newNsiHeaders(segment.provider).copy(correlationId = correlationId), InitialReserve(reserveType, Conversion.invert(criteria).right.get, service)), segment.provider)
+          ToProvider(NsiProviderMessage(newNsiHeaders(segment.provider).copy(correlationId = correlationId), InitialReserve(reserveType, Conversion.invert(criteria).get, service)), segment.provider)
       }
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(failed(NsiError.NoPathFound)))

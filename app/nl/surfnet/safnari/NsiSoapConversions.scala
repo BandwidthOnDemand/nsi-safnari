@@ -8,6 +8,7 @@ import javax.xml.bind.JAXBElement
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.Source
 import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMResult
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
 import javax.xml.transform.stream.StreamSource
@@ -20,13 +21,15 @@ import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.SAXParseException
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
-import javax.xml.transform.dom.DOMResult
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 object NsiSoapConversions {
   implicit val ByteArrayToString = Conversion.build[Array[Byte], String] { bytes =>
-    tryEither(new String(bytes, "UTF-8"))
+    Try(new String(bytes, "UTF-8"))
   } { string =>
-    tryEither(string.getBytes("UTF-8"))
+    Try(string.getBytes("UTF-8"))
   }
 
   val NsiXmlDocumentConversion = XmlDocumentConversion("wsdl/soap/soap-envelope-1.1.xsd", "wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
@@ -41,20 +44,20 @@ object NsiSoapConversions {
   private val SchemaPackages = Seq(typesFactory, headersFactory, pointToPointServiceFactory).map(_.getClass().getPackage().getName())
 
   def NsiProviderMessageToDocument[T](defaultHeaders: Option[NsiHeaders])(implicit bodyConversion: Conversion[T, Element]): Conversion[NsiProviderMessage[T], Document] = (Conversion.build[NsiProviderMessage[T], (Option[NsiHeaders], T)] {
-    message => Right((Some(message.headers), message.body))
+    message => Success((Some(message.headers), message.body))
   } {
     case (headers, body) =>
-      headers.orElse(defaultHeaders).toRight("missing NSI headers").right.map(NsiProviderMessage(_, body))
+      headers.orElse(defaultHeaders).map(headers => Success(NsiProviderMessage(headers, body))).getOrElse(Failure(ErrorMessageException("missing NSI headers")))
   }).andThen(NsiHeadersAndBodyToDocument[T](bodyConversion))
 
   def NsiRequesterMessageToDocument[T](defaultHeaders: Option[NsiHeaders])(implicit bodyConversion: Conversion[T, Element]): Conversion[NsiRequesterMessage[T], Document] = (Conversion.build[NsiRequesterMessage[T], (Option[NsiHeaders], T)] {
-    message => Right((Some(message.headers), message.body))
+    message => Success((Some(message.headers), message.body))
   } {
     case (headers, body) =>
-      headers.orElse(defaultHeaders).toRight("missing NSI headers").right.map(NsiRequesterMessage(_, body))
+      headers.orElse(defaultHeaders).map(headers => Success(NsiRequesterMessage(headers, body))).getOrElse(Failure(ErrorMessageException("missing NSI headers")))
   }).andThen(NsiHeadersAndBodyToDocument[T](bodyConversion))
 
-  private def marshal[T](jaxb: JAXBElement[T]): Either[String, Element] = tryEither {
+  private def marshal[T](jaxb: JAXBElement[T]): Try[Element] = Try {
     val result = new DOMResult()
     jaxbContext.createMarshaller().marshal(jaxb, result)
     result.getNode().asInstanceOf[Document].getDocumentElement()
@@ -74,8 +77,8 @@ object NsiSoapConversions {
         marshal(typesFactory.createQueryNotificationSyncFailed(fault))
       case ServiceException(exception) =>
         // Wrap the service exception in a SOAP Fault element using the Java DOM API.
-        marshal(typesFactory.createServiceException(exception)).right.flatMap { detailBody =>
-          tryEither {
+        marshal(typesFactory.createServiceException(exception)).flatMap { detailBody =>
+          Try {
             val doc = createDocument
             val fault = doc.createElementNS("http://www.w3.org/2003/05/soap-envelope", "S:Fault").tap(doc.appendChild)
             fault.appendChild(doc.createElement("faultcode")).appendChild(doc.createTextNode("S:Server")) // FIXME or S:Client?
@@ -87,18 +90,17 @@ object NsiSoapConversions {
     }
   } {
     messageFactories(Map[String, NsiMessageParser[NsiAcknowledgement]](
-      "acknowledgment" -> NsiMessageParser { (body: GenericAcknowledgmentType) =>
-        Right(GenericAck()) },
+      "acknowledgment" -> NsiMessageParser { (body: GenericAcknowledgmentType) => Success(GenericAck()) },
       "reserveResponse" -> NsiMessageParser { (body: ReserveResponseType) =>
-        Right(ReserveResponse(body.getConnectionId())) },
+        Success(ReserveResponse(body.getConnectionId())) },
       "querySummarySyncConfirmed" -> NsiMessageParser { (body: QuerySummaryConfirmedType) =>
-        Right(QuerySummarySyncConfirmed(body.getReservation().asScala.toVector)) },
+        Success(QuerySummarySyncConfirmed(body.getReservation().asScala.toVector)) },
       "queryNotificationSyncConfirmed" -> NsiMessageParser { (body: QueryNotificationConfirmedType) =>
-        Right(QueryNotificationSyncConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector)) },
+        Success(QueryNotificationSyncConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector)) },
       "queryNotificationSyncFailed" -> NsiMessageParser { (body: org.ogf.schemas.nsi._2013._07.connection.provider.QueryNotificationSyncFailed) =>
-        Right(QueryNotificationSyncFailed(body.getFaultInfo())) },
+        Success(QueryNotificationSyncFailed(body.getFaultInfo())) },
       "serviceException" -> NsiMessageParser { (body: ServiceExceptionType) =>
-        Right(ServiceException(body)) }))
+        Success(ServiceException(body)) }))
   }
 
   implicit val NsiProviderOperationToElement = Conversion.build[NsiProviderOperation, Element] { operation =>
@@ -124,28 +126,28 @@ object NsiSoapConversions {
   } {
     messageFactories(Map[String, NsiMessageParser[NsiProviderOperation]](
       "reserve" -> NsiMessageParser { (body: ReserveType) =>
-        if (body.getConnectionId ne null) Left("modify operation is not supported")
+        if (body.getConnectionId ne null) Failure(ErrorMessageException("modify operation is not supported"))
         else for {
-          criteria <- Conversion.invert(body.getCriteria()).right
-          service <- criteria.getPointToPointService().toRight("initial reserve is missing point2point service").right
+          criteria <- Conversion.invert(body.getCriteria())
+          service <- criteria.getPointToPointService().toTry(ErrorMessageException("initial reserve is missing point2point service"))
         } yield {
           InitialReserve(body, criteria, service)
         }
       },
-      "reserveCommit" -> NsiMessageParser { body: GenericRequestType => Right(ReserveCommit(body.getConnectionId())) },
-      "reserveAbort" -> NsiMessageParser { body: GenericRequestType => Right(ReserveAbort(body.getConnectionId())) },
-      "provision" -> NsiMessageParser { body: GenericRequestType => Right(Provision(body.getConnectionId())) },
-      "release" -> NsiMessageParser { body: GenericRequestType => Right(Release(body.getConnectionId())) },
-      "terminate" -> NsiMessageParser { body: GenericRequestType => Right(Terminate(body.getConnectionId())) },
-      "querySummary" -> NsiMessageParser { body: QueryType => Right(QuerySummary(toIds(body))) },
-      "querySummarySync" -> NsiMessageParser { body: QueryType => Right(QuerySummarySync(toIds(body))) },
-      "queryRecursive" -> NsiMessageParser { body: QueryType => Right(QueryRecursive(toIds(body))) },
+      "reserveCommit" -> NsiMessageParser { body: GenericRequestType => Success(ReserveCommit(body.getConnectionId())) },
+      "reserveAbort" -> NsiMessageParser { body: GenericRequestType => Success(ReserveAbort(body.getConnectionId())) },
+      "provision" -> NsiMessageParser { body: GenericRequestType => Success(Provision(body.getConnectionId())) },
+      "release" -> NsiMessageParser { body: GenericRequestType => Success(Release(body.getConnectionId())) },
+      "terminate" -> NsiMessageParser { body: GenericRequestType => Success(Terminate(body.getConnectionId())) },
+      "querySummary" -> NsiMessageParser { body: QueryType => Success(QuerySummary(toIds(body))) },
+      "querySummarySync" -> NsiMessageParser { body: QueryType => Success(QuerySummarySync(toIds(body))) },
+      "queryRecursive" -> NsiMessageParser { body: QueryType => Success(QueryRecursive(toIds(body))) },
       "queryNotification" -> NsiMessageParser { body: QueryNotificationType =>
-        Right(QueryNotification(body.getConnectionId,
+        Success(QueryNotification(body.getConnectionId,
           Option(body.getStartNotificationId()).map(_.toInt),
           Option(body.getEndNotificationId()).map(_.toInt))) },
       "queryNotificationSync" -> NsiMessageParser { body: QueryNotificationType =>
-        Right(QueryNotificationSync(body.getConnectionId,
+        Success(QueryNotificationSync(body.getConnectionId,
           Option(body.getStartNotificationId()).map(_.toInt),
           Option(body.getEndNotificationId()).map(_.toInt))) }))
   }
@@ -186,27 +188,27 @@ object NsiSoapConversions {
     })
   } {
     messageFactories(Map[String, NsiMessageParser[NsiRequesterOperation]](
-      "reserveConfirmed" -> NsiMessageParser { (body: ReserveConfirmedType) => Right(ReserveConfirmed(body.getConnectionId(), body.getCriteria())) },
-      "reserveFailed" -> NsiMessageParser { (body: GenericFailedType) => Right(ReserveFailed(body)) },
-      "reserveCommitConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ReserveCommitConfirmed(body.getConnectionId)) },
-      "reserveCommitFailed" -> NsiMessageParser { (body: GenericFailedType) => Right(ReserveCommitFailed(body)) },
-      "reserveAbortConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ReserveAbortConfirmed(body.getConnectionId)) },
-      "reserveTimeout" -> NsiMessageParser { (body: ReserveTimeoutRequestType) => Right(ReserveTimeout(body)) },
-      "provisionConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ProvisionConfirmed(body.getConnectionId)) },
-      "releaseConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(ReleaseConfirmed(body.getConnectionId)) },
-      "terminateConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Right(TerminateConfirmed(body.getConnectionId)) },
-      "querySummaryConfirmed" -> NsiMessageParser { (body: QuerySummaryConfirmedType) => Right(QuerySummaryConfirmed(body.getReservation().asScala.toVector)) },
-      "querySummaryFailed" -> NsiMessageParser { (body: QueryFailedType) => Right(QuerySummaryFailed(body)) },
-      "queryRecursiveConfirmed" -> NsiMessageParser { (body: QueryRecursiveConfirmedType) => Right(QueryRecursiveConfirmed(body.getReservation().asScala.toVector)) },
-      "queryRecursiveFailed" -> NsiMessageParser { (body: QueryFailedType) => Right(QueryRecursiveFailed(body)) },
-      "queryNotificationConfirmed" -> NsiMessageParser { body: QueryNotificationConfirmedType => Right(QueryNotificationConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector)) },
-      "dataPlaneStateChange" -> NsiMessageParser { (body: DataPlaneStateChangeRequestType) => Right(DataPlaneStateChange(body)) },
-      "errorEvent" -> NsiMessageParser { (body: ErrorEventType) => Right(ErrorEvent(body)) },
-      "messageDeliveryTimeout" -> NsiMessageParser { (body: MessageDeliveryTimeoutRequestType) => Right(MessageDeliveryTimeout(body)) }))
+      "reserveConfirmed" -> NsiMessageParser { (body: ReserveConfirmedType) => Success(ReserveConfirmed(body.getConnectionId(), body.getCriteria())) },
+      "reserveFailed" -> NsiMessageParser { (body: GenericFailedType) => Success(ReserveFailed(body)) },
+      "reserveCommitConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Success(ReserveCommitConfirmed(body.getConnectionId)) },
+      "reserveCommitFailed" -> NsiMessageParser { (body: GenericFailedType) => Success(ReserveCommitFailed(body)) },
+      "reserveAbortConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Success(ReserveAbortConfirmed(body.getConnectionId)) },
+      "reserveTimeout" -> NsiMessageParser { (body: ReserveTimeoutRequestType) => Success(ReserveTimeout(body)) },
+      "provisionConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Success(ProvisionConfirmed(body.getConnectionId)) },
+      "releaseConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Success(ReleaseConfirmed(body.getConnectionId)) },
+      "terminateConfirmed" -> NsiMessageParser { (body: GenericConfirmedType) => Success(TerminateConfirmed(body.getConnectionId)) },
+      "querySummaryConfirmed" -> NsiMessageParser { (body: QuerySummaryConfirmedType) => Success(QuerySummaryConfirmed(body.getReservation().asScala.toVector)) },
+      "querySummaryFailed" -> NsiMessageParser { (body: QueryFailedType) => Success(QuerySummaryFailed(body)) },
+      "queryRecursiveConfirmed" -> NsiMessageParser { (body: QueryRecursiveConfirmedType) => Success(QueryRecursiveConfirmed(body.getReservation().asScala.toVector)) },
+      "queryRecursiveFailed" -> NsiMessageParser { (body: QueryFailedType) => Success(QueryRecursiveFailed(body)) },
+      "queryNotificationConfirmed" -> NsiMessageParser { body: QueryNotificationConfirmedType => Success(QueryNotificationConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector)) },
+      "dataPlaneStateChange" -> NsiMessageParser { (body: DataPlaneStateChangeRequestType) => Success(DataPlaneStateChange(body)) },
+      "errorEvent" -> NsiMessageParser { (body: ErrorEventType) => Success(ErrorEvent(body)) },
+      "messageDeliveryTimeout" -> NsiMessageParser { (body: MessageDeliveryTimeoutRequestType) => Success(MessageDeliveryTimeout(body)) }))
   }
 
   private implicit val NsiHeadersToCommonHeaderType = Conversion.build[NsiHeaders, CommonHeaderType] { headers =>
-    Right(new CommonHeaderType()
+    Try(new CommonHeaderType()
       .withCorrelationId(headers.correlationId.toString)
       .withReplyTo(headers.replyTo.map(_.toASCIIString()).orNull)
       .withProtocolVersion(headers.protocolVersion.toASCIIString())
@@ -214,33 +216,33 @@ object NsiSoapConversions {
       .withRequesterNSA(headers.requesterNSA))
   } { header =>
     for {
-      correlationId <- CorrelationId.fromString(header.getCorrelationId()).toRight(s"invalid correlation id ${header.getCorrelationId()}").right
-      replyTo <- tryEither(Option(header.getReplyTo()).map(URI.create)).right
-      protocolVersion <- tryEither(URI.create(header.getProtocolVersion())).right
+      correlationId <- CorrelationId.fromString(header.getCorrelationId()).toTry(ErrorMessageException(s"invalid correlation id ${header.getCorrelationId()}"))
+      replyTo <- Try(Option(header.getReplyTo()).map(URI.create))
+      protocolVersion <- Try(URI.create(header.getProtocolVersion()))
     } yield {
       NsiHeaders(correlationId, header.getRequesterNSA(), header.getProviderNSA(), replyTo, protocolVersion)
     }
   }
 
   private trait NsiMessageParser[T] {
-    def apply(bodyNode: Element): Either[String, T]
+    def apply(bodyNode: Element): Try[T]
   }
   private object NsiMessageParser {
-    def apply[M, T](f: M => Either[String, T])(implicit manifest: ClassTag[M]): NsiMessageParser[T] = new NsiMessageParser[T] {
+    def apply[M, T](f: M => Try[T])(implicit manifest: ClassTag[M]): NsiMessageParser[T] = new NsiMessageParser[T] {
       override def apply(bodyNode: Element) = {
         val unmarshaller = jaxbContext.createUnmarshaller()
         for {
-          body <- tryEither(unmarshaller.unmarshal(bodyNode, manifest.runtimeClass.asInstanceOf[Class[M]])).right
-          message <- f(body.getValue()).right
+          body <- Try(unmarshaller.unmarshal(bodyNode, manifest.runtimeClass.asInstanceOf[Class[M]]))
+          message <- f(body.getValue())
         } yield message
       }
     }
   }
 
-  private def messageFactories[T](factories: Map[String, NsiMessageParser[T]])(bodyNode: Element): Either[String, T] =
+  private def messageFactories[T](factories: Map[String, NsiMessageParser[T]])(bodyNode: Element): Try[T] =
     for {
-      parser <- factories.get(bodyNode.getLocalName()).toRight(s"unknown body element type '${bodyNode.getLocalName()}'").right
-      body <- parser(bodyNode).right
+      parser <- factories.get(bodyNode.getLocalName()).toTry(ErrorMessageException(s"unknown body element type '${bodyNode.getLocalName()}'"))
+      body <- parser(bodyNode)
     } yield body
 
   private val SoapNamespaceUri = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -258,7 +260,7 @@ object NsiSoapConversions {
     }
 
     Conversion.build[Document, Array[Byte]] { document =>
-      tryEither {
+      Try {
         val domSource = new DOMSource(document)
 
         val validator = schema.newValidator()
@@ -272,7 +274,7 @@ object NsiSoapConversions {
         baos.toByteArray()
       }
     } { bytes =>
-      tryEither {
+      Try {
         val dbf = DocumentBuilderFactory.newInstance()
         dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
         dbf.setNamespaceAware(true)
@@ -292,20 +294,20 @@ object NsiSoapConversions {
   private implicit val NsiHeadersToElement: Conversion[NsiHeaders, Element] = Conversion.build[NsiHeaders, Element] {
     headers =>
       for {
-        commonHeaderType <- Conversion[NsiHeaders, CommonHeaderType].apply(headers).right
-        headersElement <- marshal(headersFactory.createNsiHeader(commonHeaderType)).right
+        commonHeaderType <- Conversion[NsiHeaders, CommonHeaderType].apply(headers)
+        headersElement <- marshal(headersFactory.createNsiHeader(commonHeaderType))
       } yield headersElement
   } {
     headersElement =>
       val unmarshaller = jaxbContext.createUnmarshaller()
       for {
-        commonHeaderType <- tryEither(unmarshaller.unmarshal(headersElement, classOf[CommonHeaderType]).getValue).right
-        headers <- Conversion[NsiHeaders, CommonHeaderType].invert(commonHeaderType).right
+        commonHeaderType <- Try(unmarshaller.unmarshal(headersElement, classOf[CommonHeaderType]).getValue)
+        headers <- Conversion[NsiHeaders, CommonHeaderType].invert(commonHeaderType)
       } yield headers
   }
 
   private def NsiJaxbElementToString[T](jaxb: JAXBElement[T]): Conversion[T, String] = Conversion.build[T, String] { value =>
-    tryEither {
+    Try {
       val wrapped = new JAXBElement(jaxb.getName(), jaxb.getDeclaredType(), value)
       val marshaller = jaxbContext.createMarshaller()
       val baos = new ByteArrayOutputStream()
@@ -313,7 +315,7 @@ object NsiSoapConversions {
       baos.toString("UTF-8")
     }
   } { s =>
-    tryEither {
+    Try {
       val unmarshaller = jaxbContext.createUnmarshaller()
       val source = new StreamSource(new ByteArrayInputStream(s.getBytes("UTF-8")))
       unmarshaller.unmarshal(source, jaxb.getDeclaredType()).getValue()
@@ -326,9 +328,9 @@ object NsiSoapConversions {
   private def NsiHeadersAndBodyToDocument[T](implicit bodyConversion: Conversion[T, Element]) = Conversion.build[(Option[NsiHeaders], T), Document] {
     case (headers, body) =>
       for {
-        headersElementOption <- headers.map(Conversion[NsiHeaders, Element].apply).sequence.right
-        bodyElement <- bodyConversion(body).right
-        document <- tryEither {
+        headersElementOption <- headers.map(Conversion[NsiHeaders, Element].apply).sequence
+        bodyElement <- bodyConversion(body)
+        document <- Try {
           val document = createDocument
           val soapEnvelope = document.appendChild(document.createElementNS(SoapNamespaceUri, "soapenv:Envelope"))
           val soapHeader = soapEnvelope.appendChild(document.createElementNS(SoapNamespaceUri, "soapenv:Header"))
@@ -338,59 +340,59 @@ object NsiSoapConversions {
           soapBody.appendChild(document.importNode(bodyElement, true))
 
           document
-        }.right
+        }
       } yield document
   } { document =>
     for {
-      soapEnvelope <- Option(document.getDocumentElement).toRight("missing document root").right
-      header <- parseNsiHeaders(soapEnvelope).right
-      soapBody <- findSingleChildElement(SoapNamespaceUri, "Body", soapEnvelope).right
-      soapFaultNode <- findOptionalChildElement(SoapNamespaceUri, "Fault", soapBody).right
-      body <- soapFaultNode.map(n => parseSoapFault(n)(bodyConversion)).getOrElse(parseSoapBody(soapBody)(bodyConversion)).right
+      soapEnvelope <- Option(document.getDocumentElement).toTry(ErrorMessageException("missing document root"))
+      header <- parseNsiHeaders(soapEnvelope)
+      soapBody <- findSingleChildElement(SoapNamespaceUri, "Body", soapEnvelope)
+      soapFaultNode <- findOptionalChildElement(SoapNamespaceUri, "Fault", soapBody)
+      body <- soapFaultNode.map(n => parseSoapFault(n)(bodyConversion)).getOrElse(parseSoapBody(soapBody)(bodyConversion))
     } yield {
       (header, body)
     }
   }
 
-  private def parseNsiHeaders(soapEnvelope: Element): Either[String, Option[NsiHeaders]] = for {
-      soapHeader <- findOptionalChildElement(SoapNamespaceUri, "Header", soapEnvelope).right
-      headerNode <- soapHeader.map(it => findOptionalChildElement(NsiHeadersQName.getNamespaceURI(), NsiHeadersQName.getLocalPart(), it)).getOrElse(Right(None)).right
-      header <- headerNode.map(Conversion[NsiHeaders, Element].invert(_)).sequence.right
+  private def parseNsiHeaders(soapEnvelope: Element): Try[Option[NsiHeaders]] = for {
+      soapHeader <- findOptionalChildElement(SoapNamespaceUri, "Header", soapEnvelope)
+      headerNode <- soapHeader.map(it => findOptionalChildElement(NsiHeadersQName.getNamespaceURI(), NsiHeadersQName.getLocalPart(), it)).getOrElse(Success(None))
+      header <- headerNode.map(Conversion[NsiHeaders, Element].invert(_)).sequence
   } yield header
 
-  private def parseSoapBody[T](soapBody: Element)(implicit bodyConversion: Conversion[T, Element]): Either[String, T] = for {
-      bodyNode <- findSingleChildElement(NsiConnectionTypesNamespace, "*", soapBody).right
-      body <- bodyConversion.invert(bodyNode).right
+  private def parseSoapBody[T](soapBody: Element)(implicit bodyConversion: Conversion[T, Element]): Try[T] = for {
+      bodyNode <- findSingleChildElement(NsiConnectionTypesNamespace, "*", soapBody)
+      body <- bodyConversion.invert(bodyNode)
   } yield body
 
   private val ServiceExceptionTypeName = typesFactory.createServiceException(null).getName()
 
-  private def parseSoapFault[T](soapFault: Element)(implicit bodyConversion: Conversion[T, Element]): Either[String, T] = for {
-    faultString <- findSingleChildElement("", "faultstring", soapFault).right
-    serviceExceptionNode <- findOptionalChildElement(ServiceExceptionTypeName.getNamespaceURI(), ServiceExceptionTypeName.getLocalPart(), soapFault).right
-    serviceException <- serviceExceptionNode.map(bodyConversion.invert(_)).sequence.right
-    result <- serviceException.toRight(s"SOAP fault without ${ServiceExceptionTypeName}. Fault string: ${faultString.getTextContent()}").right
+  private def parseSoapFault[T](soapFault: Element)(implicit bodyConversion: Conversion[T, Element]): Try[T] = for {
+    faultString <- findSingleChildElement("", "faultstring", soapFault)
+    serviceExceptionNode <- findOptionalChildElement(ServiceExceptionTypeName.getNamespaceURI(), ServiceExceptionTypeName.getLocalPart(), soapFault)
+    serviceException <- serviceExceptionNode.map(bodyConversion.invert(_)).sequence
+    result <- serviceException.toTry(ErrorMessageException(s"SOAP fault without ${ServiceExceptionTypeName}. Fault string: ${faultString.getTextContent()}"))
   } yield result
 
   private def createDocument: Document = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
 
-  private def findSingleChildElement(namespaceUri: String, localName: String, parent: Element): Either[String, Element] = {
+  private def findSingleChildElement(namespaceUri: String, localName: String, parent: Element): Try[Element] = {
     findOptionalChildElement(namespaceUri, localName, parent) match {
-      case Right(None)    => Left(s"missing element '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one")
-      case Right(Some(x)) => Right(x)
-      case Left(x)        => Left(x)
+      case Success(None)    => Failure(ErrorMessageException(s"missing element '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one"))
+      case Success(Some(x)) => Success(x)
+      case Failure(x)       => Failure(x)
     }
   }
 
-  private def findOptionalChildElement(namespaceUri: String, localName: String, parent: Element): Either[String, scala.Option[Element]] = {
+  private def findOptionalChildElement(namespaceUri: String, localName: String, parent: Element): Try[Option[Element]] = {
     val childNodes = parent.getElementsByTagNameNS(namespaceUri, localName)
     val children = Vector.tabulate(childNodes.getLength)(childNodes.item)
     children.collect {
       case e: Element => e
     } match {
-      case Vector(e) => Right(Some(e))
-      case Vector()  => Right(None)
-      case _         => Left(s"multiple elements '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one")
+      case Vector(e) => Success(Some(e))
+      case Vector()  => Success(None)
+      case _         => Failure(ErrorMessageException(s"multiple elements '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one"))
     }
   }
 }

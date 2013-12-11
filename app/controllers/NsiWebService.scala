@@ -11,6 +11,9 @@ import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.ws.WS
 import scala.concurrent.Future
 import scala.language.higherKinds
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 import support.ExtraBodyParsers._
 
 object NsiWebService {
@@ -38,7 +41,7 @@ object NsiWebService {
     provider: ProviderEndPoint,
     soapAction: String,
     message: M[T],
-    convertAck: (NsiHeaders, Document) => Either[String, M[NsiAcknowledgement]],
+    convertAck: (NsiHeaders, Document) => Try[M[NsiAcknowledgement]],
     convertError: (NsiHeaders, ServiceExceptionType) => M[NsiAcknowledgement])(implicit messageConversion: Conversion[M[T], Document]): Future[M[NsiAcknowledgement]] = {
 
     var request = WS.url(provider.url.toASCIIString())
@@ -60,13 +63,13 @@ object NsiWebService {
         case OK | CREATED | ACCEPTED | INTERNAL_SERVER_ERROR =>
           Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
 
-          DocumentToString.invert(ack.body).right.flatMap { document =>
+          DocumentToString.invert(ack.body).flatMap { document =>
             convertAck(defaultAckHeaders, document)
           } match {
-            case Left(error) =>
-              Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error")
-              convertError(defaultAckHeaders, NsiError.ChildError.copy(text = error).toServiceException(provider.nsa))
-            case Right(ack) =>
+            case Failure(error) =>
+              Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error", error)
+              convertError(defaultAckHeaders, NsiError.ChildError.copy(text = error.toString).toServiceException(provider.nsa))
+            case Success(ack) =>
               Logger.debug(s"Received ack from ${provider.nsa} at ${provider.url}: $ack")
               ack
           }

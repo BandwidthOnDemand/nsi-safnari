@@ -50,7 +50,7 @@ class ReserveRequestSpec extends helpers.Specification {
           headers.replyTo.foreach { replyTo =>
             NsiWebService.callRequester(
               ProviderEndPoint(headers.requesterNSA, replyTo, NoAuthentication),
-              message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
+              message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).get))
           }
           Future.successful(message.ack(ReserveResponse(connectionId)))
         case wtf =>

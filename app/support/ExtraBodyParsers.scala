@@ -34,9 +34,9 @@ object ExtraBodyParsers {
   implicit val NsiMessageContentType: ContentTypeOf[NsiMessage[_]] = ContentTypeOf(Some(SOAPConstants.SOAP_1_1_CONTENT_TYPE))
 
   implicit def NsiMessageWriteable[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): Writeable[T] = Writeable { message =>
-    conversion.andThen(NsiXmlDocumentConversion)(message).fold({ error =>
+    conversion.andThen(NsiXmlDocumentConversion)(message).toEither.fold({ error =>
       // Exceptions from writeable are swallowed by Play, so log these here.
-      Logger.error(error)
+      Logger.error(s"error while writing NsiMessage to response $error", error)
       throw new java.io.IOException(error)
     }, bytes => bytes)
   }
@@ -97,7 +97,7 @@ object ExtraBodyParsers {
           Done(Left(b), Empty)
         case Right(it) =>
           it.flatMap {
-            case Left(error) =>
+            case Failure(error) =>
               Logger.warn(s"SOAP parsing failed ${request.uri} from ${request.remoteAddress} with content-type ${request.contentType}: $error")
               Done(Left(Results.InternalServerError(
                 <S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
@@ -108,7 +108,7 @@ object ExtraBodyParsers {
                     </S:Fault>
                   </S:Body>
                 </S:Envelope>).as(SOAPConstants.SOAP_1_1_CONTENT_TYPE)), Empty)
-            case Right(xml) =>
+            case Success(xml) =>
               Done(Right(xml), Empty)
           }
       }
@@ -124,8 +124,8 @@ object ExtraBodyParsers {
 
       Logger.debug(s"Received (${requestHeader.uri}): $parsedMessage")
 
-      Done(parsedMessage.left.map { error =>
-        Logger.warn(s"Failed to parse $soapMessage with $error on ${requestHeader.uri}")
+      Done(parsedMessage.toEither.left.map { error =>
+        Logger.warn(s"Failed to parse $soapMessage with $error on ${requestHeader.uri}", error)
         Results.InternalServerError(
           <S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
             <S:Body>

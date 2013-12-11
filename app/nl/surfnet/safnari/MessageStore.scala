@@ -21,9 +21,9 @@ case class StoredMessage(correlationId: CorrelationId, direction: String, protoc
 object StoredMessage {
   private def conversionToFormat[A, B: Format](conversion: Conversion[A, B]): Format[A] = new Format[A] {
     override def reads(js: JsValue): JsResult[A] = Json.fromJson[B](js).flatMap { b =>
-      conversion.invert(b).fold(error => JsError(ValidationError("error.conversion.failed", error)), JsSuccess(_))
+      conversion.invert(b).toEither.fold(error => JsError(ValidationError("error.conversion.failed", error)), JsSuccess(_))
     }
-    override def writes(a: A): JsValue = Json.toJson(conversion(a).fold(error => sys.error(s"failed to write message $a: $error"), identity))
+    override def writes(a: A): JsValue = Json.toJson(conversion(a).get)
   }
 
   private val Inbound = "INBOUND"
@@ -75,15 +75,15 @@ object StoredMessage {
   private implicit val PassedEndTimeFormat = Json.format[PassedEndTime]
 
   implicit val MessageToStoredMessage = Conversion.build[Message, StoredMessage] {
-    case message @ FromRequester(nsi)    => Right(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromRequester", formatJson(message)))
-    case message @ ToRequester(nsi)      => Right(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToRequester", formatJson(message)))
-    case message @ FromProvider(nsi)     => Right(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromProvider", formatJson(message)))
-    case message @ AckFromProvider(nsi)  => Right(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ProviderAck", formatJson(message)))
-    case message @ ToProvider(nsi, _)    => Right(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToProvider", formatJson(message)))
-    case message @ FromPce(pce)          => Right(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "FromPce", formatJson(message)))
-    case message @ ToPce(pce)            => Right(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "ToPce", formatJson(message)))
-    case message: MessageDeliveryFailure => Right(StoredMessage(message.correlationId, directionOf(message), "", "MessageDeliveryFailure", formatJson(message)))
-    case message: PassedEndTime          => Right(StoredMessage(message.correlationId, directionOf(message), "", "PassedEndTime", formatJson(message)))
+    case message @ FromRequester(nsi)    => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromRequester", formatJson(message)))
+    case message @ ToRequester(nsi)      => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToRequester", formatJson(message)))
+    case message @ FromProvider(nsi)     => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromProvider", formatJson(message)))
+    case message @ AckFromProvider(nsi)  => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ProviderAck", formatJson(message)))
+    case message @ ToProvider(nsi, _)    => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToProvider", formatJson(message)))
+    case message @ FromPce(pce)          => Success(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "FromPce", formatJson(message)))
+    case message @ ToPce(pce)            => Success(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "ToPce", formatJson(message)))
+    case message: MessageDeliveryFailure => Success(StoredMessage(message.correlationId, directionOf(message), "", "MessageDeliveryFailure", formatJson(message)))
+    case message: PassedEndTime          => Success(StoredMessage(message.correlationId, directionOf(message), "", "PassedEndTime", formatJson(message)))
   } { stored =>
     stored.tpe match {
       case "FromRequester"          => parseJson[FromRequester](stored.content)
@@ -99,7 +99,7 @@ object StoredMessage {
   }
 
   private def formatJson[T: Writes](value: T): String = Json.stringify(Json.toJson(value))
-  private def parseJson[T: Reads](json: String): Either[String, T] = Json.parse(json).validate[T].fold(errors => Left(errors.mkString(", ")), ok => Right(ok))
+  private def parseJson[T: Reads](json: String): Try[T] = Json.parse(json).validate[T].fold(errors => Failure(ErrorMessageException(errors.mkString(", "))), ok => Success(ok))
 }
 
 class MessageStore[T]()(implicit conversion: Conversion[T, StoredMessage]) {
@@ -124,7 +124,7 @@ class MessageStore[T]()(implicit conversion: Conversion[T, StoredMessage]) {
           FROM messages
          WHERE aggregated_connection_id = {aggregated_connection_id}
          ORDER BY id ASC""").on(
-      'aggregated_connection_id -> aggregatedConnectionId).as(messageParser.*).map(message => conversion.invert(message).fold(sys.error, identity)) // FIXME error handling
+      'aggregated_connection_id -> aggregatedConnectionId).as(messageParser.*).map(message => conversion.invert(message).get) // FIXME error handling
   }
 
   def loadEverything(): Seq[(ConnectionId, Seq[T])] = DB.withConnection { implicit connection =>
@@ -137,7 +137,7 @@ class MessageStore[T]()(implicit conversion: Conversion[T, StoredMessage]) {
       }.map {
         case (connectionId, messages) =>
           connectionId -> messages.flatMap {
-            case _ ~ message => conversion.invert(message).right.toOption
+            case _ ~ message => conversion.invert(message).toOption
           }
       }(collection.breakOut)
   }
@@ -148,7 +148,7 @@ class MessageStore[T]()(implicit conversion: Conversion[T, StoredMessage]) {
   }
 
   private def store(aggregatedConnectionId: ConnectionId, message: T, inboundId: Option[Long]) = DB.withTransaction { implicit connection =>
-    val stored = conversion(message).right.get
+    val stored = conversion(message).get
     SQL("""
         INSERT INTO messages (aggregated_connection_id, correlation_id, direction, protocol, type, content, created_at, inbound_message_id)
              VALUES ({aggregated_connection_id}, {correlation_id}, {direction}, {protocol}, {type}, {content}, {created_at}, {inbound_message_id})

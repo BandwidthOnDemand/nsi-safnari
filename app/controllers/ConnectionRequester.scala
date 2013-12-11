@@ -103,7 +103,7 @@ object ConnectionRequester {
       case ToProvider(message @ NsiProviderMessage(headers, reserve: InitialReserve), _) =>
         val connectionId = newConnectionId
         sender ! AckFromProvider(message ack ReserveResponse(connectionId))
-        sender ! FromProvider(message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).right.get))
+        sender ! FromProvider(message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).get))
       case ToProvider(message @ NsiProviderMessage(headers, commit: ReserveCommit), _) =>
         sender ! AckFromProvider(message ack GenericAck())
         sender ! FromProvider(message reply ReserveCommitConfirmed(commit.connectionId))
