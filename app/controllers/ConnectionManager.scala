@@ -66,6 +66,11 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       (connectionId, messages @ (FromRequester(NsiProviderMessage(headers, initialReserve: InitialReserve)) +: _)) <- messageStore.loadEverything()
     } yield {
       val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
+      messages.foreach {
+        case FromRequester(message) =>
+          connectionsByRequesterCorrelationId.single.put((message.headers.requesterNSA, message.headers.correlationId), connection)
+        case _ =>
+      }
       (connection ? Replay(messages)).mapTo[Try[Unit]]
     }).map(_.collect {
       case Failure(exception) => exception
@@ -198,20 +203,17 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       })
     }
 
-    private def PersistMessages[E](wrapped: InboundMessage => Either[E, (Boolean, Seq[OutboundMessage])]): InboundMessage => Either[E, Seq[OutboundMessage]] = { inbound =>
+    private def PersistMessages[E](wrapped: InboundMessage => Either[E, Seq[OutboundMessage]]): InboundMessage => Either[E, Seq[OutboundMessage]] = { inbound =>
       val result = wrapped(inbound)
-      result.right.foreach {
-        case (replayed, outbound) =>
-          if (!replayed) {
-            messageStore.storeInboundWithOutboundMessages(connection.id, inbound, outbound)
-          }
+      result.right.foreach { outbound =>
+        messageStore.storeInboundWithOutboundMessages(connection.id, inbound, outbound)
       }
-      result.right.map(_._2)
+      result
     }
 
-    private def ManageChildConnections[E, A](wrapped: InboundMessage => Option[A]): InboundMessage => Option[A] = { inbound =>
+    private def ManageChildConnections[E, A](wrapped: InboundMessage => Either[E, A]): InboundMessage => Either[E, A] = { inbound =>
       val outbound = wrapped(inbound)
-      if (outbound.isDefined) {
+      if (outbound.isRight) {
         updateChildConnection(inbound)
       }
       outbound

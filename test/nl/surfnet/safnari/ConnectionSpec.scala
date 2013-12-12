@@ -65,12 +65,12 @@ class ConnectionSpec extends helpers.Specification {
       val response = message match {
         case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) => connection.queryRecursive(query)
         case message: FromRequester =>
-          val first = processInbound(message).right.toOption.map(_._2)
-          val second = processInbound(message).right.toOption.map(_._2)
+          val first = processInbound(message).right.toOption
+          val second = processInbound(message).right.toOption
           second aka "idempotent retransmit" must beEqualTo(first)
           first
         case other: InboundMessage =>
-          processInbound(message).right.toOption.map(_._2)
+          processInbound(message).right.toOption
       }
       response.tap(_.foreach(messages = _))
     }

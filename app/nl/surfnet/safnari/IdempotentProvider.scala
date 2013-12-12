@@ -16,46 +16,46 @@ private case class RequesterCommandStatus(command: FromRequester, outstandingCom
   })
 }
 
-class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Option[Seq[OutboundMessage]]) extends (InboundMessage => Either[ServiceExceptionType, (Boolean, Seq[OutboundMessage])]) {
+class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Either[ServiceExceptionType, Seq[OutboundMessage]]) extends (InboundMessage => Either[ServiceExceptionType, Seq[OutboundMessage]]) {
   private var requesterCommands = Map.empty[CorrelationId, RequesterCommandStatus]
-  private var outstandingToRequesterCommands = Map.empty[CorrelationId, CorrelationId]
+  private var outgoingToRequesterCommands = Map.empty[CorrelationId, CorrelationId]
 
   override def apply(message: InboundMessage) = message match {
     case inbound @ FromRequester(NsiProviderMessage(_, _: NsiProviderCommand)) =>
       requesterCommands.get(inbound.correlationId) match {
         case None =>
           val result = wrapped(inbound)
-          result.foreach(recordOutput(inbound, _))
-          result.map((false, _)).toRight(messageNotApplicable(inbound))
+          result.right.foreach(recordOutput(inbound, _))
+          result
         case Some(RequesterCommandStatus(original, outstandingCommandsOrReply)) =>
           if (!sameMessage(inbound.message, original.message)) {
             Left(NsiError.PayloadError.toServiceException(providerNsa).withText(s"duplicate request with existing correlation id ${inbound.correlationId} does not match the original"))
           } else {
-            Right((true, outstandingCommandsOrReply match {
+            Right(outstandingCommandsOrReply match {
               case Left(outstandingCommands) =>
                 outstandingCommands.values.to[Seq]
               case Right(reply) =>
                 List(reply)
-            }))
+            })
           }
       }
-    case _: FromProvider | _: FromPce =>
-      val result = outstandingToRequesterCommands.get(message.correlationId).flatMap(requesterCommands.get) match {
-        case None =>
-          wrapped(message)
-        case Some(RequesterCommandStatus(originalRequest, _)) =>
-          outstandingToRequesterCommands -= message.correlationId
-          val output = wrapped(message)
-          output.foreach { messages =>
-            recordOutput(originalRequest, messages)
+    case _: FromRequester =>
+      wrapped(message)
+    case _: FromProvider | _: FromPce | _: MessageDeliveryFailure | _: PassedEndTime | _: AckFromProvider =>
+      val output = wrapped(message)
+      for {
+        requesterCommandCorrelationId <- outgoingToRequesterCommands.get(message.correlationId)
+        RequesterCommandStatus(originalRequest, _) <- requesterCommands.get(requesterCommandCorrelationId)
+        messages <- output.right.toOption
+      } {
+        recordOutput(originalRequest, messages)
+        message match {
+          case _: FromProvider | _: FromPce =>
             requesterCommands += originalRequest.correlationId -> requesterCommands(originalRequest.correlationId).commandReplyReceived(message)
-          }
-          output
+          case _ =>
+        }
       }
-      result.map((false, _)).toRight(messageNotApplicable(message))
-    case _: MessageDeliveryFailure | _: PassedEndTime | _: AckFromProvider | _: FromRequester =>
-      val result = wrapped(message)
-      result.map((false, _)).toRight(messageNotApplicable(message))
+      output
   }
 
   private def recordOutput(requesterCommand: FromRequester, output: Seq[OutboundMessage]): Unit = {
@@ -67,7 +67,7 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Option[
       case message: ToPce      => message
       case message: ToProvider => message
     }
-    outstandingToRequesterCommands ++= newOutstandingCommands.map { _.correlationId -> requesterCommand.correlationId }
+    outgoingToRequesterCommands ++= newOutstandingCommands.map { _.correlationId -> requesterCommand.correlationId }
 
     val currentStatus = requesterCommands.getOrElse(requesterCommand.correlationId, RequesterCommandStatus(requesterCommand, Left(Map.empty)))
 
@@ -87,6 +87,4 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Option[
     val conversion = NsiProviderMessageToDocument[NsiProviderOperation](None).andThen(DocumentToString)
     conversion(a) == conversion(b)
   }
-
-  private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(providerNsa)
 }

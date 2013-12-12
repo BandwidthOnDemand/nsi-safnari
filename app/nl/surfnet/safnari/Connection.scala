@@ -75,7 +75,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       qrsm.flatMap(_.process(message))
   }
 
-  def process(message: InboundMessage): Option[Seq[OutboundMessage]] = {
+  def process(message: InboundMessage): Either[ServiceExceptionType, Seq[OutboundMessage]] = {
     message match {
       case AckFromProvider(NsiProviderMessage(_, ServiceException(exception))) =>
         Option(exception.getConnectionId()).foreach { connectionId =>
@@ -134,7 +134,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         } yield lifecycleStateMachine
     }
 
-    stateMachine.flatMap(applyMessageToStateMachine(_, message)).orElse(handleUnhandledProviderNotifications(message))
+    stateMachine.flatMap(applyMessageToStateMachine(_, message)).orElse(handleUnhandledProviderNotifications(message)).toRight(messageNotApplicable(message))
   }
 
   def process(message: OutboundMessage): Unit = message match {
@@ -161,6 +161,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
     output
   }
+
+  private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(aggregatorNsa)
 
   private def registerProviderConversations(messages: Seq[OutboundMessage], stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage]): Unit = {
     providerConversations ++= messages.collect {
