@@ -30,7 +30,8 @@ case class ReservationStateMachineData(
   initialCorrelationIdByConnectionId: Map[ConnectionId, CorrelationId] = Map.empty,
   childConnectionStates: Map[CorrelationId, ReservationState] = Map.empty,
   childExceptions: Map[CorrelationId, ServiceExceptionType] = Map.empty,
-  childTimeouts: Map[CorrelationId, ReserveTimeoutRequestType] = Map.empty) {
+  childTimeouts: Map[CorrelationId, ReserveTimeoutRequestType] = Map.empty,
+  pceError: Option[NsiError] = None) {
 
   def aggregatedReservationState: ReservationState =
     if (awaitingReserveReply.isEmpty && childConnectionStates.isEmpty) CheckingReservationState
@@ -114,6 +115,10 @@ class ReservationStateMachine(
       goto(CheckingReservationState) using data.copy(segments = segments.toVector, awaitingReserveReply = segments.map(_._1).toSet)
     case Event(FromPce(message: PathComputationFailed), _) =>
       goto(FailedReservationState)
+    case Event(AckFromPce(failure: PceFailed), data) =>
+      goto(FailedReservationState) using data.copy(pceError = Some(NsiError.TopologyError.copy(text = s"PCE failed to accept request ${failure.status} (${failure.statusText})")))
+    case Event(AckFromPce(_: PceAccepted), _) =>
+      stay
   }
 
   when(CheckingReservationState) {
@@ -207,7 +212,7 @@ class ReservationStateMachine(
           ToProvider(NsiProviderMessage(newNsiHeaders(segment.provider).copy(correlationId = correlationId), InitialReserve(reserveType, Conversion.invert(criteria).get, service)), segment.provider)
       }
     case PathComputationState -> FailedReservationState =>
-      respond(ReserveFailed(failed(NsiError.NoPathFound)))
+      respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoPathFound))))
     case CheckingReservationState -> FailedReservationState =>
       respond(ReserveFailed(failed(NsiError.ChildError).tap(_.getServiceException().withChildException(nextStateData.childExceptions.values.toSeq.asJava))))
     case CheckingReservationState -> HeldReservationState =>

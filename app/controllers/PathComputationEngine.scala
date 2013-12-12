@@ -13,6 +13,8 @@ import play.api.Logger
 import scala.util.{ Success, Failure }
 import scala.concurrent.duration._
 import scala.concurrent.Future
+import org.joda.time.DateTime
+import java.util.concurrent.TimeoutException
 
 object PathComputationEngine extends Controller {
   private val pceContinuations = new Continuations[PceResponse](Akka.system.scheduler)
@@ -52,15 +54,31 @@ object PathComputationEngine extends Controller {
         sender ! healthy.map("PCE (Real)" -> _)
 
       case ToPce(request) =>
-        val connection = sender
-        pceContinuations.register(request.correlationId, Configuration.AsyncReplyTimeout).onSuccess {
-          case reply => connection ! FromPce(reply)
-        }
         val findPathEndPoint = s"$endPoint/paths/find"
         Logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
-        WS.url(findPathEndPoint).post(Json.toJson(request)).onFailure {
-          case e => Logger.error(s"Could not reach the pce ($endPoint): $e")
+
+        val connection = sender
+        pceContinuations.register(request.correlationId, Configuration.AsyncReplyTimeout).onComplete {
+          case Success(reply) =>
+            connection ! FromPce(reply)
+          case Failure(e) =>
+            connection ! MessageDeliveryFailure(request.correlationId, None, URI.create(findPathEndPoint), DateTime.now(), e.toString)
         }
+
+        val response = WS.url(findPathEndPoint).post(Json.toJson(request))
+        response onComplete {
+          case Failure(e) =>
+            Logger.error(s"Could not reach the pce ($endPoint): $e")
+            pceContinuations.unregister(request.correlationId)
+            connection ! MessageDeliveryFailure(request.correlationId, None, URI.create(findPathEndPoint), DateTime.now(), e.toString)
+          case Success(response) if response.status == ACCEPTED =>
+            connection ! AckFromPce(PceAccepted(request.correlationId))
+          case Success(response) =>
+            Logger.error(s"Got back a ${response.status} response from the PCE: ${response.body}")
+            pceContinuations.unregister(request.correlationId)
+            connection ! AckFromPce(PceFailed(request.correlationId, response.status, response.statusText, response.body))
+        }
+
     }
   }
 

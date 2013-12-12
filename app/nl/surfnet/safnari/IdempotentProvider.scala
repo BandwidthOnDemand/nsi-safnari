@@ -41,7 +41,7 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Either[
       }
     case _: FromRequester =>
       wrapped(message)
-    case _: FromProvider | _: FromPce | _: MessageDeliveryFailure | _: PassedEndTime | _: AckFromProvider =>
+    case _: FromProvider | _: FromPce | _: MessageDeliveryFailure | _: PassedEndTime | _: AckFromProvider | _: AckFromPce =>
       val output = wrapped(message)
       for {
         requesterCommandCorrelationId <- outgoingToRequesterCommands.get(message.correlationId)

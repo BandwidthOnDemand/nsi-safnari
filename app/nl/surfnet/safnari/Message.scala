@@ -42,6 +42,10 @@ final case class FromPce(message: PceResponse) extends InboundMessage {
   override def toShortString = Message.shortString(getClass(), message.getClass(), correlationId)
   override def correlationId = message.correlationId
 }
+final case class AckFromPce(message: PceAcknowledgement) extends InboundMessage {
+  override def toShortString = Message.shortString(getClass(), message.getClass(), correlationId)
+  override def correlationId = message.correlationId
+}
 final case class ToPce(message: PceRequest) extends OutboundMessage {
   override def toShortString = Message.shortString(getClass(), message.getClass(), correlationId)
   override def correlationId = message.correlationId

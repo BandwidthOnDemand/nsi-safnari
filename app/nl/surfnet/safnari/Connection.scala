@@ -98,6 +98,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       case FromRequester(NsiProviderMessage(_, _)) => None
 
       case FromPce(_) => Some(rsm)
+      case AckFromPce(_) => Some(rsm)
 
       case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout)) => Some(rsm)
       case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm
