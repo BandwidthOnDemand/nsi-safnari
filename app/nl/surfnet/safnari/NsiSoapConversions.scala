@@ -83,7 +83,7 @@ object NsiSoapConversions {
             val fault = doc.createElementNS("http://www.w3.org/2003/05/soap-envelope", "S:Fault").tap(doc.appendChild)
             fault.appendChild(doc.createElement("faultcode")).appendChild(doc.createTextNode("S:Server")) // FIXME or S:Client?
             fault.appendChild(doc.createElement("faultstring")).appendChild(doc.createTextNode(exception.getText()))
-            fault.appendChild(doc.createElement("detail")).appendChild(doc.adoptNode(detailBody))
+            fault.appendChild(doc.createElement("detail")).appendChild(doc.importNode(detailBody, true))
             doc.getDocumentElement()
           }
         }
