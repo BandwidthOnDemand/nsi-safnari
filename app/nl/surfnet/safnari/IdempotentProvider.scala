@@ -53,7 +53,7 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Option[
           output
       }
       result.map((false, _)).toRight(messageNotApplicable(message))
-    case _: MessageDeliveryFailure | _: PassedEndTime | _: AckFromProvider | _: FromRequester =>
+    case _: MessageDeliveryFailure | _: PassedEndTime | _: AckFromProvider | _: FromRequester | _: AckFromPce =>
       val result = wrapped(message)
       result.map((false, _)).toRight(messageNotApplicable(message))
   }

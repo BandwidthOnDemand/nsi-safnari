@@ -61,6 +61,7 @@ object ConnectionRequester {
     def receive = {
       case 'healthCheck =>
         sender ! Future.successful("NSI requester (Real)" -> true)
+
       case ToProvider(message @ NsiProviderMessage(headers, operation: NsiProviderOperation), provider) =>
         val connectionId = operation match {
           case command: NsiProviderCommand => command.optionalConnectionId

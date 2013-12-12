@@ -64,7 +64,7 @@ class ReserveRequestSpec extends helpers.Specification {
             case JsSuccess(request: PathComputationRequest, _) =>
               val response = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri), NoAuthentication), request.serviceType) :: Nil)
               WS.url(request.replyTo.toASCIIString()).post(Json.toJson(response))
-              Results.Ok
+              Results.Accepted
             case _ =>
               Results.BadRequest
           }

@@ -27,6 +27,10 @@ sealed trait PceResponse extends PceMessage
 case class PathComputationFailed(correlationId: CorrelationId, message: String) extends PceResponse
 case class PathComputationConfirmed(correlationId: CorrelationId, segments: Seq[ComputedSegment]) extends PceResponse
 
+sealed trait PceAcknowledgement extends PceMessage
+case class PceAccepted(correlationId: CorrelationId) extends PceAcknowledgement
+case class PceFailed(correlationId: CorrelationId, status: Int, statusText: String, body: String) extends PceAcknowledgement
+
 sealed trait ProviderAuthentication
 case object NoAuthentication extends ProviderAuthentication
 case class BasicAuthentication(username: String, password: String) extends ProviderAuthentication {
@@ -197,4 +201,26 @@ object PceMessage {
           Nil,
           serviceType)
     })
+
+    implicit val PceAcknowledgementWrites: Writes[PceAcknowledgement] = Writes {
+      case PceAccepted(correlationId) => Json.obj("correlationId" -> correlationId, "status" -> 202)
+      case PceFailed(correlationId, status, statusText, message) => Json.obj("correlationId" -> correlationId, "status" -> status, "statusText" -> statusText, "message" -> message)
+    }
+    implicit val PceAcknowledgementReads: Reads[PceAcknowledgement] = Reads { json =>
+      (__ \ "status").read[Int].reads(json) match {
+        case JsSuccess(202, _) => Json.fromJson[PceAccepted](json)
+        case JsSuccess(status, _) => Json.fromJson[PceFailed](json)
+        case errors: JsError => errors
+      }
+    }
+
+    implicit val PceAcceptedReads: Reads[PceAccepted] = (
+      (__ \ "correlationId").read[CorrelationId] and
+      (__ \ "status").read[Int]) { (correlationId, status) => PceAccepted(correlationId) }
+
+    implicit val PceFailedReads: Reads[PceFailed] = (
+      (__ \ "correlationId").read[CorrelationId] and
+      ( __ \ "status").read[Int] and
+      (__ \ "statusText").read[String] and
+      (__ \ "message").read[String]) { (correlationId, status, statusText, message) => PceFailed(correlationId, status, statusText, message) }
 }

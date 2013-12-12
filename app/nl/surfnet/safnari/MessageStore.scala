@@ -70,6 +70,7 @@ object StoredMessage {
   private implicit val AckFromProviderFormat = ((__ \ 'message).format[NsiProviderMessage[NsiAcknowledgement]]).inmap(AckFromProvider.apply, unlift(AckFromProvider.unapply))
   private implicit val ToProviderFormat = Json.format[ToProvider]
   private implicit val FromPceFormat = Json.format[FromPce]
+  private implicit val AckFromPceFormat = Json.format[AckFromPce]
   private implicit val ToPceFormat = Json.format[ToPce]
   private implicit val MessageDeliveryFailureFormat = Json.format[MessageDeliveryFailure]
   private implicit val PassedEndTimeFormat = Json.format[PassedEndTime]
@@ -81,6 +82,7 @@ object StoredMessage {
     case message @ AckFromProvider(nsi)  => Right(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ProviderAck", formatJson(message)))
     case message @ ToProvider(nsi, _)    => Right(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToProvider", formatJson(message)))
     case message @ FromPce(pce)          => Right(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "FromPce", formatJson(message)))
+    case message @ AckFromPce(pce)       => Right(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "AckFromPce", formatJson(message)))
     case message @ ToPce(pce)            => Right(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "ToPce", formatJson(message)))
     case message: MessageDeliveryFailure => Right(StoredMessage(message.correlationId, directionOf(message), "", "MessageDeliveryFailure", formatJson(message)))
     case message: PassedEndTime          => Right(StoredMessage(message.correlationId, directionOf(message), "", "PassedEndTime", formatJson(message)))
@@ -91,6 +93,7 @@ object StoredMessage {
       case "FromProvider"           => parseJson[FromProvider](stored.content)
       case "ProviderAck"            => parseJson[AckFromProvider](stored.content)
       case "ToProvider"             => parseJson[ToProvider](stored.content)
+      case "AckFromPce"             => parseJson[AckFromPce](stored.content)
       case "FromPce"                => parseJson[FromPce](stored.content)
       case "ToPce"                  => parseJson[ToPce](stored.content)
       case "MessageDeliveryFailure" => parseJson[MessageDeliveryFailure](stored.content)
