@@ -21,9 +21,7 @@ class MessageStoreSpec extends helpers.Specification {
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromPce(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
-      loaded must haveOneElementLike {
-        case FromPce(request) => request must beEqualTo(message)
-      }
+      loaded must contain(beEqualTo(FromPce(message))).exactly(1)
     }
 
     "store a from PCE message" in new WithApplication(Application) {
@@ -33,9 +31,7 @@ class MessageStoreSpec extends helpers.Specification {
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromPce(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
-      loaded must haveOneElementLike {
-        case FromPce(request) => request must beEqualTo(message)
-      }
+      loaded must contain(beEqualTo(FromPce(message))).exactly(1)
     }
 
     "store a fromRequester NSI message" in new WithApplication(Application) {
@@ -44,9 +40,7 @@ class MessageStoreSpec extends helpers.Specification {
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromRequester(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
-      loaded must haveOneElementLike {
-        case FromRequester(request) => request must beEqualTo(message)
-      }
+      loaded must contain(beEqualTo(FromRequester(message))).exactly(1)
     }
 
     "store a fromProvider NSI message" in new WithApplication(Application) {
@@ -56,9 +50,7 @@ class MessageStoreSpec extends helpers.Specification {
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromProvider(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
-      loaded must haveOneElementLike {
-        case FromProvider(request) => request must beEqualTo(message)
-      }
+      loaded must contain(beEqualTo(FromProvider(message))).exactly(1)
     }
 
     "store a toProvider NSI message" in new WithApplication(Application) {
@@ -69,11 +61,7 @@ class MessageStoreSpec extends helpers.Specification {
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, ToProvider(message, endPoint), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
-      loaded must haveOneElementLike {
-        case ToProvider(request, provider) =>
-          request must beEqualTo(message)
-          provider must beEqualTo(endPoint)
-      }
+      loaded must contain(beEqualTo(ToProvider(message, endPoint))).exactly(1)
     }
   }
 
