@@ -154,6 +154,18 @@ class ConnectionSpec extends helpers.Specification {
       }
     }
 
+    "fail the connection when pce did not accept the find path request" in new fixture {
+      given(
+        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service))
+      )
+
+      when(pce.failedAck(CorrelationId(0, 1)))
+
+      messages must contain(like[Message] {
+        case ToRequester(NsiRequesterMessage(_, ReserveFailed(_))) => ok
+      }).exactly(1)
+    }
+
     "fail the connection when path computation fails" in new fixture {
       given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
@@ -762,6 +774,7 @@ class ConnectionSpec extends helpers.Specification {
         case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(results))) => results must haveSize(1)
       }
     }
+
   }
 
   private def dataPlaneStatusType(active: Boolean) = new DataPlaneStatusType().withActive(active).withVersion(0).withVersionConsistent(true)

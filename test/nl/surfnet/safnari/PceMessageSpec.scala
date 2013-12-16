@@ -35,6 +35,9 @@ object PceMessageSpec {
   val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication)
   val computedSegment = ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))
   val pathComputationResponse = PathComputationConfirmed(correlationId, Seq(computedSegment))
+
+  val pathComputationFailedAck = PceFailed(correlationId, 404, "Not Accepted", "")
+  val pathComputationAcceptedAck = PceAccepted(correlationId)
 }
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
