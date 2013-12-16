@@ -41,9 +41,7 @@ class MessageStoreSpec extends helpers.Specification {
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, AckFromPce(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId)
-      loaded must contain(like[Message] {
-        case ack @ AckFromPce(message) => ok
-      }).exactly(1)
+      loaded must contain(beEqualTo(AckFromPce(message))).exactly(1)
     }
 
     "store a accepted ack from PCE message" in new WithApplication(Application) {
