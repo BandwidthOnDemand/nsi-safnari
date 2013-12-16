@@ -42,6 +42,9 @@ object PathComputationEngine extends Controller {
   }
 
   class PceRequesterActor(endPoint: String) extends Actor {
+    private val uuidGenerator = Uuid.randomUuidGenerator()
+    private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
+
     def receive = {
       case 'healthCheck =>
         val topologyHealth = WS.url(s"$endPoint/topology/ping").get()
@@ -62,7 +65,7 @@ object PathComputationEngine extends Controller {
           case Success(reply) =>
             connection ! FromPce(reply)
           case Failure(e) =>
-            connection ! MessageDeliveryFailure(request.correlationId, None, URI.create(findPathEndPoint), DateTime.now(), e.toString)
+            connection ! MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), DateTime.now(), e.toString)
         }
 
         val response = WS.url(findPathEndPoint).post(Json.toJson(request))
@@ -70,7 +73,7 @@ object PathComputationEngine extends Controller {
           case Failure(e) =>
             Logger.error(s"Could not reach the pce ($endPoint): $e")
             pceContinuations.unregister(request.correlationId)
-            connection ! MessageDeliveryFailure(request.correlationId, None, URI.create(findPathEndPoint), DateTime.now(), e.toString)
+            connection ! MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), DateTime.now(), e.toString)
           case Success(response) if response.status == ACCEPTED =>
             connection ! AckFromPce(PceAccepted(request.correlationId))
           case Success(response) =>
