@@ -87,6 +87,12 @@ object NsiMessageSpec {
     def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: DateTime) = {
       MessageDeliveryFailure(correlationId, None, originalCorrelationId, URI.create("http://pce.local/"), timestamp, "message-delivery-timeout")
     }
+    def failedAck(correlationId: CorrelationId, status: Int = 400, statusText: String = "Bad Request", message: String = "Find path request not accepted") = {
+      AckFromPce(PceFailed(correlationId, status, statusText, message))
+    }
+    def acceptedAck(correlationId: CorrelationId) = {
+      AckFromPce(PceAccepted(correlationId))
+    }
   }
 
 }

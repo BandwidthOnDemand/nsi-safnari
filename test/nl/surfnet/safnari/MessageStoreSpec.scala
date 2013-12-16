@@ -34,6 +34,30 @@ class MessageStoreSpec extends helpers.Specification {
       loaded must contain(beEqualTo(FromPce(message))).exactly(1)
     }
 
+    "store a failed ack from PCE message" in new WithApplication(Application) {
+      val aggregatedConnectionId = newConnectionId
+      val message = PceMessageSpec.pathComputationFailedAck
+
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, AckFromPce(message), Seq.empty) must not(throwA[Exception])
+
+      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      loaded must contain(like[Message] {
+        case ack @ AckFromPce(message) => ok
+      }).exactly(1)
+    }
+
+    "store a accepted ack from PCE message" in new WithApplication(Application) {
+      val aggregatedConnectionId = newConnectionId
+      val message = PceMessageSpec.pathComputationAcceptedAck
+
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, AckFromPce(message), Seq.empty) must not(throwA[Exception])
+
+      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      loaded must contain(like[Message] {
+        case ack @ AckFromPce(message) => ok
+      }).exactly(1)
+    }
+
     "store a fromRequester NSI message" in new WithApplication(Application) {
       val aggregatedConnectionId = newConnectionId
       val message = NsiMessageSpec.initialReserveMessage
