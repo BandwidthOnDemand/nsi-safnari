@@ -1,4 +1,4 @@
-@(secure: Boolean)(implicit request: play.api.mvc.RequestHeader)
+@(secure: Boolean, nsaId: String)(implicit request: play.api.mvc.RequestHeader)
 
 @providerWsdl = { @routes.ConnectionProvider.wsdl("").absoluteURL(secure) }
 @requesterWsdl = { @routes.ConnectionRequester.wsdl("").absoluteURL(secure) }
@@ -9,7 +9,7 @@
         <div class="content">
             <h3>Using NSI Safnari</h3>
 
-            <p>Safnari is a NSI Aggregator supporting the NSI v2 specification.</p>
+            <p>Safnari (@nsaId) is a NSI Aggregator supporting the NSI v2 specification.</p>
 
             <p>The following service end points are implemented:</p>
             <ul>

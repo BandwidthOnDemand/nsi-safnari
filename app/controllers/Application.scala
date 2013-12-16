@@ -23,7 +23,7 @@ class Application(connectionManager: ConnectionManager) extends Controller {
 
   def index = Action { implicit request =>
     val secure = request.headers.get("X-Forwarded-Proto") == Some("https")
-    Ok(views.html.index(secure))
+    Ok(views.html.index(secure, Configuration.Nsa))
   }
 
   def healthcheck = Action.async {
