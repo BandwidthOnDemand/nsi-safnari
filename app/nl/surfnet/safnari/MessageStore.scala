@@ -16,9 +16,13 @@ import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import scala.util.{ Try, Success, Failure }
 import java.net.URI
 
-case class StoredMessage(correlationId: CorrelationId, direction: String, protocol: String, tpe: String, content: String, createdAt: Instant = new Instant())
+private case class SerializedMessage(correlationId: CorrelationId, direction: String, protocol: String, tpe: String, content: String)
 
-object StoredMessage {
+case class MessageRecord[T](id: Long, createdAt: Instant = new Instant(), aggregatedConnectionId: ConnectionId, message: T) {
+  def map[B](f: T => B) = copy(message = f(message))
+}
+
+object MessageStore {
   private def conversionToFormat[A, B: Format](conversion: Conversion[A, B]): Format[A] = new Format[A] {
     override def reads(js: JsValue): JsResult[A] = Json.fromJson[B](js).flatMap { b =>
       conversion.invert(b).toEither.fold(error => JsError(ValidationError("error.conversion.failed", error)), JsSuccess(_))
@@ -42,27 +46,6 @@ object StoredMessage {
   private implicit val NsiHeadersFormat: Format[NsiHeaders] = conversionToFormat(Conversion[NsiHeaders, String])
   private implicit val ServiceExceptionTypeFormat: Format[ServiceExceptionType] = conversionToFormat(Conversion[ServiceExceptionType, String])
 
-  private implicit val CorrelationIdFormat: Format[CorrelationId] = new Format[CorrelationId] {
-    override def reads(json: JsValue): JsResult[CorrelationId] = json match {
-      case JsString(s) => CorrelationId.fromString(s) match {
-        case Some(correlationId) => JsSuccess(correlationId)
-        case None                => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.correlationId", s))))
-      }
-      case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.jsstring"))))
-    }
-    override def writes(correlationId: CorrelationId): JsValue = JsString(correlationId.toString)
-  }
-  private implicit val UriFormat: Format[URI] = new Format[URI] {
-    override def reads(json: JsValue): JsResult[URI] = json match {
-      case JsString(s) => Try(URI.create(s)) match {
-        case Success(uri) => JsSuccess(uri)
-        case Failure(_)   => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.uri", s))))
-      }
-      case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.jsstring"))))
-    }
-    override def writes(uri: URI): JsValue = JsString(uri.toASCIIString())
-  }
-
   // Json.format doesn't work, so use manual conversion instead.
   private implicit val FromRequesterFormat = ((__ \ 'message).format[NsiProviderMessage[NsiProviderOperation]]).inmap(FromRequester.apply, unlift(FromRequester.unapply))
   private implicit val ToRequesterFormat = ((__ \ 'message).format[NsiRequesterMessage[NsiRequesterOperation]]).inmap(ToRequester.apply, unlift(ToRequester.unapply))
@@ -75,29 +58,29 @@ object StoredMessage {
   private implicit val MessageDeliveryFailureFormat = Json.format[MessageDeliveryFailure]
   private implicit val PassedEndTimeFormat = Json.format[PassedEndTime]
 
-  implicit val MessageToStoredMessage = Conversion.build[Message, StoredMessage] {
-    case message @ FromRequester(nsi)    => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromRequester", formatJson(message)))
-    case message @ ToRequester(nsi)      => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToRequester", formatJson(message)))
-    case message @ FromProvider(nsi)     => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromProvider", formatJson(message)))
-    case message @ AckFromProvider(nsi)  => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ProviderAck", formatJson(message)))
-    case message @ ToProvider(nsi, _)    => Success(StoredMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToProvider", formatJson(message)))
-    case message @ FromPce(pce)          => Success(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "FromPce", formatJson(message)))
-    case message @ AckFromPce(pce)       => Success(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "AckFromPce", formatJson(message)))
-    case message @ ToPce(pce)            => Success(StoredMessage(pce.correlationId, directionOf(message), "PCEv1", "ToPce", formatJson(message)))
-    case message: MessageDeliveryFailure => Success(StoredMessage(message.correlationId, directionOf(message), "", "MessageDeliveryFailure", formatJson(message)))
-    case message: PassedEndTime          => Success(StoredMessage(message.correlationId, directionOf(message), "", "PassedEndTime", formatJson(message)))
-  } { stored =>
-    stored.tpe match {
-      case "FromRequester"          => parseJson[FromRequester](stored.content)
-      case "ToRequester"            => parseJson[ToRequester](stored.content)
-      case "FromProvider"           => parseJson[FromProvider](stored.content)
-      case "ProviderAck"            => parseJson[AckFromProvider](stored.content)
-      case "ToProvider"             => parseJson[ToProvider](stored.content)
-      case "AckFromPce"             => parseJson[AckFromPce](stored.content)
-      case "FromPce"                => parseJson[FromPce](stored.content)
-      case "ToPce"                  => parseJson[ToPce](stored.content)
-      case "MessageDeliveryFailure" => parseJson[MessageDeliveryFailure](stored.content)
-      case "PassedEndTime"          => parseJson[PassedEndTime](stored.content)
+  private implicit val MessageToSerializedMessage = Conversion.build[Message, SerializedMessage] {
+    case message @ FromRequester(nsi)    => Success(SerializedMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromRequester", formatJson(message)))
+    case message @ ToRequester(nsi)      => Success(SerializedMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToRequester", formatJson(message)))
+    case message @ FromProvider(nsi)     => Success(SerializedMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromProvider", formatJson(message)))
+    case message @ AckFromProvider(nsi)  => Success(SerializedMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ProviderAck", formatJson(message)))
+    case message @ ToProvider(nsi, _)    => Success(SerializedMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToProvider", formatJson(message)))
+    case message @ FromPce(pce)          => Success(SerializedMessage(pce.correlationId, directionOf(message), "PCEv1", "FromPce", formatJson(message)))
+    case message @ AckFromPce(pce)       => Success(SerializedMessage(pce.correlationId, directionOf(message), "PCEv1", "AckFromPce", formatJson(message)))
+    case message @ ToPce(pce)            => Success(SerializedMessage(pce.correlationId, directionOf(message), "PCEv1", "ToPce", formatJson(message)))
+    case message: MessageDeliveryFailure => Success(SerializedMessage(message.correlationId, directionOf(message), "", "MessageDeliveryFailure", formatJson(message)))
+    case message: PassedEndTime          => Success(SerializedMessage(message.correlationId, directionOf(message), "", "PassedEndTime", formatJson(message)))
+  } { serialized =>
+    serialized.tpe match {
+      case "FromRequester"          => parseJson[FromRequester](serialized.content)
+      case "ToRequester"            => parseJson[ToRequester](serialized.content)
+      case "FromProvider"           => parseJson[FromProvider](serialized.content)
+      case "ProviderAck"            => parseJson[AckFromProvider](serialized.content)
+      case "ToProvider"             => parseJson[ToProvider](serialized.content)
+      case "AckFromPce"             => parseJson[AckFromPce](serialized.content)
+      case "FromPce"                => parseJson[FromPce](serialized.content)
+      case "ToPce"                  => parseJson[ToPce](serialized.content)
+      case "MessageDeliveryFailure" => parseJson[MessageDeliveryFailure](serialized.content)
+      case "PassedEndTime"          => parseJson[PassedEndTime](serialized.content)
     }
   }
 
@@ -105,7 +88,9 @@ object StoredMessage {
   private def parseJson[T: Reads](json: String): Try[T] = Json.parse(json).validate[T].fold(errors => Failure(ErrorMessageException(errors.mkString(", "))), ok => Success(ok))
 }
 
-class MessageStore[T]()(implicit conversion: Conversion[T, StoredMessage]) {
+class MessageStore() {
+  import MessageStore.MessageToSerializedMessage
+
   private implicit def rowToUuid: Column[UUID] = {
     Column.nonNull[UUID] { (value, meta) =>
       val MetaDataItem(qualified, nullable, clazz) = meta
@@ -116,53 +101,56 @@ class MessageStore[T]()(implicit conversion: Conversion[T, StoredMessage]) {
     }
   }
 
-  def storeInboundWithOutboundMessages(aggregatedConnectionId: ConnectionId, inbound: T, outbound: Seq[T]) = DB.withTransaction { implicit connection =>
-    val inboundId = store(aggregatedConnectionId, inbound, None)
-    outbound.foreach(store(aggregatedConnectionId, _, Some(inboundId)))
+  def storeInboundWithOutboundMessages(aggregatedConnectionId: ConnectionId, inbound: InboundMessage, outbound: Seq[OutboundMessage]) = DB.withTransaction { implicit connection =>
+    val createdAt = new Instant()
+    val inboundId = store(aggregatedConnectionId, createdAt, inbound, None)
+    outbound.foreach(store(aggregatedConnectionId, createdAt, _, Some(inboundId)))
   }
 
-  def loadAll(aggregatedConnectionId: ConnectionId): Seq[T] = DB.withConnection { implicit connection =>
+  def loadAll(aggregatedConnectionId: ConnectionId): Seq[MessageRecord[Message]] = DB.withConnection { implicit connection =>
     SQL("""
-        SELECT correlation_id, direction, protocol, type, content, created_at
+        SELECT id, created_at, aggregated_connection_id, correlation_id, direction, protocol, type, content, created_at
           FROM messages
          WHERE aggregated_connection_id = {aggregated_connection_id}
          ORDER BY id ASC""").on(
-      'aggregated_connection_id -> aggregatedConnectionId).as(messageParser.*).map(message => conversion.invert(message).get) // FIXME error handling
+      'aggregated_connection_id -> aggregatedConnectionId)
+      .as(recordParser.*)
+      .map(_.map(message => MessageToSerializedMessage.invert(message).get)) // FIXME error handling
   }
 
-  def loadEverything(): Seq[(ConnectionId, Seq[T])] = DB.withConnection { implicit connection =>
+  def loadEverything(): Seq[(ConnectionId, Seq[Message])] = DB.withConnection { implicit connection =>
     SQL("""
-        SELECT aggregated_connection_id, direction, correlation_id, protocol, type, content, created_at
+        SELECT id, aggregated_connection_id, created_at, direction, correlation_id, protocol, type, content
           FROM messages
-         ORDER BY aggregated_connection_id ASC, id ASC""").as(
-      (str("aggregated_connection_id") ~ messageParser).*).groupBy {
-        case connectionId ~ _ => connectionId
-      }.map {
-        case (connectionId, messages) =>
-          connectionId -> messages.flatMap {
-            case _ ~ message => conversion.invert(message).toOption
+         ORDER BY aggregated_connection_id ASC, id ASC""")
+      .as(recordParser.*)
+      .groupBy(_.aggregatedConnectionId)
+      .map {
+        case (connectionId, records) =>
+          connectionId -> records.flatMap { record =>
+            MessageToSerializedMessage.invert(record.message).toOption
           }
       }(collection.breakOut)
   }
 
-  private def messageParser = (get[UUID]("correlation_id") ~ str("direction") ~ str("protocol") ~ str("type") ~ str("content") ~ get[java.util.Date]("created_at")).map {
-    case correlationId ~ direction ~ protocol ~ tpe ~ content ~ createdAt =>
-      StoredMessage(CorrelationId.fromUuid(correlationId), direction, protocol, tpe, content, new Instant(createdAt))
+  private def recordParser = (get[Long]("id") ~ get[java.util.Date]("created_at") ~ get[String]("aggregated_connection_id") ~ get[UUID]("correlation_id") ~ str("direction") ~ str("protocol") ~ str("type") ~ str("content")).map {
+    case id ~ createdAt ~ aggregatedConnectionId ~ correlationId ~ direction ~ protocol ~ tpe ~ content =>
+      MessageRecord(id, new Instant(createdAt), aggregatedConnectionId, SerializedMessage(CorrelationId.fromUuid(correlationId), direction, protocol, tpe, content))
   }
 
-  private def store(aggregatedConnectionId: ConnectionId, message: T, inboundId: Option[Long]) = DB.withTransaction { implicit connection =>
-    val stored = conversion(message).get
+  private def store(aggregatedConnectionId: ConnectionId, createdAt: Instant, message: Message, inboundId: Option[Long]) = DB.withTransaction { implicit connection =>
+    val serialized = MessageToSerializedMessage(message).get
     SQL("""
         INSERT INTO messages (aggregated_connection_id, correlation_id, direction, protocol, type, content, created_at, inbound_message_id)
              VALUES ({aggregated_connection_id}, {correlation_id}, {direction}, {protocol}, {type}, {content}, {created_at}, {inbound_message_id})
         """).on(
       'aggregated_connection_id -> aggregatedConnectionId,
-      'direction -> stored.direction,
-      'correlation_id -> stored.correlationId.value,
-      'protocol -> stored.protocol,
-      'type -> stored.tpe,
-      'content -> stored.content,
-      'created_at -> stored.createdAt.toSqlTimestamp,
+      'direction -> serialized.direction,
+      'correlation_id -> serialized.correlationId.value,
+      'protocol -> serialized.protocol,
+      'type -> serialized.tpe,
+      'content -> serialized.content,
+      'created_at -> createdAt.toSqlTimestamp,
       'inbound_message_id -> inboundId).executeInsert().getOrElse(sys.error("insert failed to generate primary key"))
   }
 }

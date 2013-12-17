@@ -55,12 +55,6 @@ object PceMessage {
   }
   implicit val CorrelationIdWrites: Writes[CorrelationId] = Writes { x => JsString(x.toString) }
 
-  implicit val UriReads: Reads[URI] = Reads[URI] {
-    case JsString(s) => Try { new URI(s) }.map { x => JsSuccess(x) }.getOrElse { JsError(ValidationError("bad.uri", s)) }
-    case json        => JsError(ValidationError("bad.uri", json))
-  }
-  implicit val UriWrites: Writes[URI] = Writes[URI] { x => JsString(x.toASCIIString()) }
-
   implicit val StpTypeFormat: Format[StpType] = (
     (__ \ "networkId").format[String] and
     (__ \ "localId").format[String])(

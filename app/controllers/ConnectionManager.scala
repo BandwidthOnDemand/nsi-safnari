@@ -26,7 +26,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   private val connectionsByRequesterCorrelationId = TMap.empty[(RequesterNsa, CorrelationId), ActorRef]
 
   private val childConnections = TMap.empty[ConnectionId, ActorRef]
-  private val messageStore = new MessageStore[Message]()
+  val messageStore = new MessageStore()
 
   def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: ActorRef) = {
     connections.single(connectionId) = connection

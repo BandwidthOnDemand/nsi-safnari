@@ -11,7 +11,7 @@ class MessageStoreSpec extends helpers.Specification {
 
   def Application = FakeApplication()
 
-  val messageStore = new MessageStore[Message]()
+  val messageStore = new MessageStore()
 
   "MessageStore" should {
 
@@ -20,7 +20,7 @@ class MessageStoreSpec extends helpers.Specification {
       val message = PceMessageSpec.pathComputationResponse
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromPce(message), Seq.empty) must not(throwA[Exception])
 
-      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
       loaded must contain(beEqualTo(FromPce(message))).exactly(1)
     }
 
@@ -30,7 +30,7 @@ class MessageStoreSpec extends helpers.Specification {
 
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromPce(message), Seq.empty) must not(throwA[Exception])
 
-      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
       loaded must contain(beEqualTo(FromPce(message))).exactly(1)
     }
 
@@ -40,7 +40,7 @@ class MessageStoreSpec extends helpers.Specification {
 
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, AckFromPce(message), Seq.empty) must not(throwA[Exception])
 
-      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
       loaded must contain(like[Message] {
         case ack @ AckFromPce(message) => ok
       }).exactly(1)
@@ -52,7 +52,7 @@ class MessageStoreSpec extends helpers.Specification {
 
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, AckFromPce(message), Seq.empty) must not(throwA[Exception])
 
-      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
       loaded must contain(like[Message] {
         case ack @ AckFromPce(message) => ok
       }).exactly(1)
@@ -63,7 +63,7 @@ class MessageStoreSpec extends helpers.Specification {
       val message = NsiMessageSpec.initialReserveMessage
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromRequester(message), Seq.empty) must not(throwA[Exception])
 
-      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
       loaded must contain(beEqualTo(FromRequester(message))).exactly(1)
     }
 
@@ -73,7 +73,7 @@ class MessageStoreSpec extends helpers.Specification {
 
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromProvider(message), Seq.empty) must not(throwA[Exception])
 
-      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
       loaded must contain(beEqualTo(FromProvider(message))).exactly(1)
     }
 
@@ -82,9 +82,9 @@ class MessageStoreSpec extends helpers.Specification {
       val message = NsiMessageSpec.initialReserveMessage
       val endPoint = ProviderEndPoint("urn:nsa:surf", URI.create("http://localhost"), NoAuthentication)
 
-      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, ToProvider(message, endPoint), Seq.empty) must not(throwA[Exception])
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, FromRequester(message), Seq(ToProvider(message, endPoint))) must not(throwA[Exception])
 
-      val loaded = messageStore.loadAll(aggregatedConnectionId)
+      val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
       loaded must contain(beEqualTo(ToProvider(message, endPoint))).exactly(1)
     }
   }
