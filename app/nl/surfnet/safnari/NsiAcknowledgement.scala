@@ -6,7 +6,9 @@ import org.ogf.schemas.nsi._2013._07.connection.types.NotificationBaseType
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._07.connection.types.QueryFailedType
 
-sealed trait NsiAcknowledgement
+sealed trait NsiAcknowledgement {
+  final def action: String = this.getClass.getSimpleName
+}
 case class GenericAck() extends NsiAcknowledgement
 case class ReserveResponse(connectionId: String) extends NsiAcknowledgement
 case class ServiceException(exception: ServiceExceptionType) extends NsiAcknowledgement

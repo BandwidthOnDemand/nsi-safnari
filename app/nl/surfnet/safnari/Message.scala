@@ -16,11 +16,11 @@ object Message {
 sealed trait OutboundMessage extends Message
 sealed trait InboundMessage extends Message
 
-final case class ToRequester(message: NsiRequesterMessage[NsiRequesterOperation]) extends OutboundMessage {
+final case class FromRequester(message: NsiProviderMessage[NsiProviderOperation]) extends InboundMessage {
   override def toShortString = Message.shortString(getClass(), message.body.getClass(), correlationId)
   override def correlationId = message.headers.correlationId
 }
-final case class FromRequester(message: NsiProviderMessage[NsiProviderOperation]) extends InboundMessage {
+final case class ToRequester(message: NsiRequesterMessage[NsiRequesterOperation]) extends OutboundMessage {
   override def toShortString = Message.shortString(getClass(), message.body.getClass(), correlationId)
   override def correlationId = message.headers.correlationId
 }

@@ -18,6 +18,7 @@ import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetBaseType
 case class ServiceType(serviceType: String, service: P2PServiceBaseType)
 
 sealed trait PceMessage {
+  final def action = this.getClass.getSimpleName
   def correlationId: CorrelationId
 }
 sealed trait PceRequest extends PceMessage

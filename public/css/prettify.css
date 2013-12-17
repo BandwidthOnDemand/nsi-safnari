@@ -1,0 +1,25 @@
+.lit, .atn { color: #195f91; }
+.com, .pun, .opn, .clo { color: #93a1a1; }
+.pln, .fun { color: #dc322f; }
+.str { color: #D14; }
+.kwd, .linenums .tag { color: #1e347b; }
+.tag, .typ, .dec, .var { color: teal; }
+.atv { color: #48484c; }
+
+.xml-content {
+    background-color: #ffffff;
+    border: 1px solid #BFBFBF;
+    padding-top: 1.5em;
+    margin-bottom: 20px;
+}
+.xml-content .message {
+    padding: .4em 40px;
+    margin-bottom: 1em;
+    background-color: #CAE8F0;
+}
+.prettyprint {
+    background-color: #ffffff;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 0;
+}

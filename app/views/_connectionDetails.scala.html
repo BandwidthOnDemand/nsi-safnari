@@ -1,0 +1,73 @@
+@* _connectionDetails Template File *@
+@(connection: org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType, segments: Seq[nl.surfnet.safnari.ConnectionData])
+
+@import nl.surfnet.safnari._
+
+@stp(stp: org.ogf.schemas.nsi._2013._07.services.types.StpType) = {
+    @stp.getNetworkId() @@ @stp.getLocalId()
+}
+@nullable(field: AnyRef) = @{
+    if (field eq null) "-" else field
+}
+
+<div class="rowdetails-content">
+    <div class="row-fluid">
+        <div class="span6">
+            <dl class="dl-horizontal">
+                <dt>Start</dt>
+                <dd>@nullable(connection.getCriteria().head.getSchedule().getStartTime())</dd>
+                <dt>Bandwidth</dt>
+                <dd>@connection.getCriteria().head.getPointToPointService().map(_.getCapacity()).getOrElse("unknown")</dd>
+                <dt>Global id</dt>
+                <dd>@nullable(connection.getGlobalReservationId())</dd>
+            </dl>
+        </div>
+        <div class="span6">
+            <dl class="dl-horizontal">
+                <dt>End</dt>
+                <dd>@nullable(connection.getCriteria().head.getSchedule().getEndTime())</dd>
+                <dt>Version</dt>
+                <dd>@connection.getCriteria().head.getVersion()</dd>
+                <dt>Requester</dt>
+                <dd>@connection.getRequesterNSA()</dd>
+            </dl>
+        </div>
+            <dl class="dl-horizontal">
+                <dt>Source</dt>
+                <dd>@connection.getCriteria().head.getPointToPointService().map(_.getSourceSTP()).map(stp).getOrElse("unknown")</dd>
+                <dt>Destination</dt>
+                <dd>@connection.getCriteria().head.getPointToPointService().map(_.getDestSTP()).map(stp).getOrElse("unknown")</dd>
+            </dl>
+    </div>
+    @if(segments.isEmpty) {
+        <strong>No Child Connections</strong>
+    } else {
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>ConnectionId</th>
+                    <th>NSA</th>
+                    <th>LSM</th>
+                    <th>RSM</th>
+                    <th>PSM</th>
+                    <th>DSM</th>
+                    <th>Error?</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for(segment <- segments) {
+                    <tr>
+                        <td>@segment.connectionId.getOrElse("<unknown>")</td>
+                        <td>@segment.providerNsa</td>
+                        <td>@segment.lifecycleState</td>
+                        <td>@segment.reservationState</td>
+                        <td>@segment.provisionState</td>
+                        <td>@segment.dataPlaneStatus</td>
+                        <td>@segment.lastServiceException.getOrElse("none")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+

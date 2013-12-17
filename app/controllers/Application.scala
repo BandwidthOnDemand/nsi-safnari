@@ -15,11 +15,12 @@ import nl.surfnet.safnari.ConnectionId
 import nl.surfnet.safnari.ReservationState
 import nl.surfnet.safnari.ConnectionData
 import nl.surfnet.safnari._
+import akka.actor.ActorRef
 
 class Application(connectionManager: ConnectionManager) extends Controller {
   implicit val timeout = Timeout(2.seconds)
 
-  private lazy val version: String = Seq("git", "log", "--format=%ad %h", "--date=short",  "-1").!!
+  private lazy val version: String = Seq("git", "log", "--format=%ad %h", "--date=short", "-1").!!
 
   def index = Action { implicit request =>
     val secure = request.headers.get("X-Forwarded-Proto") == Some("https")
@@ -43,11 +44,8 @@ class Application(connectionManager: ConnectionManager) extends Controller {
   def connections(page: Int) = Action.async {
     val timeBound = DateTime.now().minusWeeks(1).toXmlGregorianCalendar
 
-    val queryResult = Future.traverse(connectionManager.all) { c =>
-      (c ? 'query).mapTo[QuerySummaryResultType] flatMap { summary =>
-        (c ? 'querySegments).mapTo[Seq[ConnectionData]] map (summary -> _)
-      }
-    }
+    // FIXME data consistency (two messages may be interleaved with other messages)
+    val queryResult = Future.traverse(connectionManager.all)(connectionDetails)
 
     queryResult map { cs =>
       val connections =
@@ -61,6 +59,25 @@ class Application(connectionManager: ConnectionManager) extends Controller {
 
       Ok(views.html.connections(connections.reverse))
     }
+  }
+
+  def connection(id: ConnectionId) = Action.async {
+    // FIXME data consistency (db query + two messages may be interleaved with other messages)
+    connectionManager.get(id).map { c =>
+      connectionDetails(c) map { case (connection, segments) =>
+        val messages = connectionManager.messageStore.loadAll(id)
+        Ok(views.html.connection(connection, segments, messages))
+      }
+    }.getOrElse {
+      Future.successful(NotFound)
+    }
+  }
+
+  private def connectionDetails(connection: ActorRef) = for {
+    summary <- (connection ? 'query).mapTo[QuerySummaryResultType]
+    segments <- (connection ? 'querySegments).mapTo[Seq[ConnectionData]]
+  } yield {
+    summary -> segments
   }
 
 }

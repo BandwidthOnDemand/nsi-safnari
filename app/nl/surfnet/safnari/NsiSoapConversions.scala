@@ -24,6 +24,9 @@ import scala.reflect.ClassTag
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import javax.xml.transform.OutputKeys
+import scala.xml.parsing.NoBindingFactoryAdapter
+import javax.xml.transform.sax.SAXResult
 
 object NsiSoapConversions {
   implicit val ByteArrayToString = Conversion.build[Array[Byte], String] { bytes =>
@@ -33,6 +36,16 @@ object NsiSoapConversions {
   }
 
   val NsiXmlDocumentConversion = XmlDocumentConversion("wsdl/soap/soap-envelope-1.1.xsd", "wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
+
+  def documentToScalaXml(document: Document): scala.xml.Node = {
+    val source = new DOMSource(document)
+    val adapter = new NoBindingFactoryAdapter
+    val saxResult = new SAXResult(adapter)
+    val transformerFactory = javax.xml.transform.TransformerFactory.newInstance()
+    val transformer = transformerFactory.newTransformer()
+    transformer.transform(source, saxResult)
+    adapter.rootElem
+  }
 
   implicit val DocumentToString: Conversion[Document, String] = NsiXmlDocumentConversion.andThen(ByteArrayToString)
 
@@ -92,36 +105,41 @@ object NsiSoapConversions {
     messageFactories(Map[String, NsiMessageParser[NsiAcknowledgement]](
       "acknowledgment" -> NsiMessageParser { (body: GenericAcknowledgmentType) => Success(GenericAck()) },
       "reserveResponse" -> NsiMessageParser { (body: ReserveResponseType) =>
-        Success(ReserveResponse(body.getConnectionId())) },
+        Success(ReserveResponse(body.getConnectionId()))
+      },
       "querySummarySyncConfirmed" -> NsiMessageParser { (body: QuerySummaryConfirmedType) =>
-        Success(QuerySummarySyncConfirmed(body.getReservation().asScala.toVector)) },
+        Success(QuerySummarySyncConfirmed(body.getReservation().asScala.toVector))
+      },
       "queryNotificationSyncConfirmed" -> NsiMessageParser { (body: QueryNotificationConfirmedType) =>
-        Success(QueryNotificationSyncConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector)) },
+        Success(QueryNotificationSyncConfirmed(body.getErrorEventOrReserveTimeoutOrDataPlaneStateChange().asScala.toVector))
+      },
       "queryNotificationSyncFailed" -> NsiMessageParser { (body: org.ogf.schemas.nsi._2013._07.connection.provider.QueryNotificationSyncFailed) =>
-        Success(QueryNotificationSyncFailed(body.getFaultInfo())) },
+        Success(QueryNotificationSyncFailed(body.getFaultInfo()))
+      },
       "serviceException" -> NsiMessageParser { (body: ServiceExceptionType) =>
-        Success(ServiceException(body)) }))
+        Success(ServiceException(body))
+      }))
   }
 
   implicit val NsiProviderOperationToElement = Conversion.build[NsiProviderOperation, Element] { operation =>
     marshal(operation match {
-      case InitialReserve(body, _, _)                      => typesFactory.createReserve(body)
-      case ReserveCommit(connectionId)                     => typesFactory.createReserveCommit(new GenericRequestType().withConnectionId(connectionId))
-      case ReserveAbort(connectionId)                      => typesFactory.createReserveAbort(new GenericRequestType().withConnectionId(connectionId))
-      case Provision(connectionId)                         => typesFactory.createProvision(new GenericRequestType().withConnectionId(connectionId))
-      case Release(connectionId)                           => typesFactory.createRelease(new GenericRequestType().withConnectionId(connectionId))
-      case Terminate(connectionId)                         => typesFactory.createTerminate(new GenericRequestType().withConnectionId(connectionId))
-      case QuerySummary(ids)                               => typesFactory.createQuerySummary(toQueryType(ids))
-      case QuerySummarySync(ids)                           => typesFactory.createQuerySummarySync(toQueryType(ids))
-      case QueryRecursive(ids)                             => typesFactory.createQueryRecursive(toQueryType(ids))
-      case QueryNotification(connectionId, start, end)     => typesFactory.createQueryNotification(new QueryNotificationType()
-                                                                .withConnectionId(connectionId)
-                                                                .withStartNotificationId(start.map(x => x: Integer).orNull)
-                                                                .withEndNotificationId(end.map(x => x: Integer).orNull))
+      case InitialReserve(body, _, _)  => typesFactory.createReserve(body)
+      case ReserveCommit(connectionId) => typesFactory.createReserveCommit(new GenericRequestType().withConnectionId(connectionId))
+      case ReserveAbort(connectionId)  => typesFactory.createReserveAbort(new GenericRequestType().withConnectionId(connectionId))
+      case Provision(connectionId)     => typesFactory.createProvision(new GenericRequestType().withConnectionId(connectionId))
+      case Release(connectionId)       => typesFactory.createRelease(new GenericRequestType().withConnectionId(connectionId))
+      case Terminate(connectionId)     => typesFactory.createTerminate(new GenericRequestType().withConnectionId(connectionId))
+      case QuerySummary(ids)           => typesFactory.createQuerySummary(toQueryType(ids))
+      case QuerySummarySync(ids)       => typesFactory.createQuerySummarySync(toQueryType(ids))
+      case QueryRecursive(ids)         => typesFactory.createQueryRecursive(toQueryType(ids))
+      case QueryNotification(connectionId, start, end) => typesFactory.createQueryNotification(new QueryNotificationType()
+        .withConnectionId(connectionId)
+        .withStartNotificationId(start.map(x => x: Integer).orNull)
+        .withEndNotificationId(end.map(x => x: Integer).orNull))
       case QueryNotificationSync(connectionId, start, end) => typesFactory.createQueryNotificationSync(new QueryNotificationType()
-                                                                .withConnectionId(connectionId)
-                                                                .withStartNotificationId(start.map(x => x: Integer).orNull)
-                                                                .withEndNotificationId(end.map(x => x: Integer).orNull))
+        .withConnectionId(connectionId)
+        .withStartNotificationId(start.map(x => x: Integer).orNull)
+        .withEndNotificationId(end.map(x => x: Integer).orNull))
     })
   } {
     messageFactories(Map[String, NsiMessageParser[NsiProviderOperation]](
@@ -145,11 +163,13 @@ object NsiSoapConversions {
       "queryNotification" -> NsiMessageParser { body: QueryNotificationType =>
         Success(QueryNotification(body.getConnectionId,
           Option(body.getStartNotificationId()).map(_.toInt),
-          Option(body.getEndNotificationId()).map(_.toInt))) },
+          Option(body.getEndNotificationId()).map(_.toInt)))
+      },
       "queryNotificationSync" -> NsiMessageParser { body: QueryNotificationType =>
         Success(QueryNotificationSync(body.getConnectionId,
           Option(body.getStartNotificationId()).map(_.toInt),
-          Option(body.getEndNotificationId()).map(_.toInt))) }))
+          Option(body.getEndNotificationId()).map(_.toInt)))
+      }))
   }
 
   private def toIds(query: QueryType): Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]] =
@@ -355,14 +375,14 @@ object NsiSoapConversions {
   }
 
   private def parseNsiHeaders(soapEnvelope: Element): Try[Option[NsiHeaders]] = for {
-      soapHeader <- findOptionalChildElement(SoapNamespaceUri, "Header", soapEnvelope)
-      headerNode <- soapHeader.map(it => findOptionalChildElement(NsiHeadersQName.getNamespaceURI(), NsiHeadersQName.getLocalPart(), it)).getOrElse(Success(None))
-      header <- headerNode.map(Conversion[NsiHeaders, Element].invert(_)).sequence
+    soapHeader <- findOptionalChildElement(SoapNamespaceUri, "Header", soapEnvelope)
+    headerNode <- soapHeader.map(it => findOptionalChildElement(NsiHeadersQName.getNamespaceURI(), NsiHeadersQName.getLocalPart(), it)).getOrElse(Success(None))
+    header <- headerNode.map(Conversion[NsiHeaders, Element].invert(_)).sequence
   } yield header
 
   private def parseSoapBody[T](soapBody: Element)(implicit bodyConversion: Conversion[T, Element]): Try[T] = for {
-      bodyNode <- findSingleChildElement(NsiConnectionTypesNamespace, "*", soapBody)
-      body <- bodyConversion.invert(bodyNode)
+    bodyNode <- findSingleChildElement(NsiConnectionTypesNamespace, "*", soapBody)
+    body <- bodyConversion.invert(bodyNode)
   } yield body
 
   private val ServiceExceptionTypeName = typesFactory.createServiceException(null).getName()

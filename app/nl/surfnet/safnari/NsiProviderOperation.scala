@@ -5,8 +5,9 @@ import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteria
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 
 sealed trait NsiProviderOperation {
-  def soapActionUrl: String = {
-    s"http://schemas.ogf.org/nsi/2013/07/connection/service/${this.getClass().getSimpleName().deCapitalize}"
+  def action: String = this.getClass().getSimpleName()
+  final def soapActionUrl: String = {
+    s"http://schemas.ogf.org/nsi/2013/07/connection/service/${action.uncapitalize}"
   }
 }
 
@@ -20,7 +21,7 @@ sealed trait NsiProviderUpdateCommand extends NsiProviderCommand {
 }
 
 case class InitialReserve(body: ReserveType, criteria: ReservationConfirmCriteriaType, service: P2PServiceBaseType) extends NsiProviderCommand {
-  override def soapActionUrl = "http://schemas.ogf.org/nsi/2013/07/connection/service/reserve"
+  override def action = "Reserve"
   override def optionalConnectionId: Option[ConnectionId] = None
 }
 case class ReserveCommit(connectionId: ConnectionId) extends NsiProviderUpdateCommand

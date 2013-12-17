@@ -1,0 +1,76 @@
+@(connection: org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType, segments: Seq[nl.surfnet.safnari.ConnectionData], messages: Seq[nl.surfnet.safnari.MessageRecord[nl.surfnet.safnari.Message]])
+
+@import nl.surfnet.safnari._
+@import nl.surfnet.safnari.NsiSoapConversions._
+@import org.w3c.dom.Document
+@import scala.xml.PrettyPrinter
+@import play.api.libs.json.Json
+
+@pretty(document: Document) = @{
+  val pp = new PrettyPrinter(Int.MaxValue, 2)
+  val xml = documentToScalaXml(document)
+  pp.format(xml)
+}
+
+@main("Connection", "connection") {
+
+    <section id="connection">
+        <h1>Connection</h1>
+        @_connectionDetails(connection, segments)
+    </section>
+    <section id="messages">
+        <h1>Messages</h1>
+        <div class="content">
+        </div>
+        <div class="xml-content template" id="xml-template">
+            @for((record, index) <- messages.zipWithIndex.reverse) {
+              @record.message match {
+                case FromRequester(message) => {
+                  <div class="message"><h3>@(index + 1) @message.body.action.capitalize request from @message.headers.requesterNSA<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@pretty(NsiProviderMessageToDocument[NsiProviderOperation](None).apply(message).get)</pre>
+                }
+                case ToRequester(message) => {
+                  <div class="message"><h3>@(index + 1) @message.body.action.capitalize reply to @message.headers.requesterNSA<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@pretty(NsiRequesterMessageToDocument[NsiRequesterOperation](None).apply(message).get)</pre>
+                }
+                case ToProvider(message, _) => {
+                  <div class="message"><h3>@(index + 1) @message.body.action.capitalize request to @message.headers.providerNSA<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@pretty(NsiProviderMessageToDocument[NsiProviderOperation](None).apply(message).get)</pre>
+                }
+                case FromProvider(message) => {
+                  <div class="message"><h3>@(index + 1) @message.body.action.capitalize reply from @message.headers.providerNSA<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@pretty(NsiRequesterMessageToDocument[NsiRequesterOperation](None).apply(message).get)</pre>
+                }
+                case AckFromProvider(message) => {
+                  <div class="message"><h3>@(index + 1) @message.body.action.capitalize from @message.headers.providerNSA<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@pretty(NsiProviderMessageToDocument[NsiAcknowledgement](None).apply(message).get)</pre>
+                }
+                case ToPce(message) => {
+                  <div class="message"><h3>@(index + 1) @message.action.capitalize request to PCE<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@{Json.prettyPrint(Json.toJson(message))}</pre>
+                }
+                case FromPce(message) => {
+                  <div class="message"><h3>@(index + 1) @message.action.capitalize reply from PCE<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@{Json.prettyPrint(Json.toJson(message))}</pre>
+                }
+                case AckFromPce(message) => {
+                  <div class="message"><h3>@(index + 1) @message.action.capitalize from PCE<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@{Json.prettyPrint(Json.toJson(message))}</pre>
+                }
+                case message: MessageDeliveryFailure => {
+                  <div class="message"><h3>@(index + 1) MessageDeliveryFailure<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@message</pre>
+                }
+                case message: PassedEndTime => {
+                  <div class="message"><h3>@(index + 1) PassedEndTime<span class="time">@record.createdAt.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></h3></div>
+                  <pre class="prettyprint">@message</pre>
+                }
+              }
+            }
+        </div>
+    </section>
+}
+
+<script>
+$(prettyPrint);
+</script>

@@ -5,6 +5,7 @@
 # Home page
 GET    /                                    @controllers.Application.index
 GET    /connections                         @controllers.Application.connections(page: Int ?= 1)
+GET    /connections/:id                     @controllers.Application.connection(id: String)
 GET    /healthcheck                         @controllers.Application.healthcheck
 
 POST   /nsi-v2/ConnectionServiceProvider    @controllers.ConnectionProvider.request

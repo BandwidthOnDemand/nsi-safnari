@@ -66,7 +66,7 @@ package object safnari {
   }
 
   implicit class RichString(str: String) {
-    def deCapitalize: String = str.take(1).toLowerCase + str.drop(1)
+    def uncapitalize: String = str.take(1).toLowerCase + str.drop(1)
   }
 
   implicit object XmlGregorianCalendarOrdering extends Ordering[XMLGregorianCalendar] {

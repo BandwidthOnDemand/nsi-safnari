@@ -16,13 +16,8 @@ import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import scala.util.{ Try, Success, Failure }
 import java.net.URI
 
-private case class SerializedMessage(correlationId: CorrelationId, direction: String, protocol: String, tpe: String, content: String)
-
-case class MessageRecord[T](id: Long, createdAt: Instant = new Instant(), aggregatedConnectionId: ConnectionId, message: T) {
-  def map[B](f: T => B) = copy(message = f(message))
-}
-
-object MessageStore {
+case class SerializedMessage(correlationId: CorrelationId, direction: String, protocol: String, tpe: String, content: String)
+object SerializedMessage {
   private def conversionToFormat[A, B: Format](conversion: Conversion[A, B]): Format[A] = new Format[A] {
     override def reads(js: JsValue): JsResult[A] = Json.fromJson[B](js).flatMap { b =>
       conversion.invert(b).toEither.fold(error => JsError(ValidationError("error.conversion.failed", error)), JsSuccess(_))
@@ -58,7 +53,7 @@ object MessageStore {
   private implicit val MessageDeliveryFailureFormat = Json.format[MessageDeliveryFailure]
   private implicit val PassedEndTimeFormat = Json.format[PassedEndTime]
 
-  private implicit val MessageToSerializedMessage = Conversion.build[Message, SerializedMessage] {
+  implicit val MessageToSerializedMessage = Conversion.build[Message, SerializedMessage] {
     case message @ FromRequester(nsi)    => Success(SerializedMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromRequester", formatJson(message)))
     case message @ ToRequester(nsi)      => Success(SerializedMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "ToRequester", formatJson(message)))
     case message @ FromProvider(nsi)     => Success(SerializedMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromProvider", formatJson(message)))
@@ -88,8 +83,12 @@ object MessageStore {
   private def parseJson[T: Reads](json: String): Try[T] = Json.parse(json).validate[T].fold(errors => Failure(ErrorMessageException(errors.mkString(", "))), ok => Success(ok))
 }
 
+case class MessageRecord[T](id: Long, createdAt: Instant = new Instant(), aggregatedConnectionId: ConnectionId, message: T) {
+  def map[B](f: T => B) = copy(message = f(message))
+}
+
 class MessageStore() {
-  import MessageStore.MessageToSerializedMessage
+  import SerializedMessage.MessageToSerializedMessage
 
   private implicit def rowToUuid: Column[UUID] = {
     Column.nonNull[UUID] { (value, meta) =>
