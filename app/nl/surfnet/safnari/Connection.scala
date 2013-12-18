@@ -22,6 +22,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     r
   }
   private var mostRecentChildExceptions = Map.empty[ConnectionId, ServiceExceptionType]
+  private var committedCriteria: Option[ReservationConfirmCriteriaType] = None
 
   val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, newNotificationId, { error =>
     new GenericFailedType().
@@ -150,13 +151,16 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       registerProviderConversations(messages, stateMachine)
 
       messages.collectFirst {
-        case ToRequester(NsiRequesterMessage(_, confirmed: ReserveCommitConfirmed)) =>
-          rsm.childConnections.map(kv => kv._2.getOrElse(throw new IllegalStateException("reserveConfirmed with unknown child connectionId")) -> kv._1.provider).toMap
-      }.foreach { children =>
-        otherStateMachines = Some((
-          new ProvisionStateMachine(id, newNsiHeaders, children),
-          new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children),
-          new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children)))
+        case ToRequester(NsiRequesterMessage(_, _: ReserveCommitConfirmed)) =>
+          val children = rsm.childConnections.map {
+            case (segment, Some(connectionId)) => connectionId -> segment.provider
+            case (segment, None)               => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
+          }.toMap
+          committedCriteria = Some(initialReserve.body.criteria)
+          otherStateMachines = Some((
+            new ProvisionStateMachine(id, newNsiHeaders, children),
+            new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children),
+            new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children)))
       }
     }
 
@@ -210,7 +214,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def query = {
-    val children = rsm.childConnections.zipWithIndex.collect {
+    lazy val children = rsm.childConnections.zipWithIndex.collect {
       case ((segment, Some(id)), order) => new ChildSummaryType().
         withConnectionId(id).
         withProviderNSA(segment.provider.nsa).
@@ -218,19 +222,24 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         withOrder(order)
     }
 
-    val criteria = rsm.criteria
-    new QuerySummaryResultType().
+    val result = new QuerySummaryResultType().
       withGlobalReservationId(initialReserve.body.body.getGlobalReservationId()).
       withDescription(initialReserve.body.body.getDescription()).
       withConnectionId(id).
-      withCriteria(new QuerySummaryResultCriteriaType().
-        withSchedule(criteria.getSchedule()).
-        withServiceType(criteria.getServiceType()).
-        withPointToPointService(initialReserve.body.service).
-        withChildren(new ChildSummaryListType().withChild(children.toSeq: _*)).
-        tap(_.getOtherAttributes().putAll(criteria.getOtherAttributes()))).
       withRequesterNSA(requesterNSA).
       withConnectionStates(connectionStates)
+
+    committedCriteria.foreach { criteria =>
+      result.getCriteria().add(new QuerySummaryResultCriteriaType()
+        .withVersion(criteria.getVersion())
+        .withSchedule(criteria.getSchedule())
+        .withServiceType(criteria.getServiceType())
+        .withPointToPointService(initialReserve.body.service)
+        .withChildren(new ChildSummaryListType().withChild(children: _*))
+        .tap(_.getOtherAttributes().putAll(criteria.getOtherAttributes())))
+    }
+
+    result
   }
 
   def connectionStates: ConnectionStatesType = {

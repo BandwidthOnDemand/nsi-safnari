@@ -49,12 +49,14 @@ object PathComputationEngine extends Controller {
       case 'healthCheck =>
         val topologyHealth = WS.url(s"$endPoint/topology/ping").get()
         val pathsHealth = WS.url(s"$endPoint/paths").get()
+
         topologyHealth onFailure { case e => Logger.warn(s"Failed to access PCE topology service: $e") }
         pathsHealth onFailure { case e => Logger.warn(s"Failed to access PCE path finding service: $e") }
 
+        val lastModified = topologyHealth map { _.header("Last-Modified").getOrElse("unknown") }
         val healthy = Future.sequence(List(topologyHealth, pathsHealth)).map(_.forall(_.status == 200)).recover { case t => false }
 
-        sender ! healthy.map("PCE (Real)" -> _)
+        sender ! healthy.flatMap(h => lastModified.map(d => s"PCE (Real; $d)" -> h))
 
       case ToPce(request) =>
         val findPathEndPoint = s"$endPoint/paths/find"
