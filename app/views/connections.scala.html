@@ -28,7 +28,9 @@
                             <td class="center">
                                 <i class="icon-plus-sign"></i>
                                 <i class="icon-minus-sign"></i>
-                                @_connectionDetails(connection, segments)
+                                <div class="rowdetails-content">
+                                    @_connectionDetails(connection, segments)
+                                </div>
                             </td>
                             <td><a href="@routes.Application.connection(connection.getConnectionId)">@connection.getConnectionId()</a></td>
                             <td>@connection.getDescription()</td>

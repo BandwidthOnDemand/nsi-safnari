@@ -42,16 +42,16 @@ object SerializedMessage {
   private implicit val ServiceExceptionTypeFormat: Format[ServiceExceptionType] = conversionToFormat(Conversion[ServiceExceptionType, String])
 
   // Json.format doesn't work, so use manual conversion instead.
-  private implicit val FromRequesterFormat = ((__ \ 'message).format[NsiProviderMessage[NsiProviderOperation]]).inmap(FromRequester.apply, unlift(FromRequester.unapply))
-  private implicit val ToRequesterFormat = ((__ \ 'message).format[NsiRequesterMessage[NsiRequesterOperation]]).inmap(ToRequester.apply, unlift(ToRequester.unapply))
-  private implicit val FromProviderFormat = ((__ \ 'message).format[NsiRequesterMessage[NsiRequesterOperation]]).inmap(FromProvider.apply, unlift(FromProvider.unapply))
-  private implicit val AckFromProviderFormat = ((__ \ 'message).format[NsiProviderMessage[NsiAcknowledgement]]).inmap(AckFromProvider.apply, unlift(AckFromProvider.unapply))
-  private implicit val ToProviderFormat = Json.format[ToProvider]
-  private implicit val FromPceFormat = Json.format[FromPce]
-  private implicit val AckFromPceFormat = Json.format[AckFromPce]
-  private implicit val ToPceFormat = Json.format[ToPce]
-  private implicit val MessageDeliveryFailureFormat = Json.format[MessageDeliveryFailure]
-  private implicit val PassedEndTimeFormat = Json.format[PassedEndTime]
+  implicit val FromRequesterFormat = ((__ \ 'message).format[NsiProviderMessage[NsiProviderOperation]]).inmap(FromRequester.apply, unlift(FromRequester.unapply))
+  implicit val ToRequesterFormat = ((__ \ 'message).format[NsiRequesterMessage[NsiRequesterOperation]]).inmap(ToRequester.apply, unlift(ToRequester.unapply))
+  implicit val FromProviderFormat = ((__ \ 'message).format[NsiRequesterMessage[NsiRequesterOperation]]).inmap(FromProvider.apply, unlift(FromProvider.unapply))
+  implicit val AckFromProviderFormat = ((__ \ 'message).format[NsiProviderMessage[NsiAcknowledgement]]).inmap(AckFromProvider.apply, unlift(AckFromProvider.unapply))
+  implicit val ToProviderFormat = Json.format[ToProvider]
+  implicit val FromPceFormat = Json.format[FromPce]
+  implicit val AckFromPceFormat = Json.format[AckFromPce]
+  implicit val ToPceFormat = Json.format[ToPce]
+  implicit val MessageDeliveryFailureFormat = Json.format[MessageDeliveryFailure]
+  implicit val PassedEndTimeFormat = Json.format[PassedEndTime]
 
   implicit val MessageToSerializedMessage = Conversion.build[Message, SerializedMessage] {
     case message @ FromRequester(nsi)    => Success(SerializedMessage(nsi.headers.correlationId, directionOf(message), "NSIv2", "FromRequester", formatJson(message)))
