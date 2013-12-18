@@ -20,8 +20,6 @@ import akka.actor.ActorRef
 class Application(connectionManager: ConnectionManager) extends Controller {
   implicit val timeout = Timeout(2.seconds)
 
-  private lazy val version: String = Seq("git", "log", "--format=%ad %h", "--date=short", "-1").!!
-
   def index = Action { implicit request =>
     val secure = request.headers.get("X-Forwarded-Proto") == Some("https")
     Ok(views.html.index(secure, Configuration.Nsa))
@@ -32,7 +30,7 @@ class Application(connectionManager: ConnectionManager) extends Controller {
     val nsiHealth = (ConnectionRequester.nsiRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
 
     Future.sequence(List(nsiHealth, pceHealth)) map { healthStates =>
-      val view = views.html.healthcheck(healthStates.toMap, version)
+      val view = views.html.healthcheck(healthStates.toMap, s"${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})")
 
       if (healthStates forall { case (_, healthy) => healthy })
         Ok(view)

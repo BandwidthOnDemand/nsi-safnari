@@ -1,6 +1,7 @@
 import sbt._
 import Keys._
 import play.Project._
+import sbtbuildinfo.Plugin._
 
 object ApplicationBuild extends Build {
 
@@ -19,10 +20,13 @@ object ApplicationBuild extends Build {
 
   lazy val mavenCommand = settingKey[String]("Command to run maven")
   lazy val deployDist = taskKey[File]("Deploy distribution using maven")
+  lazy val gitHeadCommitSha = settingKey[String]("current git commit SHA")
 
   val nexusBaseUri = "https://atlas.dlp.surfnet.nl/nexus/content/repositories"
 
-  val main = play.Project(appName, appVersion, appDependencies).settings(
+  val main = play.Project(appName, appVersion, appDependencies,
+    settings = play.Project.playScalaSettings ++ buildInfoSettings
+  ).settings(
     organization := "nl.surfnet.bod",
     scalaVersion := "2.10.3",
     scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
@@ -35,6 +39,11 @@ object ApplicationBuild extends Build {
 
     // Override Play! defaults to enable parallel test execution
     testOptions in Test := Seq(Tests.Argument(TestFrameworks.Specs2, "junitxml", "console")),
+
+    gitHeadCommitSha := Process("git rev-parse --short HEAD").lines.head,
+    sourceGenerators in Compile <+= buildInfo,
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha),
+    buildInfoPackage := "nl.surfnet.safnari",
 
     mavenCommand := "mvn",
 
