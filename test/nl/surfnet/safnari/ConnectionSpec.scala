@@ -398,19 +398,26 @@ class ConnectionSpec extends helpers.Specification {
       reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
     }
 
-    "provide information about connections" in new fixture {
+    "provide basic information about uncommitted connections" in new fixture {
       given(InitialMessages: _*)
 
       val result = connection.query
 
       result.getConnectionId() must beEqualTo(ConnectionId)
-      result.getCriteria().get(0).getChildren().getChild() must haveSize(0)
+      result.getDescription() must beEqualTo(InitialReserveType.getDescription())
+      result.getGlobalReservationId() must beEqualTo(InitialReserveType.getGlobalReservationId())
+      result.getCriteria() must haveSize(0)
     }
 
-    "provide information about connections with children" in new ReservedConnection {
+    "provide detailed information about committed connections with children" in new ReservedConnection {
       val result = connection.query
 
-      result.getCriteria().get(0).getChildren().getChild() must haveSize(1)
+      result.getCriteria() must haveSize(1)
+      val committed = result.getCriteria().get(0)
+      committed.getVersion() must beEqualTo(RequestCriteria.getVersion())
+      committed.getSchedule() must beEqualTo(RequestCriteria.getSchedule())
+      committed.getServiceType() must beEqualTo(RequestCriteria.getServiceType())
+      committed.getChildren().getChild() must haveSize(1)
     }
 
     "be in released state when initial reserve" in new fixture {

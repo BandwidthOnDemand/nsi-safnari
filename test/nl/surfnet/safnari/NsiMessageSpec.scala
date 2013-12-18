@@ -19,10 +19,10 @@ object NsiMessageSpec {
     withDestSTP(new StpType().withNetworkId("networkId").withLocalId("B"))
 
   val Schedule = new ScheduleType().withStartTime(DateTime.now().plusMinutes(5).toXmlGregorianCalendar).withEndTime(DateTime.now().plusMinutes(30).toXmlGregorianCalendar)
-  val ConfirmCriteria = new ReservationConfirmCriteriaType().withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
+  val ConfirmCriteria = new ReservationConfirmCriteriaType().withVersion(5).withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
   val RequestCriteria = Conversion.convert(ConfirmCriteria).get
 
-  def InitialReserveType = new ReserveType().withCriteria(RequestCriteria)
+  def InitialReserveType = new ReserveType().withCriteria(RequestCriteria).withDescription("description").withGlobalReservationId("global-reservation-id")
   val InitialReserveCorrelationId = helpers.Specification.newCorrelationId
 
   def initialReserveMessage = NsiProviderMessage(headers(InitialReserveCorrelationId, NsiHeaders.ProviderProtocolVersion), InitialReserve(InitialReserveType, ConfirmCriteria, Service))
