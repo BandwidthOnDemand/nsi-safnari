@@ -17,6 +17,7 @@ import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
 import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
+import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
 
 class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity)) {
   implicit val timeout = Timeout(2.seconds)
@@ -43,9 +44,9 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   }
 
   def findByRequesterNsa(requesterNsa: RequesterNsa)(implicit executionContext: ExecutionContext): Future[Seq[ActorRef]] = {
-    val futures = all map { actor => (actor ? 'query).mapTo[QuerySummaryResultType].map(actor -> _) }
+    val futures = all map { actor => (actor ? 'query).mapTo[(ReservationConfirmCriteriaType, QuerySummaryResultType)].map(actor -> _) }
     Future.fold(futures)(List[ActorRef]()) {
-      case (actors, (actor, queryResult)) if (queryResult.getRequesterNSA() == requesterNsa) => actor :: actors
+      case (actors, (actor, (criteria, queryResult))) if (queryResult.getRequesterNSA() == requesterNsa) => actor :: actors
       case (actors, _) => actors
     }
   }
@@ -127,7 +128,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     var endTimeCancellable: Option[Cancellable] = None
 
     override def receive = LoggingReceive {
-      case 'query              => sender ! connection.query
+      case 'query              => sender ! ((connection.rsm.criteria, connection.query))
       case 'querySegments      => sender ! connection.segments
       case 'queryNotifications => sender ! connection.notifications
 

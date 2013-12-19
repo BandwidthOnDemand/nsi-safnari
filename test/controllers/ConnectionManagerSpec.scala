@@ -45,7 +45,7 @@ class ConnectionManagerSpec extends helpers.Specification {
   "Connection manager" should {
     "find a created connection" in new DummyConnectionFixture {
       val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
-      val data = await(actor ? 'query).asInstanceOf[QuerySummaryResultType]
+      val (_, data: QuerySummaryResultType) = await(actor ? 'query)
 
       connectionManager.get(data.getConnectionId) must beSome(actor)
     }
@@ -90,7 +90,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     lazy val connectionManager = createConnectionManager
     lazy val Some(connection) = connectionManager.findOrCreateConnection(initialReserveMessage)
 
-    def query = await((connection ? 'query).mapTo[QuerySummaryResultType])
+    def query = await((connection ? 'query).mapTo[(ReservationConfirmCriteriaType, QuerySummaryResultType)])._2
     lazy val connectionId = query.getConnectionId
 
     def reserveWithEndTime(endTime: DateTime): Unit = {

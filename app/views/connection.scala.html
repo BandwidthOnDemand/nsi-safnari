@@ -1,4 +1,4 @@
-@(connection: org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType, segments: Seq[nl.surfnet.safnari.ConnectionData], messages: Seq[nl.surfnet.safnari.MessageRecord[nl.surfnet.safnari.Message]])
+@(criteria: org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType, connection: org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType, segments: Seq[nl.surfnet.safnari.ConnectionData], messages: Seq[nl.surfnet.safnari.MessageRecord[nl.surfnet.safnari.Message]])
 
 @import nl.surfnet.safnari._
 @import nl.surfnet.safnari.NsiSoapConversions._
@@ -32,7 +32,7 @@
     <section id="connection">
         <h1>Connection @id()</h1>
         <div class="connection-details">
-            @_connectionDetails(connection, segments)
+            @_connectionDetails(criteria, connection, segments)
         </div>
     </section>
     <section id="messages">

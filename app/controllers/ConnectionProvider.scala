@@ -20,6 +20,7 @@ import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
 import org.ogf.schemas.nsi._2013._07.connection.types.QueryRecursiveResultType
+import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
 
 class ConnectionProvider(connectionManager: ConnectionManager) extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -104,7 +105,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
     val connections = connectionIdsToConnections(ids, requesterNsa)
 
     connections flatMap { cs =>
-      Future.traverse(cs)(c => (c ? 'query).mapTo[QuerySummaryResultType])
+      Future.traverse(cs)(c => (c ? 'query).mapTo[(ReservationConfirmCriteriaType, QuerySummaryResultType)].map(_._2))
     }
   }
 

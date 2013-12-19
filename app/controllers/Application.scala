@@ -1,21 +1,19 @@
 package controllers
 
-import scala.sys.process._
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import play.api.Play.current
-import play.api._
-import play.api.mvc._
-import play.api.libs.concurrent.Execution.Implicits._
+import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util.Timeout
-import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
-import org.joda.time.DateTime
-import nl.surfnet.safnari.ConnectionId
-import nl.surfnet.safnari.ReservationState
-import nl.surfnet.safnari.ConnectionData
 import nl.surfnet.safnari._
-import akka.actor.ActorRef
+import org.joda.time.DateTime
+import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
+import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
+import play.api.Play.current
+import play.api._
+import play.api.libs.concurrent.Execution.Implicits._
+import play.api.mvc._
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.sys.process._
 
 class Application(connectionManager: ConnectionManager) extends Controller {
   implicit val timeout = Timeout(2.seconds)
@@ -48,11 +46,11 @@ class Application(connectionManager: ConnectionManager) extends Controller {
     queryResult map { cs =>
       val connections =
         cs filter {
-          case (con, _) =>
-            val endTime = Option(con.getCriteria().get(0).getSchedule().getEndTime())
+          case (criteria, _, _) =>
+            val endTime = Option(criteria.getSchedule().getEndTime())
             endTime.map(_.compare(timeBound) > 0).getOrElse(true)
         } sortBy {
-          case (con, _) => Option(con.getCriteria().get(0).getSchedule().getStartTime())
+          case (criteria, _, _) => Option(criteria.getSchedule().getStartTime())
         }
 
       Ok(views.html.connections(connections.reverse))
@@ -62,9 +60,9 @@ class Application(connectionManager: ConnectionManager) extends Controller {
   def connection(id: ConnectionId) = Action.async {
     // FIXME data consistency (db query + two messages may be interleaved with other messages)
     connectionManager.get(id).map { c =>
-      connectionDetails(c) map { case (connection, segments) =>
+      connectionDetails(c) map { case (criteria, summary, segments) =>
         val messages = connectionManager.messageStore.loadAll(id)
-        Ok(views.html.connection(connection, segments, messages))
+        Ok(views.html.connection(criteria, summary, segments, messages))
       }
     }.getOrElse {
       Future.successful(NotFound)
@@ -72,10 +70,10 @@ class Application(connectionManager: ConnectionManager) extends Controller {
   }
 
   private def connectionDetails(connection: ActorRef) = for {
-    summary <- (connection ? 'query).mapTo[QuerySummaryResultType]
+    (criteria, summary) <- (connection ? 'query).mapTo[(ReservationConfirmCriteriaType, QuerySummaryResultType)]
     segments <- (connection ? 'querySegments).mapTo[Seq[ConnectionData]]
   } yield {
-    summary -> segments
+    (criteria, summary, segments)
   }
 
 }
