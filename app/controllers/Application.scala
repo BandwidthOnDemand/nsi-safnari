@@ -37,7 +37,7 @@ class Application(connectionManager: ConnectionManager) extends Controller {
     }
   }
 
-  def connections(page: Int) = Action.async {
+  def connections = Action.async {
     val timeBound = DateTime.now().minusWeeks(1).toXmlGregorianCalendar
 
     // FIXME data consistency (two messages may be interleaved with other messages)
