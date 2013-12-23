@@ -69,9 +69,9 @@ class Application(connectionManager: ConnectionManager) extends Controller {
     }
   }
 
-  private def connectionDetails(connection: ActorRef) = for {
-    (criteria, summary) <- (connection ? 'query).mapTo[(ReservationConfirmCriteriaType, QuerySummaryResultType)]
-    segments <- (connection ? 'querySegments).mapTo[Seq[ConnectionData]]
+  private def connectionDetails(connection: Connection) = for {
+    (criteria, summary) <- (connection ? Connection.Query)
+    segments <- (connection ? Connection.QuerySegments)
   } yield {
     (criteria, summary, segments)
   }

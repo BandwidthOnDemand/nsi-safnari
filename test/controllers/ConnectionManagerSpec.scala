@@ -1,20 +1,22 @@
 package controllers
 
-import play.api.test._
-import play.api.test.Helpers._
-import nl.surfnet.safnari._
-import org.specs2.execute.PendingUntilFixed
-import play.api.libs.concurrent.Akka
-import akka.testkit.TestActorRef
-import akka.pattern.ask
 import akka.actor.Actor
+import akka.actor.ActorRef
+import akka.pattern.ask
+import akka.testkit.TestActorRef
 import java.net.URI
+import nl.surfnet.safnari._
+import org.joda.time.DateTime
+import org.joda.time.Instant
 import org.ogf.schemas.nsi._2013._07.connection.types._
+import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._07.services.types.DirectionalityType
 import org.ogf.schemas.nsi._2013._07.services.types.StpType
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
-import org.joda.time.DateTime
+import org.specs2.execute.PendingUntilFixed
+import play.api.libs.concurrent.Akka
+import play.api.test.Helpers._
+import play.api.test._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionManagerSpec extends helpers.Specification {
@@ -31,6 +33,8 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
   }
 
+  private def command(message: Message, timestamp: Instant = new Instant()) = Connection.Command(timestamp, message)
+
   class DummyConnectionFixture extends WithApplication() {
     implicit lazy val system = Akka.system
 
@@ -45,25 +49,28 @@ class ConnectionManagerSpec extends helpers.Specification {
   "Connection manager" should {
     "find a created connection" in new DummyConnectionFixture {
       val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
-      val (_, data: QuerySummaryResultType) = await(actor ? 'query)
+      val (_, data) = await(actor ? Connection.Query)
 
       connectionManager.get(data.getConnectionId) must beSome(actor)
     }
 
     "add child connection id" in new DummyConnectionFixture {
       val initialReserve = ura.request(CorrelationId(0, 0), initialReserveMessage.body)
-      val Some(actor) = connectionManager.findOrCreateConnection(initialReserve.message.asInstanceOf[NsiProviderMessage[NsiProviderCommand]])
-      await(actor ? initialReserve)
-      await(actor ? pce.confirm(CorrelationId(0, 1), A))
-      await(actor ? upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionId", initialReserveMessage.body.criteria)))
+      val Some(connection) = connectionManager.findOrCreateConnection(initialReserve.message.asInstanceOf[NsiProviderMessage[NsiProviderCommand]])
+      connection ! command(initialReserve)
+      connection ! command(pce.confirm(CorrelationId(0, 1), A))
+      await(connection ? command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionId", initialReserveMessage.body.criteria))))
 
-      connectionManager.findByChildConnectionId("ChildConnectionId") must beSome(actor)
+      connectionManager.findByChildConnectionId("ChildConnectionId") must beSome(connection)
     }
 
     "add child connection id during replay" in new DummyConnectionFixture {
       val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
 
-      await(actor ? connectionManager.Replay(Seq(FromRequester(initialReserveMessage), pce.confirm(CorrelationId(0, 1), A), upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria)))))
+      await(actor ? Connection.Replay(Seq(
+        command(FromRequester(initialReserveMessage)),
+        command(pce.confirm(CorrelationId(0, 1), A)),
+        command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria))))))
 
       connectionManager.findByChildConnectionId("ChildConnection") must beSome(actor)
     }
@@ -90,19 +97,21 @@ class ConnectionManagerSpec extends helpers.Specification {
     lazy val connectionManager = createConnectionManager
     lazy val Some(connection) = connectionManager.findOrCreateConnection(initialReserveMessage)
 
-    def query = await((connection ? 'query).mapTo[(ReservationConfirmCriteriaType, QuerySummaryResultType)])._2
+    def query = await(connection ? Connection.Query)._2
     lazy val connectionId = query.getConnectionId
 
     def reserveWithEndTime(endTime: DateTime): Unit = {
       val reserve = initialReserveMessage.tap(_.body.body.getCriteria().getSchedule().withEndTime(endTime.toXmlGregorianCalendar))
-      Seq(
+      val messages = Seq(
         FromRequester(reserve),
         pce.confirm(CorrelationId(0, 1), A),
         upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria)),
         ura.request(CorrelationId(1, 1), ReserveCommit(connectionId)),
-        upa.response(CorrelationId(0, 4), ReserveCommitConfirmed("ChildConnection"))).foreach {
-          message => await(connection ? message)
-        }
+        upa.response(CorrelationId(0, 4), ReserveCommitConfirmed("ChildConnection")))
+
+      messages.foreach { message =>
+        await(connection ? command(message))
+      }
     }
 
     def output[A](f: => A): Vector[Any] = {
@@ -110,27 +119,27 @@ class ConnectionManagerSpec extends helpers.Specification {
       f
       outbound.underlyingActor.messages
     }
-
   }
 
   "Connection actor" should {
     "persist and restore from the database" in new SingleConnectionActorFixture {
-      Seq(FromRequester(initialReserveMessage), pce.confirm(CorrelationId(0, 1), A), upa.response(CorrelationId(0, 1), ReserveConfirmed("ChildConnection", ConfirmCriteria))).foreach(message => await(connection ? message))
+      val messages = Seq(FromRequester(initialReserveMessage), pce.confirm(CorrelationId(0, 1), A), upa.response(CorrelationId(0, 1), ReserveConfirmed("ChildConnection", ConfirmCriteria)))
+      messages.foreach(message => await(connection ? command(message)))
       val restoredConnectionManager = createConnectionManager
       await(restoredConnectionManager.restore)
 
       val restoredConnection = restoredConnectionManager.get(connectionId)
 
       restoredConnection aka "restored connection" must beSome
-      await(restoredConnection.get ? 'query) must_== await(connection ? 'query)
+      await(restoredConnection.get ? Connection.Query) must_== await(connection ? Connection.Query)
     }
 
     "ensure retransmitted message is exactly the same as the original" in new SingleConnectionActorFixture {
       val OriginalReserve = InitialReserveType.withDescription("original")
       val ModifiedReserve = InitialReserveType.withDescription("modified")
 
-      val ack = await(connection ? FromRequester(NsiProviderMessage(initialReserveMessage.headers, InitialReserve(OriginalReserve, ConfirmCriteria, Service))))
-      val error = await(connection ? FromRequester(NsiProviderMessage(initialReserveMessage.headers, InitialReserve(ModifiedReserve, ConfirmCriteria, Service))))
+      val ack = await(connection ? command(FromRequester(NsiProviderMessage(initialReserveMessage.headers, InitialReserve(OriginalReserve, ConfirmCriteria, Service)))))
+      val error = await(connection ? command(FromRequester(NsiProviderMessage(initialReserveMessage.headers, InitialReserve(ModifiedReserve, ConfirmCriteria, Service)))))
 
       error must beLike {
         case ServiceException(details) =>
@@ -139,15 +148,15 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     "retransmit original async reply on duplicate request" in new SingleConnectionActorFixture {
-      val ack = await(connection ? FromRequester(initialReserveMessage))
-      await(connection ? pce.confirm(CorrelationId(0, 1), A))
+      val ack = await(connection ? command(FromRequester(initialReserveMessage)))
+      await(connection ? command(pce.confirm(CorrelationId(0, 1), A)))
 
       val original = output {
-        await(connection ? upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria)))
+        await(connection ? command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria))))
       }
 
       val retransmitted = output {
-        await(connection ? FromRequester(initialReserveMessage))
+        await(connection ? command(FromRequester(initialReserveMessage)))
       }
 
       retransmitted must_== original
@@ -155,30 +164,30 @@ class ConnectionManagerSpec extends helpers.Specification {
 
     "retransmit PCE message when no async reply has been received" in new SingleConnectionActorFixture {
       val original = output {
-        await(connection ? FromRequester(initialReserveMessage))
+        await(connection ? command(FromRequester(initialReserveMessage)))
       }
 
       val retransmitted = output {
-        await(connection ? FromRequester(initialReserveMessage))
+        await(connection ? command(FromRequester(initialReserveMessage)))
       }
 
       retransmitted aka "retransmitted" must_== original
     }
 
     "retransmit ToProvider messages without async reply" in new SingleConnectionActorFixture {
-      await(connection ? FromRequester(initialReserveMessage))
+      await(connection ? command(FromRequester(initialReserveMessage)))
       val original = output {
-        await(connection ? pce.confirm(CorrelationId(0, 1), A, B))
+        await(connection ? command(pce.confirm(CorrelationId(0, 1), A, B)))
       }
       val retransmitted = output {
-        await(connection ? FromRequester(initialReserveMessage))
+        await(connection ? command(FromRequester(initialReserveMessage)))
       }
       retransmitted aka "retransmitted" must_== original
 
-      await(connection ? upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionA", initialReserveMessage.body.criteria)))
+      await(connection ? command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionA", initialReserveMessage.body.criteria))))
 
       val retransmitted2 = output {
-        await(connection ? FromRequester(initialReserveMessage))
+        await(connection ? command(FromRequester(initialReserveMessage)))
       }
 
       retransmitted2 aka "retransmitted 2" must_== (original.collect {
@@ -187,10 +196,13 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     "restore state from replayed messages" in new SingleConnectionActorFixture {
-      await(connection ? connectionManager.Replay(Seq(FromRequester(initialReserveMessage), pce.confirm(CorrelationId(0, 1), A), upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria)))))
+      await(connection ? Connection.Replay(Seq(
+        command(FromRequester(initialReserveMessage)),
+        command(pce.confirm(CorrelationId(0, 1), A)),
+        command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria))))))
 
       val retransmitted = output {
-        await(connection ? FromRequester(initialReserveMessage))
+        await(connection ? command(FromRequester(initialReserveMessage)))
       }
 
       retransmitted must_== Vector(agg.response(initialReserveMessage.headers.correlationId, ReserveConfirmed(connectionId, initialReserveMessage.body.criteria)))
@@ -205,7 +217,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     "ignore PassedEndTime message received before end time" in new SingleConnectionActorFixture {
       reserveWithEndTime(DateTime.now().plusDays(1))
 
-      await(connection ? PassedEndTime(newCorrelationId, connectionId, DateTime.now()))
+      await(connection ? command(PassedEndTime(newCorrelationId, connectionId, DateTime.now())))
 
       query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.CREATED
     }

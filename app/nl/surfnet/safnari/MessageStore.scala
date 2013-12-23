@@ -83,7 +83,7 @@ object SerializedMessage {
   private def parseJson[T: Reads](json: String): Try[T] = Json.parse(json).validate[T].fold(errors => Failure(ErrorMessageException(errors.mkString(", "))), ok => Success(ok))
 }
 
-case class MessageRecord[T](id: Long, createdAt: Instant = new Instant(), aggregatedConnectionId: ConnectionId, message: T) {
+case class MessageRecord[T](id: Long, createdAt: Instant, aggregatedConnectionId: ConnectionId, message: T) {
   def map[B](f: T => B) = copy(message = f(message))
 }
 
@@ -100,8 +100,7 @@ class MessageStore() {
     }
   }
 
-  def storeInboundWithOutboundMessages(aggregatedConnectionId: ConnectionId, inbound: InboundMessage, outbound: Seq[OutboundMessage]) = DB.withTransaction { implicit connection =>
-    val createdAt = new Instant()
+  def storeInboundWithOutboundMessages(aggregatedConnectionId: ConnectionId, createdAt: Instant, inbound: InboundMessage, outbound: Seq[OutboundMessage]) = DB.withTransaction { implicit connection =>
     val inboundId = store(aggregatedConnectionId, createdAt, inbound, None)
     outbound.foreach(store(aggregatedConnectionId, createdAt, _, Some(inboundId)))
   }
@@ -117,7 +116,7 @@ class MessageStore() {
       .map(_.map(message => MessageToSerializedMessage.invert(message).get)) // FIXME error handling
   }
 
-  def loadEverything(): Seq[(ConnectionId, Seq[Message])] = DB.withConnection { implicit connection =>
+  def loadEverything(): Seq[(ConnectionId, Seq[MessageRecord[Message]])] = DB.withConnection { implicit connection =>
     SQL("""
         SELECT id, aggregated_connection_id, created_at, direction, correlation_id, protocol, type, content
           FROM messages
@@ -127,7 +126,8 @@ class MessageStore() {
       .map {
         case (connectionId, records) =>
           connectionId -> records.flatMap { record =>
-            MessageToSerializedMessage.invert(record.message).toOption
+            val deserialized = MessageToSerializedMessage.invert(record.message).toOption
+            deserialized.map(message => record.map(Function.const(message)))
           }
       }(collection.breakOut)
   }

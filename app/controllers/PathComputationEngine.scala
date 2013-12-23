@@ -2,19 +2,20 @@ package controllers
 
 import akka.actor._
 import java.net.URI
+import java.util.concurrent.TimeoutException
 import nl.surfnet.safnari._
+import org.joda.time.DateTime
+import org.joda.time.Instant
+import play.api.Logger
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
-import play.api.Logger
-import scala.util.{ Success, Failure }
-import scala.concurrent.duration._
 import scala.concurrent.Future
-import org.joda.time.DateTime
-import java.util.concurrent.TimeoutException
+import scala.concurrent.duration._
+import scala.util.{ Success, Failure }
 
 object PathComputationEngine extends Controller {
   private val pceContinuations = new Continuations[PceResponse](Akka.system.scheduler)
@@ -62,12 +63,12 @@ object PathComputationEngine extends Controller {
         val findPathEndPoint = s"$endPoint/paths/find"
         Logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
 
-        val connection = sender
+        val connection = Connection(sender)
         pceContinuations.register(request.correlationId, Configuration.AsyncReplyTimeout).onComplete {
           case Success(reply) =>
-            connection ! FromPce(reply)
+            connection ! Connection.Command(new Instant(), FromPce(reply))
           case Failure(e) =>
-            connection ! MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), DateTime.now(), e.toString)
+            connection ! Connection.Command(new Instant(), MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), DateTime.now(), e.toString))
         }
 
         val response = WS.url(findPathEndPoint).post(Json.toJson(request))
@@ -75,13 +76,13 @@ object PathComputationEngine extends Controller {
           case Failure(e) =>
             Logger.error(s"Could not reach the pce ($endPoint): $e")
             pceContinuations.unregister(request.correlationId)
-            connection ! MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), DateTime.now(), e.toString)
+            connection ! Connection.Command(new Instant(), MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), DateTime.now(), e.toString))
           case Success(response) if response.status == ACCEPTED =>
-            connection ! AckFromPce(PceAccepted(request.correlationId))
+            connection ! Connection.Command(new Instant(), AckFromPce(PceAccepted(request.correlationId)))
           case Success(response) =>
             Logger.error(s"Got back a ${response.status} response from the PCE: ${response.body}")
             pceContinuations.unregister(request.correlationId)
-            connection ! AckFromPce(PceFailed(request.correlationId, response.status, response.statusText, response.body))
+            connection ! Connection.Command(new Instant(), AckFromPce(PceFailed(request.correlationId, response.status, response.statusText, response.body)))
         }
 
     }
@@ -93,7 +94,7 @@ object PathComputationEngine extends Controller {
         sender ! Future.successful("PCE (Dummy)" -> true)
 
       case ToPce(pce: PathComputationRequest) =>
-        sender !
+        Connection(sender) ! Connection.Command(new Instant(),
           FromPce(PathComputationConfirmed(
             pce.correlationId,
             Seq(ComputedSegment(
@@ -101,7 +102,7 @@ object PathComputationEngine extends Controller {
                 "urn:ogf:network:surfnet.nl:1990:nsa:bod-dev",
                 URI.create("http://localhost:8082/bod/nsi/v2/provider"),
                 OAuthAuthentication("f44b1e47-0a19-4c11-861b-c9abf82d4cbf")),
-              pce.serviceType))))
+              pce.serviceType)))))
     }
   }
 }

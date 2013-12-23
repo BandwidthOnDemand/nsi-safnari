@@ -7,7 +7,9 @@ import java.net.URI
 import java.util.concurrent.TimeoutException
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
+import org.joda.time.Instant
 import org.ogf.schemas.nsi._2013._07.connection.types.MessageDeliveryTimeoutRequestType
+import org.ogf.schemas.nsi._2013._07.connection.types.QueryRecursiveResultType
 import play.api.Logger
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
@@ -17,7 +19,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
-import org.ogf.schemas.nsi._2013._07.connection.types.QueryRecursiveResultType
 
 class ConnectionRequester(connectionManager: ConnectionManager) extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -31,7 +32,7 @@ class ConnectionRequester(connectionManager: ConnectionManager) extends Controll
       val connection = connectionManager.findByChildConnectionId(notification.connectionId)
 
       val ack = connection.map { c =>
-        (c ? FromProvider(NsiRequesterMessage(headers, notification))).mapTo[NsiAcknowledgement]
+        (c ? Connection.Command(new Instant(), FromProvider(NsiRequesterMessage(headers, notification))))
       } getOrElse Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))
 
       ack.map(message.ack)
@@ -71,13 +72,13 @@ object ConnectionRequester {
           case _ => None
         }
 
-        val connection = sender
+        val connection = Connection(sender)
         continuations.register(headers.correlationId, Configuration.AsyncReplyTimeout).onComplete {
           case Success(reply) =>
-            connection ! FromProvider(reply)
+            connection ! Connection.Command(new Instant(), FromProvider(reply))
           case Failure(exception) =>
             // FIXME maybe handle timeouts separately?
-            connection ! MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, DateTime.now(), exception.toString)
+            connection ! Connection.Command(new Instant(), MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, DateTime.now(), exception.toString))
         }
 
         val response = NsiWebService.callProvider(provider, message)
@@ -87,12 +88,12 @@ object ConnectionRequester {
           case Failure(exception) =>
             Logger.warn(s"communication failure calling $provider", exception)
             continuations.unregister(headers.correlationId)
-            connection ! MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, DateTime.now(), exception.toString)
+            connection ! Connection.Command(new Instant(), MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, DateTime.now(), exception.toString))
           case Success(ack @ NsiProviderMessage(_, ServiceException(_))) =>
             continuations.unregister(headers.correlationId)
-            connection ! AckFromProvider(ack)
+            connection ! Connection.Command(new Instant(), AckFromProvider(ack))
           case Success(ack) =>
-            connection ! AckFromProvider(ack)
+            connection ! Connection.Command(new Instant(), AckFromProvider(ack))
         }
     }
   }
@@ -103,20 +104,20 @@ object ConnectionRequester {
         sender ! Future.successful("NSI requester (Dummy)" -> true)
       case ToProvider(message @ NsiProviderMessage(headers, reserve: InitialReserve), _) =>
         val connectionId = newConnectionId
-        sender ! AckFromProvider(message ack ReserveResponse(connectionId))
-        sender ! FromProvider(message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).get))
+        Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack ReserveResponse(connectionId)))
+        Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).get)))
       case ToProvider(message @ NsiProviderMessage(headers, commit: ReserveCommit), _) =>
-        sender ! AckFromProvider(message ack GenericAck())
-        sender ! FromProvider(message reply ReserveCommitConfirmed(commit.connectionId))
+        Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack GenericAck()))
+        Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply ReserveCommitConfirmed(commit.connectionId)))
       case ToProvider(message @ NsiProviderMessage(headers, provision: Provision), _) =>
-        sender ! AckFromProvider(message ack GenericAck())
-        sender ! FromProvider(message reply ProvisionConfirmed(provision.connectionId))
+        Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack GenericAck()))
+        Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply ProvisionConfirmed(provision.connectionId)))
       case ToProvider(message @ NsiProviderMessage(headers, update: NsiProviderUpdateCommand), provider) =>
-        sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa).withConnectionId(update.connectionId)))
+        Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa).withConnectionId(update.connectionId))))
       case ToProvider(message @ NsiProviderMessage(headers, query: QueryRecursive), provider) =>
-        sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa)))
+        Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa))))
       case ToProvider(message @ NsiProviderMessage(headers, query: NsiProviderQuery), provider) =>
-        sender ! AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa)))
+        Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa))))
     }
   }
 
