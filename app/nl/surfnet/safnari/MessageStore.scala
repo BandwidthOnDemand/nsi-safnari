@@ -1,20 +1,20 @@
 package nl.surfnet.safnari
 
-import anorm._
 import anorm.SqlParser._
+import anorm._
+import java.net.URI
 import java.util.UUID
 import nl.surfnet.safnari.NsiSoapConversions._
 import org.joda.time.Instant
+import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import org.w3c.dom.Document
-import play.api.Play.current
+import play.api.Logger
 import play.api.data.validation.ValidationError
 import play.api.db.DB
+import play.api.libs.functional.FunctionalBuilder
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
-import play.api.libs.functional.FunctionalBuilder
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
 import scala.util.{ Try, Success, Failure }
-import java.net.URI
 
 case class SerializedMessage(correlationId: CorrelationId, direction: String, protocol: String, tpe: String, content: String)
 object SerializedMessage {
@@ -87,7 +87,7 @@ case class MessageRecord[T](id: Long, createdAt: Instant, aggregatedConnectionId
   def map[B](f: T => B) = copy(message = f(message))
 }
 
-class MessageStore() {
+class MessageStore(implicit app: play.api.Application) {
   import SerializedMessage.MessageToSerializedMessage
 
   private implicit def rowToUuid: Column[UUID] = {
@@ -100,17 +100,29 @@ class MessageStore() {
     }
   }
 
+  def create(aggregatedConnectionId: ConnectionId, createdAt: Instant, requesterNsa: RequesterNsa): Unit = DB.withTransaction { implicit connection =>
+    SQL("""INSERT INTO connections (aggregated_connection_id, created_at, requester_nsa) VALUES ({aggregated_connection_id}, {created_at}, {requester_nsa})""")
+      .on('aggregated_connection_id -> aggregatedConnectionId, 'created_at -> createdAt.toSqlTimestamp, 'requester_nsa -> requesterNsa)
+      .executeInsert()
+  }
+
   def storeInboundWithOutboundMessages(aggregatedConnectionId: ConnectionId, createdAt: Instant, inbound: InboundMessage, outbound: Seq[OutboundMessage]) = DB.withTransaction { implicit connection =>
-    val inboundId = store(aggregatedConnectionId, createdAt, inbound, None)
-    outbound.foreach(store(aggregatedConnectionId, createdAt, _, Some(inboundId)))
+    val connectionPk = SQL("""SELECT id FROM connections WHERE aggregated_connection_id = {aggregated_connection_id} AND deleted_at IS NULL""")
+      .on('aggregated_connection_id -> aggregatedConnectionId)
+      .singleOpt(get[Long]("id"))
+      .getOrElse {
+        throw new IllegalArgumentException(s"connection $aggregatedConnectionId does not exist or is already deleted")
+      }
+    val inboundId = store(connectionPk, createdAt, inbound, None)
+    outbound.foreach(store(connectionPk, createdAt, _, Some(inboundId)))
   }
 
   def loadAll(aggregatedConnectionId: ConnectionId): Seq[MessageRecord[Message]] = DB.withConnection { implicit connection =>
     SQL("""
-        SELECT id, created_at, aggregated_connection_id, correlation_id, direction, protocol, type, content, created_at
-          FROM messages
-         WHERE aggregated_connection_id = {aggregated_connection_id}
-         ORDER BY id ASC""").on(
+        SELECT m.id, c.aggregated_connection_id, m.created_at, m.correlation_id, m.direction, m.protocol, m.type, m.content
+          FROM messages m INNER JOIN connections c ON m.connection_id = c.id
+         WHERE c.aggregated_connection_id = {aggregated_connection_id}
+         ORDER BY m.id ASC""").on(
       'aggregated_connection_id -> aggregatedConnectionId)
       .as(recordParser.*)
       .map(_.map(message => MessageToSerializedMessage.invert(message).get)) // FIXME error handling
@@ -118,9 +130,10 @@ class MessageStore() {
 
   def loadEverything(): Seq[(ConnectionId, Seq[MessageRecord[Message]])] = DB.withConnection { implicit connection =>
     SQL("""
-        SELECT id, aggregated_connection_id, created_at, direction, correlation_id, protocol, type, content
-          FROM messages
-         ORDER BY aggregated_connection_id ASC, id ASC""")
+        SELECT m.id, c.aggregated_connection_id, m.created_at, m.correlation_id, m.direction, m.protocol, m.type, m.content
+          FROM messages m INNER JOIN connections c ON m.connection_id = c.id
+         WHERE c.deleted_at IS NULL
+         ORDER BY c.aggregated_connection_id ASC, m.id ASC""")
       .as(recordParser.*)
       .groupBy(_.aggregatedConnectionId)
       .map {
@@ -132,18 +145,24 @@ class MessageStore() {
       }(collection.breakOut)
   }
 
+  def delete(aggregatedConnectionId: ConnectionId, deletedAt: Instant): Unit = DB.withTransaction { implicit connection =>
+    SQL("""UPDATE connections SET deleted_at = {deleted_at} WHERE aggregated_connection_id = {aggregated_connection_id} AND deleted_at IS NULL""")
+      .on('aggregated_connection_id -> aggregatedConnectionId, 'deleted_at -> deletedAt.toSqlTimestamp)
+      .executeUpdate().tap(n => Logger.debug(s"Deleted connection $aggregatedConnectionId"))
+  }
+
   private def recordParser = (get[Long]("id") ~ get[java.util.Date]("created_at") ~ get[String]("aggregated_connection_id") ~ get[UUID]("correlation_id") ~ str("direction") ~ str("protocol") ~ str("type") ~ str("content")).map {
     case id ~ createdAt ~ aggregatedConnectionId ~ correlationId ~ direction ~ protocol ~ tpe ~ content =>
       MessageRecord(id, new Instant(createdAt), aggregatedConnectionId, SerializedMessage(CorrelationId.fromUuid(correlationId), direction, protocol, tpe, content))
   }
 
-  private def store(aggregatedConnectionId: ConnectionId, createdAt: Instant, message: Message, inboundId: Option[Long]) = DB.withTransaction { implicit connection =>
+  private def store(connectionPk: Long, createdAt: Instant, message: Message, inboundId: Option[Long]) = DB.withTransaction { implicit connection =>
     val serialized = MessageToSerializedMessage(message).get
     SQL("""
-        INSERT INTO messages (aggregated_connection_id, correlation_id, direction, protocol, type, content, created_at, inbound_message_id)
-             VALUES ({aggregated_connection_id}, {correlation_id}, {direction}, {protocol}, {type}, {content}, {created_at}, {inbound_message_id})
+        INSERT INTO messages (connection_id, correlation_id, direction, protocol, type, content, created_at, inbound_message_id)
+             VALUES ({connection_id}, {correlation_id}, {direction}, {protocol}, {type}, {content}, {created_at}, {inbound_message_id})
         """).on(
-      'aggregated_connection_id -> aggregatedConnectionId,
+      'connection_id -> connectionPk,
       'direction -> serialized.direction,
       'correlation_id -> serialized.correlationId.value,
       'protocol -> serialized.protocol,

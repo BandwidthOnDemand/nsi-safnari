@@ -15,7 +15,7 @@ trait GlobalSettings extends play.api.GlobalSettings {
   private var connectionManager: ConnectionManager = _
 
   override def onStart(app: PlayApp): Unit = {
-    connectionManager = new ConnectionManager(ConnectionProvider.connectionFactory)
+    connectionManager = new ConnectionManager(ConnectionProvider.connectionFactory)(app)
     if (app.configuration.getBoolean("clean.db.on.start") getOrElse false) {
       cleanDatabase(app)
     }

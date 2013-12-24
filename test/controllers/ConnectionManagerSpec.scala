@@ -83,7 +83,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
   }
 
-  class SingleConnectionActorFixture extends WithApplication() {
+  class SingleConnectionActorFixture(additionalConfiguration: Map[String, Any] = Map.empty) extends WithApplication(FakeApplication(additionalConfiguration = additionalConfiguration)) {
     implicit lazy val system = Akka.system
     implicit lazy val executionContext = system.dispatcher
 
@@ -95,10 +95,13 @@ class ConnectionManagerSpec extends helpers.Specification {
 
     lazy val outbound = TestActorRef(new RecordingActor)
     lazy val connectionManager = createConnectionManager
-    lazy val Some(connection) = connectionManager.findOrCreateConnection(initialReserveMessage)
+    lazy val Some((connectionId, connection)) = {
+      connectionManager.findOrCreateConnection(initialReserveMessage).map { c =>
+        (await(c ? Connection.Query)._2.getConnectionId(), c)
+      }
+    }
 
     def query = await(connection ? Connection.Query)._2
-    lazy val connectionId = query.getConnectionId
 
     def reserveWithEndTime(endTime: DateTime): Unit = {
       val reserve = initialReserveMessage.tap(_.body.body.getCriteria().getSchedule().withEndTime(endTime.toXmlGregorianCalendar))
@@ -220,6 +223,22 @@ class ConnectionManagerSpec extends helpers.Specification {
       await(connection ? command(PassedEndTime(newCorrelationId, connectionId, DateTime.now())))
 
       query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.CREATED
+    }
+
+    "be deleted after a grace period" should {
+      "when never successfully reserved" in new SingleConnectionActorFixture() {
+        await(connection ? command(ura.request(CorrelationId(0, 0), initialReserveMessage.body), timestamp = new Instant().minus(Configuration.ConnectionExpirationTime.toMillis)))
+
+        eventually(connectionManager.get(connectionId) must beNone)
+        connectionManager.messageStore.loadEverything().map(_._1) must not(contain(connectionId))
+      }
+
+      "delete connections with LSM state different from CREATED after a grace period" in new SingleConnectionActorFixture(additionalConfiguration = Map("safnari.connection.expiration.time" -> "250 milliseconds")) {
+        reserveWithEndTime(DateTime.now())
+        eventually(query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.PASSED_END_TIME)
+
+        eventually(connectionManager.get(connectionId) must beNone)
+      }
     }
   }
 }

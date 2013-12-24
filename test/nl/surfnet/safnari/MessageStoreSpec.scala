@@ -10,15 +10,33 @@ import play.api.test._
 class MessageStoreSpec extends helpers.Specification {
   sequential
 
-  def Application = FakeApplication()
 
-  val timestamp = new Instant()
-  val messageStore = new MessageStore()
+  class Fixture() extends WithApplication() {
+    lazy val timestamp = new Instant()
+    lazy val aggregatedConnectionId = newConnectionId
+    lazy val messageStore = {
+      val s = new MessageStore()
+      s.create(aggregatedConnectionId, timestamp, "requester_nsa")
+      s
+    }
+  }
 
   "MessageStore" should {
+    "fail to store message for unknown connection" in new Fixture() {
+      val unknownConnectionId = newConnectionId
+      val message = PceMessageSpec.pathComputationResponse
 
-    "store a to PCE message" in new WithApplication(Application) {
-      val aggregatedConnectionId = newConnectionId
+      messageStore.storeInboundWithOutboundMessages(unknownConnectionId, timestamp, FromPce(message), Seq.empty) must throwA[IllegalArgumentException]
+    }
+
+    "fail to store a message for a deleted connection" in new Fixture() {
+      messageStore.delete(aggregatedConnectionId, timestamp)
+
+      val message = PceMessageSpec.pathComputationResponse
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromPce(message), Seq.empty) must throwA[IllegalArgumentException]
+    }
+
+    "store a to PCE message" in new Fixture() {
       val message = PceMessageSpec.pathComputationResponse
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromPce(message), Seq.empty) must not(throwA[Exception])
 
@@ -27,30 +45,24 @@ class MessageStoreSpec extends helpers.Specification {
       loaded.map(_.message) must contain(beEqualTo(FromPce(message))).exactly(1)
     }
 
-    "store a from PCE message" in new WithApplication(Application) {
-      val aggregatedConnectionId = newConnectionId
+    "store a from PCE message" in new Fixture() {
       val message = PceMessageSpec.pathComputationResponse
-
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromPce(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
       loaded must contain(beEqualTo(FromPce(message))).exactly(1)
     }
 
-    "store a failed ack from PCE message" in new WithApplication(Application) {
-      val aggregatedConnectionId = newConnectionId
+    "store a failed ack from PCE message" in new Fixture() {
       val message = PceMessageSpec.pathComputationFailedAck
-
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, AckFromPce(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
       loaded must contain(beEqualTo(AckFromPce(message))).exactly(1)
     }
 
-    "store a accepted ack from PCE message" in new WithApplication(Application) {
-      val aggregatedConnectionId = newConnectionId
+    "store a accepted ack from PCE message" in new Fixture() {
       val message = PceMessageSpec.pathComputationAcceptedAck
-
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, AckFromPce(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
@@ -59,8 +71,7 @@ class MessageStoreSpec extends helpers.Specification {
       }).exactly(1)
     }
 
-    "store a fromRequester NSI message" in new WithApplication(Application) {
-      val aggregatedConnectionId = newConnectionId
+    "store a fromRequester NSI message" in new Fixture() {
       val message = NsiMessageSpec.initialReserveMessage
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromRequester(message), Seq.empty) must not(throwA[Exception])
 
@@ -68,8 +79,7 @@ class MessageStoreSpec extends helpers.Specification {
       loaded must contain(beEqualTo(FromRequester(message))).exactly(1)
     }
 
-    "store a fromProvider NSI message" in new WithApplication(Application) {
-      val aggregatedConnectionId = newConnectionId
+    "store a fromProvider NSI message" in new Fixture() {
       val message = NsiRequesterMessage(NsiMessageSpec.headers(newCorrelationId, NsiHeaders.RequesterProtocolVersion), ReserveConfirmed(newConnectionId, NsiMessageSpec.ConfirmCriteria))
 
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromProvider(message), Seq.empty) must not(throwA[Exception])
@@ -78,11 +88,9 @@ class MessageStoreSpec extends helpers.Specification {
       loaded must contain(beEqualTo(FromProvider(message))).exactly(1)
     }
 
-    "store a toProvider NSI message" in new WithApplication(Application) {
-      val aggregatedConnectionId = newConnectionId
+    "store a toProvider NSI message" in new Fixture() {
       val message = NsiMessageSpec.initialReserveMessage
       val endPoint = ProviderEndPoint("urn:nsa:surf", URI.create("http://localhost"), NoAuthentication)
-
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromRequester(message), Seq(ToProvider(message, endPoint))) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)

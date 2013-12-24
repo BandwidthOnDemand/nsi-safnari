@@ -23,8 +23,8 @@ import scala.util.Failure
 import scala.util.Try
 
 case class Connection(actor: ActorRef) {
-  def ! (operation: Connection.Operation): Unit = actor ! operation
-  def ? (operation: Connection.Operation)(implicit timeout: Timeout): Future[operation.Result] =
+  def !(operation: Connection.Operation): Unit = actor ! operation
+  def ?(operation: Connection.Operation)(implicit timeout: Timeout): Future[operation.Result] =
     (actor ? operation).mapTo(operation.resultClassTag)
 }
 object Connection {
@@ -56,30 +56,51 @@ object Connection {
     type Result = Try[Unit]
     final val resultClassTag = implicitly[ClassTag[Result]]
   }
+  case object Delete extends Operation {
+    type Result = Nothing
+    final val resultClassTag = implicitly[ClassTag[Result]]
+  }
 }
 
-class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity)) {
+class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity))(implicit app: play.api.Application) {
   implicit val timeout = Timeout(2.seconds)
 
   private val connections = TMap.empty[ConnectionId, Connection]
-  private val globalReservationIdsMap = TMap.empty[GlobalReservationId, ConnectionId]
+  private val globalReservationIdsMap = TMap.empty[GlobalReservationId, Connection]
   private val connectionsByRequesterCorrelationId = TMap.empty[(RequesterNsa, CorrelationId), Connection]
-
   private val childConnections = TMap.empty[ConnectionId, Connection]
+  private val deleteHooks = TMap.empty[ConnectionId, InTxn => Unit]
+
+  private def addDeleteHook(connectionId: ConnectionId)(f: InTxn => Unit)(implicit tx: InTxn): Unit = {
+    val existing = deleteHooks.getOrElse(connectionId, (_: InTxn) => ())
+    deleteHooks.put(connectionId, { txn => existing(txn); f(txn) })
+  }
+
+  private def runDeleteHook(connectionId: ConnectionId): Unit = atomic { implicit txn =>
+    deleteHooks.remove(connectionId).foreach { hook => hook(txn) }
+  }
+
   val messageStore = new MessageStore()
 
-  def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection) = {
-    connections.single(connectionId) = connection
-    globalReservationId map (globalReservationIdsMap.single(_) = connectionId)
+  def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection) = atomic { implicit txn =>
+    connections(connectionId) = connection
+    addDeleteHook(connectionId) { implicit txn => connections.remove(connectionId) }
+    globalReservationId map { globalReservationId =>
+      globalReservationIdsMap(globalReservationId) = connection
+      addDeleteHook(connectionId) { implicit txn => globalReservationIdsMap.remove(globalReservationId) }
+    }
   }
 
   def get(connectionId: ConnectionId): Option[Connection] = connections.single.get(connectionId)
 
-  def find(connectionIds: Seq[ConnectionId]): Seq[Connection] = connections.single.filterKeys(connectionIds.contains).values.toSeq
+  def find(connectionIds: Seq[ConnectionId]): Seq[Connection] = {
+    val connectionsMap = connections.single.snapshot
+    connectionIds.flatMap(connectionsMap.get)
+  }
 
   def findByGlobalReservationIds(globalReservationIds: Seq[GlobalReservationId]): Seq[Connection] = {
-    val connectionIds = globalReservationIdsMap.single.filterKeys(globalReservationIds.contains).values.toSeq
-    find(connectionIds)
+    val globalIdsMap = globalReservationIdsMap.single.snapshot
+    globalReservationIds.flatMap(globalIdsMap.get)
   }
 
   def findByRequesterNsa(requesterNsa: RequesterNsa)(implicit executionContext: ExecutionContext): Future[Seq[Connection]] = {
@@ -90,11 +111,20 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     }
   }
 
-  def findByRequesterCorrelationId(requesterNsa: RequesterNsa, correlationId: CorrelationId): Option[Connection] =
+  private def findByRequesterCorrelationId(requesterNsa: RequesterNsa, correlationId: CorrelationId): Option[Connection] =
     connectionsByRequesterCorrelationId.single.get((requesterNsa, correlationId))
 
-  private def addChildConnectionId(connection: Connection, childConnectionId: ConnectionId) {
-    childConnections.single(childConnectionId) = connection
+  private def addChildConnectionId(connection: Connection, aggregatedConnectionId: ConnectionId, childConnectionId: ConnectionId)(implicit txn: InTxn): Unit = {
+    childConnections(childConnectionId) = connection
+    addDeleteHook(aggregatedConnectionId) { implicit txn =>
+      childConnections.remove(childConnectionId)
+    }
+  }
+
+  private def registerRequesterAndCorrelationId(requesterNsa: RequesterNsa, correlationId: CorrelationId, connectionId: ConnectionId, connection: Connection): Unit = atomic { implicit txn =>
+    val key = (requesterNsa, correlationId)
+    connectionsByRequesterCorrelationId(key) = connection
+    addDeleteHook(connectionId) { implicit txn => connectionsByRequesterCorrelationId.remove(key) }
   }
 
   def findByChildConnectionId(connectionId: ConnectionId): Option[Connection] = childConnections.single.get(connectionId)
@@ -109,7 +139,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
       commands.foreach {
         case Connection.Command(_, FromRequester(message)) =>
-          connectionsByRequesterCorrelationId.single.put((message.headers.requesterNSA, message.headers.correlationId), connection)
+          registerRequesterAndCorrelationId(message.headers.requesterNSA, message.headers.correlationId, connectionId, connection)
         case _ =>
       }
       (connection ? Connection.Replay(commands))
@@ -132,28 +162,30 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     findByRequesterCorrelationId(request.headers.requesterNSA, request.headers.correlationId).orElse {
       val result = request match {
         case NsiProviderMessage(headers, update: NsiProviderUpdateCommand) =>
-          get(update.connectionId)
+          get(update.connectionId).map(update.connectionId -> _)
         case NsiProviderMessage(headers, initialReserve: InitialReserve) =>
           val connectionId = newConnectionId
           val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
-          Some(connection)
+          messageStore.create(connectionId, new Instant(), headers.requesterNSA)
+          Some(connectionId -> connection)
       }
-      result.foreach { connection =>
-        connectionsByRequesterCorrelationId.put((request.headers.requesterNSA, request.headers.correlationId), connection)
+      result.foreach {
+        case (connectionId, connection) =>
+          registerRequesterAndCorrelationId(request.headers.requesterNSA, request.headers.correlationId, connectionId, connection)
       }
-      result
+      result.map(_._2)
     }
   }
 
   private def createConnection(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve])(implicit actorSystem: ActorSystem): Connection = {
-    val (output, connection) = connectionFactory(connectionId, initialReserve)
+    val (outputActor, connectionEntity) = connectionFactory(connectionId, initialReserve)
 
-    val storingActor = Connection(actorSystem.actorOf(Props(new ConnectionActor(connection, output))))
+    val connection = Connection(actorSystem.actorOf(Props(new ConnectionActor(connectionEntity, outputActor))))
     val globalReservationId = Option(initialReserve.body.body.getGlobalReservationId()).map(URI.create)
 
-    add(connectionId, globalReservationId, storingActor)
+    add(connectionId, globalReservationId, connection)
 
-    storingActor
+    connection
   }
 
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
@@ -164,9 +196,14 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
     var queryRequesters: Map[CorrelationId, ActorRef] = Map.empty
     var endTimeCancellable: Option[Cancellable] = None
+    var expirationCancellable: Option[Cancellable] = None
+
+    override def postStop(): Unit = {
+      endTimeCancellable.foreach(_.cancel)
+      expirationCancellable.foreach(_.cancel)
+    }
 
     import Connection._
-
     override def receive = LoggingReceive {
       case Query              => sender ! ((connection.rsm.criteria, connection.query))
       case QuerySegments      => sender ! connection.segments
@@ -199,6 +236,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
           case Left(error) =>
             ServiceException(error)
           case Right(outbound) =>
+            scheduleExpiration(timestamp)
+
             outbound.foreach(connection.process)
 
             outbound.foreach(output ! _)
@@ -225,9 +264,16 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
           }
 
           schedulePassedEndTimeMessage()
+          messages.lastOption.foreach { lastMessage => scheduleExpiration(lastMessage.timestamp) }
         }
 
         sender ! result
+
+      case Delete =>
+        Logger.info(s"Stopping $connection.id")
+        messageStore.delete(connection.id, new Instant())
+        runDeleteHook(connection.id)
+        context.stop(self)
     }
 
     private def schedulePassedEndTimeMessage(): Unit = {
@@ -238,11 +284,24 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       } yield {
         val delay = (endTime.getMillis - DateTimeUtils.currentTimeMillis()).milliseconds
         val message = Connection.Command(endTime.toInstant, PassedEndTime(newPassedEndTimeCorrelationId, connection.id, new DateTime(endTime)))
-        Logger.debug(s"Scheduling $message for execution within $delay milliseconds")
+        Logger.debug(s"Scheduling $message for execution after $delay")
         context.system.scheduler.scheduleOnce(delay) {
           self ! message
         }(context.dispatcher)
       })
+    }
+
+    private def scheduleExpiration(lastMessageTimestamp: Instant): Unit = {
+      expirationCancellable.foreach(_.cancel())
+      expirationCancellable = if (connection.lsm.exists(_.lifecycleState == LifecycleStateEnumType.CREATED)) None else {
+        val expirationTime = lastMessageTimestamp.plus(Configuration.ConnectionExpirationTime.toMillis)
+        val delay = (expirationTime.getMillis() - DateTimeUtils.currentTimeMillis()).milliseconds
+        val message = Connection.Delete
+        Logger.debug(s"Scheduling $message for execution after $delay")
+        Some(context.system.scheduler.scheduleOnce(delay) {
+          self ! message
+        }(context.dispatcher))
+      }
     }
 
     private def PersistMessages[E](timestamp: Instant, wrapped: InboundMessage => Either[E, Seq[OutboundMessage]]): InboundMessage => Either[E, Seq[OutboundMessage]] = { inbound =>
@@ -261,13 +320,19 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       outbound
     }
 
-    private def updateChildConnection(message: InboundMessage): Unit = message match {
-      case AckFromProvider(NsiProviderMessage(_, ReserveResponse(connectionId))) => addChildConnectionId(Connection(self), connectionId)
-      case FromProvider(NsiRequesterMessage(_, ReserveConfirmed(connectionId, _))) => addChildConnectionId(Connection(self), connectionId)
-      case FromProvider(NsiRequesterMessage(_, ReserveFailed(body))) => addChildConnectionId(Connection(self), body.getConnectionId)
-      case _ =>
+    private def updateChildConnection(message: InboundMessage): Unit = atomic { implicit txn =>
+      val childConnectionId = message match {
+        case AckFromProvider(NsiProviderMessage(_, ReserveResponse(connectionId))) =>
+          Some(connectionId)
+        case FromProvider(NsiRequesterMessage(_, ReserveConfirmed(connectionId, _))) =>
+          Some(connectionId)
+        case FromProvider(NsiRequesterMessage(_, ReserveFailed(body))) =>
+          Some(body.getConnectionId)
+        case _ =>
+          None
+      }
+      childConnectionId.foreach(addChildConnectionId(Connection(self), connection.id, _))
     }
-
   }
 
   private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(Configuration.Nsa)
