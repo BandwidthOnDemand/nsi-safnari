@@ -65,11 +65,17 @@ case class ReservationStateMachineData(
       childExceptions = childException.fold(childExceptions - correlationId)(exception => childExceptions.updated(correlationId, exception)),
       childTimeouts = childTimeout.fold(childTimeouts)(timeout => childTimeouts.updated(correlationId, timeout)))
 
-  def startProcessingNewCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: ReservationState) =
+  def startProcessingNewCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: ReservationState) = {
+    // Skip aborted state when we never received a child connection id due to an immediate service exception.
+    val stateForChildConnectionsWithoutConnectionId = if (transitionalState == AbortingReservationState) AbortedReservationState else transitionalState
     copy(
       currentCommand = command,
-      childConnectionStates = childConnectionStates.map { _._1 -> transitionalState },
+      childConnectionStates = childConnectionStates.map {
+        case (correlationId, _) =>
+          correlationId -> (if (connectionByInitialCorrelationId contains correlationId) transitionalState else stateForChildConnectionsWithoutConnectionId)
+      },
       childExceptions = Map.empty)
+    }
 
   def childHasState(correlationId: CorrelationId, state: ReservationState): Boolean = {
     val currentState = childConnectionStates.get(correlationId)
@@ -152,7 +158,7 @@ class ReservationStateMachine(
       goto(CommittingReservationState) using newData
     case Event(FromRequester(message @ NsiProviderMessage(_, _: ReserveAbort)), data) =>
       val newData = data.startProcessingNewCommand(message, AbortingReservationState)
-      goto(AbortingReservationState) using newData
+      goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveTimeout)), data) =>
       val newData = data.updateChild(connectionId = message.connectionId, reservationState = TimeoutReservationState, childTimeout = Some(message.timeout))
       goto(newData.aggregatedReservationState) using newData
@@ -179,12 +185,18 @@ class ReservationStateMachine(
       stay using newData
     case Event(FromRequester(message @ NsiProviderMessage(_, _: ReserveAbort)), data) =>
       val newData = data.startProcessingNewCommand(message, AbortingReservationState)
-      goto(AbortingReservationState) using newData
+      goto(newData.aggregatedReservationState) using newData
+  }
+
+  when(FailedReservationState) {
+    case Event(FromRequester(message @ NsiProviderMessage(_, _: ReserveAbort)), data) =>
+      val newData = data.startProcessingNewCommand(message, AbortingReservationState)
+      goto(newData.aggregatedReservationState) using newData
   }
 
   when(ReservedReservationState)(PartialFunction.empty)
-  when(FailedReservationState)(PartialFunction.empty)
   when(CommitFailedReservationState)(PartialFunction.empty)
+  when(AbortedReservationState)(PartialFunction.empty)
 
   whenUnhandled {
     case Event(AckFromProvider(_), _) => stay
@@ -223,7 +235,7 @@ class ReservationStateMachine(
           val seg = nextStateData.segmentByCorrelationId(correlationId)
           ToProvider(NsiProviderMessage(newNsiHeaders(seg.provider), ReserveCommit(connectionId)), seg.provider)
       }.toVector
-    case HeldReservationState -> AbortingReservationState =>
+    case (HeldReservationState | FailedReservationState | TimeoutReservationState) -> AbortingReservationState =>
       nextStateData.connectionByInitialCorrelationId.map {
         case (correlationId, connectionId) =>
           val seg = nextStateData.segmentByCorrelationId(correlationId)
@@ -242,18 +254,22 @@ class ReservationStateMachine(
       respond(ReserveCommitConfirmed(id))
     case CommittingReservationState -> CommitFailedReservationState =>
       respond(ReserveCommitFailed(failed(NsiError.InternalError).tap(_.getServiceException().withChildException(stateData.childExceptions.values.toSeq.asJava))))
-    case ReservedReservationState -> CheckingReservationState => ???
-    case FailedReservationState -> AbortingReservationState   => ???
-    case AbortingReservationState -> ReservedReservationState => ???
+    case ReservedReservationState -> CheckingReservationState =>
+      throw new IllegalStateException("modify reserve not implemented yet")
+    case (HeldReservationState | FailedReservationState | TimeoutReservationState | AbortingReservationState) -> AbortedReservationState =>
+      respond(ReserveAbortConfirmed(id))
   }
 
+  def childConnectionStateByInitialCorrelationId(correlationId: CorrelationId): ReservationStateEnumType = {
+    stateData.childConnectionStates.getOrElse(correlationId, CheckingReservationState).jaxb
+  }
   def childConnectionState(connectionId: ConnectionId): ReservationStateEnumType = {
     val correlationId = stateData.initialCorrelationIdByConnectionId(connectionId)
     stateData.childConnectionStates(correlationId).jaxb
   }
-  def childConnections: Seq[(ComputedSegment, Option[ConnectionId])] = stateData.segments.map {
+  def childConnections: Seq[(ComputedSegment, CorrelationId, Option[ConnectionId])] = stateData.segments.map {
     case (correlationId, segment) =>
-      (segment, stateData.connectionByInitialCorrelationId.get(correlationId))
+      (segment, correlationId, stateData.connectionByInitialCorrelationId.get(correlationId))
   }
   def reservationState = stateName.jaxb
   def criteria = stateData.criteria

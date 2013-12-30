@@ -50,14 +50,14 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         case Right(globalReservationIds) => globalReservationIds.contains(globalReservationId)
       })
 
-      val done = rsm.childConnections.forall { case (_, connectionId) => connectionId.isDefined }
+      val done = rsm.childConnections.forall { case (_, _, connectionId) => connectionId.isDefined }
 
       val qrsm = new QueryRecursiveStateMachine(
         id,
         pm.asInstanceOf[NsiProviderMessage[QueryRecursive]],
         initialReserve,
         connectionStates,
-        rsm.childConnections.map { case (segment, id) => segment.provider -> id }.toMap,
+        rsm.childConnections.map { case (segment, _, id) => segment.provider -> id }.toMap,
         newCorrelationId,
         newNsiHeaders)
 
@@ -110,7 +110,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
       case FromProvider(NsiRequesterMessage(headers, _)) =>
         val stateMachine = providerConversations.get(headers.correlationId)
-        if (stateMachine.isEmpty) Logger.debug(s"No active conversation for reply ${message.toShortString}")
+        if (stateMachine.isEmpty) Logger.debug(s"No active conversation for reply ${message.toShortString}, one of ${providerConversations.keySet.mkString(", ")} expected")
         providerConversations -= headers.correlationId
         stateMachine
 
@@ -153,8 +153,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       messages.collectFirst {
         case ToRequester(NsiRequesterMessage(_, _: ReserveCommitConfirmed)) =>
           val children = rsm.childConnections.map {
-            case (segment, Some(connectionId)) => connectionId -> segment.provider
-            case (segment, None)               => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
+            case (segment, _, Some(connectionId)) => connectionId -> segment.provider
+            case (segment, _, None)               => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
           }.toMap
           committedCriteria = Some(initialReserve.body.criteria)
           otherStateMachines = Some((
@@ -215,7 +215,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
   def query = {
     lazy val children = rsm.childConnections.zipWithIndex.collect {
-      case ((segment, Some(id)), order) => new ChildSummaryType().
+      case ((segment, _, Some(id)), order) => new ChildSummaryType().
         withConnectionId(id).
         withProviderNSA(segment.provider.nsa).
         withPointToPointService(segment.serviceType.service).
@@ -252,10 +252,10 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def segments: Seq[ConnectionData] = rsm.childConnections.map {
-    case (segment, id) => ConnectionData(
+    case (segment, correlationId, id) => ConnectionData(
       id,
       segment.provider.nsa,
-      id.map(rsm.childConnectionState).getOrElse(ReservationStateEnumType.RESERVE_CHECKING),
+      rsm.childConnectionStateByInitialCorrelationId(correlationId),
       id.flatMap(id => lsm.map(_.childConnectionState(id))).getOrElse(LifecycleStateEnumType.CREATED),
       id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
       id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(false),

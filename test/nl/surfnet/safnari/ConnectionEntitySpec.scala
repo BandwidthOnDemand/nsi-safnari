@@ -131,293 +131,348 @@ class ConnectionEntitySpec extends helpers.Specification {
       upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
   }
 
-  "A connection" should {
-    "send a path computation request when reserve is received" in new fixture {
-      when(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
+  "A connection" >> {
+    "in initial state" should {
+      "send a path computation request when reserve is received" in new fixture {
+        when(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
-      messages must contain(ToPce(PathComputationRequest(
-        correlationId = CorrelationId(0, 3),
-        replyTo = PceReplyToUri,
-        schedule = Schedule,
-        serviceType = ServiceType("ServiceType", Service))))
-    }
+        messages must contain(ToPce(PathComputationRequest(
+          correlationId = CorrelationId(0, 3),
+          replyTo = PceReplyToUri,
+          schedule = Schedule,
+          serviceType = ServiceType("ServiceType", Service))))
+      }
 
-    "send reserve request for each segment when path computation confirmed is received" in new fixture {
-      given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
+      "reject commit" in new fixture {
+        val ack = when(ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)))
 
-      when(pce.confirm(CorrelationId(0, 1), A, B))
-
-      messages must haveSize(2)
-      messages must haveAllElementsLike {
-        case ToProvider(NsiProviderMessage(_, reserve: InitialReserve), A.provider) => ok
-        case ToProvider(NsiProviderMessage(_, reserve: InitialReserve), B.provider) => ok
+        ack must beNone
       }
     }
 
-    "fail the connection when pce did not accept the find path request" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service))
-      )
+    "in path computation state" should {
+      "send reserve request for each segment when path computation confirmed is received" in new fixture {
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
-      when(pce.failedAck(CorrelationId(0, 1)))
+        when(pce.confirm(CorrelationId(0, 1), A, B))
 
-      messages must contain(like[Message] {
-        case ToRequester(NsiRequesterMessage(_, ReserveFailed(_))) => ok
-      }).exactly(1)
-    }
-
-    "fail the connection when path computation fails" in new fixture {
-      given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
-
-      when(pce.fail(CorrelationId(0, 1), "failed"))
-
-      messages must haveSize(1)
-      messages must haveOneElementLike {
-        case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-          headers must beEqualTo(Headers.copy(correlationId = ReserveCorrelationId).forAsyncReply)
-          failed.getConnectionId() must beEqualTo(ConnectionId)
-          failed.getServiceException().getErrorId() must beEqualTo(NsiError.NoPathFound.id)
+        messages must haveSize(2)
+        messages must haveAllElementsLike {
+          case ToProvider(NsiProviderMessage(_, reserve: InitialReserve), A.provider) => ok
+          case ToProvider(NsiProviderMessage(_, reserve: InitialReserve), B.provider) => ok
+        }
       }
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
-    }
 
-    "notify timeout when path computation times out" in new fixture {
-      val TimeoutTimestamp = DateTime.now().plusMinutes(2)
-      given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
+      "fail the connection when pce did not accept the find path request" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
-      when(pce.timeout(CorrelationId(1, 1), CorrelationId(0, 2), TimeoutTimestamp))
+        when(pce.failedAck(CorrelationId(0, 1)))
 
-      messages must contain(agg.notification(CorrelationId(0, 4), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
-        .withConnectionId(ConnectionId)
-        .withCorrelationId(CorrelationId(0, 2).toString)
-        .withNotificationId(1)
-        .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
-    }
-
-    "confirm the reservation with a single path segment" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 3), A))
-
-      when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
-      when(upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteria)))
-
-      messages must contain(ToRequester(NsiRequesterMessage(InitialReserveHeaders.forAsyncReply, ReserveConfirmed(ConnectionId, ConfirmCriteria))))
-      messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria)))
-
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-    }
-
-    "notify timeout to requester when child times out" in new fixture {
-      val TimeoutTimestamp = DateTime.now().plusMinutes(2)
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        agg.request(CorrelationId(0, 4), InitialReserve(InitialReserveType, ConfirmCriteria, A.serviceType.service)),
-        pce.confirm(CorrelationId(0, 3), A))
-
-      when(upa.timeout(CorrelationId(2, 7), CorrelationId(0, 4), TimeoutTimestamp))
-
-      messages must contain(agg.notification(CorrelationId(0, 6), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
-        .withConnectionId(ConnectionId)
-        .withCorrelationId(CorrelationId(0, 4).toString)
-        .withNotificationId(1)
-        .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
-    }
-
-    "ignore reserve response after async reserve confirm" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 3), A),
-        upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteria)))
-
-      when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
-
-      messages must beEmpty
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-    }
-
-    "be in reservation held state when both segments are confirmed" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 1), A, B),
-        upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
-        upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
-
-      when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
-      messages must beEmpty
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok }
-
-      when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
-      messages must contain(ToRequester(NsiRequesterMessage(InitialReserveHeaders.forAsyncReply, ReserveConfirmed(ConnectionId, ConfirmCriteria))))
-
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
-    }
-
-    "fail the reservation with a single path segment" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 3), A))
-
-      when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
-
-      messages must haveSize(1)
-      messages must haveOneElementLike {
-        case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-          headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
-          failed.getConnectionId() must beEqualTo(ConnectionId)
-          failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
-          failed.getServiceException().getChildException().asScala must haveSize(1)
-          failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.BandwidthUnavailable.id)
+        messages must contain(like[Message] {
+          case ToRequester(NsiRequesterMessage(_, ReserveFailed(_))) => ok
+        }).exactly(1)
       }
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
-    }
 
-    "fail the reservation with two segments and at least one fails" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 3), A, B),
-        upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+      "fail the connection when path computation fails" in new fixture {
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        when(pce.fail(CorrelationId(0, 1), "failed"))
 
-      when(upa.response(CorrelationId(0, 5), ReserveConfirmed("connectionIdB", ConfirmCriteria)))
-
-      messages must haveSize(1)
-      messages must haveOneElementLike {
-        case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-          headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
-          failed.getConnectionId() must beEqualTo(ConnectionId)
-          failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
-          failed.getServiceException().getChildException().asScala must haveSize(1)
+        messages must haveSize(1)
+        messages must haveOneElementLike {
+          case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
+            headers must beEqualTo(Headers.copy(correlationId = ReserveCorrelationId).forAsyncReply)
+            failed.getConnectionId() must beEqualTo(ConnectionId)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.NoPathFound.id)
+        }
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
       }
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
-    }
 
-    "fail the reservation with two segments and one downstream communication fails" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 3), A, B),
-        upa.error(CorrelationId(0, 4), new ServiceExceptionType().withText("communication error")))
+      "notify timeout when path computation times out" in new fixture {
+        val TimeoutTimestamp = DateTime.now().plusMinutes(2)
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        when(pce.timeout(CorrelationId(1, 1), CorrelationId(0, 2), TimeoutTimestamp))
 
-      when(upa.response(CorrelationId(0, 5), ReserveConfirmed("connectionIdB", ConfirmCriteria)))
-
-      messages must haveSize(1)
-      messages must haveOneElementLike {
-        case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-          headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
-          failed.getConnectionId() must beEqualTo(ConnectionId)
-          failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
-          failed.getServiceException().getChildException().asScala must haveSize(1)
+        messages must contain(agg.notification(CorrelationId(0, 4), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
+          .withConnectionId(ConnectionId)
+          .withCorrelationId(CorrelationId(0, 2).toString)
+          .withNotificationId(1)
+          .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
       }
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
     }
 
-    "fail the reservation with two segments when both fail" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 3), A, B),
-        upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+    "in reserve checking state" should {
+      "confirm the reservation with a single path segment" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A))
 
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
+        when(upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteria)))
 
-      when(upa.response(CorrelationId(0, 5), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdB").withServiceException(NsiError.BandwidthUnavailable.toServiceException(B.provider.nsa)))))
+        messages must contain(ToRequester(NsiRequesterMessage(InitialReserveHeaders.forAsyncReply, ReserveConfirmed(ConnectionId, ConfirmCriteria))))
+        messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria)))
 
-      messages must haveSize(1)
-      messages must haveOneElementLike {
-        case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-          headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
-          failed.getConnectionId() must beEqualTo(ConnectionId)
-          failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
-          failed.getServiceException().getChildException().asScala must haveSize(2)
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
       }
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
+
+      "notify timeout to requester when child times out" in new fixture {
+        val TimeoutTimestamp = DateTime.now().plusMinutes(2)
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          agg.request(CorrelationId(0, 4), InitialReserve(InitialReserveType, ConfirmCriteria, A.serviceType.service)),
+          pce.confirm(CorrelationId(0, 3), A))
+
+        when(upa.timeout(CorrelationId(2, 7), CorrelationId(0, 4), TimeoutTimestamp))
+
+        messages must contain(agg.notification(CorrelationId(0, 6), MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
+          .withConnectionId(ConnectionId)
+          .withCorrelationId(CorrelationId(0, 4).toString)
+          .withNotificationId(1)
+          .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
+      }
+
+      "ignore reserve response after async reserve confirm" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A),
+          upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteria)))
+
+        when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
+
+        messages must beEmpty
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+      }
+
+      "be in reservation held state when both segments are confirmed" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 1), A, B),
+          upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
+          upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
+
+        when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+        messages must beEmpty
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
+        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok }
+
+        when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
+        messages must contain(ToRequester(NsiRequesterMessage(InitialReserveHeaders.forAsyncReply, ReserveConfirmed(ConnectionId, ConfirmCriteria))))
+
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
+        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
+      }
+
+      "fail the reservation with a single path segment" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A))
+
+        when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+
+        messages must haveSize(1)
+        messages must haveOneElementLike {
+          case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
+            headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
+            failed.getConnectionId() must beEqualTo(ConnectionId)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+            failed.getServiceException().getChildException().asScala must haveSize(1)
+            failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.BandwidthUnavailable.id)
+        }
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
+      }
+
+      "fail the reservation with two segments and at least one fails" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A, B),
+          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+
+        when(upa.response(CorrelationId(0, 5), ReserveConfirmed("connectionIdB", ConfirmCriteria)))
+
+        messages must haveSize(1)
+        messages must haveOneElementLike {
+          case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
+            headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
+            failed.getConnectionId() must beEqualTo(ConnectionId)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+            failed.getServiceException().getChildException().asScala must haveSize(1)
+        }
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
+      }
+
+      "fail the reservation with two segments and one downstream communication fails" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A, B),
+          upa.error(CorrelationId(0, 4), new ServiceExceptionType().withText("communication error")))
+
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+
+        when(upa.response(CorrelationId(0, 5), ReserveConfirmed("connectionIdB", ConfirmCriteria)))
+
+        messages must haveSize(1)
+        messages must haveOneElementLike {
+          case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
+            headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
+            failed.getConnectionId() must beEqualTo(ConnectionId)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+            failed.getServiceException().getChildException().asScala must haveSize(1)
+        }
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
+      }
+
+      "fail the reservation with two segments when both fail" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A, B),
+          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+
+        when(upa.response(CorrelationId(0, 5), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdB").withServiceException(NsiError.BandwidthUnavailable.toServiceException(B.provider.nsa)))))
+
+        messages must haveSize(1)
+        messages must haveOneElementLike {
+          case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
+            headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
+            failed.getConnectionId() must beEqualTo(ConnectionId)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+            failed.getServiceException().getChildException().asScala must haveSize(2)
+        }
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
+      }
     }
 
-    "be in committing state when reserve commit is received" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 1), A),
-        upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+    "in reserve held state" should {
+      "be in committing state when reserve commit is received" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 1), A),
+          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
 
-      when(ura.request(newCorrelationId, ReserveCommit(ConnectionId)))
+        when(ura.request(newCorrelationId, ReserveCommit(ConnectionId)))
 
-      messages must haveOneElementLike { case ToProvider(NsiProviderMessage(_, _: ReserveCommit), _) => ok }
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_COMMITTING)
+        messages must haveOneElementLike { case ToProvider(NsiProviderMessage(_, _: ReserveCommit), _) => ok }
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_COMMITTING)
+      }
+
+      "be in aborting state when reserve abort is received" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 1), A),
+          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+
+        when(ura.request(newCorrelationId, ReserveAbort(ConnectionId)))
+
+        messages must haveOneElementLike { case ToProvider(NsiProviderMessage(_, _: ReserveAbort), _) => ok }
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
+      }
+
+      "be in reserve timeout state when provider times out" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A),
+          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+
+        when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType().withConnectionId("ConnectionIdA"))))
+
+        messages must contain(agg.response(ReserveCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
+          .withConnectionId(ConnectionId)
+          .withOriginatingConnectionId("ConnectionIdA")
+          .withNotificationId(1))))
+
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
+      }
     }
 
-    "be in reserved state when reserve commit confirmed is received" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 1), A),
-        upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)),
-        ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)))
+    "in reserve committing state" should {
+      "be in reserved state when reserve commit confirmed is received" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 1), A),
+          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)),
+          ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)))
 
-      when(upa.response(CorrelationId(0, 6), ReserveCommitConfirmed("ConnectionIdA")))
+        when(upa.response(CorrelationId(0, 6), ReserveCommitConfirmed("ConnectionIdA")))
 
-      messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = CommitCorrelationId).forAsyncReply, ReserveCommitConfirmed(ConnectionId))))
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+        messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = CommitCorrelationId).forAsyncReply, ReserveCommitConfirmed(ConnectionId))))
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+      }
     }
 
-    "reject commit when in initial state" in new fixture {
-      val ack = when(ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)))
+    "in reserve failed state" should {
+      "be in reserve aborting state when reserve abort is received" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 1), A),
+          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
 
-      ack must beNone
+        when(ura.request(CorrelationId(0, 6), ReserveAbort(ConnectionId)))
+
+        messages must haveOneElementLike { case ToProvider(NsiProviderMessage(_, _: ReserveAbort), _) => ok }
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
+      }
+
+      "be in reserve start state when reserve abort is received with a single child connection without connection id" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 1), A),
+          upa.acknowledge(CorrelationId(0, 4), ServiceException(NsiError.PayloadError.toServiceException(A.provider.nsa))))
+
+        when(ura.request(CorrelationId(0, 6), ReserveAbort(ConnectionId)))
+
+        messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, _: ReserveAbortConfirmed)) => ok }
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+      }
     }
 
-    "be in aborting state when reserve abort is received" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 1), A),
-        upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+    "in reserve aborting state" should {
+      "be in reserve aborted state when reserve abort confirm is received" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 1), A),
+          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))),
+          ura.request(CorrelationId(0, 5), ReserveAbort(ConnectionId)))
 
-      when(ura.request(newCorrelationId, ReserveAbort(ConnectionId)))
+        when(upa.response(CorrelationId(0, 6), ReserveAbortConfirmed("ConnectionIdA")))
 
-      messages must haveOneElementLike { case ToProvider(NsiProviderMessage(_, _: ReserveAbort), _) => ok }
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+        messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) }
+      }
     }
 
-    "be in reserve timeout state when provider times out" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
-        pce.confirm(CorrelationId(0, 3), A),
-        upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+    "that is not yet committed" should {
+      "provide basic information about uncommitted connections" in new fixture {
+        given(InitialMessages: _*)
 
-      when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType().withConnectionId("ConnectionIdA"))))
+        val result = connection.query
 
-      messages must contain(agg.response(ReserveCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
-        .withConnectionId(ConnectionId)
-        .withOriginatingConnectionId("ConnectionIdA")
-        .withNotificationId(1))))
-
-      reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
+        result.getConnectionId() must beEqualTo(ConnectionId)
+        result.getDescription() must beEqualTo(InitialReserveType.getDescription())
+        result.getGlobalReservationId() must beEqualTo(InitialReserveType.getGlobalReservationId())
+        result.getCriteria() must haveSize(0)
+      }
     }
 
-    "provide basic information about uncommitted connections" in new fixture {
-      given(InitialMessages: _*)
+    "that has been committed" should {
+      "provide detailed information about committed connections with children" in new ReservedConnection {
+        val result = connection.query
 
-      val result = connection.query
-
-      result.getConnectionId() must beEqualTo(ConnectionId)
-      result.getDescription() must beEqualTo(InitialReserveType.getDescription())
-      result.getGlobalReservationId() must beEqualTo(InitialReserveType.getGlobalReservationId())
-      result.getCriteria() must haveSize(0)
-    }
-
-    "provide detailed information about committed connections with children" in new ReservedConnection {
-      val result = connection.query
-
-      result.getCriteria() must haveSize(1)
-      val committed = result.getCriteria().get(0)
-      committed.getVersion() must beEqualTo(RequestCriteria.getVersion())
-      committed.getSchedule() must beEqualTo(RequestCriteria.getSchedule())
-      committed.getServiceType() must beEqualTo(RequestCriteria.getServiceType())
-      committed.getChildren().getChild() must haveSize(1)
+        result.getCriteria() must haveSize(1)
+        val committed = result.getCriteria().get(0)
+        committed.getVersion() must beEqualTo(RequestCriteria.getVersion())
+        committed.getSchedule() must beEqualTo(RequestCriteria.getSchedule())
+        committed.getServiceType() must beEqualTo(RequestCriteria.getServiceType())
+        committed.getChildren().getChild() must haveSize(1)
+      }
     }
 
     "be in released state when initial reserve" in new fixture {
@@ -435,12 +490,14 @@ class ConnectionEntitySpec extends helpers.Specification {
       provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
     }
 
-    "become provisioning on provision request" in new ReservedConnection with Released {
-      val ProvisionCorrelationId = newCorrelationId
+    "in released state" should {
+      "become provisioning on provision request" in new ReservedConnection with Released {
+        val ProvisionCorrelationId = newCorrelationId
 
-      when(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
+        when(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
 
-      messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 8)), Provision("ConnectionIdA")), A.provider))
+        messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 8)), Provision("ConnectionIdA")), A.provider))
+      }
     }
 
     "send a provision confirmed to requester" in new ReservedConnection with Released {
