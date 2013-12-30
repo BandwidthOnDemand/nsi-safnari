@@ -14,7 +14,7 @@ import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ConnectionSpec extends helpers.Specification {
+class ConnectionEntitySpec extends helpers.Specification {
   // These tests modify global state through joda time mocking.
   sequential
 
