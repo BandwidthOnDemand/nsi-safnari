@@ -128,13 +128,17 @@ class ConnectionManagerSpec extends helpers.Specification {
     "persist and restore from the database" in new SingleConnectionActorFixture {
       val messages = Seq(FromRequester(initialReserveMessage), pce.confirm(CorrelationId(0, 1), A), upa.response(CorrelationId(0, 1), ReserveConfirmed("ChildConnection", ConfirmCriteria)))
       messages.foreach(message => await(connection ? command(message)))
+
+      val originalQueryResult = await(connection ? Connection.Query)
+      system.stop(connection.actor)
+
       val restoredConnectionManager = createConnectionManager
       await(restoredConnectionManager.restore)
 
       val restoredConnection = restoredConnectionManager.get(connectionId)
 
       restoredConnection aka "restored connection" must beSome
-      await(restoredConnection.get ? Connection.Query) must_== await(connection ? Connection.Query)
+      await(restoredConnection.get ? Connection.Query) must_== originalQueryResult
     }
 
     "ensure retransmitted message is exactly the same as the original" in new SingleConnectionActorFixture {

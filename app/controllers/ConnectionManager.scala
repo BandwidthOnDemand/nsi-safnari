@@ -180,7 +180,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   private def createConnection(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve])(implicit actorSystem: ActorSystem): Connection = {
     val (outputActor, connectionEntity) = connectionFactory(connectionId, initialReserve)
 
-    val connection = Connection(actorSystem.actorOf(Props(new ConnectionActor(connectionEntity, outputActor))))
+    val connection = Connection(actorSystem.actorOf(ConnectionActor.props(connectionEntity, outputActor), s"con-$connectionId"))
     val globalReservationId = Option(initialReserve.body.body.getGlobalReservationId()).map(URI.create)
 
     add(connectionId, globalReservationId, connection)
@@ -188,6 +188,9 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     connection
   }
 
+  private object ConnectionActor {
+    def props(connectionEntity: ConnectionEntity, outputActor: ActorRef): Props = Props(new ConnectionActor(connectionEntity, outputActor))
+  }
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
     private val process = new IdempotentProvider(connection.aggregatorNsa, ManageChildConnections(connection.process))
 
@@ -337,3 +340,4 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
   private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(Configuration.Nsa)
 }
+
