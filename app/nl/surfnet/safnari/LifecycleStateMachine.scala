@@ -1,10 +1,8 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._07.connection.types.LifecycleStateEnumType._
-import org.ogf.schemas.nsi._2013._07.connection.types.LifecycleStateEnumType
-import org.ogf.schemas.nsi._2013._07.connection.types.EventEnumType
-import org.ogf.schemas.nsi._2013._07.connection.types.ErrorEventType
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.connection.types.LifecycleStateEnumType._
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 case class LifecycleStateMachineData(
   children: Map[ConnectionId, ProviderEndPoint],

@@ -1,8 +1,8 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._07.connection.types.ReserveType
-import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.connection.types.ReserveType
+import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 
 sealed trait NsiProviderOperation {
   def action: String = this.getClass().getSimpleName()

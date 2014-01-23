@@ -1,10 +1,10 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import scala.collection.JavaConverters._
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
 
 sealed abstract class ReservationState(val jaxb: ReservationStateEnumType)
 case object InitialReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)

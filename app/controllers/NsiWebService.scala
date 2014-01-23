@@ -3,7 +3,7 @@ package controllers
 import com.ning.http.client.Realm.AuthScheme
 import nl.surfnet.safnari._
 import nl.surfnet.safnari.NsiSoapConversions._
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.w3c.dom.Document
 import play.api.Logger
 import play.api.http.Status._

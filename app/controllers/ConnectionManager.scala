@@ -9,18 +9,14 @@ import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
 import org.joda.time.Instant
-import org.ogf.schemas.nsi._2013._07.connection.types.LifecycleStateEnumType
-import org.ogf.schemas.nsi._2013._07.connection.types.NotificationBaseType
-import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
-import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import play.Logger
 import scala.concurrent._
 import scala.concurrent.duration.{ Duration, DurationLong }
 import scala.concurrent.stm._
 import scala.reflect.ClassTag
-import scala.util.Failure
-import scala.util.Try
+import scala.util.{ Failure, Try }
 
 case class Connection(actor: ActorRef) {
   def !(operation: Connection.Operation): Unit = actor ! operation
@@ -220,7 +216,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
           outbound <- outbounds
         } output ! outbound
 
-      case Command(_, inbound @ FromProvider(NsiRequesterMessage(_, _: NsiQueryRecursiveResponse))) =>
+      case Command(_, inbound @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed))) =>
         for {
           messages <- connection.queryRecursiveResult(inbound)
           msg <- messages

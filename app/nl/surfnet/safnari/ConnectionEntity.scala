@@ -3,9 +3,9 @@ package nl.surfnet.safnari
 import akka.actor._
 import java.net.URI
 import org.joda.time.DateTime
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import play.api.Logger
 import scala.math.Ordering.Implicits._
 import scala.util.Try
@@ -69,7 +69,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def queryRecursiveResult(message: FromProvider): Option[Seq[OutboundMessage]] = message match {
-    case FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) | FromProvider(NsiRequesterMessage(_, _: QueryRecursiveFailed)) =>
+    case FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) | FromProvider(NsiRequesterMessage(_, _: Error)) =>
       val qrsm = providerConversations.get(message.correlationId)
       providerConversations -= message.correlationId
 

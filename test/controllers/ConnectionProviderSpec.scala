@@ -6,8 +6,8 @@ import scala.concurrent.Promise
 import nl.surfnet.safnari._
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.TypeValuePairListType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends helpers.Specification {

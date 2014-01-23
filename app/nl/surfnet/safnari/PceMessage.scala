@@ -1,7 +1,5 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.services.types.StpType
 import java.net.URI
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
@@ -10,10 +8,9 @@ import play.api.data.validation.ValidationError
 import scala.util.Try
 import javax.xml.datatype.XMLGregorianCalendar
 import javax.xml.datatype.DatatypeFactory
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetVlanType
-import org.ogf.schemas.nsi._2013._07.services.types.DirectionalityType
-import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetBaseType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 
 case class ServiceType(serviceType: String, service: P2PServiceBaseType)
 
@@ -56,12 +53,6 @@ object PceMessage {
   }
   implicit val CorrelationIdWrites: Writes[CorrelationId] = Writes { x => JsString(x.toString) }
 
-  implicit val StpTypeFormat: Format[StpType] = (
-    (__ \ "networkId").format[String] and
-    (__ \ "localId").format[String])(
-      (networkId, localId) => new StpType().withNetworkId(networkId).withLocalId(localId),
-      stpType => (stpType.getNetworkId(), stpType.getLocalId()))
-
   implicit val ProviderAuthenticationReads: Reads[ProviderAuthentication] = Reads { json =>
     (__ \ "method").read[String].reads(json) match {
       case JsSuccess("NONE", _)    => JsSuccess(NoAuthentication)
@@ -81,65 +72,24 @@ object PceMessage {
     (__ \ "csProviderURL").format[URI] and
     (__ \ "credentials").format[ProviderAuthentication])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply))
 
-  // Formats for the P2PServiceBaseType hierarchy. This is rather involved due to the use of sub-typing in the XML mappings.
-  private def pointToPointServiceFormat[A <: P2PServiceBaseType](f: => A = new P2PServiceBaseType()): OFormat[A] = (
+  implicit val pointToPointServiceFormat: OFormat[P2PServiceBaseType] = (
     (__ \ "capacity").format[Long] and
     (__ \ "directionality").formatNullable[String].inmap[Option[DirectionalityType]](_.map(DirectionalityType.fromValue(_)), _.map(_.value)) and
     (__ \ "symmetricPath").formatNullable[Boolean] and
-    (__ \ "sourceSTP").format[StpType] and
-    (__ \ "destSTP").format[StpType]).apply(
-      { (capacity, directionality, symmetricPath, source, dest) =>
-        val p2ps = f
-        p2ps.setCapacity(capacity)
-        p2ps.setDirectionality(directionality.getOrElse(DirectionalityType.BIDIRECTIONAL))
-        p2ps.setSymmetricPath(symmetricPath.map(x => x: java.lang.Boolean).orNull)
-        p2ps.setSourceSTP(source)
-        p2ps.setDestSTP(dest)
-        p2ps
-      }, { p2ps =>
-        (p2ps.getCapacity(), Option(p2ps.getDirectionality()), Option(p2ps.isSymmetricPath()).map(_.booleanValue()), p2ps.getSourceSTP(), p2ps.getDestSTP())
-      })
+    (__ \ "sourceSTP").format[String] and
+    (__ \ "destSTP").format[String]
+  ).apply((capacity, directionality, symmetricPath, source, dest) => {
+    new P2PServiceBaseType()
+      .withCapacity(capacity)
+      .withDirectionality(directionality.getOrElse(DirectionalityType.BIDIRECTIONAL))
+      .withSymmetricPath(symmetricPath.map(x => x: java.lang.Boolean).orNull)
+      .withSourceSTP(source)
+      .withDestSTP(dest)
+  }, { p2ps => (p2ps.getCapacity(), Option(p2ps.getDirectionality()), Option(p2ps.isSymmetricPath()).map(_.booleanValue()), p2ps.getSourceSTP(), p2ps.getDestSTP()) })
 
-  private def ethernetBaseTypeFormat[A <: EthernetBaseType](f: => A = new EthernetBaseType()): OFormat[A] = (
-    pointToPointServiceFormat(f) and
-    (__ \ "mtu").formatNullable[Int] and
-    (__ \ "burstsize").formatNullable[Long])(
-      { (ets, mtu, burstsize) =>
-        ets.setMtu(mtu.map(x => x: java.lang.Integer).orNull)
-        ets.setBurstsize(burstsize.map(x => x: java.lang.Long).orNull)
-        ets
-      }, { ets =>
-        (ets, Option(ets.getMtu()).map(_.toInt), Option(ets.getBurstsize()).map(_.toLong))
-      })
-
-  private def ethernetVlanTypeFormat[A <: EthernetVlanType](f: => A = new EthernetVlanType()): OFormat[A] = (
-    ethernetBaseTypeFormat(f) and
-    (__ \ "sourceVLAN").format[Int] and
-    (__ \ "destVLAN").format[Int]).apply(
-      { (evts, sourceVlan, destVlan) =>
-        evts.setSourceVLAN(sourceVlan)
-        evts.setDestVLAN(destVlan)
-        evts
-      }, { evts =>
-        (evts, evts.getSourceVLAN(), evts.getDestVLAN())
-      })
-
-  private val ServiceTypeReads: Reads[ServiceType] = (
-    (__ \ "serviceType").read[String] and
-    // Explicitly pass in the required formats. Inference doesn't work due to sub-typing.
-    ((__ \ "p.p2ps").read(Reads.seq(pointToPointServiceFormat())) or
-      (__ \ "p.ets").read(Reads.seq(ethernetBaseTypeFormat())).map(identity[Seq[P2PServiceBaseType]]) or
-      (__ \ "p.evts").read(Reads.seq(ethernetVlanTypeFormat())).map(identity[Seq[P2PServiceBaseType]])).filter(ValidationError("error.single.service.required"))(_.size == 1)) {
-        (serviceType, services) => ServiceType(serviceType, services.head)
-      }
-
-  private val ServiceTypeWrites: OWrites[ServiceType] = OWrites {
-    case ServiceType(serviceType, service: EthernetVlanType)   => Json.obj("serviceType" -> serviceType, "p.evts" -> Json.arr(ethernetVlanTypeFormat().writes(service)))
-    case ServiceType(serviceType, service: EthernetBaseType)   => Json.obj("serviceType" -> serviceType, "p.ets" -> Json.arr(ethernetBaseTypeFormat().writes(service)))
-    case ServiceType(serviceType, service: P2PServiceBaseType) => Json.obj("serviceType" -> serviceType, "p.p2ps" -> Json.arr(pointToPointServiceFormat().writes(service)))
-  }
-
-  implicit val ServiceTypeFormat = OFormat(ServiceTypeReads, ServiceTypeWrites)
+  implicit val ServiceTypeFormat: OFormat[ServiceType] = (
+    (__ \ "serviceType").format[String] and
+    (__ \ "p.p2ps").format[Seq[P2PServiceBaseType]]).apply((st, p2ps) => ServiceType(st, p2ps.head), serviceType => (serviceType.serviceType, serviceType.service :: Nil))
 
   implicit val ComputedSegmentFormat: Format[ComputedSegment] = (ProviderEndPointFormat and ServiceTypeFormat)(ComputedSegment.apply, unlift(ComputedSegment.unapply))
 

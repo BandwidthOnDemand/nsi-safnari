@@ -6,10 +6,6 @@ import javax.xml.ws.Holder
 import play.api.mvc._
 import play.api.test._
 import play.api.test.Helpers._
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.framework.headers._
-import org.ogf.schemas.nsi._2013._07.framework.types._
-import org.ogf.schemas.nsi._2013._07.connection.provider.ConnectionServiceProvider
 import support.ExtraBodyParsers
 import scala.concurrent._
 import nl.surfnet.safnari._
@@ -19,9 +15,12 @@ import play.api.libs.ws.WS
 import play.api.libs.json._
 import java.net.URI
 import support.ExtraBodyParsers._
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._07.services.types.DirectionalityType
-import org.ogf.schemas.nsi._2013._07.services.types.StpType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.headers._
+import org.ogf.schemas.nsi._2013._12.framework.types._
+import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import javax.xml.bind.JAXBElement
 import org.w3c.dom.Element
 import javax.xml.transform.dom.DOMResult
@@ -86,7 +85,7 @@ class ReserveRequestSpec extends helpers.Specification {
     "safnari.nsa" -> SafnariNsa), withGlobal = Some(Global))
 
   def marshal(p2ps: P2PServiceBaseType): Element = {
-    val jaxb = new org.ogf.schemas.nsi._2013._07.services.point2point.ObjectFactory().createP2Ps(p2ps)
+    val jaxb = new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory().createP2Ps(p2ps)
     val result = new DOMResult()
     jaxbContext.createMarshaller().marshal(jaxb, result)
     result.getNode().asInstanceOf[Document].getDocumentElement();
@@ -107,8 +106,8 @@ class ReserveRequestSpec extends helpers.Specification {
       withAny(marshal(new P2PServiceBaseType().
         withCapacity(100).
         withDirectionality(DirectionalityType.BIDIRECTIONAL).
-        withSourceSTP(new StpType().withNetworkId("networkId").withLocalId("source-localId")).
-        withDestSTP(new StpType().withNetworkId("networkId").withLocalId("dest-localId"))))
+        withSourceSTP("networkId:source-localId").
+        withDestSTP("networkId:dest-localId")))
 
     "send a reserve request to the ultimate provider agent" in new WithServer(Application, ServerPort) {
       val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))

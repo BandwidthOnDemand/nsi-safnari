@@ -1,9 +1,7 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._07.framework.types.VariablesType
-import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairType
+import org.ogf.schemas.nsi._2013._12.framework.types._
 import scala.collection.JavaConverters._
 
 object NsiHeaders {

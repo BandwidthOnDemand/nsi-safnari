@@ -1,5 +1,5 @@
 <soapenv:Envelope 
-xmlns:type="http://schemas.ogf.org/nsi/2013/07/connection/types" xmlns:head="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+xmlns:type="http://schemas.ogf.org/nsi/2013/12/connection/types" xmlns:head="http://schemas.ogf.org/nsi/2013/12/framework/headers" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
     <soapenv:Header>
         <head:nsiHeader>
             <protocolVersion>2.0</protocolVersion>

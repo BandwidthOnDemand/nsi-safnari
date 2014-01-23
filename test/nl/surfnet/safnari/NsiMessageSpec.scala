@@ -1,10 +1,9 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.framework.types._
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._07.services.types.DirectionalityType
-import org.ogf.schemas.nsi._2013._07.services.types.StpType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types._
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import java.net.URI
 import org.joda.time.DateTime
 
@@ -15,8 +14,8 @@ object NsiMessageSpec {
   val Service = new P2PServiceBaseType().
     withDirectionality(DirectionalityType.BIDIRECTIONAL).
     withCapacity(100).
-    withSourceSTP(new StpType().withNetworkId("networkId").withLocalId("A")).
-    withDestSTP(new StpType().withNetworkId("networkId").withLocalId("B"))
+    withSourceSTP("networkId:A").
+    withDestSTP("networkId:B")
 
   val Schedule = new ScheduleType().withStartTime(DateTime.now().plusMinutes(5).toXmlGregorianCalendar).withEndTime(DateTime.now().plusMinutes(30).toXmlGregorianCalendar)
   val ConfirmCriteria = new ReservationConfirmCriteriaType().withVersion(5).withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
@@ -29,10 +28,10 @@ object NsiMessageSpec {
   val reserveConfirmed = NsiRequesterMessage(headers(InitialReserveCorrelationId, NsiHeaders.RequesterProtocolVersion), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))
 
   val A = ComputedSegment(
-    serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("A")).withDestSTP(new StpType().withLocalId("X"))),
+    serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP("A").withDestSTP("X")),
     provider = ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"), NoAuthentication))
   val B = ComputedSegment(
-    serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP(new StpType().withLocalId("X")).withDestSTP(new StpType().withLocalId("B"))),
+    serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP("X").withDestSTP("B")),
     provider = ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"), NoAuthentication))
 
   object ura {

@@ -7,12 +7,7 @@ import java.net.URI
 import nl.surfnet.safnari.NsiSoapConversions._
 import nl.surfnet.safnari._
 import org.joda.time.Instant
-import org.ogf.schemas.nsi._2013._07.connection.types.NotificationBaseType
-import org.ogf.schemas.nsi._2013._07.connection.types.QueryFailedType
-import org.ogf.schemas.nsi._2013._07.connection.types.QueryNotificationConfirmedType
-import org.ogf.schemas.nsi._2013._07.connection.types.QueryRecursiveResultType
-import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
-import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
+import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.Play.current
 import play.api._
 import play.api.libs.concurrent.Akka
@@ -61,7 +56,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       case Success(list) =>
         val resultTypes = list.flatMap {
           case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultType
-          case ToRequester(NsiRequesterMessage(_, QueryRecursiveFailed(e)))             => Seq.empty
+          case ToRequester(NsiRequesterMessage(_, Error(e)))                            => Seq.empty
         }
 
         replyTo(QueryRecursiveConfirmed(resultTypes))
@@ -92,7 +87,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       val connection = connectionManager.get(q.connectionId)
       val ack = connection.map(queryNotifications(_, q.start, q.end).map(QueryNotificationSyncConfirmed))
 
-      ack.getOrElse(Future.successful(QueryNotificationSyncFailed(new QueryFailedType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
     case q: QueryRecursive =>
       sys.error("Should be handled by its own handler")
   }

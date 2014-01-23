@@ -2,24 +2,16 @@ package nl.surfnet.safnari
 
 import play.api.libs.json._
 import java.net.URI
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.framework.types._
-import org.ogf.schemas.nsi._2013._07.services.types.StpType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types._
 import play.api.data.validation.ValidationError
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetVlanType
-import org.ogf.schemas.nsi._2013._07.services.types.DirectionalityType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 
 object PceMessageSpec {
-  val sourceStp = new StpType().withNetworkId("network-id").withLocalId("source")
+  val sourceStp = "network-id:source"
 
-  val destStp = new StpType().withNetworkId("network-id").withLocalId("dest")
-  val EthernetVlanService = new EthernetVlanType()
-    .withDirectionality(DirectionalityType.BIDIRECTIONAL)
-    .withSymmetricPath(true)
-    .withCapacity(100)
-    .withSourceSTP(sourceStp)
-    .withDestSTP(destStp)
+  val destStp = "network-id:dest"
   val ServiceBaseType = new P2PServiceBaseType()
     .withDirectionality(DirectionalityType.BIDIRECTIONAL)
     .withCapacity(100)
@@ -47,18 +39,6 @@ class PceMessageSpec extends helpers.Specification {
   "PceMessages" should {
 
     import nl.surfnet.safnari.PceMessage._
-
-    "serialize request with ethernetVlanService to json" in {
-      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, EthernetVlanService))
-
-      val json = Json.toJson(request)
-
-      json \ "correlationId" must beEqualTo(JsString(correlationId.toString))
-      json \ "replyTo" \ "url" must beEqualTo(JsString("http://localhost/pce/reply"))
-      json \ "p:evts"
-
-      Json.fromJson[PceRequest](json) must beEqualTo(JsSuccess(request))
-    }
 
     "serialize request with p2pServiceBaseType to json" in {
       val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType))
@@ -91,14 +71,6 @@ class PceMessageSpec extends helpers.Specification {
       Json.fromJson[PceResponse](json) must beEqualTo(JsSuccess(response))
     }
 
-    "deserialize stp type" in {
-      val input = """{"networkId":"network-id","localId":"local-id"}"""
-
-      val stp = Json.fromJson[StpType](Json.parse(input))
-
-      stp must beEqualTo(JsSuccess(new StpType().withNetworkId("network-id").withLocalId("local-id")))
-    }
-
     "deserialize path computation failed" in {
       val input = """{"correlationId":"urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640","status":"FAILED","message":"oops!"}"""
 
@@ -124,22 +96,14 @@ class PceMessageSpec extends helpers.Specification {
         |      "credentials": {
         |        "method": "NONE"
         |      },
-        |      "serviceType": "http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE",
-        |      "p.evts": [
+        |      "serviceType": "http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE",
+        |      "p.p2ps": [
         |        {
         |          "capacity": 100,
         |          "directionality": "Bidirectional",
         |          "symmetricPath": true,
-        |          "sourceSTP": {
-        |            "networkId": "urn:ogf:network:internet2.edu",
-        |            "localId": "i2-edge"
-        |          },
-        |          "destSTP": {
-        |            "networkId": "urn:ogf:network:internet2.edu",
-        |            "localId": "to-esnet"
-        |          },
-        |          "sourceVLAN": 1780,
-        |          "destVLAN": 1780
+        |          "sourceSTP": "urn:ogf:network:internet2.edu:i2-edge?vlan=1780",
+        |          "destSTP": "urn:ogf:network:internet2.edu:to-esnet?vlan=1780"
         |        }
         |      ]
         |    },
@@ -151,22 +115,14 @@ class PceMessageSpec extends helpers.Specification {
         |        "username": "foo",
         |        "password": "bar"
         |      },
-        |      "serviceType": "http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE",
-        |      "p.evts": [
+        |      "serviceType": "http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE",
+        |      "p.p2ps": [
         |        {
         |          "capacity": 100,
         |          "directionality": "Bidirectional",
         |          "symmetricPath": true,
-        |          "sourceSTP": {
-        |            "networkId": "urn:ogf:network:es.net",
-        |            "localId": "to-internet2"
-        |          },
-        |          "destSTP": {
-        |            "networkId": "urn:ogf:network:es.net",
-        |            "localId": "esnet-edge-one"
-        |          },
-        |          "sourceVLAN": 1780,
-        |          "destVLAN": 1780
+        |          "sourceSTP": "urn:ogf:network:es.net:to-internet2?vlan=1780",
+        |          "destSTP": "urn:ogf:network:es.net:esnet-edge-one?vlan=1780"
         |        }
         |      ]
         |    }
@@ -179,24 +135,22 @@ class PceMessageSpec extends helpers.Specification {
           ProviderEndPoint("urn:ogf:network:nsa:internet2.edu",
             URI.create("http://oscars.internet2.edu/provider"),
             NoAuthentication),
-          ServiceType("http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE", new EthernetVlanType()
+          ServiceType("http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE", new P2PServiceBaseType()
             .withCapacity(100)
             .withDirectionality(DirectionalityType.BIDIRECTIONAL)
             .withSymmetricPath(true)
-            .withSourceSTP(new StpType().withNetworkId("urn:ogf:network:internet2.edu").withLocalId("i2-edge"))
-            .withDestSTP(new StpType().withNetworkId("urn:ogf:network:internet2.edu").withLocalId("to-esnet"))
-            .withSourceVLAN(1780).withDestVLAN(1780)))
+            .withSourceSTP("urn:ogf:network:internet2.edu:i2-edge?vlan=1780")
+            .withDestSTP("urn:ogf:network:internet2.edu:to-esnet?vlan=1780")))
         :: ComputedSegment(
           ProviderEndPoint("urn:ogf:network:nsa:es.net",
             URI.create("http://oscars.es.net/nsi/ConnectionService"),
             BasicAuthentication("foo", "bar")),
-          ServiceType("http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE", new EthernetVlanType()
+          ServiceType("http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE", new P2PServiceBaseType()
             .withCapacity(100)
             .withDirectionality(DirectionalityType.BIDIRECTIONAL)
             .withSymmetricPath(true)
-            .withSourceSTP(new StpType().withNetworkId("urn:ogf:network:es.net").withLocalId("to-internet2"))
-            .withDestSTP(new StpType().withNetworkId("urn:ogf:network:es.net").withLocalId("esnet-edge-one"))
-            .withSourceVLAN(1780).withDestVLAN(1780)))
+            .withSourceSTP("urn:ogf:network:es.net:to-internet2?vlan=1780")
+            .withDestSTP("urn:ogf:network:es.net:esnet-edge-one?vlan=1780")))
         :: Nil)
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
