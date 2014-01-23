@@ -53,12 +53,9 @@ class PceMessageSpec extends helpers.Specification {
 
       val json = Json.toJson(request)
 
-      println(json)
-
       json \ "correlationId" must beEqualTo(JsString(correlationId.toString))
       json \ "replyTo" \ "url" must beEqualTo(JsString("http://localhost/pce/reply"))
       json \ "p:evts"
-      println(json \ "p:evts")
 
       Json.fromJson[PceRequest](json) must beEqualTo(JsSuccess(request))
     }
@@ -108,6 +105,11 @@ class PceMessageSpec extends helpers.Specification {
       val output = PathComputationFailed(CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get, "oops!")
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
+    }
+
+    "toString of a pceResponse should not contain authorization information" in {
+      BasicAuthentication("johndoe", "secret").toString must not(contain("secret"))
+      OAuthAuthentication("secret-token").toString must not(contain("secret-token"))
     }
 
     "deserialize path computation confirmed" in {

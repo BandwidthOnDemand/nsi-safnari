@@ -5,7 +5,8 @@
 @import nl.surfnet.safnari.SerializedMessage._
 @import org.w3c.dom.Document
 @import scala.xml.PrettyPrinter
-@import play.api.libs.json.{ Json, Writes }
+@import play.api.libs.json.{ Json, Writes, JsString }
+@import play.api.libs.json.extensions._
 @import org.joda.time.Instant
 
 @id() = @{
@@ -20,7 +21,13 @@
   val xml = documentToScalaXml(document)
   pp.format(xml)
 }
-@prettyJson[A: Writes](a: A) = @{ Json.prettyPrint(Json.toJson(a)) }
+@prettyJson[A: Writes](a: A) = @{
+  val json = Json.toJson(a).updateAll {
+    case ((__ \ "path")@@idx \ "credentials" \ "token", value) => JsString("******")
+    case ((__ \ "path")@@idx \ "credentials" \ "password", value) => JsString("******")
+  }
+  Json.prettyPrint(json)
+}
 
 @display(index: Int, text: String, time: Instant, body: String) = {
   <div class="message"><span class="section-number">@(index + 1).</span> @text<span class="time">@time.toDateTime.toString("YYYY-MM-dd HH:mm:ss,SSS")</span></div>

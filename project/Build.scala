@@ -14,6 +14,7 @@ object ApplicationBuild extends Build {
     "nl.surfnet.bod" % "bod-nsi" % "0.2.4",
     "org.scala-stm" %% "scala-stm" % "0.7",
     "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
+    "play-json-zipper" %% "play-json-zipper" % "1.0",
     "org.scalacheck" %% "scalacheck" % "1.10.1" % "test",
     "com.typesafe.akka" %% "akka-testkit" % "2.2.0" % "test"
   )
@@ -32,7 +33,8 @@ object ApplicationBuild extends Build {
     scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
     resolvers ++= Seq(
         "SURFnet BoD Snapshots" at s"$nexusBaseUri/public-snapshots",
-        "SURFnet BoD Releases" at s"$nexusBaseUri/public-releases"
+        "SURFnet BoD Releases" at s"$nexusBaseUri/public-releases",
+        "Mandubian repository releases" at "https://github.com/mandubian/mandubian-mvn/raw/master/releases/"
     ),
     javaOptions in Test += "-Dconfig.file=conf/test.conf",
     testFrameworks in Test := Seq(TestFrameworks.Specs2),
