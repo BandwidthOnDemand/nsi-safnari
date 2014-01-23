@@ -65,7 +65,7 @@ class Application(connectionManager: ConnectionManager) extends Controller {
         Ok(views.html.connection(criteria, summary, segments, messages))
       }
     }.getOrElse {
-      Future.successful(NotFound)
+      Future.successful(NotFound(s"Connection ($id) was not found"))
     }
   }
 
