@@ -44,6 +44,10 @@ object Connection {
     type Result = ToRequester
     final val resultClassTag = implicitly[ClassTag[Result]]
   }
+  case object QueryResults extends Operation {
+    type Result = Seq[QueryResultResponseType]
+    final val resultClassTag = implicitly[ClassTag[Result]]
+  }
   case class Command[+T <: Message](timestamp: Instant, message: T) extends Operation {
     type Result = NsiAcknowledgement
     final val resultClassTag = implicitly[ClassTag[Result]]
@@ -207,6 +211,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       case Query              => sender ! ((connection.rsm.criteria, connection.query))
       case QuerySegments      => sender ! connection.segments
       case QueryNotifications => sender ! connection.notifications
+      case QueryResults       => sender ! connection.results
 
       case Connection.QueryRecursive(query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive))) =>
         queryRequesters += (query.correlationId -> sender)

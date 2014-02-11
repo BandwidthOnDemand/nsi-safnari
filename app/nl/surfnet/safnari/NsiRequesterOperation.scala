@@ -31,6 +31,7 @@ case class TerminateConfirmed(connectionId: ConnectionId) extends NsiCommandRepl
 case class QuerySummaryConfirmed(reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
 case class QueryRecursiveConfirmed(reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
 case class QueryNotificationConfirmed(notifications: Seq[NotificationBaseType]) extends NsiRequesterOperation
+case class QueryResultConfirmed(results: Seq[QueryResultResponseType]) extends NsiRequesterOperation
 
 case class Error(error: GenericErrorType) extends NsiRequesterOperation
 

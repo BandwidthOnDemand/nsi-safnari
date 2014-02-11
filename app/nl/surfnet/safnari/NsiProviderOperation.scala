@@ -38,3 +38,6 @@ case class QueryRecursive(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReserv
 
 case class QueryNotification(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery
 case class QueryNotificationSync(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery
+
+case class QueryResult(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery
+case class QueryResultSync(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery

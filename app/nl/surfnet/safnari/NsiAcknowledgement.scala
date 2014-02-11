@@ -11,4 +11,5 @@ case class ReserveResponse(connectionId: String) extends NsiAcknowledgement
 case class ServiceException(exception: ServiceExceptionType) extends NsiAcknowledgement
 case class QuerySummarySyncConfirmed(results: Seq[QuerySummaryResultType]) extends NsiAcknowledgement
 case class QueryNotificationSyncConfirmed(results: Seq[NotificationBaseType]) extends NsiAcknowledgement
+case class QueryResultSyncConfirmed(results: Seq[QueryResultResponseType]) extends NsiAcknowledgement
 case class ErrorAck(error: GenericErrorType) extends NsiAcknowledgement

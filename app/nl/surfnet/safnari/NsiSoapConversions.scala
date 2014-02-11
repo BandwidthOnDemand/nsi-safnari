@@ -86,6 +86,8 @@ object NsiSoapConversions {
         marshal(typesFactory.createQuerySummarySyncConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava)))
       case QueryNotificationSyncConfirmed(notifications) =>
         marshal(typesFactory.createQueryNotificationSyncConfirmed(new QueryNotificationConfirmedType().withErrorEventOrReserveTimeoutOrDataPlaneStateChange(notifications.asJava)))
+      case QueryResultSyncConfirmed(results) =>
+        marshal(typesFactory.createQueryResultSyncConfirmed(new QueryResultConfirmedType().withResult(results.asJava)))
       case ErrorAck(error) =>
         marshal(typesFactory.createError(error))
       case ServiceException(exception) =>
@@ -140,6 +142,14 @@ object NsiSoapConversions {
                                                                 .withConnectionId(connectionId)
                                                                 .withStartNotificationId(if (start.isDefined) start.get else null)
                                                                 .withEndNotificationId(if (end.isDefined) end.get else null))
+      case QueryResult(connectionId, start, end)           => typesFactory.createQueryResult(new QueryResultType()
+                                                               .withConnectionId(connectionId)
+                                                               .withStartResultId(if (start.isDefined) start.get else null)
+                                                               .withEndResultId(if (end.isDefined) end.get else null))
+      case QueryResultSync(connectionId, start, end)       => typesFactory.createQueryResultSync(new QueryResultType()
+                                                               .withConnectionId(connectionId)
+                                                               .withStartResultId(if (start.isDefined) start.get else null)
+                                                               .withEndResultId(if (end.isDefined) end.get else null))
     })
   } {
     messageFactories(Map[String, NsiMessageParser[NsiProviderOperation]](
@@ -161,15 +171,30 @@ object NsiSoapConversions {
       "querySummarySync" -> NsiMessageParser { body: QueryType => Success(QuerySummarySync(toIds(body))) },
       "queryRecursive" -> NsiMessageParser { body: QueryType => Success(QueryRecursive(toIds(body))) },
       "queryNotification" -> NsiMessageParser { body: QueryNotificationType =>
-        Success(QueryNotification(body.getConnectionId,
+        Success(QueryNotification(
+          body.getConnectionId(),
           Option(body.getStartNotificationId()).map(_.toInt),
           Option(body.getEndNotificationId()).map(_.toInt)))
       },
       "queryNotificationSync" -> NsiMessageParser { body: QueryNotificationType =>
-        Success(QueryNotificationSync(body.getConnectionId,
+        Success(QueryNotificationSync(
+          body.getConnectionId(),
           Option(body.getStartNotificationId()).map(_.toInt),
           Option(body.getEndNotificationId()).map(_.toInt)))
-      }))
+      },
+      "queryResult" -> NsiMessageParser { body: QueryResultType =>
+        Success(QueryResult(
+          body.getConnectionId(),
+          Option(body.getStartResultId()).map(_.toInt),
+          Option(body.getEndResultId()).map(_.toInt)))
+      },
+      "queryResultSync" -> NsiMessageParser { body: QueryResultType =>
+        Success(QueryResultSync(
+          body.getConnectionId(),
+          Option(body.getStartResultId()).map(_.toInt),
+          Option(body.getEndResultId()).map(_.toInt)))
+      }
+    ))
   }
 
   private def toIds(query: QueryType): Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]] =
@@ -200,6 +225,7 @@ object NsiSoapConversions {
       case QuerySummaryConfirmed(reservations)       => typesFactory.createQuerySummaryConfirmed(new QuerySummaryConfirmedType().withReservation(reservations.asJava))
       case QueryRecursiveConfirmed(reservations)     => typesFactory.createQueryRecursiveConfirmed(new QueryRecursiveConfirmedType().withReservation(reservations.asJava))
       case QueryNotificationConfirmed(notifications) => typesFactory.createQueryNotificationConfirmed(new QueryNotificationConfirmedType().withErrorEventOrReserveTimeoutOrDataPlaneStateChange(notifications.asJava))
+      case QueryResultConfirmed(results)             => typesFactory.createQueryResultConfirmed(new QueryResultConfirmedType().withResult(results.asJava))
       case Error(error)                              => typesFactory.createError(error)
       case DataPlaneStateChange(notification)        => typesFactory.createDataPlaneStateChange(notification)
       case ErrorEvent(error)                         => typesFactory.createErrorEvent(error)
