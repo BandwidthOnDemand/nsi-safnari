@@ -112,6 +112,9 @@ object ConnectionRequester {
       case ToProvider(message @ NsiProviderMessage(headers, provision: Provision), _) =>
         Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack GenericAck()))
         Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply ProvisionConfirmed(provision.connectionId)))
+      case ToProvider(message @ NsiProviderMessage(headers, terminate: Terminate), _) =>
+        Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack GenericAck()))
+        Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply TerminateConfirmed(terminate.connectionId)))
       case ToProvider(message @ NsiProviderMessage(headers, update: NsiProviderUpdateCommand), provider) =>
         Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa).withConnectionId(update.connectionId))))
       case ToProvider(message @ NsiProviderMessage(headers, query: QueryRecursive), provider) =>
