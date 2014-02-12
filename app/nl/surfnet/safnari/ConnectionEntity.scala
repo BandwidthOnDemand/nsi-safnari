@@ -230,19 +230,20 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
   def query = {
     lazy val children = rsm.childConnections.zipWithIndex.collect {
-      case ((segment, _, Some(id)), order) => new ChildSummaryType().
-        withConnectionId(id).
-        withProviderNSA(segment.provider.nsa).
-        withPointToPointService(segment.serviceType.service).
-        withOrder(order)
+      case ((segment, _, Some(id)), order) => new ChildSummaryType()
+        .withConnectionId(id)
+        .withProviderNSA(segment.provider.nsa)
+        .withServiceType(segment.serviceType.serviceType)
+        .withPointToPointService(segment.serviceType.service)
+        .withOrder(order)
     }
 
-    val result = new QuerySummaryResultType().
-      withGlobalReservationId(initialReserve.body.body.getGlobalReservationId()).
-      withDescription(initialReserve.body.body.getDescription()).
-      withConnectionId(id).
-      withRequesterNSA(requesterNSA).
-      withConnectionStates(connectionStates)
+    val result = new QuerySummaryResultType()
+      .withGlobalReservationId(initialReserve.body.body.getGlobalReservationId())
+      .withDescription(initialReserve.body.body.getDescription())
+      .withConnectionId(id)
+      .withRequesterNSA(requesterNSA)
+      .withConnectionStates(connectionStates)
 
     committedCriteria.foreach { criteria =>
       result.getCriteria().add(new QuerySummaryResultCriteriaType()
@@ -259,11 +260,11 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
   def connectionStates: ConnectionStatesType = {
     val version = rsm.version
-    new ConnectionStatesType().
-      withReservationState(rsm.reservationState).
-      withProvisionState(psm.map(_.provisionState).getOrElse(ProvisionStateEnumType.RELEASED)).
-      withLifecycleState(lsm.map(_.lifecycleState).getOrElse(LifecycleStateEnumType.CREATED)).
-      withDataPlaneStatus(dsm.map(_.dataPlaneStatus(version)).getOrElse(new DataPlaneStatusType()))
+    new ConnectionStatesType()
+      .withReservationState(rsm.reservationState)
+      .withProvisionState(psm.map(_.provisionState).getOrElse(ProvisionStateEnumType.RELEASED))
+      .withLifecycleState(lsm.map(_.lifecycleState).getOrElse(LifecycleStateEnumType.CREATED))
+      .withDataPlaneStatus(dsm.map(_.dataPlaneStatus(version)).getOrElse(new DataPlaneStatusType()))
   }
 
   def segments: Seq[ConnectionData] = rsm.childConnections.map {
