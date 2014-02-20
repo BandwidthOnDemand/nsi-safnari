@@ -161,13 +161,30 @@ object ConnectionProvider {
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
     requestHeaders.replyTo.foreach { replyTo =>
-      val ack = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))
 
-      ack.onComplete {
-        case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
-        case Success(NsiRequesterMessage(headers, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
-        case Success(acknowledgement)                                       => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
+      Configuration.TwoWayTLS match {
+        case true => {
+          // take the detour
+          val hostAndPort = replyTo.getHost + ":" + replyTo.getPort
+          val replacementParts = Configuration.TwoWayTLSTranslations.get(hostAndPort).render().split(":")
+          val replyUri = new URI("http", replacementParts(0), replacementParts(1), replyTo.getFragment)
+          val ack = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyUri, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))
+          complete(ack)
+        }
+        case false => {
+          val ack = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))
+          complete(ack)
+        }
       }
+
+      def complete = { ack: Future[NsiRequesterMessage[NsiAcknowledgement]] =>
+        ack.onComplete {
+          case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
+          case Success(NsiRequesterMessage(headers, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
+          case Success(acknowledgement)                                       => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
+        }
+      }
+
     }
 
   private[controllers] def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
