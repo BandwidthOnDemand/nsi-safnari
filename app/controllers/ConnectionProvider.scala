@@ -8,7 +8,7 @@ import nl.surfnet.safnari.NsiSoapConversions._
 import nl.surfnet.safnari._
 import org.joda.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import play.api.Play.current
+import play.api.Play._
 import play.api._
 import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
@@ -18,6 +18,36 @@ import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
 import nl.surfnet.safnari.QueryResult
+import com.typesafe.config.ConfigUtil
+import nl.surfnet.safnari.QuerySummary
+import nl.surfnet.safnari.GenericAck
+import scala.util.Failure
+import scala.Some
+import nl.surfnet.safnari.QueryNotificationSync
+import nl.surfnet.safnari.QueryResult
+import nl.surfnet.safnari.ErrorAck
+import nl.surfnet.safnari.ToPce
+import nl.surfnet.safnari.QueryNotificationConfirmed
+import nl.surfnet.safnari.QueryNotificationSyncConfirmed
+import nl.surfnet.safnari.QuerySummaryConfirmed
+import scala.util.Success
+import nl.surfnet.safnari.ServiceException
+import nl.surfnet.safnari.InitialReserve
+import nl.surfnet.safnari.QuerySummarySync
+import nl.surfnet.safnari.FromRequester
+import nl.surfnet.safnari.QueryResultConfirmed
+import nl.surfnet.safnari.NsiRequesterMessage
+import nl.surfnet.safnari.NsiProviderMessage
+import nl.surfnet.safnari.QueryRecursiveConfirmed
+import nl.surfnet.safnari.ToRequester
+import nl.surfnet.safnari.ToProvider
+import nl.surfnet.safnari.ProviderEndPoint
+import nl.surfnet.safnari.QueryResultSyncConfirmed
+import nl.surfnet.safnari.QuerySummarySyncConfirmed
+import nl.surfnet.safnari.Error
+import nl.surfnet.safnari.QueryRecursive
+import nl.surfnet.safnari.QueryNotification
+import nl.surfnet.safnari.QueryResultSync
 
 class ConnectionProvider(connectionManager: ConnectionManager) extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -162,19 +192,22 @@ object ConnectionProvider {
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
     requestHeaders.replyTo.foreach { replyTo =>
 
-      Configuration.TwoWayTLS match {
-        case true => {
-          // take the detour
-          val hostAndPort = replyTo.getHost + ":" + replyTo.getPort
-          val replacementParts = Configuration.TwoWayTLSTranslations.get(hostAndPort).render().split(":")
-          val replyUri = new URI("http", replacementParts(0), replacementParts(1), replyTo.getFragment)
-          val ack = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyUri, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))
-          complete(ack)
+      val keyBuilder = new StringBuilder(replyTo.getHost)
+      if (replyTo.getPort != -1 && replyTo.getPort != 443) {
+        keyBuilder.append(":" + replyTo.getPort)
+      }
+      val key = keyBuilder.mkString
+      val path = ConfigUtil.joinPath("nsi", "tlsmap", key)
+
+      val useTls: Option[Boolean] = current.configuration.getBoolean("nsi.twoway.tls")
+
+      current.configuration.getString(path) match {
+        case Some(replacement) if useTls.isDefined && useTls.get => {
+          val stunnelURI = replyTo.toASCIIString().replace(key, replacement)
+          val replyUri = URI.create(stunnelURI)
+          complete(NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyUri, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response)))
         }
-        case false => {
-          val ack = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))
-          complete(ack)
-        }
+        case _ => complete(NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response)))
       }
 
       def complete = { ack: Future[NsiRequesterMessage[NsiAcknowledgement]] =>
