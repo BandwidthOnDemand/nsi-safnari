@@ -192,20 +192,15 @@ object ConnectionProvider {
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
     requestHeaders.replyTo.foreach { replyTo =>
 
-      val keyBuilder = new StringBuilder(replyTo.getHost)
-      if (replyTo.getPort != -1 && replyTo.getPort != 443) {
-        keyBuilder.append(":" + replyTo.getPort)
-      }
-      val key = keyBuilder.mkString
-      val path = ConfigUtil.joinPath("nsi", "tlsmap", key)
+      val path = ConfigUtil.joinPath("nsi", "tlsmap", requestHeaders.requesterNSA)
 
       val useTls: Option[Boolean] = current.configuration.getBoolean("nsi.twoway.tls")
 
       current.configuration.getString(path) match {
-        case Some(replacement) if useTls.isDefined && useTls.get => {
-          val stunnelURI = replyTo.toASCIIString().replace(key, replacement)
-          val replyUri = URI.create(stunnelURI)
-          complete(NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyUri, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response)))
+        case Some(hostAndPort) if useTls.isDefined && useTls.get => {
+          val splitted = hostAndPort.split(":")
+          val stunnelURI = new URI("http", "", splitted(0), Integer.parseInt(splitted(1)), replyTo.getPath(), replyTo.getQuery(), replyTo.getFragment() )
+          complete(NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, stunnelURI, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response)))
         }
         case _ => complete(NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response)))
       }
