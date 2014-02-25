@@ -7,7 +7,7 @@ object Configuration {
   lazy val Nsa = current.configuration.getString("safnari.nsa").getOrElse(sys.error("safnari.nsa not set"))
   def BaseUrl = current.configuration.getString("nsi.base.url").getOrElse(sys.error("nsi.base.url option is not set"))
 
-  lazy val Use2WayTLS = current.configuration.getBoolean("nsi.twoway.tls").getOrElse(sys.error("nsi.twoway.tls option is not set"))
+  val Use2WayTLS = current.configuration.getBoolean("nsi.twoway.tls").getOrElse(sys.error("Setting the nsi.twoway.tls option is mandatory"))
 
   lazy val AsyncReplyTimeout = readFiniteDuration("safnari.async.reply.timeout")
   def ConnectionExpirationTime = readFiniteDuration("safnari.connection.expiration.time")
