@@ -11,10 +11,20 @@ import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.ws.WS
 import scala.concurrent.Future
 import scala.language.higherKinds
-import scala.util.Failure
-import scala.util.Success
 import scala.util.Try
 import support.ExtraBodyParsers._
+import play.api.Play._
+import nl.surfnet.safnari.NsiRequesterMessage
+import nl.surfnet.safnari.NsiProviderMessage
+import nl.surfnet.safnari.OAuthAuthentication
+import scala.util.Failure
+import scala.Some
+import nl.surfnet.safnari.ProviderEndPoint
+import scala.util.Success
+import nl.surfnet.safnari.ServiceException
+import nl.surfnet.safnari.BasicAuthentication
+import com.typesafe.config.ConfigUtil
+import java.net.URI
 
 object NsiWebService {
   implicit class SoapRequestHolder(request: WS.WSRequestHolder) {
@@ -44,7 +54,21 @@ object NsiWebService {
     convertAck: (NsiHeaders, Document) => Try[M[NsiAcknowledgement]],
     convertError: (NsiHeaders, ServiceExceptionType) => M[NsiAcknowledgement])(implicit messageConversion: Conversion[M[T], Document]): Future[M[NsiAcknowledgement]] = {
 
+    val path = ConfigUtil.joinPath("nsi", "tlsmap", provider.nsa)
+    val useTls = current.configuration.getBoolean("nsi.twoway.tls")
+
     var request = WS.url(provider.url.toASCIIString())
+
+    if (useTls.isDefined && useTls.get) {
+      current.configuration.getString(path) match {
+        case Some(hostAndPort) => {
+          val splitted = hostAndPort.split(":")
+          val uri = new URI("http", "", splitted(0), Integer.parseInt(splitted(1)), provider.url.getPath, provider.url.getQuery, provider.url.getFragment)
+          request = WS.url(uri.toASCIIString)
+        }
+        case None => {}
+      }
+    }
 
     request = provider.authentication match {
       case OAuthAuthentication(token)              => request.withHeaders("Authorization" -> s"bearer $token")
