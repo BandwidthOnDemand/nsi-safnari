@@ -193,8 +193,7 @@ object ConnectionProvider {
     requestHeaders.replyTo.foreach { replyTo =>
 
       val path = ConfigUtil.joinPath("nsi", "tlsmap", requestHeaders.requesterNSA)
-
-      val useTls: Option[Boolean] = current.configuration.getBoolean("nsi.twoway.tls")
+      val useTls = current.configuration.getBoolean("nsi.twoway.tls")
 
       current.configuration.getString(path) match {
         case Some(hostAndPort) if useTls.isDefined && useTls.get => {
