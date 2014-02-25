@@ -201,7 +201,8 @@ object ConnectionProvider {
           val stunnelURI = new URI("http", "", splitted(0), Integer.parseInt(splitted(1)), replyTo.getPath(), replyTo.getQuery(), replyTo.getFragment() )
           complete(NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, stunnelURI, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response)))
         }
-        case _ => complete(NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response)))
+        case None if useTls.isDefined && useTls.get => throw new IllegalArgumentException(s"No stunnel detour configured for NSA ${requestHeaders.requesterNSA} while TLS was enabled")
+        case _ => complete(NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))) // development setup only
       }
 
       def complete = { ack: Future[NsiRequesterMessage[NsiAcknowledgement]] =>

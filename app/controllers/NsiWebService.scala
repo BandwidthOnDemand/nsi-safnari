@@ -66,7 +66,7 @@ object NsiWebService {
           val uri = new URI("http", "", splitted(0), Integer.parseInt(splitted(1)), provider.url.getPath, provider.url.getQuery, provider.url.getFragment)
           request = WS.url(uri.toASCIIString)
         }
-        case None => {}
+        case None => throw new IllegalArgumentException(s"No stunnel detour configured for NSA ${provider.nsa} while TLS was enabled.")
       }
     }
 
