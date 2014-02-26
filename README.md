@@ -17,8 +17,8 @@ Sbt can be downloaded from [http://www.scala-sbt.org](http://www.scala-sbt.org) 
 
 By default Safnari will use a dummy PCE and a dummy NSI requester. To use a real PCE and NSI requester change the `pce.actor` and `nsi.actor` properties in `conf/application.conf` to `real`.
 
-`sbt stage` will create an executable in `target/universal/stage/bin/nsi-safnari` which can be used to run Safnari in production like environment. You can give it a configuration file that overrides the default per environment.
-Like: `nsi-safnari -Dconfig.resource=prod.conf`. For further information you can look at the [Play site](http://www.playframework.com/documentation/2.2.x/Production).
+`sbt stage` will create an executable in `target/universal/stage/bin/nsi-safnari` which can be used to run Safnari in production like environment. You can give it a configuration file that overrides the default per environment, which lives outside of the project jar.
+Like: `nsi-safnari -Dconfig.file=/path/to/prod.conf`. For further information you can look at the [Play site](http://www.playframework.com/documentation/2.2.x/Production).
 
 ## PCE
 
