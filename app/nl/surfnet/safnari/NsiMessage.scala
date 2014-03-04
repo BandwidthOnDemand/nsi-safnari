@@ -54,36 +54,37 @@ final case class NsiError(id: String, description: String, text: String) {
       .withVariables(new VariablesType().withVariable(variables.asJava))
   }
 }
+
 object NsiError {
-  val PayloadError = NsiError("100", "PAYLOAD_ERROR", "")
-  val MissingParameter = NsiError("101", "MISSING_PARAMETER", "Invalid or missing parameter")
-  val UnsupportedParameter = NsiError("102", "UNSUPPORTED_PARAMETER", "Parameter provided contains an unsupported value which MUST be processed")
-  val NotImplemented = NsiError("103", "NOT_IMPLEMENTED", "This operation is not implemented yet")
-  val VersionNotSupported = NsiError("104", "VERSION_NOT_SUPPORTED", "The service version requested in NSI header is not supported")
+  val PayloadError = NsiError("00100", "PAYLOAD_ERROR", "")
+  val MissingParameter = NsiError("00101", "MISSING_PARAMETER", "Invalid or missing parameter")
+  val UnsupportedParameter = NsiError("00102", "UNSUPPORTED_PARAMETER", "Parameter provided contains an unsupported value which MUST be processed")
+  val NotImplemented = NsiError("00103", "NOT_IMPLEMENTED", "This operation is not implemented yet")
+  val VersionNotSupported = NsiError("00104", "VERSION_NOT_SUPPORTED", "The service version requested in NSI header is not supported")
 
-  val ConnectionError = NsiError("200", "", "")
-  val InvalidTransition = NsiError("201", "INVALID_TRANSITION", "Connection state machine is in invalid state for received message")
-  val ConnectionExists = NsiError("202", "CONNECTION_EXISTS", "Schedule already exists for connectionId")
-  val ConnectionNonExistent = NsiError("203", "CONNECTION_NONEXISTENT", "Schedule does not exist for connectionId")
-  val ConnectionGone = NsiError("204", "CONNECTION_GONE", "")
-  val ConnectionCreateError = NsiError("205", "CONNECTION_CREATE_ERROR", "Failed to create connection (payload was ok, something went wrong)")
+  val ConnectionError = NsiError("00200", "", "")
+  val InvalidTransition = NsiError("00201", "INVALID_TRANSITION", "Connection state machine is in invalid state for received message")
+  val ConnectionExists = NsiError("00202", "CONNECTION_EXISTS", "Schedule already exists for connectionId")
+  val ConnectionNonExistent = NsiError("00203", "CONNECTION_NONEXISTENT", "Schedule does not exist for connectionId")
+  val ConnectionGone = NsiError("00204", "CONNECTION_GONE", "")
+  val ConnectionCreateError = NsiError("00205", "CONNECTION_CREATE_ERROR", "Failed to create connection (payload was ok, something went wrong)")
 
-  val SecurityError = NsiError("300", "SECURITY_ERROR", "")
-  val AuthenticationFailure = NsiError("301", "AUTHENTICATION_FAILURE", "")
-  val Unauthorized = NsiError("302", "UNAUTHORIZED", "")
+  val SecurityError = NsiError("00300", "SECURITY_ERROR", "")
+  val AuthenticationFailure = NsiError("00301", "AUTHENTICATION_FAILURE", "")
+  val Unauthorized = NsiError("00302", "UNAUTHORIZED", "")
 
-  val TopologyError = NsiError("400", "TOPOLOGY_ERROR", "")
-  val UnknownStp = NsiError("401", "UNKNOWN_STP", "Could not find STP in topology database")
-  val StpResolutionError = NsiError("402", "STP_RESOLUTION_ERROR", "Could not resolve STP to a managing NSA")
-  val NoPathFound = NsiError("403", "NO_PATH_FOUND", "Path computation failed to resolve route for reservation")
-  val VlanIdInterchangeNotSupported = NsiError("404", "VLANID_INTERCHANGE_NOT_SUPPORTED", "VlanId interchange not supported for requested path")
+  val TopologyError = NsiError("00400", "TOPOLOGY_ERROR", "")
+  val UnknownStp = NsiError("00401", "UNKNOWN_STP", "Could not find STP in topology database")
+  val StpResolutionError = NsiError("00402", "STP_RESOLUTION_ERROR", "Could not resolve STP to a managing NSA")
+  val NoPathFound = NsiError("00403", "NO_PATH_FOUND", "Path computation failed to resolve route for reservation")
+  val VlanIdInterchangeNotSupported = NsiError("00404", "VLANID_INTERCHANGE_NOT_SUPPORTED", "VlanId interchange not supported for requested path")
 
-  val InternalError = NsiError("500", "INTERNAL_ERROR", "An internal error has caused a message processing failure")
-  val InternalNrmError = NsiError("501", "INTERNAL_NRM_ERROR", "An internal NRM error has caused a message processing failure")
+  val InternalError = NsiError("00500", "INTERNAL_ERROR", "An internal error has caused a message processing failure")
+  val InternalNrmError = NsiError("00501", "INTERNAL_NRM_ERROR", "An internal NRM error has caused a message processing failure")
 
-  val ResourceUnavailable = NsiError("600", "RESOURCE_UNAVAILABLE", "")
-  val StpUnavailable = NsiError("601", "STP_UNAVAILABLE", "Specified STP already in use")
-  val BandwidthUnavailable = NsiError("602", "BANDWIDTH_UNAVAILABLE", "Insufficient bandwdith available for reservation")
+  val ResourceUnavailable = NsiError("00600", "RESOURCE_UNAVAILABLE", "")
+  val StpUnavailable = NsiError("00601", "STP_UNAVAILABLE", "Specified STP already in use")
+  val BandwidthUnavailable = NsiError("00602", "BANDWIDTH_UNAVAILABLE", "Insufficient bandwdith available for reservation")
 
   val ChildError = NsiError("???", "CHILD_ERROR", "One or more children reported an error. See the child exceptions for details.")
 }
