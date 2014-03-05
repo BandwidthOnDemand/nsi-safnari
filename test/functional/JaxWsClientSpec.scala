@@ -2,8 +2,6 @@ package functional
 
 import org.junit.runner.RunWith
 import play.api.test._
-import org.ogf.schemas.nsi._2013._07.connection.provider.ConnectionProviderPort
-import org.ogf.schemas.nsi._2013._07.connection.provider.ConnectionServiceProvider
 import java.net.URL
 import java.util.Collection
 import java.util.Collections
@@ -15,11 +13,13 @@ import javax.xml.ws.handler.soap.SOAPHandler
 import javax.xml.ws.handler.MessageContext
 import java.util.ArrayList
 import javax.xml.soap.SOAPFactory
-import org.ogf.schemas.nsi._2013._07.framework.headers.CommonHeaderType
-import org.ogf.schemas.nsi._2013._07.framework.headers.{ObjectFactory => HeadersObjectFactory}
+import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionProviderPort
+import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
+import org.ogf.schemas.nsi._2013._12.framework.headers.CommonHeaderType
+import org.ogf.schemas.nsi._2013._12.framework.headers.{ObjectFactory => HeadersObjectFactory}
+import org.ogf.schemas.nsi._2013._12.connection.requester.ConnectionServiceRequester
 import javax.xml.bind.JAXBContext
 import javax.xml.parsers.DocumentBuilderFactory
-import org.ogf.schemas.nsi._2013._07.connection.requester.ConnectionServiceRequester
 import com.sun.xml.internal.ws.client.ClientTransportException
 import nl.surfnet.safnari.NsiMessage
 import nl.surfnet.safnari.NsiHeaders

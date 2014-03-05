@@ -1,6 +1,6 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 private case class RequesterCommandStatus(command: FromRequester, outstandingCommandsOrReply: Either[Map[CorrelationId, OutboundMessage], ToRequester]) {
   def replySent(reply: ToRequester) = {

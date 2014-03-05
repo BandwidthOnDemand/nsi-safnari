@@ -8,11 +8,10 @@ import java.net.URI
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.Instant
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._07.services.types.DirectionalityType
-import org.ogf.schemas.nsi._2013._07.services.types.StpType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import org.specs2.execute.PendingUntilFixed
 import play.api.libs.concurrent.Akka
 import play.api.test.Helpers._

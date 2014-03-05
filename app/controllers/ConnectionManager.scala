@@ -9,18 +9,14 @@ import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
 import org.joda.time.Instant
-import org.ogf.schemas.nsi._2013._07.connection.types.LifecycleStateEnumType
-import org.ogf.schemas.nsi._2013._07.connection.types.NotificationBaseType
-import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
-import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import play.Logger
 import scala.concurrent._
 import scala.concurrent.duration.{ Duration, DurationLong }
 import scala.concurrent.stm._
 import scala.reflect.ClassTag
-import scala.util.Failure
-import scala.util.Try
+import scala.util.{ Failure, Try }
 
 case class Connection(actor: ActorRef) {
   def !(operation: Connection.Operation): Unit = actor ! operation
@@ -46,6 +42,10 @@ object Connection {
   }
   case class QueryRecursive(message: FromRequester) extends Operation {
     type Result = ToRequester
+    final val resultClassTag = implicitly[ClassTag[Result]]
+  }
+  case object QueryResults extends Operation {
+    type Result = Seq[QueryResultResponseType]
     final val resultClassTag = implicitly[ClassTag[Result]]
   }
   case class Command[+T <: Message](timestamp: Instant, message: T) extends Operation {
@@ -211,6 +211,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       case Query              => sender ! ((connection.rsm.criteria, connection.query))
       case QuerySegments      => sender ! connection.segments
       case QueryNotifications => sender ! connection.notifications
+      case QueryResults       => sender ! connection.results
 
       case Connection.QueryRecursive(query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive))) =>
         queryRequesters += (query.correlationId -> sender)
@@ -220,7 +221,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
           outbound <- outbounds
         } output ! outbound
 
-      case Command(_, inbound @ FromProvider(NsiRequesterMessage(_, _: NsiQueryRecursiveResponse))) =>
+      case Command(_, inbound @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed))) =>
         for {
           messages <- connection.queryRecursiveResult(inbound)
           msg <- messages

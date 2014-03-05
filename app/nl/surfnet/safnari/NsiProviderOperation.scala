@@ -1,8 +1,8 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._07.connection.types.ReserveType
-import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.connection.types.ReserveType
+import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 
 sealed trait NsiProviderOperation {
   def action: String = this.getClass().getSimpleName()
@@ -38,3 +38,6 @@ case class QueryRecursive(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReserv
 
 case class QueryNotification(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery
 case class QueryNotificationSync(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery
+
+case class QueryResult(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery
+case class QueryResultSync(connectionId: ConnectionId, start: Option[Int], end: Option[Int]) extends NsiProviderQuery

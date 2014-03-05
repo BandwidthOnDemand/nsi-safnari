@@ -2,7 +2,7 @@ package nl.surfnet.safnari
 
 import java.net.URI
 import org.joda.time.DateTime
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 sealed trait Message {
   def toShortString: String

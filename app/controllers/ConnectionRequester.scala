@@ -8,8 +8,8 @@ import java.util.concurrent.TimeoutException
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.Instant
-import org.ogf.schemas.nsi._2013._07.connection.types.MessageDeliveryTimeoutRequestType
-import org.ogf.schemas.nsi._2013._07.connection.types.QueryRecursiveResultType
+import org.ogf.schemas.nsi._2013._12.connection.types.MessageDeliveryTimeoutRequestType
+import org.ogf.schemas.nsi._2013._12.connection.types.QueryRecursiveResultType
 import play.api.Logger
 import play.api.Play.current
 import play.api.libs.concurrent.Akka
@@ -112,6 +112,9 @@ object ConnectionRequester {
       case ToProvider(message @ NsiProviderMessage(headers, provision: Provision), _) =>
         Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack GenericAck()))
         Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply ProvisionConfirmed(provision.connectionId)))
+      case ToProvider(message @ NsiProviderMessage(headers, terminate: Terminate), _) =>
+        Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack GenericAck()))
+        Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply TerminateConfirmed(terminate.connectionId)))
       case ToProvider(message @ NsiProviderMessage(headers, update: NsiProviderUpdateCommand), provider) =>
         Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa).withConnectionId(update.connectionId))))
       case ToProvider(message @ NsiProviderMessage(headers, query: QueryRecursive), provider) =>

@@ -5,11 +5,10 @@ import java.net.URI
 import javax.xml.datatype.DatatypeFactory
 import scala.collection.JavaConverters._
 import org.specs2.specification.Scope
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._07.services.types.StpType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.framework.types.TypeValuePairListType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
 
@@ -47,7 +46,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     val processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
 
     def given(messages: Message*): Unit = messages.foreach {
-      case inbound @ FromProvider(NsiRequesterMessage(_, _: NsiQueryRecursiveResponse)) =>
+      case inbound @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) =>
         connection.queryRecursiveResult(inbound)
       case inbound @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) =>
         connection.queryRecursive(inbound)

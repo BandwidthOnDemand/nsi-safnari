@@ -5,8 +5,8 @@ import akka.pattern.ask
 import akka.util.Timeout
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
-import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
-import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
+import org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType
+import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 import play.api.Play.current
 import play.api._
 import play.api.libs.concurrent.Execution.Implicits._

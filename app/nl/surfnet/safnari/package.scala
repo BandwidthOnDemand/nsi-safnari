@@ -7,12 +7,9 @@ import javax.xml.datatype.DatatypeFactory
 import javax.xml.datatype.XMLGregorianCalendar
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone
-import org.ogf.schemas.nsi._2013._07.connection.types.{ ReservationConfirmCriteriaType, ReservationRequestCriteriaType }
-import org.ogf.schemas.nsi._2013._07.connection.types.ScheduleType
-import org.ogf.schemas.nsi._2013._07.framework.types.TypeValuePairListType
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetVlanType
-import org.ogf.schemas.nsi._2013._07.services.point2point.EthernetBaseType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.TypeValuePairListType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import play.api.data.validation.ValidationError
 import play.api.libs.json._
 import scala.collection.JavaConverters._
@@ -136,21 +133,15 @@ package object safnari {
     }
   }
 
-  private val PointToPointObjectFactory = new org.ogf.schemas.nsi._2013._07.services.point2point.ObjectFactory()
+  private val PointToPointObjectFactory = new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory()
   private val P2PS_QNAME = PointToPointObjectFactory.createP2Ps(null).getName()
-  private val ETS_QNAME = PointToPointObjectFactory.createEts(null).getName()
-  private val EVTS_QNAME = PointToPointObjectFactory.createEvts(null).getName()
 
   private object JaxbElement {
     def unapply[A](element: JAXBElement[A]): Option[(QName, A)] = Some((element.getName(), element.getValue()))
   }
   implicit class XmlPointToPointServiceOps[A: HasXmlAny](a: A) {
     def withPointToPointService(service: P2PServiceBaseType): A = {
-      val element = service match {
-        case evts: EthernetVlanType   => PointToPointObjectFactory.createEvts(evts)
-        case ets: EthernetBaseType    => PointToPointObjectFactory.createEts(ets)
-        case p2ps: P2PServiceBaseType => PointToPointObjectFactory.createP2Ps(p2ps)
-      }
+      val element = PointToPointObjectFactory.createP2Ps(service)
 
       // FIXME replace if already exists?
       HasXmlAny[A].setAny(a, Seq(element))
@@ -159,8 +150,6 @@ package object safnari {
     }
 
     def getPointToPointService(): Option[P2PServiceBaseType] = HasXmlAny[A].getAny(a).collectFirst {
-      case JaxbElement(EVTS_QNAME, evts: EthernetVlanType)   => evts
-      case JaxbElement(ETS_QNAME, ets: EthernetBaseType)     => ets
       case JaxbElement(P2PS_QNAME, p2ps: P2PServiceBaseType) => p2ps
     }
   }

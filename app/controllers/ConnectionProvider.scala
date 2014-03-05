@@ -7,12 +7,7 @@ import java.net.URI
 import nl.surfnet.safnari.NsiSoapConversions._
 import nl.surfnet.safnari._
 import org.joda.time.Instant
-import org.ogf.schemas.nsi._2013._07.connection.types.NotificationBaseType
-import org.ogf.schemas.nsi._2013._07.connection.types.QueryFailedType
-import org.ogf.schemas.nsi._2013._07.connection.types.QueryNotificationConfirmedType
-import org.ogf.schemas.nsi._2013._07.connection.types.QueryRecursiveResultType
-import org.ogf.schemas.nsi._2013._07.connection.types.QuerySummaryResultType
-import org.ogf.schemas.nsi._2013._07.connection.types.ReservationConfirmCriteriaType
+import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.Play.current
 import play.api._
 import play.api.libs.concurrent.Akka
@@ -22,6 +17,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
+import nl.surfnet.safnari.QueryResult
 
 class ConnectionProvider(connectionManager: ConnectionManager) extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -61,7 +57,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       case Success(list) =>
         val resultTypes = list.flatMap {
           case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultType
-          case ToRequester(NsiRequesterMessage(_, QueryRecursiveFailed(e)))             => Seq.empty
+          case ToRequester(NsiRequesterMessage(_, Error(e)))                            => Seq.empty
         }
 
         replyTo(QueryRecursiveConfirmed(resultTypes))
@@ -89,10 +85,22 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       }
       Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))(_ => GenericAck()))
     case q: QueryNotificationSync =>
-      val connection = connectionManager.get(q.connectionId)
-      val ack = connection.map(queryNotifications(_, q.start, q.end).map(QueryNotificationSyncConfirmed))
+      val ack = connectionManager.get(q.connectionId).map(queryNotifications(_, q.start, q.end).map(QueryNotificationSyncConfirmed))
 
-      ack.getOrElse(Future.successful(QueryNotificationSyncFailed(new QueryFailedType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
+    case q: QueryResult =>
+      val connection = connectionManager.get(q.connectionId)
+      connection.map { con =>
+        queryResults(con, q.start, q.end) onSuccess {
+          case n => replyTo(QueryResultConfirmed(n))
+        }
+      }
+
+      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))(_ => GenericAck()))
+    case q: QueryResultSync =>
+      val ack = connectionManager.get(q.connectionId).map(queryResults(_, q.start, q.end).map(QueryResultSyncConfirmed))
+
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
     case q: QueryRecursive =>
       sys.error("Should be handled by its own handler")
   }
@@ -101,6 +109,12 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
     val range = start.getOrElse(1) to end.getOrElse(Int.MaxValue)
     val notifications = (connection ? Connection.QueryNotifications)
     notifications.map(ns => ns.filter(n => range.contains(n.getNotificationId())))
+  }
+
+  private def queryResults(connection: Connection, start: Option[Int], end: Option[Int]): Future[Seq[QueryResultResponseType]] = {
+    val range = start.getOrElse(1) to end.getOrElse(Int.MaxValue)
+    val results = (connection ? Connection.QueryResults)
+    results.map(rs => rs.filter(r => range.contains(r.getResultId())))
   }
 
   private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String): Future[Seq[QuerySummaryResultType]] = {

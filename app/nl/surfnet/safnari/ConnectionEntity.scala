@@ -3,24 +3,24 @@ package nl.surfnet.safnari
 import akka.actor._
 import java.net.URI
 import org.joda.time.DateTime
-import org.ogf.schemas.nsi._2013._07.connection.types._
-import org.ogf.schemas.nsi._2013._07.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._07.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import play.api.Logger
 import scala.math.Ordering.Implicits._
 import scala.util.Try
+import java.util.concurrent.atomic.AtomicInteger
 
 class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, val aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion)
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
-  private var nextNotificationId: Int = 1
+  private var nextNotificationId = new AtomicInteger(1)
+  private var nextResultId = new AtomicInteger(1)
   private var nsiNotifications: List[NsiNotification] = Nil
-  private def newNotificationId() = {
-    val r = nextNotificationId
-    nextNotificationId += 1
-    r
-  }
+  private var nsiResults: List[QueryResultResponseType] = Nil
+  private def newNotificationId() = nextNotificationId.getAndIncrement()
+  private def newResultId() = nextResultId.getAndIncrement()
   private var mostRecentChildExceptions = Map.empty[ConnectionId, ServiceExceptionType]
   private var committedCriteria: Option[ReservationConfirmCriteriaType] = None
 
@@ -69,7 +69,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def queryRecursiveResult(message: FromProvider): Option[Seq[OutboundMessage]] = message match {
-    case FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) | FromProvider(NsiRequesterMessage(_, _: QueryRecursiveFailed)) =>
+    case FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) | FromProvider(NsiRequesterMessage(_, _: Error)) =>
       val qrsm = providerConversations.get(message.correlationId)
       providerConversations -= message.correlationId
 
@@ -140,7 +140,22 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def process(message: OutboundMessage): Unit = message match {
-    case ToRequester(NsiRequesterMessage(headers, notification: NsiNotification)) => nsiNotifications = notification :: nsiNotifications
+    case ToRequester(NsiRequesterMessage(headers, notification: NsiNotification)) =>
+      nsiNotifications = notification :: nsiNotifications
+    case ToRequester(NsiRequesterMessage(headers, result: NsiCommandReply)) =>
+      def genericConfirmed(connectionId: ConnectionId) = new GenericConfirmedType().withConnectionId(connectionId)
+
+      val nsiResult = (result match {
+        case ReserveConfirmed(connectionId, criteria) => new QueryResultResponseType().withReserveConfirmed(new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria))
+        case ReserveCommitConfirmed(connectionId)     => new QueryResultResponseType().withReserveCommitConfirmed(genericConfirmed(connectionId))
+        case ReleaseConfirmed(connectionId)           => new QueryResultResponseType().withReleaseConfirmed(genericConfirmed(connectionId))
+        case ReserveFailed(failed)                    => new QueryResultResponseType().withReserveFailed(failed)
+        case ProvisionConfirmed(connectionId)         => new QueryResultResponseType().withProvisionConfirmed(genericConfirmed(connectionId))
+        case ReserveAbortConfirmed(connectionId)      => new QueryResultResponseType().withReserveAbortConfirmed(genericConfirmed(connectionId))
+        case ReserveCommitFailed(failed)              => new QueryResultResponseType().withReserveCommitFailed(failed)
+        case TerminateConfirmed(connectionId)         => new QueryResultResponseType().withTerminateConfirmed(genericConfirmed(connectionId))
+      }).withCorrelationId(headers.correlationId.toString()).withResultId(newResultId()).withTimeStamp(DateTime.now().toXmlGregorianCalendar)
+      nsiResults = nsiResult :: nsiResults
     case _ =>
   }
 
@@ -215,19 +230,20 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
   def query = {
     lazy val children = rsm.childConnections.zipWithIndex.collect {
-      case ((segment, _, Some(id)), order) => new ChildSummaryType().
-        withConnectionId(id).
-        withProviderNSA(segment.provider.nsa).
-        withPointToPointService(segment.serviceType.service).
-        withOrder(order)
+      case ((segment, _, Some(id)), order) => new ChildSummaryType()
+        .withConnectionId(id)
+        .withProviderNSA(segment.provider.nsa)
+        .withServiceType(segment.serviceType.serviceType)
+        .withPointToPointService(segment.serviceType.service)
+        .withOrder(order)
     }
 
-    val result = new QuerySummaryResultType().
-      withGlobalReservationId(initialReserve.body.body.getGlobalReservationId()).
-      withDescription(initialReserve.body.body.getDescription()).
-      withConnectionId(id).
-      withRequesterNSA(requesterNSA).
-      withConnectionStates(connectionStates)
+    val result = new QuerySummaryResultType()
+      .withGlobalReservationId(initialReserve.body.body.getGlobalReservationId())
+      .withDescription(initialReserve.body.body.getDescription())
+      .withConnectionId(id)
+      .withRequesterNSA(requesterNSA)
+      .withConnectionStates(connectionStates)
 
     committedCriteria.foreach { criteria =>
       result.getCriteria().add(new QuerySummaryResultCriteriaType()
@@ -244,11 +260,11 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
   def connectionStates: ConnectionStatesType = {
     val version = rsm.version
-    new ConnectionStatesType().
-      withReservationState(rsm.reservationState).
-      withProvisionState(psm.map(_.provisionState).getOrElse(ProvisionStateEnumType.RELEASED)).
-      withLifecycleState(lsm.map(_.lifecycleState).getOrElse(LifecycleStateEnumType.CREATED)).
-      withDataPlaneStatus(dsm.map(_.dataPlaneStatus(version)).getOrElse(new DataPlaneStatusType()))
+    new ConnectionStatesType()
+      .withReservationState(rsm.reservationState)
+      .withProvisionState(psm.map(_.provisionState).getOrElse(ProvisionStateEnumType.RELEASED))
+      .withLifecycleState(lsm.map(_.lifecycleState).getOrElse(LifecycleStateEnumType.CREATED))
+      .withDataPlaneStatus(dsm.map(_.dataPlaneStatus(version)).getOrElse(new DataPlaneStatusType()))
   }
 
   def segments: Seq[ConnectionData] = rsm.childConnections.map {
@@ -268,5 +284,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     case ReserveTimeout(event)         => event
     case MessageDeliveryTimeout(event) => event
   }
+
+  def results: Seq[QueryResultResponseType] = nsiResults
 
 }

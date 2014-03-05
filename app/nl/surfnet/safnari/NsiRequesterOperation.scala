@@ -1,7 +1,7 @@
 package nl.surfnet.safnari
 
 import javax.xml.datatype.XMLGregorianCalendar
-import org.ogf.schemas.nsi._2013._07.connection.types._
+import org.ogf.schemas.nsi._2013._12.connection.types._
 
 sealed trait NsiRequesterOperation {
   final def action = this.getClass().getSimpleName()
@@ -10,7 +10,6 @@ sealed trait NsiRequesterOperation {
 sealed trait NsiNotification extends NsiRequesterOperation {
   def connectionId: ConnectionId
 }
-sealed trait NsiQueryRecursiveResponse extends NsiRequesterOperation
 sealed trait NsiCommandReply extends NsiRequesterOperation
 
 case class ReserveConfirmed(connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) extends NsiCommandReply
@@ -30,10 +29,11 @@ case class ReleaseConfirmed(connectionId: ConnectionId) extends NsiCommandReply
 case class TerminateConfirmed(connectionId: ConnectionId) extends NsiCommandReply
 
 case class QuerySummaryConfirmed(reservations: Seq[QuerySummaryResultType]) extends NsiRequesterOperation
-case class QuerySummaryFailed(failed: QueryFailedType) extends NsiRequesterOperation
-case class QueryRecursiveConfirmed(reservations: Seq[QueryRecursiveResultType]) extends NsiQueryRecursiveResponse
-case class QueryRecursiveFailed(failed: QueryFailedType) extends NsiQueryRecursiveResponse
+case class QueryRecursiveConfirmed(reservations: Seq[QueryRecursiveResultType]) extends NsiRequesterOperation
 case class QueryNotificationConfirmed(notifications: Seq[NotificationBaseType]) extends NsiRequesterOperation
+case class QueryResultConfirmed(results: Seq[QueryResultResponseType]) extends NsiRequesterOperation
+
+case class Error(error: GenericErrorType) extends NsiRequesterOperation
 
 case class ErrorEvent(error: ErrorEventType) extends NsiNotification {
   override def connectionId = error.getConnectionId()

@@ -14,7 +14,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
   val requestOperationToStringConversion = NsiRequesterMessageToDocument(None)(NsiRequesterOperationToElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))
   val requestAckToStringConversion = NsiRequesterMessageToDocument(Some(DefaultAckHeaders))(NsiAcknowledgementOperationToElement).andThen(NsiXmlDocumentConversion).andThen(ByteArrayToString)
 
-  val input = """<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:head="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:type="http://schemas.ogf.org/nsi/2013/07/connection/types">
+  val input = """<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:head="http://schemas.ogf.org/nsi/2013/12/framework/headers" xmlns:type="http://schemas.ogf.org/nsi/2013/12/connection/types">
     <soapenv:Header>
         <head:nsiHeader>
             <protocolVersion>application/vnd.ogf.nsi.cs.v2.provider+soap</protocolVersion>
@@ -33,7 +33,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
                     <startTime>2013-07-24T16:50:00.000+02:00</startTime>
                     <endTime>2013-07-24T17:00:00.000+02:00</endTime>
                 </schedule>
-                <p2p:p2ps xmlns:p2p="http://schemas.ogf.org/nsi/2013/07/services/point2point">
+                <p2p:p2ps xmlns:p2p="http://schemas.ogf.org/nsi/2013/12/services/point2point">
                     <capacity>100</capacity>
                     <directionality>Bidirectional</directionality>
                     <sourceSTP>
@@ -55,7 +55,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
       val reserveFailed = """<?xml version="1.0" encoding="UTF-8"?>
         <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
           <SOAP-ENV:Header>
-            <ns7:nsiHeader xmlns:ns2="http://schemas.ogf.org/nsi/2013/07/connection/types" xmlns:ns3="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns4="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://www.w3.org/2000/09/xmldsig#" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/headers">
+            <ns7:nsiHeader xmlns:ns2="http://schemas.ogf.org/nsi/2013/12/connection/types" xmlns:ns3="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns4="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://www.w3.org/2000/09/xmldsig#" xmlns:ns6="http://schemas.ogf.org/nsi/2013/12/framework/types" xmlns:ns7="http://schemas.ogf.org/nsi/2013/12/framework/headers">
               <protocolVersion>application/vnd.ogf.nsi.cs.v2.requester+soap</protocolVersion>
               <correlationId>urn:uuid:fc15890f-3118-442f-8482-da50a303689e</correlationId>
               <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-safnari</requesterNSA>
@@ -63,10 +63,11 @@ class NsiSoapConversionsSpec extends helpers.Specification {
             </ns7:nsiHeader>
           </SOAP-ENV:Header>
           <SOAP-ENV:Body>
-            <ns2:reserveFailed xmlns:ns2="http://schemas.ogf.org/nsi/2013/07/connection/types" xmlns:ns3="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns4="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://www.w3.org/2000/09/xmldsig#" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/t ypes" xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/headers">
+            <ns2:reserveFailed xmlns:ns2="http://schemas.ogf.org/nsi/2013/12/connection/types" xmlns:ns3="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns4="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://www.w3.org/2000/09/xmldsig#" xmlns:ns6="http://schemas.ogf.org/nsi/2013/12/framework/t ypes" xmlns:ns7="http://schemas.ogf.org/nsi/2013/12/framework/headers">
               <connectionId>3cb4b457-9c50-4285-bd47-f5d93f484dee</connectionId>
               <connectionStates>
                 <reservationState>ReserveFailed</reservationState>
+                <provisionState>Released</provisionState>
                 <lifecycleState>Created</lifecycleState>
                 <dataPlaneStatus>
                   <active>false</active>
@@ -93,7 +94,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
       val message =
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
           <soap:Header>
-            <ns6:nsiHeader xmlns:ns8="http://schemas.ogf.org/nsi/2013/07/services/point2point" xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types" xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#" xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion">
+            <ns6:nsiHeader xmlns:ns8="http://schemas.ogf.org/nsi/2013/12/services/point2point" xmlns:ns7="http://schemas.ogf.org/nsi/2013/12/framework/types" xmlns:ns6="http://schemas.ogf.org/nsi/2013/12/framework/headers" xmlns:ns5="http://schemas.ogf.org/nsi/2013/12/connection/types" xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#" xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion">
               <protocolVersion>application/vnd.ogf.nsi.cs.v2.provider+soap</protocolVersion>
               <correlationId>urn:uuid:88bbe366-4af7-40bf-8edb-2ad9a980f402</correlationId>
               <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-safnari</requesterNSA>
@@ -101,7 +102,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
             </ns6:nsiHeader>
           </soap:Header>
           <soap:Body>
-            <ns5:dataPlaneStateChange xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#" xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns8="http://schemas.ogf.org/nsi/2013/07/services/point2point">
+            <ns5:dataPlaneStateChange xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#" xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/12/connection/types" xmlns:ns6="http://schemas.ogf.org/nsi/2013/12/framework/headers" xmlns:ns7="http://schemas.ogf.org/nsi/2013/12/framework/types" xmlns:ns8="http://schemas.ogf.org/nsi/2013/12/services/point2point">
               <connectionId>2ac54e1f-3ce6-44af-9356-b0d4e31f3c42</connectionId>
               <notificationId>1</notificationId>
               <timeStamp>2013-09-26T06:19:49.311-07:00</timeStamp>
@@ -133,7 +134,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
       val requesterMessage = requestOperationToStringConversion.invert(soapFault)
 
       requesterMessage must beLike {
-        case Failure(ErrorMessageException("SOAP fault without {http://schemas.ogf.org/nsi/2013/07/connection/types}serviceException. Fault string: Fault occurred while processing.")) => ok
+        case Failure(ErrorMessageException("SOAP fault without {http://schemas.ogf.org/nsi/2013/12/connection/types}serviceException. Fault string: Fault occurred while processing.")) => ok
       }
     }
 
@@ -141,7 +142,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
       val soapFault =
         <S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
           <S:Header>
-            <head:nsiHeader xmlns:head="http://schemas.ogf.org/nsi/2013/07/framework/headers">
+            <head:nsiHeader xmlns:head="http://schemas.ogf.org/nsi/2013/12/framework/headers">
               <protocolVersion>application/vnd.ogf.nsi.cs.v2.requester+soap</protocolVersion>
               <correlationId>urn:uuid:5c716e15-c17c-481e-885d-c9a5c06e0436</correlationId>
               <requesterNSA>urn:ogf:network:nsa:surfnet-nsi-requester</requesterNSA>
@@ -153,7 +154,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
               <faultcode>S:Server</faultcode>
               <faultstring>This operation is not supported by this provider</faultstring>
               <detail>
-                <ns5:serviceException xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns4="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2000/09/xmldsig#" xmlns:ns2="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types">
+                <ns5:serviceException xmlns:ns7="http://schemas.ogf.org/nsi/2013/12/framework/headers" xmlns:ns6="http://schemas.ogf.org/nsi/2013/12/framework/types" xmlns:ns4="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2000/09/xmldsig#" xmlns:ns2="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/12/connection/types">
                   <nsaId>urn:ogf:network:netherlight.net:2013:nsa:bod</nsaId>
                   <errorId>103</errorId>
                   <text>Not Implemented</text>
@@ -189,7 +190,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
               <faultcode>S:Server</faultcode>
               <faultstring>This operation is not supported by this provider</faultstring>
               <detail>
-                <ns5:serviceException xmlns:ns7="http://schemas.ogf.org/nsi/2013/07/framework/headers" xmlns:ns6="http://schemas.ogf.org/nsi/2013/07/framework/types" xmlns:ns4="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2000/09/xmldsig#" xmlns:ns2="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/07/connection/types">
+                <ns5:serviceException xmlns:ns7="http://schemas.ogf.org/nsi/2013/12/framework/headers" xmlns:ns6="http://schemas.ogf.org/nsi/2013/12/framework/types" xmlns:ns4="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2000/09/xmldsig#" xmlns:ns2="http://www.w3.org/2001/04/xmlenc#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/12/connection/types">
                   <nsaId>urn:ogf:network:netherlight.net:2013:nsa:bod</nsaId>
                   <errorId>103</errorId>
                   <text>Not Implemented</text>
