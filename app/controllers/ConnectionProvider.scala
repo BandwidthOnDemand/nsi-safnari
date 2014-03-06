@@ -8,7 +8,7 @@ import nl.surfnet.safnari.NsiSoapConversions._
 import nl.surfnet.safnari._
 import org.joda.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import play.api.Play.current
+import play.api.Play._
 import play.api._
 import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
@@ -17,7 +17,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
-import nl.surfnet.safnari.QueryResult
 
 class ConnectionProvider(connectionManager: ConnectionManager) extends Controller with SoapWebService {
   implicit val timeout = Timeout(2.seconds)
@@ -159,16 +158,15 @@ object ConnectionProvider {
     }
   }
 
-  private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation): Unit =
-    requestHeaders.replyTo.foreach { replyTo =>
-      val ack = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))
+  private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation) = requestHeaders.replyTo.foreach { replyTo =>
+    val ackFuture = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))
 
-      ack.onComplete {
-        case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
-        case Success(NsiRequesterMessage(headers, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
-        case Success(acknowledgement)                                       => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
-      }
+    ackFuture onComplete {
+      case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
+      case Success(NsiRequesterMessage(headers, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
+      case Success(acknowledgement)                                       => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
     }
+  }
 
   private[controllers] def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
     requesterContinuations.replyReceived(message.headers.correlationId, message)

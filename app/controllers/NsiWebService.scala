@@ -11,10 +11,9 @@ import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.ws.WS
 import scala.concurrent.Future
 import scala.language.higherKinds
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
+import scala.util.{ Try, Success, Failure }
 import support.ExtraBodyParsers._
+import play.api.Play._
 
 object NsiWebService {
   implicit class SoapRequestHolder(request: WS.WSRequestHolder) {
@@ -44,7 +43,9 @@ object NsiWebService {
     convertAck: (NsiHeaders, Document) => Try[M[NsiAcknowledgement]],
     convertError: (NsiHeaders, ServiceExceptionType) => M[NsiAcknowledgement])(implicit messageConversion: Conversion[M[T], Document]): Future[M[NsiAcknowledgement]] = {
 
-    var request = WS.url(provider.url.toASCIIString())
+    val providerUrl = if (Configuration.Use2WayTLS) Configuration.translateToStunnelAddress(provider) else provider.url
+
+    var request = WS.url(providerUrl.toASCIIString())
 
     request = provider.authentication match {
       case OAuthAuthentication(token)              => request.withHeaders("Authorization" -> s"bearer $token")
