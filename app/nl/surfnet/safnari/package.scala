@@ -128,7 +128,7 @@ package object safnari {
         withSchedule(schedule).
         withAny(b.getAny()).
         withServiceType(b.getServiceType()).
-        withVersion(if (b.getVersion() == null) 0 else b.getVersion()).
+        withVersion(if (b.getVersion() == null) 1 else b.getVersion()).
         tap(_.getOtherAttributes().putAll(b.getOtherAttributes()))
     }
   }
