@@ -9,7 +9,7 @@ import scala.util.Success
 class NsiSoapConversionsSpec extends helpers.Specification {
   import NsiSoapConversions._
 
-  val DefaultAckHeaders = NsiHeaders(newCorrelationId, "requesterNSA", "providerNSA", None, NsiHeaders.RequesterProtocolVersion)
+  val DefaultAckHeaders = NsiHeaders(newCorrelationId, "requesterNSA", "providerNSA", None, NsiHeaders.RequesterProtocolVersion, Nil)
 
   val requestOperationToStringConversion = NsiRequesterMessageToDocument(None)(NsiRequesterOperationToElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))
   val requestAckToStringConversion = NsiRequesterMessageToDocument(Some(DefaultAckHeaders))(NsiAcknowledgementOperationToElement).andThen(NsiXmlDocumentConversion).andThen(ByteArrayToString)
@@ -173,7 +173,9 @@ class NsiSoapConversionsSpec extends helpers.Specification {
               "urn:ogf:network:nsa:surfnet-nsi-requester",
               "urn:ogf:network:nsa:surfnet.nl",
               None,
-              NsiHeaders.RequesterProtocolVersion)
+              NsiHeaders.RequesterProtocolVersion,
+              Nil
+          )
           exception.getErrorId() must_== "103"
       }
 

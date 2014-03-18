@@ -6,16 +6,24 @@ import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import java.net.URI
 import org.joda.time.DateTime
+import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
+import oasis.names.tc.saml._2_0.assertion.AttributeType
 
 object NsiMessageSpec {
   val AggregatorNsa = "urn:ogf:network:nsa:aggregator-nsa"
 
-  def headers(correlationId: CorrelationId, protocolVersion: URI) = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, protocolVersion)
+  val securityAttrs = new SessionSecurityAttrType().withAttributeOrEncryptedAttribute(new AttributeType().
+    withName("token").
+    withAttributeValue("mytoken"))
+
+  def headers(correlationId: CorrelationId, protocolVersion: URI, securityAttrs: List[SessionSecurityAttrType]) = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, protocolVersion, securityAttrs)
+
   val Service = new P2PServiceBaseType().
     withDirectionality(DirectionalityType.BIDIRECTIONAL).
     withCapacity(100).
     withSourceSTP("networkId:A").
     withDestSTP("networkId:B")
+
 
   val Schedule = new ScheduleType().withStartTime(DateTime.now().plusMinutes(5).toXmlGregorianCalendar).withEndTime(DateTime.now().plusMinutes(30).toXmlGregorianCalendar)
   val ConfirmCriteria = new ReservationConfirmCriteriaType().withVersion(5).withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
@@ -24,8 +32,8 @@ object NsiMessageSpec {
   def InitialReserveType = new ReserveType().withCriteria(RequestCriteria).withDescription("description").withGlobalReservationId("global-reservation-id")
   val InitialReserveCorrelationId = helpers.Specification.newCorrelationId
 
-  def initialReserveMessage = NsiProviderMessage(headers(InitialReserveCorrelationId, NsiHeaders.ProviderProtocolVersion), InitialReserve(InitialReserveType, ConfirmCriteria, Service))
-  val reserveConfirmed = NsiRequesterMessage(headers(InitialReserveCorrelationId, NsiHeaders.RequesterProtocolVersion), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))
+  def initialReserveMessage = NsiProviderMessage(headers(InitialReserveCorrelationId, NsiHeaders.ProviderProtocolVersion, Nil), InitialReserve(InitialReserveType, ConfirmCriteria, Service))
+  val reserveConfirmed = NsiRequesterMessage(headers(InitialReserveCorrelationId, NsiHeaders.RequesterProtocolVersion, Nil), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))
 
   val A = ComputedSegment(
     serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP("A").withDestSTP("X")),
@@ -36,25 +44,27 @@ object NsiMessageSpec {
 
   object ura {
     def request(correlationId: CorrelationId, operation: NsiProviderOperation) = {
-      val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, Some(URI.create("http://ultimate.requester.example.com/")), NsiHeaders.ProviderProtocolVersion)
+
+      val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, Some(URI.create("http://ultimate.requester.example.com/")), NsiHeaders.ProviderProtocolVersion, Nil)
       FromRequester(NsiProviderMessage(headers, operation))
     }
   }
+  
   object upa {
     def acknowledge(correlationId: CorrelationId, acknowledgment: NsiAcknowledgement) = {
-      val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.ProviderProtocolVersion)
+      val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.ProviderProtocolVersion, Nil)
       AckFromProvider(NsiProviderMessage(headers, acknowledgment))
     }
     def error(correlationId: CorrelationId, exception: ServiceExceptionType) = {
-      val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.ProviderProtocolVersion)
+      val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.ProviderProtocolVersion, Nil)
       AckFromProvider(NsiProviderMessage(headers, ServiceException(exception)))
     }
     def response(correlationId: CorrelationId, operation: NsiRequesterOperation) = {
-      val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.RequesterProtocolVersion)
+      val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.RequesterProtocolVersion, Nil)
       FromProvider(NsiRequesterMessage(headers, operation))
     }
     def notification(correlationId: CorrelationId, operation: NsiRequesterOperation) = {
-      val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.RequesterProtocolVersion)
+      val headers = NsiHeaders(correlationId, AggregatorNsa, "ProviderNSA", None, NsiHeaders.RequesterProtocolVersion, Nil)
       FromProvider(NsiRequesterMessage(headers, operation))
     }
     def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: DateTime) = {
@@ -63,15 +73,15 @@ object NsiMessageSpec {
   }
   object agg {
     def request(correlationId: CorrelationId, operation: NsiProviderOperation, segment: ComputedSegment = A) = {
-      val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
+      val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, List(securityAttrs))
       ToProvider(NsiProviderMessage(headers, operation), segment.provider)
     }
     def response(correlationId: CorrelationId, operation: NsiRequesterOperation) = {
-      val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
+      val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil)
       ToRequester(NsiRequesterMessage(headers, operation))
     }
     def notification(correlationId: CorrelationId, operation: NsiNotification) = {
-      val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
+      val headers = NsiHeaders(correlationId, "RequesterNSA", AggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil)
       ToRequester(NsiRequesterMessage(headers, operation))
     }
   }

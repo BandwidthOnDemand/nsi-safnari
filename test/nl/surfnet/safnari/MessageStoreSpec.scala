@@ -80,7 +80,7 @@ class MessageStoreSpec extends helpers.Specification {
     }
 
     "store a fromProvider NSI message" in new Fixture() {
-      val message = NsiRequesterMessage(NsiMessageSpec.headers(newCorrelationId, NsiHeaders.RequesterProtocolVersion), ReserveConfirmed(newConnectionId, NsiMessageSpec.ConfirmCriteria))
+      val message = NsiRequesterMessage(NsiMessageSpec.headers(newCorrelationId, NsiHeaders.RequesterProtocolVersion, Nil), ReserveConfirmed(newConnectionId, NsiMessageSpec.ConfirmCriteria))
 
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromProvider(message), Seq.empty) must not(throwA[Exception])
 

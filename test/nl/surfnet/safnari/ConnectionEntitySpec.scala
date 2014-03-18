@@ -11,6 +11,7 @@ import org.ogf.schemas.nsi._2013._12.framework.types.TypeValuePairListType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
+import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionEntitySpec extends helpers.Specification {
@@ -25,7 +26,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
 
-    val Headers = NsiHeaders(CorrelationId(0, 0), "RequesterNSA", AggregatorNsa, Some(URI.create("http://example.com/")), NsiHeaders.ProviderProtocolVersion)
+    val Headers = NsiHeaders(CorrelationId(0, 0), "RequesterNSA", AggregatorNsa, Some(URI.create("http://example.com/")), NsiHeaders.ProviderProtocolVersion, Nil)
     val ConnectionId = "ConnectionId"
     val ReserveCorrelationId = newCorrelationId
     val CommitCorrelationId = newCorrelationId
@@ -37,8 +38,8 @@ class ConnectionEntitySpec extends helpers.Specification {
     val NsiReplyToUri = URI.create("http://example.com/nsi/requester")
     val PceReplyToUri = URI.create("http://example.com/pce/reply")
 
-    def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, provider.nsa, Some(NsiReplyToUri), NsiHeaders.ProviderProtocolVersion)
-    def toRequesterHeaders(correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, "RequesterNSA", None, NsiHeaders.RequesterProtocolVersion)
+    def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, provider.nsa, Some(NsiReplyToUri), NsiHeaders.ProviderProtocolVersion, Nil)
+    def toRequesterHeaders(correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, "RequesterNSA", None, NsiHeaders.RequesterProtocolVersion, Nil)
 
     val connection = new ConnectionEntity(ConnectionId, InitialReserveMessage, () => newCorrelationId, AggregatorNsa, NsiReplyToUri, PceReplyToUri)
     def schedule = connection.rsm.criteria.getSchedule()
