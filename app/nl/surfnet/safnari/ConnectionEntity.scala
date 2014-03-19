@@ -13,8 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, val aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
-  private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion)
-  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion)
+  private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion, initialReserve.headers.sessionSecurityAttrs)
+  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil)
   private var nextNotificationId = new AtomicInteger(1)
   private var nextResultId = new AtomicInteger(1)
   private var nsiNotifications: List[NsiNotification] = Nil

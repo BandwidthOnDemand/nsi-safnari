@@ -35,7 +35,7 @@ object NsiSoapConversions {
     Try(string.getBytes("UTF-8"))
   }
 
-  val NsiXmlDocumentConversion = XmlDocumentConversion("wsdl/soap/soap-envelope-1.1.xsd", "wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd")
+  val NsiXmlDocumentConversion = XmlDocumentConversion("wsdl/soap/soap-envelope-1.1.xsd", "wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd", "wsdl/2.0/saml-schema-assertion-2.0.xsd")
 
   def documentToScalaXml(document: Document): scala.xml.Node = {
     val source = new DOMSource(document)
@@ -257,14 +257,15 @@ object NsiSoapConversions {
       .withReplyTo(headers.replyTo.map(_.toASCIIString()).orNull)
       .withProtocolVersion(headers.protocolVersion.toASCIIString())
       .withProviderNSA(headers.providerNSA)
-      .withRequesterNSA(headers.requesterNSA))
+      .withRequesterNSA(headers.requesterNSA)
+      .withSessionSecurityAttr(headers.sessionSecurityAttrs.asJava))
   } { header =>
     for {
       correlationId <- CorrelationId.fromString(header.getCorrelationId()).toTry(ErrorMessageException(s"invalid correlation id ${header.getCorrelationId()}"))
       replyTo <- Try(Option(header.getReplyTo()).map(URI.create))
       protocolVersion <- Try(URI.create(header.getProtocolVersion()))
     } yield {
-      NsiHeaders(correlationId, header.getRequesterNSA(), header.getProviderNSA(), replyTo, protocolVersion)
+      NsiHeaders(correlationId, header.getRequesterNSA(), header.getProviderNSA(), replyTo, protocolVersion, header.getSessionSecurityAttr.asScala.toList)
     }
   }
 

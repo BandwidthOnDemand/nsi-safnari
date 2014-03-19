@@ -10,8 +10,7 @@ import play.api.test._
 class MessageStoreSpec extends helpers.Specification {
   sequential
 
-
-  class Fixture() extends WithApplication() {
+  class Fixture extends WithApplication() {
     lazy val timestamp = new Instant()
     lazy val aggregatedConnectionId = newConnectionId
     lazy val messageStore = {
@@ -22,6 +21,8 @@ class MessageStoreSpec extends helpers.Specification {
   }
 
   "MessageStore" should {
+    import NsiMessageSpec._
+
     "fail to store message for unknown connection" in new Fixture() {
       val unknownConnectionId = newConnectionId
       val message = PceMessageSpec.pathComputationResponse
@@ -72,7 +73,15 @@ class MessageStoreSpec extends helpers.Specification {
     }
 
     "store a fromRequester NSI message" in new Fixture() {
-      val message = NsiMessageSpec.initialReserveMessage
+      val message = initialReserveMessage
+      messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromRequester(message), Seq.empty) must not(throwA[Exception])
+
+      val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
+      loaded must contain(beEqualTo(FromRequester(message))).exactly(1)
+    }
+
+    "store a fromRequester NSI message with session security attributes" in new Fixture() {
+      val message = NsiProviderMessage(nsiProviderHeaders(InitialReserveCorrelationId, SessionSecurityAttr :: Nil), InitialReserve(InitialReserveType, ConfirmCriteria, Service))
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromRequester(message), Seq.empty) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)
@@ -80,7 +89,7 @@ class MessageStoreSpec extends helpers.Specification {
     }
 
     "store a fromProvider NSI message" in new Fixture() {
-      val message = NsiRequesterMessage(NsiMessageSpec.headers(newCorrelationId, NsiHeaders.RequesterProtocolVersion), ReserveConfirmed(newConnectionId, NsiMessageSpec.ConfirmCriteria))
+      val message = NsiRequesterMessage(nsiRequesterHeaders(newCorrelationId), ReserveConfirmed(newConnectionId, ConfirmCriteria))
 
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromProvider(message), Seq.empty) must not(throwA[Exception])
 
@@ -89,7 +98,7 @@ class MessageStoreSpec extends helpers.Specification {
     }
 
     "store a toProvider NSI message" in new Fixture() {
-      val message = NsiMessageSpec.initialReserveMessage
+      val message = initialReserveMessage
       val endPoint = ProviderEndPoint("urn:nsa:surf", URI.create("http://localhost"), NoAuthentication)
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromRequester(message), Seq(ToProvider(message, endPoint))) must not(throwA[Exception])
 
