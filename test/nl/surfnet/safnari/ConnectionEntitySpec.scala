@@ -26,36 +26,37 @@ class ConnectionEntitySpec extends helpers.Specification {
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
 
-    val Headers = NsiHeaders(CorrelationId(0, 0), "RequesterNSA", AggregatorNsa, Some(URI.create("http://example.com/")), NsiHeaders.ProviderProtocolVersion, Nil)
     val ConnectionId = "ConnectionId"
     val ReserveCorrelationId = newCorrelationId
     val CommitCorrelationId = newCorrelationId
-
-    val InitialReserveMessage = ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)).message.asInstanceOf[NsiProviderMessage[InitialReserve]]
-    val InitialReserveHeaders = InitialReserveMessage.headers
-    val InitialMessages = Seq(FromRequester(InitialReserveMessage))
 
     val NsiReplyToUri = URI.create("http://example.com/nsi/requester")
     val PceReplyToUri = URI.create("http://example.com/pce/reply")
 
     def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, provider.nsa, Some(NsiReplyToUri), NsiHeaders.ProviderProtocolVersion, Nil)
-    def toRequesterHeaders(correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, "RequesterNSA", None, NsiHeaders.RequesterProtocolVersion, Nil)
 
-    val connection = new ConnectionEntity(ConnectionId, InitialReserveMessage, () => newCorrelationId, AggregatorNsa, NsiReplyToUri, PceReplyToUri)
+    var connection: ConnectionEntity = _
+    var processInbound: IdempotentProvider = _
+
     def schedule = connection.rsm.criteria.getSchedule()
-
-    val processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
 
     def given(messages: Message*): Unit = messages.foreach {
       case inbound @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) =>
         connection.queryRecursiveResult(inbound)
       case inbound @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) =>
         connection.queryRecursive(inbound)
+      case inbound @ FromRequester(NsiProviderMessage(headers, _: InitialReserve)) =>
+        initialReserve(inbound)
       case inbound: InboundMessage =>
         processInbound(inbound) aka s"given message $inbound must be processed" must beRight
       case outbound: OutboundMessage =>
-        // FIXME compare against actual outbound messages?
         connection.process(outbound)
+    }
+
+    private def initialReserve(reserve: FromRequester) = {
+      connection = new ConnectionEntity(ConnectionId, reserve.message.asInstanceOf[NsiProviderMessage[InitialReserve]], () => newCorrelationId, AggregatorNsa, NsiReplyToUri, PceReplyToUri)
+      processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
+      processInbound(reserve).right.toOption
     }
 
     var messages: Seq[Message] = Nil
@@ -64,6 +65,8 @@ class ConnectionEntitySpec extends helpers.Specification {
 
       val response = message match {
         case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) => connection.queryRecursive(query)
+        case reserve @ FromRequester(NsiProviderMessage(headers, _: InitialReserve)) =>
+          initialReserve(reserve)
         case message: FromRequester =>
           val first = processInbound(message).right.toOption
           val second = processInbound(message).right.toOption
@@ -144,6 +147,8 @@ class ConnectionEntitySpec extends helpers.Specification {
       }
 
       "reject commit" in new fixture {
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
+
         val ack = when(ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)))
 
         ack must beNone
@@ -158,14 +163,24 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         messages must haveSize(2)
         messages must haveAllElementsLike {
-          case ToProvider(NsiProviderMessage(_, reserve: InitialReserve), A.provider) => ok
-          case ToProvider(NsiProviderMessage(_, reserve: InitialReserve), B.provider) => ok
+          case ToProvider(NsiProviderMessage(_, InitialReserve(_, _, Service)), A.provider) => ok
+          case ToProvider(NsiProviderMessage(_, InitialReserve(_, _, Service)), B.provider) => ok
+        }
+      }
+
+      "send reserve request for each segment including the session security attributes" in new fixture {
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service), SessionSecurityAttr :: Nil))
+
+        when(pce.confirm(CorrelationId(0, 1), A, B))
+
+        messages must haveOneElementLike {
+          case ToProvider(NsiProviderMessage(headers, _), A.provider) => headers.sessionSecurityAttrs must contain(SessionSecurityAttr)
+          case ToProvider(NsiProviderMessage(headers, _), B.provider) => headers.sessionSecurityAttrs must contain(SessionSecurityAttr)
         }
       }
 
       "fail the connection when pce did not accept the find path request" in new fixture {
-        given(
-          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
         when(pce.failedAck(CorrelationId(0, 1)))
 
@@ -182,7 +197,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         messages must haveSize(1)
         messages must haveOneElementLike {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-            headers must beEqualTo(Headers.copy(correlationId = ReserveCorrelationId).forAsyncReply)
+            headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.NoPathFound.id)
         }
@@ -213,7 +228,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
         when(upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteria)))
 
-        messages must contain(ToRequester(NsiRequesterMessage(InitialReserveHeaders.forAsyncReply, ReserveConfirmed(ConnectionId, ConfirmCriteria))))
+        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ReserveCorrelationId), ReserveConfirmed(ConnectionId, ConfirmCriteria))))
         messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria)))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
@@ -261,7 +276,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok }
 
         when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
-        messages must contain(ToRequester(NsiRequesterMessage(InitialReserveHeaders.forAsyncReply, ReserveConfirmed(ConnectionId, ConfirmCriteria))))
+        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ReserveCorrelationId), ReserveConfirmed(ConnectionId, ConfirmCriteria))))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
         segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
@@ -278,7 +293,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         messages must haveSize(1)
         messages must haveOneElementLike {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-            headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
+            headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
@@ -300,7 +315,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         messages must haveSize(1)
         messages must haveOneElementLike {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-            headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
+            headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
@@ -321,7 +336,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         messages must haveSize(1)
         messages must haveOneElementLike {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-            headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
+            headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
@@ -342,7 +357,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         messages must haveSize(1)
         messages must haveOneElementLike {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
-            headers must beEqualTo(InitialReserveHeaders.forAsyncReply)
+            headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
             failed.getServiceException().getChildException().asScala must haveSize(2)
@@ -403,7 +418,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         when(upa.response(CorrelationId(0, 6), ReserveCommitConfirmed("ConnectionIdA")))
 
-        messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = CommitCorrelationId).forAsyncReply, ReserveCommitConfirmed(ConnectionId))))
+        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(CommitCorrelationId), ReserveCommitConfirmed(ConnectionId))))
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
       }
     }
@@ -451,7 +466,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
     "that is not yet committed" should {
       "provide basic information about uncommitted connections" in new fixture {
-        given(InitialMessages: _*)
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
         val result = connection.query
 
@@ -510,7 +525,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       when(upa.response(CorrelationId(0, 8), ProvisionConfirmed("ConnectionIdA")))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
-      messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = ProvisionCorrelationId).forAsyncReply, ProvisionConfirmed(ConnectionId))))
+      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ProvisionCorrelationId), ProvisionConfirmed(ConnectionId))))
     }
 
     "send a provision confirmed with multiple segments" in new ReservedConnectionWithTwoSegments with ReleasedSegments {
@@ -534,7 +549,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
       segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok }
       segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok }
-      messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = ProvisionCorrelationId).forAsyncReply, ProvisionConfirmed(ConnectionId))))
+      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ProvisionCorrelationId), ProvisionConfirmed(ConnectionId))))
     }
 
     "become releasing on release request" in new ReservedConnection with Provisioned {
@@ -556,7 +571,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       when(upa.response(CorrelationId(0, 10), ReleaseConfirmed("ConnectionIdA")))
 
       provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
-      messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = ReleaseCorrelationId).forAsyncReply, ReleaseConfirmed(ConnectionId))))
+      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ReleaseCorrelationId), ReleaseConfirmed(ConnectionId))))
     }
 
     "reject release request when released" in new ReservedConnection with Released {
@@ -590,7 +605,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       when(upa.response(CorrelationId(0, 8), TerminateConfirmed("ConnectionIdA")))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-      messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = TerminateCorrelationId).forAsyncReply, TerminateConfirmed(ConnectionId))))
+      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(TerminateCorrelationId), TerminateConfirmed(ConnectionId))))
     }
 
     "send a terminate for a multi segment reservation" in new ReservedConnectionWithTwoSegments {
@@ -610,7 +625,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
       segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
       segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
-      messages must contain(ToRequester(NsiRequesterMessage(Headers.copy(correlationId = TerminateCorrelationId).forAsyncReply, TerminateConfirmed(ConnectionId))))
+      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(TerminateCorrelationId), TerminateConfirmed(ConnectionId))))
     }
 
     "have a data plane inactive" in new ReservedConnection with Provisioned {

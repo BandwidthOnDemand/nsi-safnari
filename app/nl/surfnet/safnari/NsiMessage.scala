@@ -20,6 +20,7 @@ sealed trait NsiMessage[+T] {
   def body: T
   def correlationId: CorrelationId = headers.correlationId
 }
+
 final case class NsiProviderMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
   def ack(acknowledgement: NsiAcknowledgement = GenericAck()): NsiProviderMessage[NsiAcknowledgement] = ack(headers, acknowledgement)
 
@@ -31,6 +32,7 @@ final case class NsiProviderMessage[+T](headers: NsiHeaders, body: T) extends Ns
 
   def reply(reply: NsiRequesterOperation) = NsiRequesterMessage(headers.forAsyncReply, reply)
 }
+
 final case class NsiRequesterMessage[+T](headers: NsiHeaders, body: T) extends NsiMessage[T] {
   def ack(acknowledgement: NsiAcknowledgement = GenericAck()): NsiRequesterMessage[NsiAcknowledgement] = ack(headers, acknowledgement)
 
