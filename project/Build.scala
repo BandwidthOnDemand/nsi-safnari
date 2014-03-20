@@ -32,9 +32,9 @@ object ApplicationBuild extends Build {
     scalaVersion := "2.10.3",
     scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
     resolvers ++= Seq(
+        "SURFnet thirdparty" at s"$nexusBaseUri/thirdparty",
         "SURFnet BoD Snapshots" at s"$nexusBaseUri/public-snapshots",
-        "SURFnet BoD Releases" at s"$nexusBaseUri/public-releases",
-        "Mandubian repository releases" at "https://github.com/mandubian/mandubian-mvn/raw/master/releases/"
+        "SURFnet BoD Releases" at s"$nexusBaseUri/public-releases"
     ),
     javaOptions in Test += "-Dconfig.file=conf/test.conf",
     testFrameworks in Test := Seq(TestFrameworks.Specs2),
