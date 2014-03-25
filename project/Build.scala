@@ -29,7 +29,7 @@ object ApplicationBuild extends Build {
     settings = play.Project.playScalaSettings ++ buildInfoSettings
   ).settings(
     organization := "nl.surfnet.bod",
-    scalaVersion := "2.10.3",
+    scalaVersion := "2.10.4",
     scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
     resolvers ++= Seq(
         "SURFnet thirdparty" at s"$nexusBaseUri/thirdparty",
