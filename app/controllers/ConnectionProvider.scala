@@ -26,7 +26,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
 
   override def serviceUrl: String = ConnectionProvider.serviceUrl
 
-  def request = NsiProviderEndPoint(Configuration.Nsa) {
+  def request = NsiProviderEndPoint(Configuration.NsaId) {
     case message @ NsiProviderMessage(headers, query: QueryRecursive)       => handleQueryRecursive(NsiProviderMessage(headers, query))(ConnectionProvider.replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, query: NsiProviderQuery)     => handleQuery(query, headers.requesterNSA)(ConnectionProvider.replyToClient(headers)).map(message.ack)
     case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(ConnectionProvider.replyToClient(headers)).map(message.ack)
@@ -35,7 +35,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderCommand])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =
     connectionManager.findOrCreateConnection(request) match {
       case None =>
-        Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))
+        Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))
       case Some(connection) =>
         ConnectionProvider.requesterContinuations.register(request.headers.correlationId, Configuration.AsyncReplyTimeout).onSuccess {
           case reply => replyTo(reply.body)
@@ -82,11 +82,11 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
           case n => replyTo(QueryNotificationConfirmed(n))
         }
       }
-      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))(_ => GenericAck()))
+      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))(_ => GenericAck()))
     case q: QueryNotificationSync =>
       val ack = connectionManager.get(q.connectionId).map(queryNotifications(_, q.start, q.end).map(QueryNotificationSyncConfirmed))
 
-      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))))
     case q: QueryResult =>
       val connection = connectionManager.get(q.connectionId)
       connection.map { con =>
@@ -95,11 +95,11 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
         }
       }
 
-      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))(_ => GenericAck()))
+      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))(_ => GenericAck()))
     case q: QueryResultSync =>
       val ack = connectionManager.get(q.connectionId).map(queryResults(_, q.start, q.end).map(QueryResultSyncConfirmed))
 
-      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))))
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))))
     case q: QueryRecursive =>
       sys.error("Should be handled by its own handler")
   }
@@ -143,7 +143,7 @@ object ConnectionProvider {
     val outbound = outboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
-    (outbound, new ConnectionEntity(connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), Configuration.Nsa, URI.create(ConnectionRequester.serviceUrl), URI.create(PathComputationEngine.pceReplyUrl)))
+    (outbound, new ConnectionEntity(connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), Configuration.NsaId, URI.create(ConnectionRequester.serviceUrl), URI.create(PathComputationEngine.pceReplyUrl)))
   }
 
   def outboundActor(initialReserve: NsiProviderMessage[InitialReserve]) =

@@ -339,6 +339,6 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     }
   }
 
-  private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(Configuration.Nsa)
+  private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(Configuration.NsaId)
 }
 

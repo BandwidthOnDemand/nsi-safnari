@@ -27,13 +27,13 @@ class ConnectionRequester(connectionManager: ConnectionManager) extends Controll
 
   override def serviceUrl: String = ConnectionRequester.serviceUrl
 
-  def request = NsiRequesterEndPoint(Configuration.Nsa) {
+  def request = NsiRequesterEndPoint(Configuration.NsaId) {
     case message @ NsiRequesterMessage(headers, notification: NsiNotification) =>
       val connection = connectionManager.findByChildConnectionId(notification.connectionId)
 
       val ack = connection.map { c =>
         (c ? Connection.Command(new Instant(), FromProvider(NsiRequesterMessage(headers, notification))))
-      } getOrElse Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.Nsa)))
+      } getOrElse Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))
 
       ack.map(message.ack)
     case response =>
@@ -50,13 +50,11 @@ object ConnectionRequester {
   def serviceUrl: String = s"${Configuration.BaseUrl}${routes.ConnectionRequester.request().url}"
   val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
-  def nsiRequester: ActorRef = {
-    val requesterNsa = Configuration.Nsa
+  def nsiRequester: ActorRef =
     current.configuration.getString("nsi.actor") match {
       case None | Some("dummy") => Akka.system.actorOf(Props[DummyNsiRequesterActor])
-      case _                    => Akka.system.actorOf(Props(new NsiRequesterActor(requesterNsa, URI.create(serviceUrl))))
+      case _                    => Akka.system.actorOf(Props(new NsiRequesterActor(Configuration.NsaId, URI.create(serviceUrl))))
     }
-  }
 
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {
     private val uuidGenerator = Uuid.randomUuidGenerator()

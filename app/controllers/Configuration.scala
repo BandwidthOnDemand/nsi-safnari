@@ -5,14 +5,28 @@ import scala.concurrent.duration._
 import java.net.URI
 import com.typesafe.config.ConfigUtil
 import nl.surfnet.safnari.ProviderEndPoint
+import nl.surfnet.safnari.BuildInfo
 
 object Configuration {
-  lazy val Nsa = current.configuration.getString("safnari.nsa").getOrElse(sys.error("safnari.nsa not set"))
-  def BaseUrl = current.configuration.getString("nsi.base.url").getOrElse(sys.error("nsi.base.url option is not set"))
-  val Use2WayTLS = current.configuration.getBoolean("nsi.twoway.tls").getOrElse(sys.error("nsi.twoway.tls option is not set"))
-
+  lazy val NsaId = getStringOrFail("safnari.nsa.id")
+  lazy val NsaName = getStringOrFail("safnari.nsa.name")
+  lazy val AdminContactGiven = getStringOrFail("safnari.adminContact.given")
+  lazy val AdminContactSurname = getStringOrFail("safnari.adminContact.surname")
+  lazy val AdminContact = s"$AdminContactGiven $AdminContactSurname"
+  lazy val AdminContactProdid = getStringOrFail("safnari.adminContact.prodid")
+  lazy val Use2WayTLS = current.configuration.getBoolean("nsi.twoway.tls").getOrElse(sys.error("nsi.twoway.tls option is not set"))
+  lazy val VersionString = s"${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})"
+  lazy val Longitude = getStringOrFail("safnari.location.longitude")
+  lazy val Latitude = getStringOrFail("safnari.location.latitude")
   lazy val AsyncReplyTimeout = readFiniteDuration("safnari.async.reply.timeout")
+  lazy val NetworkId = current.configuration.getString("safnari.network.id")
+  lazy val NetworkUrl = current.configuration.getString("safnari.network.url")
+
   def ConnectionExpirationTime = readFiniteDuration("safnari.connection.expiration.time")
+
+  def BaseUrl = getStringOrFail("nsi.base.url")
+
+  private def getStringOrFail(property: String) = current.configuration.getString(property).getOrElse(sys.error(s"$property is not set"))
 
   private def readFiniteDuration(key: String): FiniteDuration = current.configuration.getString(key).map(Duration.apply) match {
     case Some(fd: FiniteDuration) => fd
@@ -28,5 +42,4 @@ object Configuration {
       case None =>
         throw new IllegalArgumentException(s"No stunnel detour configured for NSA ${provider.nsa} while TLS was enabled.")
     }
-
 }

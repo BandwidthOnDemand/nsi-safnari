@@ -14,13 +14,14 @@ import play.api.mvc._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.sys.process._
+import play.api.http.HeaderNames.X_FORWARDED_PROTO
 
 class Application(connectionManager: ConnectionManager) extends Controller {
   implicit val timeout = Timeout(2.seconds)
 
   def index = Action { implicit request =>
-    val secure = request.headers.get("X-Forwarded-Proto") == Some("https")
-    Ok(views.html.index(secure, Configuration.Nsa))
+    val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
+    Ok(views.html.index(secure, Configuration.NsaId))
   }
 
   def healthcheck = Action.async {
@@ -28,7 +29,7 @@ class Application(connectionManager: ConnectionManager) extends Controller {
     val nsiHealth = (ConnectionRequester.nsiRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
 
     Future.sequence(List(nsiHealth, pceHealth)) map { healthStates =>
-      val view = views.html.healthcheck(healthStates.toMap, s"${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})")
+      val view = views.html.healthcheck(healthStates.toMap, Configuration.VersionString)
 
       if (healthStates forall { case (_, healthy) => healthy })
         Ok(view)
