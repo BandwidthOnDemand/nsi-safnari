@@ -82,7 +82,7 @@ class ReserveRequestSpec extends helpers.Specification {
     "pce.actor" -> "real",
     "pce.endpoint" -> FakePceUri,
     "nsi.base.url" -> s"http://localhost:$ServerPort",
-    "safnari.nsa" -> SafnariNsa), withGlobal = Some(Global))
+    "safnari.nsa.id" -> SafnariNsa), withGlobal = Some(Global))
 
   def marshal(p2ps: P2PServiceBaseType): Element = {
     val jaxb = new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory().createP2Ps(p2ps)
