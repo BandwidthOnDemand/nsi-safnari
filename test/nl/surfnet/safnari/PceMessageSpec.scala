@@ -7,6 +7,7 @@ import org.ogf.schemas.nsi._2013._12.framework.types._
 import play.api.data.validation.ValidationError
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 
 object PceMessageSpec {
   val sourceStp = "network-id:source"
@@ -22,7 +23,7 @@ object PceMessageSpec {
 
   val correlationId = helpers.Specification.newCorrelationId
 
-  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType))
+  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), Nil)
 
   val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication)
   val computedSegment = ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))
@@ -41,13 +42,28 @@ class PceMessageSpec extends helpers.Specification {
     import nl.surfnet.safnari.PceMessage._
 
     "serialize request with p2pServiceBaseType to json" in {
-      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType))
+      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), Nil)
 
       val json = Json.toJson(request)
 
       json \ "correlationId" must beEqualTo(JsString(correlationId.toString))
       json \ "replyTo" \ "url" must beEqualTo(JsString("http://localhost/pce/reply"))
       (json \ "p.p2ps" apply 0) \ "capacity" must beEqualTo(JsNumber(100))
+
+      Json.fromJson[PceRequest](json) must beEqualTo(JsSuccess(request))
+    }
+
+    "serialize request with connection trace to json" in {
+      val first = new ConnectionType().withIndex(0).withValue("firstnsa")
+      val second = new ConnectionType().withIndex(1).withValue("secondnsa")
+      val connectionTrace = List(first, second)
+      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), connectionTrace)
+
+      val json = Json.toJson(request)
+      (json \ "connectionTrace" apply 0) \ "index" must beEqualTo(JsNumber(first.getIndex))
+      (json \ "connectionTrace" apply 1) \ "index" must beEqualTo(JsNumber(second.getIndex))
+      (json \ "connectionTrace" apply 0) \ "value" must beEqualTo(JsString(first.getValue))
+      (json \ "connectionTrace" apply 1) \ "value" must beEqualTo(JsString(second.getValue))
 
       Json.fromJson[PceRequest](json) must beEqualTo(JsSuccess(request))
     }

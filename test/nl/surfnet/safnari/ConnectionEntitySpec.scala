@@ -138,13 +138,15 @@ class ConnectionEntitySpec extends helpers.Specification {
   "A connection" >> {
     "in initial state" should {
       "send a path computation request when reserve is received" in new fixture {
-        when(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
+        val connectionTrace = new ConnectionType().withIndex(0).withValue("foo") :: Nil
+        when(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service), Nil, connectionTrace))
 
         messages must contain(ToPce(PathComputationRequest(
           correlationId = CorrelationId(0, 3),
           replyTo = PceReplyToUri,
           schedule = Schedule,
-          serviceType = ServiceType("ServiceType", Service))))
+          serviceType = ServiceType("ServiceType", Service),
+          connectionTrace)))
       }
 
       "reject commit" in new fixture {

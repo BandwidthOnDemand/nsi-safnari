@@ -11,6 +11,7 @@ import javax.xml.datatype.DatatypeFactory
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 
 case class ServiceType(serviceType: String, service: P2PServiceBaseType)
 
@@ -19,7 +20,7 @@ sealed trait PceMessage {
   def correlationId: CorrelationId
 }
 sealed trait PceRequest extends PceMessage
-case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, schedule: ScheduleType, serviceType: ServiceType) extends PceRequest
+case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, schedule: ScheduleType, serviceType: ServiceType, connectionTrace: List[ConnectionType]) extends PceRequest
 
 sealed trait PceResponse extends PceMessage
 case class PathComputationFailed(correlationId: CorrelationId, message: String) extends PceResponse
@@ -122,6 +123,10 @@ object PceMessage {
   }
   implicit val XMLGregorianCalendarWrites: Writes[XMLGregorianCalendar] = Writes { x => JsString(x.toString) }
 
+  implicit val ConnectionTypeFormat: Format[ConnectionType] = (
+      (__ \ "index").format[Int] and
+      (__ \ "value").format[String]).apply((index, value) => new ConnectionType().withIndex(index).withValue(value), connectionType => (connectionType.getIndex(), connectionType.getValue()))
+
   implicit val PceRequestFormat: Format[PceRequest] = (
     (__ \ "correlationId").format[CorrelationId] and
     (__ \ "replyTo" \ "url").format[URI] and
@@ -130,12 +135,13 @@ object PceMessage {
     (__ \ "startTime").formatNullable[XMLGregorianCalendar] and
     (__ \ "endTime").formatNullable[XMLGregorianCalendar] and
     (__ \ "constraints").format[Seq[String]] and
-    ServiceTypeFormat)
-    .apply((correlationId, replyTo, mediaType, algorithm, start, end, constraints, serviceType) => {
+    ServiceTypeFormat and
+    (__ \ "connectionTrace").format[Seq[ConnectionType]])
+    .apply((correlationId, replyTo, mediaType, algorithm, start, end, constraints, serviceType, connectionTrace) => {
       val schedule = new ScheduleType().withStartTime(start.orNull).withEndTime(end.orNull)
-      PathComputationRequest(correlationId, replyTo, schedule, serviceType)
+      PathComputationRequest(correlationId, replyTo, schedule, serviceType, connectionTrace.toList)
     }, {
-      case PathComputationRequest(correlationId, replyTo, schedule, serviceType) =>
+      case PathComputationRequest(correlationId, replyTo, schedule, serviceType, connectionTrace) =>
         (correlationId,
           replyTo,
           "application/json",
@@ -143,7 +149,8 @@ object PceMessage {
           Option(schedule.getStartTime()),
           Option(schedule.getEndTime()),
           Nil,
-          serviceType)
+          serviceType,
+          connectionTrace)
     })
 
   implicit val PceAcknowledgementWrites: Writes[PceAcknowledgement] = Writes {
