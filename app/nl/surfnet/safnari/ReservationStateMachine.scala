@@ -100,6 +100,7 @@ class ReservationStateMachine(
   pceReplyUri: URI,
   newCorrelationId: () => CorrelationId,
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
+  newInitialReserveNsiHeaders: ProviderEndPoint => NsiHeaders,
   newNotificationId: () => Int,
   failed: NsiError => GenericFailedType)
   extends FiniteStateMachine[ReservationState, ReservationStateMachineData, InboundMessage, OutboundMessage](
@@ -221,7 +222,9 @@ class ReservationStateMachine(
             withDescription(data.description.orNull).
             withCriteria(criteria)
 
-          ToProvider(NsiProviderMessage(newNsiHeaders(segment.provider).copy(correlationId = correlationId), InitialReserve(reserveType, Conversion.invert(criteria).get, service)), segment.provider)
+          val headers = newInitialReserveNsiHeaders(segment.provider).copy(correlationId = correlationId)
+
+          ToProvider(NsiProviderMessage(headers, InitialReserve(reserveType, Conversion.invert(criteria).get, service)), segment.provider)
       }
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoPathFound))))

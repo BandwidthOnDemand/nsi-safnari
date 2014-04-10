@@ -6,6 +6,7 @@ import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import play.api.Logger
 import scala.math.Ordering.Implicits._
 import scala.util.Try
@@ -13,8 +14,14 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, val aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
-  private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion, initialReserve.headers.sessionSecurityAttrs)
-  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil)
+  private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion, initialReserve.headers.sessionSecurityAttrs, Nil)
+  private def newInitialReserveNsiHeaders(provider: ProviderEndPoint) = {
+    val oldTrace = initialReserve.headers.connectionTrace
+    val index = if (oldTrace.isEmpty) 0 else oldTrace.map(_.getIndex()).max + 1
+    val newTrace = new ConnectionType().withIndex(index).withValue(s"$aggregatorNsa:$id") :: initialReserve.headers.connectionTrace
+    newNsiHeaders(provider).copy(connectionTrace = newTrace)
+  }
+  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil, Nil)
   private var nextNotificationId = new AtomicInteger(1)
   private var nextResultId = new AtomicInteger(1)
   private var nsiNotifications: List[NsiNotification] = Nil
@@ -24,7 +31,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   private var mostRecentChildExceptions = Map.empty[ConnectionId, ServiceExceptionType]
   private var committedCriteria: Option[ReservationConfirmCriteriaType] = None
 
-  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, newNotificationId, { error =>
+  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, newInitialReserveNsiHeaders, newNotificationId, { error =>
     new GenericFailedType().
       withConnectionId(id).
       withConnectionStates(connectionStates).

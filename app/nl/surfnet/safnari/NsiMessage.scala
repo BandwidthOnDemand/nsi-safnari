@@ -11,9 +11,9 @@ object NsiHeaders {
   val RequesterProtocolVersion: URI = URI.create("application/vnd.ogf.nsi.cs.v2.requester+soap")
 }
 
-case class NsiHeaders(correlationId: CorrelationId, requesterNSA: RequesterNsa, providerNSA: String, replyTo: Option[URI], protocolVersion: URI, sessionSecurityAttrs: List[SessionSecurityAttrType], connectionTrace: List[ConnectionType] = Nil) {
-  def forSyncAck: NsiHeaders = copy(replyTo = None)
-  def forAsyncReply: NsiHeaders = copy(replyTo = None, protocolVersion = NsiHeaders.RequesterProtocolVersion)
+case class NsiHeaders(correlationId: CorrelationId, requesterNSA: RequesterNsa, providerNSA: String, replyTo: Option[URI], protocolVersion: URI, sessionSecurityAttrs: List[SessionSecurityAttrType] = Nil, connectionTrace: List[ConnectionType] = Nil) {
+  def forSyncAck: NsiHeaders = copy(replyTo = None, sessionSecurityAttrs = Nil, connectionTrace = Nil)
+  def forAsyncReply: NsiHeaders = copy(replyTo = None, protocolVersion = NsiHeaders.RequesterProtocolVersion, sessionSecurityAttrs = Nil, connectionTrace = Nil)
 }
 
 sealed trait NsiMessage[+T] {

@@ -11,7 +11,7 @@ import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 class NsiSoapConversionsSpec extends helpers.Specification {
   import NsiSoapConversions._
 
-  val DefaultAckHeaders = NsiHeaders(newCorrelationId, "requesterNSA", "providerNSA", None, NsiHeaders.RequesterProtocolVersion, Nil)
+  val DefaultAckHeaders = NsiHeaders(newCorrelationId, "requesterNSA", "providerNSA", None, NsiHeaders.RequesterProtocolVersion)
 
   val providerOperationToStringConversion = NsiProviderMessageToDocument(None)(NsiProviderOperationToElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))
   val requestOperationToStringConversion = NsiRequesterMessageToDocument(None)(NsiRequesterOperationToElement).andThen(NsiXmlDocumentConversion.andThen(ByteArrayToString))

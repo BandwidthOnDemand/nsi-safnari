@@ -12,6 +12,7 @@ import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
 import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionEntitySpec extends helpers.Specification {
@@ -33,7 +34,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     val NsiReplyToUri = URI.create("http://example.com/nsi/requester")
     val PceReplyToUri = URI.create("http://example.com/pce/reply")
 
-    def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, provider.nsa, Some(NsiReplyToUri), NsiHeaders.ProviderProtocolVersion, Nil)
+    def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, provider.nsa, Some(NsiReplyToUri), NsiHeaders.ProviderProtocolVersion)
 
     var connection: ConnectionEntity = _
     var processInbound: IdempotentProvider = _
@@ -176,6 +177,20 @@ class ConnectionEntitySpec extends helpers.Specification {
         messages must haveOneElementLike {
           case ToProvider(NsiProviderMessage(headers, _), A.provider) => headers.sessionSecurityAttrs must contain(SessionSecurityAttr)
           case ToProvider(NsiProviderMessage(headers, _), B.provider) => headers.sessionSecurityAttrs must contain(SessionSecurityAttr)
+        }
+      }
+
+      "send reserve request including the connection trace" in new fixture {
+        val requesterTrace = new ConnectionType().withIndex(2).withValue("urn:ogf:network:someone:noId")
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service), Nil, requesterTrace :: Nil))
+
+        when(pce.confirm(CorrelationId(0, 1), A))
+
+        messages must haveOneElementLike {
+          case ToProvider(NsiProviderMessage(headers, _), A.provider) =>
+            headers.connectionTrace must haveSize(2)
+            headers.connectionTrace must contain(equalTo(new ConnectionType().withIndex(3).withValue(s"$AggregatorNsa:$ConnectionId")))
+            headers.connectionTrace must contain(equalTo(requesterTrace))
         }
       }
 
