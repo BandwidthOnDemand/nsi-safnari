@@ -12,7 +12,7 @@ import play.api.libs.ws.WS
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import play.api.libs.json._
-import scala.language.postfixOps
+
 
 object DiscoveryService extends Controller {
 
@@ -109,15 +109,14 @@ object DiscoveryService extends Controller {
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
       <other>
         { reachabilityEntries match {
-            case Nil => {}
-            case _ => {
+            case Nil =>
+            case _ =>
               <gns:TopologyReachability>
                 { reachabilityEntries.map { entry =>
                     <Topology id={ entry.id } cost={ entry.cost.toString }/>
                   }
                 }
               </gns:TopologyReachability>
-            }
           }
         }
       </other>
@@ -125,11 +124,12 @@ object DiscoveryService extends Controller {
   }
 
   def retrieveReachabilityEntries(): List[ReachabilityTopologyEntry] = {
+
     val reachabilityEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set")) + "/reachability"
     val response = WS.url(reachabilityEndpoint).get()
     implicit val reachabilityTopologyEntryReader = Json.reads[ReachabilityTopologyEntry]
     try {
-      val result = Await.result(response, 1 seconds) // the pce is running locally
+      val result = Await.result(response, 1.seconds) // the pce is running locally
       val jsValue = Json.parse(result.body)
       (jsValue \ "reachability").as[List[ReachabilityTopologyEntry]]
     } catch {
