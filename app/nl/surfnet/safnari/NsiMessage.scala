@@ -4,13 +4,14 @@ import java.net.URI
 import org.ogf.schemas.nsi._2013._12.framework.types._
 import scala.collection.JavaConverters._
 import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 
 object NsiHeaders {
   val ProviderProtocolVersion: URI = URI.create("application/vnd.ogf.nsi.cs.v2.provider+soap")
   val RequesterProtocolVersion: URI = URI.create("application/vnd.ogf.nsi.cs.v2.requester+soap")
 }
 
-case class NsiHeaders(correlationId: CorrelationId, requesterNSA: RequesterNsa, providerNSA: String, replyTo: Option[URI], protocolVersion: URI, sessionSecurityAttrs: List[SessionSecurityAttrType]) {
+case class NsiHeaders(correlationId: CorrelationId, requesterNSA: RequesterNsa, providerNSA: String, replyTo: Option[URI], protocolVersion: URI, sessionSecurityAttrs: List[SessionSecurityAttrType], connectionTrace: List[ConnectionType] = Nil) {
   def forSyncAck: NsiHeaders = copy(replyTo = None)
   def forAsyncReply: NsiHeaders = copy(replyTo = None, protocolVersion = NsiHeaders.RequesterProtocolVersion)
 }

@@ -27,6 +27,8 @@ import scala.util.Try
 import javax.xml.transform.OutputKeys
 import scala.xml.parsing.NoBindingFactoryAdapter
 import javax.xml.transform.sax.SAXResult
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionTraceType
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 
 object NsiSoapConversions {
   implicit val ByteArrayToString = Conversion.build[Array[Byte], String] { bytes =>
@@ -35,7 +37,12 @@ object NsiSoapConversions {
     Try(string.getBytes("UTF-8"))
   }
 
-  val NsiXmlDocumentConversion = XmlDocumentConversion("wsdl/soap/soap-envelope-1.1.xsd", "wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd", "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd", "wsdl/2.0/saml-schema-assertion-2.0.xsd")
+  val NsiXmlDocumentConversion = XmlDocumentConversion(
+    "wsdl/soap/soap-envelope-1.1.xsd",
+    "wsdl/2.0/ogf_nsi_framework_headers_v2_0.xsd",
+    "wsdl/2.0/ogf_nsi_connection_types_v2_0.xsd",
+    "wsdl/2.0/saml-schema-assertion-2.0.xsd",
+    "wsdl/2.0/gnsbod.xsd")
 
   def documentToScalaXml(document: Document): scala.xml.Node = {
     val source = new DOMSource(document)
@@ -54,7 +61,8 @@ object NsiSoapConversions {
   private val typesFactory = new org.ogf.schemas.nsi._2013._12.connection.types.ObjectFactory()
   private val headersFactory = new org.ogf.schemas.nsi._2013._12.framework.headers.ObjectFactory()
   private val pointToPointServiceFactory = new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory()
-  private val SchemaPackages = Seq(typesFactory, headersFactory, pointToPointServiceFactory).map(_.getClass().getPackage().getName())
+  private val gnsFactory = new net.nordu.namespaces._2013._12.gnsbod.ObjectFactory()
+  private val SchemaPackages = Seq(typesFactory, headersFactory, pointToPointServiceFactory, gnsFactory).map(_.getClass().getPackage().getName())
 
   def NsiProviderMessageToDocument[T](defaultHeaders: Option[NsiHeaders])(implicit bodyConversion: Conversion[T, Element]): Conversion[NsiProviderMessage[T], Document] = (Conversion.build[NsiProviderMessage[T], (Option[NsiHeaders], T)] {
     message => Success((Some(message.headers), message.body))
@@ -258,14 +266,19 @@ object NsiSoapConversions {
       .withProtocolVersion(headers.protocolVersion.toASCIIString())
       .withProviderNSA(headers.providerNSA)
       .withRequesterNSA(headers.requesterNSA)
-      .withSessionSecurityAttr(headers.sessionSecurityAttrs.asJava))
+      .withSessionSecurityAttr(headers.sessionSecurityAttrs.asJava)
+      .withAny(if (headers.connectionTrace.isEmpty) null else gnsFactory.createConnectionTrace(new ConnectionTraceType().withConnection(headers.connectionTrace.asJava))))
   } { header =>
     for {
       correlationId <- CorrelationId.fromString(header.getCorrelationId()).toTry(ErrorMessageException(s"invalid correlation id ${header.getCorrelationId()}"))
       replyTo <- Try(Option(header.getReplyTo()).map(URI.create))
       protocolVersion <- Try(URI.create(header.getProtocolVersion()))
     } yield {
-      NsiHeaders(correlationId, header.getRequesterNSA(), header.getProviderNSA(), replyTo, protocolVersion, header.getSessionSecurityAttr.asScala.toList)
+      val connectionTrace = header.getAny().asScala collectFirst {
+        case any: JAXBElement[_] if any.getValue().isInstanceOf[ConnectionTraceType] => any.getValue().asInstanceOf[ConnectionTraceType].getConnection().asScala.toList
+      } getOrElse(Nil)
+
+      NsiHeaders(correlationId, header.getRequesterNSA(), header.getProviderNSA(), replyTo, protocolVersion, header.getSessionSecurityAttr.asScala.toList, connectionTrace)
     }
   }
 
