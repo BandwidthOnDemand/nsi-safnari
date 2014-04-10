@@ -9,10 +9,8 @@ import scala.util.control.NonFatal
 import play.api.Play._
 import scala.Some
 import play.api.libs.ws.WS
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import play.api.libs.json._
-import scala.language.postfixOps
+import play.api.libs.concurrent.Execution.Implicits._
 
 object DiscoveryService extends Controller {
 
@@ -27,7 +25,7 @@ object DiscoveryService extends Controller {
   private val rfc1123Parser = DateTimeFormat.forPattern("EEE, dd MMM yyyy HH:mm:ss").withLocale(java.util.Locale.ENGLISH).withZone(DateTimeZone.forID(timeZoneCode))
 
 
-  def index = Action { implicit request =>
+  def index = Action.async { implicit request =>
     def parseDate(date: String): Option[DateTime] = try {
       //jodatime does not parse timezones, so we handle that manually
       val d = rfc1123Parser.parseDateTime(date.replace(parseableTimezoneCode, ""))
@@ -35,13 +33,17 @@ object DiscoveryService extends Controller {
     } catch {
       case NonFatal(_) => None
     }
-    val reachabilityEntries: List[ReachabilityTopologyEntry] = retrieveReachabilityEntries()
-    val sendDocument = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).map(modifiedSince => startTime.isAfter(modifiedSince)).getOrElse(true)
-
-    if (sendDocument)
-      Ok(discoveryDocument(reachabilityEntries)).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(startTime)).as(ContentTypes.withCharset(contentType))
-    else
-       NotModified
+    val reachabilityEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set")) + "/reachability"
+    WS.url(reachabilityEndpoint).get().map { response =>
+      implicit val reachabilityTopologyEntryReader = Json.reads[ReachabilityTopologyEntry]
+      val jsValue = response.json
+      val reachabilityEntries = (jsValue \ "reachability").as[List[ReachabilityTopologyEntry]]
+      val sendDocument = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).map(modifiedSince => startTime.isAfter(modifiedSince)).getOrElse(true)
+      if (sendDocument)
+        Ok(discoveryDocument(reachabilityEntries)).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(startTime)).as(ContentTypes.withCharset(contentType))
+      else
+        NotModified
+    }
   }
 
   def discoveryDocument(reachabilityEntries: List[ReachabilityTopologyEntry])(implicit request: RequestHeader) = {
@@ -109,35 +111,18 @@ object DiscoveryService extends Controller {
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
       <other>
         { reachabilityEntries match {
-            case Nil => {}
-            case _ => {
+            case Nil =>
+            case _ =>
               <gns:TopologyReachability>
                 { reachabilityEntries.map { entry =>
                     <Topology id={ entry.id } cost={ entry.cost.toString }/>
                   }
                 }
               </gns:TopologyReachability>
-            }
           }
         }
       </other>
     </nsa:nsa>
   }
 
-  def retrieveReachabilityEntries(): List[ReachabilityTopologyEntry] = {
-    val reachabilityEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set")) + "/reachability"
-    val response = WS.url(reachabilityEndpoint).get()
-    implicit val reachabilityTopologyEntryReader = Json.reads[ReachabilityTopologyEntry]
-    try {
-      val result = Await.result(response, 1 seconds) // the pce is running locally
-      val jsValue = Json.parse(result.body)
-      (jsValue \ "reachability").as[List[ReachabilityTopologyEntry]]
-    } catch {
-      case NonFatal(e) => {
-        play.api.Logger.info("Unable to retrieve reachability info: ", e)
-        Nil
-      }
-    }
-
-  }
 }
