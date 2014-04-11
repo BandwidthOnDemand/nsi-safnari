@@ -1,20 +1,27 @@
 package controllers
 
+import org.joda.time.{ DateTime, DateTimeZone }
+import org.joda.time.format.DateTimeFormat
 import play.api.mvc._
 import play.api.http.ContentTypes
-import org.joda.time.DateTime
-import org.joda.time.DateTimeZone
-import org.joda.time.format.DateTimeFormat
-import scala.util.control.NonFatal
 import play.api.Play._
-import scala.Some
 import play.api.libs.ws.WS
 import play.api.libs.json._
 import play.api.libs.concurrent.Execution.Implicits._
+import akka.pattern.ask
+import scala.Some
+import scala.util.control.NonFatal
+import scala.concurrent.duration._
+import akka.util.Timeout
+import play.api.libs.concurrent.Akka
+import scala.concurrent.Future
+import nl.surfnet.safnari.ReachabilityTopologyEntry
 
-object DiscoveryService extends Controller {
+trait DiscoveryService {
+  this: Controller =>
 
-  case class ReachabilityTopologyEntry(id: String, cost: Int)
+  implicit val timeout = Timeout(2.seconds)
+  implicit def actorSystem = Akka.system
 
   private val startTime = DateTime.now
   private val contentType = "application/xml"
@@ -24,7 +31,6 @@ object DiscoveryService extends Controller {
   private val rfc1123Formatter = DateTimeFormat.forPattern(s"EEE, dd MMM yyyy HH:mm:ss '$timeZoneCode'").withLocale(java.util.Locale.ENGLISH).withZone(DateTimeZone.forID(timeZoneCode))
   private val rfc1123Parser = DateTimeFormat.forPattern("EEE, dd MMM yyyy HH:mm:ss").withLocale(java.util.Locale.ENGLISH).withZone(DateTimeZone.forID(timeZoneCode))
 
-
   def index = Action.async { implicit request =>
     def parseDate(date: String): Option[DateTime] = try {
       //jodatime does not parse timezones, so we handle that manually
@@ -33,20 +39,20 @@ object DiscoveryService extends Controller {
     } catch {
       case NonFatal(_) => None
     }
-    val reachabilityEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set")) + "/reachability"
-    WS.url(reachabilityEndpoint).get().map { response =>
-      implicit val reachabilityTopologyEntryReader = Json.reads[ReachabilityTopologyEntry]
-      val jsValue = response.json
-      val reachabilityEntries = (jsValue \ "reachability").as[List[ReachabilityTopologyEntry]]
-      val sendDocument = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).map(modifiedSince => startTime.isAfter(modifiedSince)).getOrElse(true)
-      if (sendDocument)
-        Ok(discoveryDocument(reachabilityEntries)).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(startTime)).as(ContentTypes.withCharset(contentType))
-      else
-        NotModified
+
+    val haveLatest = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).exists(modifiedSince => startTime.isBefore(modifiedSince))
+
+    if (haveLatest)
+      Future.successful(NotModified)
+    else {
+      val reachability = (PathComputationEngine.pceRequester ? 'reachability).mapTo[Future[Seq[ReachabilityTopologyEntry]]].flatMap(identity)
+      reachability.map(discoveryDocument).map { document =>
+        Ok(document).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(startTime)).as(ContentTypes.withCharset(contentType))
+      }
     }
   }
 
-  def discoveryDocument(reachabilityEntries: List[ReachabilityTopologyEntry])(implicit request: RequestHeader) = {
+  def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry])(implicit request: RequestHeader): xml.Elem = {
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
     val providerUrl = routes.ConnectionProvider.request.absoluteURL(secure)
 
@@ -124,5 +130,6 @@ object DiscoveryService extends Controller {
       </other>
     </nsa:nsa>
   }
-
 }
+
+object DiscoveryService extends Controller with DiscoveryService
