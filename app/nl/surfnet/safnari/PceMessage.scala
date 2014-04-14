@@ -43,6 +43,8 @@ case class ProviderEndPoint(nsa: String, url: URI, authentication: ProviderAuthe
 
 case class ComputedSegment(provider: ProviderEndPoint, serviceType: ServiceType)
 
+case class ReachabilityTopologyEntry(id: String, cost: Int)
+
 object PceMessage {
   private implicit class JsResultOps[A](js: JsResult[A]) {
     def clearPath = js.fold(JsError(_), JsSuccess(_, path = JsPath()))

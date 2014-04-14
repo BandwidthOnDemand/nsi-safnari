@@ -13,9 +13,12 @@ import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
+import play.api.http.HeaderNames.ACCEPT
+import play.api.http.MimeTypes.JSON
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Success, Failure }
+import nl.surfnet.safnari.ReachabilityTopologyEntry
 
 object PathComputationEngine extends Controller {
   private val pceContinuations = new Continuations[PceResponse](Akka.system.scheduler)
@@ -48,7 +51,7 @@ object PathComputationEngine extends Controller {
 
     def receive = {
       case 'healthCheck =>
-        val topologyHealth = WS.url(s"$endPoint/management/status/topology").withHeaders("Accept" -> "application/json").get()
+        val topologyHealth = WS.url(s"$endPoint/management/status/topology").withHeaders(ACCEPT -> JSON).get()
 
         topologyHealth onFailure { case e => Logger.warn(s"Failed to access PCE topology service: $e") }
 
@@ -56,6 +59,17 @@ object PathComputationEngine extends Controller {
         val healthy = topologyHealth.map(_.status == 200).recover { case t => false }
 
         sender ! healthy.flatMap(h => lastModified.map(d => s"PCE (Real; $d)" -> h))
+
+      case 'reachability =>
+        val reachabilityResponse = WS.url(s"$endPoint/reachability").withHeaders(ACCEPT -> JSON).get()
+
+        val reachability = reachabilityResponse.map { response =>
+          implicit val reachabilityTopologyEntryReader = Json.reads[ReachabilityTopologyEntry]
+
+          (response.json \ "reachability").validate[Seq[ReachabilityTopologyEntry]].fold(error => { Logger.error(""); Nil }, identity)
+        }
+
+        sender ! reachability
 
       case ToPce(request) =>
         val findPathEndPoint = s"$endPoint/paths/find"
@@ -82,7 +96,6 @@ object PathComputationEngine extends Controller {
             pceContinuations.unregister(request.correlationId)
             connection ! Connection.Command(new Instant(), AckFromPce(PceFailed(request.correlationId, response.status, response.statusText, response.body)))
         }
-
     }
   }
 
@@ -90,6 +103,14 @@ object PathComputationEngine extends Controller {
     def receive = {
       case 'healthCheck =>
         sender ! Future.successful("PCE (Dummy)" -> true)
+
+      case 'reachability =>
+        val reachability =
+          ReachabilityTopologyEntry("urn:ogf:network:surfnet.nl:1990:nsa:bod-dev", 0) ::
+          ReachabilityTopologyEntry("urn:ogf:network:es.net:2013:nsa:oscars", 3) ::
+          Nil
+
+        sender ! Future.successful(reachability)
 
       case ToPce(pce: PathComputationRequest) =>
         Connection(sender) ! Connection.Command(new Instant(),
