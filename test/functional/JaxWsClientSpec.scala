@@ -32,7 +32,7 @@ class JaxWsClientSpec extends helpers.Specification {
 
   val ServerPort = Helpers.testServerPort
   val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
-  def Application = FakeApplication(additionalConfiguration = Map("nsi.base.url" -> s"http://localhost:$ServerPort", "safnari.nsa" -> SafnariNsa))
+  def Application = FakeApplication(additionalConfiguration = Map("nsi.base.url" -> s"http://localhost:$ServerPort", "safnari.nsa.id" -> SafnariNsa))
 
   "A JAX WS client" should {
 
