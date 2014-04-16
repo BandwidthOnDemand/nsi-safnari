@@ -5,8 +5,6 @@ import org.joda.time.format.DateTimeFormat
 import play.api.mvc._
 import play.api.http.ContentTypes
 import play.api.Play._
-import play.api.libs.ws.WS
-import play.api.libs.json._
 import play.api.libs.concurrent.Execution.Implicits._
 import akka.pattern.ask
 import scala.Some
@@ -24,7 +22,7 @@ trait DiscoveryService {
   implicit def actorSystem = Akka.system
 
   private val startTime = DateTime.now
-  private val contentType = "application/xml"
+  private val contentType = "application/vnd.ogf.nsi.nsa.v2+xml"
 
   private val timeZoneCode = "GMT"
   private val parseableTimezoneCode = s" $timeZoneCode"
