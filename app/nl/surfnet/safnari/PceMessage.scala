@@ -20,7 +20,15 @@ sealed trait PceMessage {
   def correlationId: CorrelationId
 }
 sealed trait PceRequest extends PceMessage
-case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, schedule: ScheduleType, serviceType: ServiceType, connectionTrace: List[ConnectionType]) extends PceRequest
+case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, schedule: ScheduleType, serviceType: ServiceType, algorithm: PathComputationAlgorithm, connectionTrace: List[ConnectionType]) extends PceRequest
+
+sealed trait PathComputationAlgorithm { val name: String }
+case object ChainAlgorithm extends PathComputationAlgorithm { val name = "CHAIN" }
+case object TreeAlgorithm extends PathComputationAlgorithm { val name = "TREE" }
+object PathComputationAlgorithm {
+  val values: List[PathComputationAlgorithm] = List(ChainAlgorithm, TreeAlgorithm)
+  def parse(value: String): Option[PathComputationAlgorithm] = values.find(_.name == value.toUpperCase())
+}
 
 sealed trait PceResponse extends PceMessage
 case class PathComputationFailed(correlationId: CorrelationId, message: String) extends PceResponse
@@ -70,6 +78,17 @@ object PceMessage {
     case BasicAuthentication(username, password) => Json.obj("method" -> "BASIC", "username" -> username, "password" -> password)
     case OAuthAuthentication(token)              => Json.obj("method" -> "OAUTH2", "token" -> token)
   }
+
+  implicit val PathFindingAlgorithmWrites: Writes[PathComputationAlgorithm] = Writes {
+    case algo => JsString(algo.name)
+  }
+  implicit val PathFindingAlgorithmReads: Reads[PathComputationAlgorithm] = Reads { json =>
+    json match {
+      case JsString(value) => PathComputationAlgorithm.parse(value).fold[JsResult[PathComputationAlgorithm]](JsError(s"Unknown path computation algorithm '$value'"))(JsSuccess(_))
+      case _ => JsError("Could not read path finding algorithm")
+    }
+  }
+
   implicit val ProviderEndPointFormat: OFormat[ProviderEndPoint] = (
     (__ \ "nsa").format[String] and
     (__ \ "csProviderURL").format[URI] and
@@ -133,7 +152,7 @@ object PceMessage {
     (__ \ "correlationId").format[CorrelationId] and
     (__ \ "replyTo" \ "url").format[URI] and
     (__ \ "replyTo" \ "mediaType").format[String] and
-    (__ \ "algorithm").formatNullable[String] and
+    (__ \ "algorithm").format[PathComputationAlgorithm] and
     (__ \ "startTime").formatNullable[XMLGregorianCalendar] and
     (__ \ "endTime").formatNullable[XMLGregorianCalendar] and
     (__ \ "constraints").format[Seq[String]] and
@@ -141,13 +160,13 @@ object PceMessage {
     (__ \ "connectionTrace").format[Seq[ConnectionType]])
     .apply((correlationId, replyTo, mediaType, algorithm, start, end, constraints, serviceType, connectionTrace) => {
       val schedule = new ScheduleType().withStartTime(start.orNull).withEndTime(end.orNull)
-      PathComputationRequest(correlationId, replyTo, schedule, serviceType, connectionTrace.toList)
+      PathComputationRequest(correlationId, replyTo, schedule, serviceType, algorithm, connectionTrace.toList)
     }, {
-      case PathComputationRequest(correlationId, replyTo, schedule, serviceType, connectionTrace) =>
+      case PathComputationRequest(correlationId, replyTo, schedule, serviceType, algorithm, connectionTrace) =>
         (correlationId,
           replyTo,
           "application/json",
-          None,
+          algorithm,
           Option(schedule.getStartTime()),
           Option(schedule.getEndTime()),
           Nil,

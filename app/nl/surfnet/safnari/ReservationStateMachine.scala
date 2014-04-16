@@ -102,6 +102,7 @@ class ReservationStateMachine(
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
   newInitialReserveNsiHeaders: ProviderEndPoint => NsiHeaders,
   newNotificationId: () => Int,
+  pathComputationAlgorithm: PathComputationAlgorithm,
   failed: NsiError => GenericFailedType)
   extends FiniteStateMachine[ReservationState, ReservationStateMachineData, InboundMessage, OutboundMessage](
     InitialReservationState,
@@ -205,7 +206,7 @@ class ReservationStateMachine(
 
   onTransition {
     case InitialReservationState -> PathComputationState =>
-      Seq(ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, initialReserve.body.criteria.getSchedule(), ServiceType(initialReserve.body.criteria.getServiceType(), initialReserve.body.service), initialReserve.headers.connectionTrace)))
+      Seq(ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, initialReserve.body.criteria.getSchedule(), ServiceType(initialReserve.body.criteria.getServiceType(), initialReserve.body.service), pathComputationAlgorithm, initialReserve.headers.connectionTrace)))
 
     case PathComputationState -> CheckingReservationState =>
       val data = nextStateData

@@ -12,7 +12,7 @@ import scala.math.Ordering.Implicits._
 import scala.util.Try
 import java.util.concurrent.atomic.AtomicInteger
 
-class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, val aggregatorNsa: String, nsiReplyToUri: URI, pceReplyUri: URI) {
+class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, val aggregatorNsa: String, pathComputationAlgorithm: PathComputationAlgorithm, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion, initialReserve.headers.sessionSecurityAttrs, Nil)
   private def newInitialReserveNsiHeaders(provider: ProviderEndPoint) = {
@@ -31,7 +31,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   private var mostRecentChildExceptions = Map.empty[ConnectionId, ServiceExceptionType]
   private var committedCriteria: Option[ReservationConfirmCriteriaType] = None
 
-  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, newInitialReserveNsiHeaders, newNotificationId, { error =>
+  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, newInitialReserveNsiHeaders, newNotificationId, pathComputationAlgorithm, { error =>
     new GenericFailedType().
       withConnectionId(id).
       withConnectionStates(connectionStates).

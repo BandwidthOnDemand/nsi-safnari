@@ -55,7 +55,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     }
 
     private def initialReserve(reserve: FromRequester) = {
-      connection = new ConnectionEntity(ConnectionId, reserve.message.asInstanceOf[NsiProviderMessage[InitialReserve]], () => newCorrelationId, AggregatorNsa, NsiReplyToUri, PceReplyToUri)
+      connection = new ConnectionEntity(ConnectionId, reserve.message.asInstanceOf[NsiProviderMessage[InitialReserve]], () => newCorrelationId, AggregatorNsa, ChainAlgorithm, NsiReplyToUri, PceReplyToUri)
       processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
       processInbound(reserve).right.toOption
     }
@@ -146,7 +146,8 @@ class ConnectionEntitySpec extends helpers.Specification {
           replyTo = PceReplyToUri,
           schedule = Schedule,
           serviceType = ServiceType("ServiceType", Service),
-          connectionTrace)))
+          algorithm = ChainAlgorithm,
+          connectionTrace = connectionTrace)))
       }
 
       "reject commit" in new fixture {

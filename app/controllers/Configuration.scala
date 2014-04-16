@@ -4,8 +4,7 @@ import play.api.Play.current
 import scala.concurrent.duration._
 import java.net.URI
 import com.typesafe.config.ConfigUtil
-import nl.surfnet.safnari.ProviderEndPoint
-import nl.surfnet.safnari.BuildInfo
+import nl.surfnet.safnari._
 
 object Configuration {
   lazy val NsaId = getStringOrFail("safnari.nsa.id")
@@ -21,6 +20,7 @@ object Configuration {
   lazy val AsyncReplyTimeout = readFiniteDuration("safnari.async.reply.timeout")
   lazy val NetworkId = current.configuration.getString("safnari.network.id")
   lazy val NetworkUrl = current.configuration.getString("safnari.network.url")
+  lazy val PceAlgorithm: PathComputationAlgorithm = current.configuration.getString("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
 
   def ConnectionExpirationTime = readFiniteDuration("safnari.connection.expiration.time")
 
