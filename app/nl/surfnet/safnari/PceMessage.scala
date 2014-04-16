@@ -53,10 +53,15 @@ case class ComputedSegment(provider: ProviderEndPoint, serviceType: ServiceType)
 
 case class ReachabilityTopologyEntry(id: String, cost: Int)
 
+object ReachabilityTopologyEntry {
+  implicit val ReachabilityTopologyEntryFormat: Format[ReachabilityTopologyEntry] = Json.format[ReachabilityTopologyEntry]
+}
+
 object PceMessage {
   private implicit class JsResultOps[A](js: JsResult[A]) {
     def clearPath = js.fold(JsError(_), JsSuccess(_, path = JsPath()))
   }
+
 
   implicit val CorrelationIdReads: Reads[CorrelationId] = Reads[CorrelationId] {
     case JsString(s) => CorrelationId.fromString(s).map { x => JsSuccess(x) }.getOrElse { JsError(ValidationError("bad.correlation.id", s)) }

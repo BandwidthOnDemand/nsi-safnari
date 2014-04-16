@@ -18,7 +18,6 @@ import play.api.http.MimeTypes.JSON
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Success, Failure }
-import nl.surfnet.safnari.ReachabilityTopologyEntry
 
 object PathComputationEngine extends Controller {
   private val pceContinuations = new Continuations[PceResponse](Akka.system.scheduler)
@@ -64,8 +63,6 @@ object PathComputationEngine extends Controller {
         val reachabilityResponse = WS.url(s"$endPoint/reachability").withHeaders(ACCEPT -> JSON).get()
 
         val reachability = reachabilityResponse.map { response =>
-          implicit val reachabilityTopologyEntryReader = Json.reads[ReachabilityTopologyEntry]
-
           (response.json \ "reachability").validate[Seq[ReachabilityTopologyEntry]].fold(error => { Logger.error(""); Nil }, identity)
         }
 
