@@ -113,8 +113,8 @@ object PathComputationEngine extends Controller {
           ReachabilityTopologyEntry("urn:ogf:network:surfnet.nl:1990:nsa:bod-dev", 0) ::
           ReachabilityTopologyEntry("urn:ogf:network:es.net:2013:nsa:oscars", 3) ::
           Nil
-
-        sender ! Future.successful(reachability)
+        val result = (reachability, DateTime.now())
+        sender ! result
 
       case ToPce(pce: PathComputationRequest) =>
         Connection(sender) ! Connection.Command(new Instant(),
