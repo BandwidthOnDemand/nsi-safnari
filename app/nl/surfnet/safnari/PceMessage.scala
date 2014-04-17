@@ -38,16 +38,7 @@ sealed trait PceAcknowledgement extends PceMessage
 case class PceAccepted(correlationId: CorrelationId) extends PceAcknowledgement
 case class PceFailed(correlationId: CorrelationId, status: Int, statusText: String, message: String) extends PceAcknowledgement
 
-sealed trait ProviderAuthentication
-case object NoAuthentication extends ProviderAuthentication
-case class BasicAuthentication(username: String, password: String) extends ProviderAuthentication {
-  override def toString = s"BasicAuthentication($username, *******)"
-}
-case class OAuthAuthentication(token: String) extends ProviderAuthentication {
-  override def toString = "OAuthAuthentication(*******)"
-}
-
-case class ProviderEndPoint(nsa: String, url: URI, authentication: ProviderAuthentication)
+case class ProviderEndPoint(nsa: String, url: URI)
 
 case class ComputedSegment(provider: ProviderEndPoint, serviceType: ServiceType)
 
@@ -69,21 +60,6 @@ object PceMessage {
   }
   implicit val CorrelationIdWrites: Writes[CorrelationId] = Writes { x => JsString(x.toString) }
 
-  implicit val ProviderAuthenticationReads: Reads[ProviderAuthentication] = Reads { json =>
-    (__ \ "method").read[String].reads(json) match {
-      case JsSuccess("NONE", _)    => JsSuccess(NoAuthentication)
-      case JsSuccess("BASIC", _)   => Json.reads[BasicAuthentication].reads(json).clearPath
-      case JsSuccess("OAUTH2", _)  => Json.reads[OAuthAuthentication].reads(json).clearPath
-      case JsSuccess(method, path) => JsError(path -> ValidationError("bad.authentication.method", method))
-      case errors: JsError         => errors
-    }
-  }
-  implicit val ProviderAuthenticationWrites: Writes[ProviderAuthentication] = Writes {
-    case NoAuthentication                        => Json.obj("method" -> "NONE")
-    case BasicAuthentication(username, password) => Json.obj("method" -> "BASIC", "username" -> username, "password" -> password)
-    case OAuthAuthentication(token)              => Json.obj("method" -> "OAUTH2", "token" -> token)
-  }
-
   implicit val PathFindingAlgorithmWrites: Writes[PathComputationAlgorithm] = Writes {
     case algo => JsString(algo.name)
   }
@@ -96,8 +72,7 @@ object PceMessage {
 
   implicit val ProviderEndPointFormat: OFormat[ProviderEndPoint] = (
     (__ \ "nsa").format[String] and
-    (__ \ "csProviderURL").format[URI] and
-    (__ \ "credentials").format[ProviderAuthentication])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply))
+    (__ \ "csProviderURL").format[URI])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply))
 
   implicit val pointToPointServiceFormat: OFormat[P2PServiceBaseType] = (
     (__ \ "capacity").format[Long] and
@@ -162,7 +137,7 @@ object PceMessage {
     (__ \ "endTime").formatNullable[XMLGregorianCalendar] and
     (__ \ "constraints").format[Seq[String]] and
     ServiceTypeFormat and
-    (__ \ "connectionTrace").format[Seq[ConnectionType]])
+    (__ \ "trace").format[Seq[ConnectionType]])
     .apply((correlationId, replyTo, mediaType, algorithm, start, end, constraints, serviceType, connectionTrace) => {
       val schedule = new ScheduleType().withStartTime(start.orNull).withEndTime(end.orNull)
       PathComputationRequest(correlationId, replyTo, schedule, serviceType, algorithm, connectionTrace.toList)

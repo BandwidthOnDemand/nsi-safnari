@@ -48,7 +48,7 @@ class ReserveRequestSpec extends helpers.Specification {
           val connectionId = newConnectionId
           headers.replyTo.foreach { replyTo =>
             NsiWebService.callRequester(
-              ProviderEndPoint(headers.requesterNSA, replyTo, NoAuthentication),
+              ProviderEndPoint(headers.requesterNSA, replyTo),
               message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).get))
           }
           Future.successful(message.ack(ReserveResponse(connectionId)))
@@ -61,7 +61,7 @@ class ReserveRequestSpec extends helpers.Specification {
           val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
             case JsSuccess(request: PathComputationRequest, _) =>
-              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri), NoAuthentication), request.serviceType) :: Nil)
+              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri)), request.serviceType) :: Nil)
               WS.url(request.replyTo.toASCIIString()).post(Json.toJson(response))
               Results.Accepted
             case _ =>

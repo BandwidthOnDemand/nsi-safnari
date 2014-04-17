@@ -99,7 +99,7 @@ class MessageStoreSpec extends helpers.Specification {
 
     "store a toProvider NSI message" in new Fixture() {
       val message = initialReserveMessage
-      val endPoint = ProviderEndPoint("urn:nsa:surf", URI.create("http://localhost"), NoAuthentication)
+      val endPoint = ProviderEndPoint("urn:nsa:surf", URI.create("http://localhost"))
       messageStore.storeInboundWithOutboundMessages(aggregatedConnectionId, timestamp, FromRequester(message), Seq(ToProvider(message, endPoint))) must not(throwA[Exception])
 
       val loaded = messageStore.loadAll(aggregatedConnectionId).map(_.message)

@@ -114,10 +114,7 @@ object PathComputationEngine extends Controller {
           FromPce(PathComputationConfirmed(
             pce.correlationId,
             Seq(ComputedSegment(
-              ProviderEndPoint(
-                "urn:ogf:network:surfnet.nl:1990:nsa:bod-dev",
-                URI.create("http://localhost:8082/bod/nsi/v2/provider"),
-                OAuthAuthentication("f44b1e47-0a19-4c11-861b-c9abf82d4cbf")),
+              ProviderEndPoint("urn:ogf:network:surfnet.nl:1990:nsa:bod-dev", URI.create("http://localhost:8082/bod/nsi/v2/provider")),
               pce.serviceType)))))
     }
   }

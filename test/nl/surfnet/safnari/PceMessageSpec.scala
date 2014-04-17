@@ -25,7 +25,7 @@ object PceMessageSpec {
 
   val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), ChainAlgorithm, Nil)
 
-  val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"), NoAuthentication)
+  val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"))
   val computedSegment = ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))
   val pathComputationResponse = PathComputationConfirmed(correlationId, Seq(computedSegment))
 
@@ -61,10 +61,10 @@ class PceMessageSpec extends helpers.Specification {
       val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), ChainAlgorithm, connectionTrace)
 
       val json = Json.toJson(request)
-      (json \ "connectionTrace" apply 0) \ "index" must beEqualTo(JsNumber(first.getIndex))
-      (json \ "connectionTrace" apply 1) \ "index" must beEqualTo(JsNumber(second.getIndex))
-      (json \ "connectionTrace" apply 0) \ "value" must beEqualTo(JsString(first.getValue))
-      (json \ "connectionTrace" apply 1) \ "value" must beEqualTo(JsString(second.getValue))
+      (json \ "trace" apply 0) \ "index" must beEqualTo(JsNumber(first.getIndex))
+      (json \ "trace" apply 1) \ "index" must beEqualTo(JsNumber(second.getIndex))
+      (json \ "trace" apply 0) \ "value" must beEqualTo(JsString(first.getValue))
+      (json \ "trace" apply 1) \ "value" must beEqualTo(JsString(second.getValue))
 
       Json.fromJson[PceRequest](json) must beEqualTo(JsSuccess(request))
     }
@@ -96,11 +96,6 @@ class PceMessageSpec extends helpers.Specification {
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
     }
 
-    "toString of a pceResponse should not contain authorization information" in {
-      BasicAuthentication("johndoe", "secret").toString must not(contain("secret"))
-      OAuthAuthentication("secret-token").toString must not(contain("secret-token"))
-    }
-
     "deserialize path computation confirmed" in {
       val input = """
         |{
@@ -110,9 +105,6 @@ class PceMessageSpec extends helpers.Specification {
         |    {
         |      "nsa": "urn:ogf:network:nsa:internet2.edu",
         |      "csProviderURL": "http://oscars.internet2.edu/provider",
-        |      "credentials": {
-        |        "method": "NONE"
-        |      },
         |      "serviceType": "http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE",
         |      "p.p2ps": [
         |        {
@@ -150,8 +142,7 @@ class PceMessageSpec extends helpers.Specification {
         CorrelationId.fromString("urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02").get,
         ComputedSegment(
           ProviderEndPoint("urn:ogf:network:nsa:internet2.edu",
-            URI.create("http://oscars.internet2.edu/provider"),
-            NoAuthentication),
+            URI.create("http://oscars.internet2.edu/provider")),
           ServiceType("http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE", new P2PServiceBaseType()
             .withCapacity(100)
             .withDirectionality(DirectionalityType.BIDIRECTIONAL)
@@ -160,8 +151,7 @@ class PceMessageSpec extends helpers.Specification {
             .withDestSTP("urn:ogf:network:internet2.edu:to-esnet?vlan=1780")))
         :: ComputedSegment(
           ProviderEndPoint("urn:ogf:network:nsa:es.net",
-            URI.create("http://oscars.es.net/nsi/ConnectionService"),
-            BasicAuthentication("foo", "bar")),
+            URI.create("http://oscars.es.net/nsi/ConnectionService")),
           ServiceType("http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE", new P2PServiceBaseType()
             .withCapacity(100)
             .withDirectionality(DirectionalityType.BIDIRECTIONAL)
@@ -173,25 +163,9 @@ class PceMessageSpec extends helpers.Specification {
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
     }
 
-    "deserialize authentication method" in {
-      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"foo"}""")) must beLike {
-        case JsError(errors) =>
-          errors must contain((JsPath \ "method") -> Seq(ValidationError("bad.authentication.method", "foo")))
-      }
-
-      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"BASIC"}""")) must beLike {
-        case JsError(errors) =>
-          errors must contain((JsPath \ "username") -> Seq(ValidationError("error.path.missing")))
-      }
-
-      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"OAUTH2", "token":"oath2-token"}""")) must beEqualTo(JsSuccess(OAuthAuthentication("oath2-token")))
-
-      Json.fromJson[ProviderAuthentication](Json.parse("""{"method":"BASIC", "username":"user", "password":"pwd"}""")) must beEqualTo(JsSuccess(BasicAuthentication("user", "pwd")))
-    }
-
     "deserialize provider end point" in {
-      Json.fromJson[ProviderEndPoint](Json.parse("""{"nsa":"urn:nsa:surfnet.nl", "csProviderURL":"http://localhost", "credentials":{"method":"NONE"}}""")) must beEqualTo(
-        JsSuccess(ProviderEndPoint("urn:nsa:surfnet.nl", URI.create("http://localhost"), NoAuthentication)))
+      Json.fromJson[ProviderEndPoint](Json.parse("""{"nsa":"urn:nsa:surfnet.nl", "csProviderURL":"http://localhost"}""")) must beEqualTo(
+        JsSuccess(ProviderEndPoint("urn:nsa:surfnet.nl", URI.create("http://localhost"))))
     }
 
   }

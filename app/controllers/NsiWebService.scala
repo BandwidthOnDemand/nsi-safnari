@@ -45,15 +45,7 @@ object NsiWebService {
 
     val providerUrl = if (Configuration.Use2WayTLS) Configuration.translateToStunnelAddress(provider) else provider.url
 
-    var request = WS.url(providerUrl.toASCIIString())
-
-    request = provider.authentication match {
-      case OAuthAuthentication(token)              => request.withHeaders("Authorization" -> s"bearer $token")
-      case BasicAuthentication(username, password) => request.withAuth(username, password, AuthScheme.BASIC)
-      case _                                       => request
-    }
-
-    request = request.withSoapActionHeader(soapAction)
+    val request = WS.url(providerUrl.toASCIIString()).withSoapActionHeader(soapAction)
 
     Logger.debug(s"Sending provider ${provider.nsa} at ${request.url} the SOAP message: ${Conversion[M[T], Document].andThen(Conversion[Document, String]).apply(message)}")
 

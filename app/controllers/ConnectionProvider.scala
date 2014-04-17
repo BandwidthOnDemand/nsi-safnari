@@ -159,7 +159,7 @@ object ConnectionProvider {
   }
 
   private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation) = requestHeaders.replyTo.foreach { replyTo =>
-    val ackFuture = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo, NoAuthentication), NsiRequesterMessage(requestHeaders.forSyncAck, response))
+    val ackFuture = NsiWebService.callRequester(ProviderEndPoint(requestHeaders.requesterNSA, replyTo), NsiRequesterMessage(requestHeaders.forSyncAck, response))
 
     ackFuture onComplete {
       case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
