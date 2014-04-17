@@ -37,16 +37,17 @@ object PathComputationEngine extends Controller {
   }
 
   def pceRequester: ActorRef = {
-    val pceEndpoint = current.configuration.getString("pce.endpoint").getOrElse(sys.error("pce.endpoint configuration property is not set"))
     current.configuration.getString("pce.actor") match {
       case None | Some("dummy") => Akka.system.actorOf(Props[DummyPceRequesterActor])
-      case _                    => Akka.system.actorOf(Props(new PceRequesterActor(pceEndpoint)))
+      case _                    => Akka.system.actorOf(Props(new PceRequesterActor(Configuration.PceEndpoint)))
     }
   }
 
   class PceRequesterActor(endPoint: String) extends Actor {
     private val uuidGenerator = Uuid.randomUuidGenerator()
     private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
+    private var latestReachabilityEntries: Seq[ReachabilityTopologyEntry] = Nil
+    private var lastChanged: DateTime = _
 
     def receive = {
       case 'healthCheck =>
@@ -61,12 +62,18 @@ object PathComputationEngine extends Controller {
 
       case 'reachability =>
         val reachabilityResponse = WS.url(s"$endPoint/reachability").withHeaders(ACCEPT -> JSON).get()
+        val senderRef = sender
 
-        val reachability = reachabilityResponse.map { response =>
-          (response.json \ "reachability").validate[Seq[ReachabilityTopologyEntry]].fold(error => { Logger.error(""); Nil }, identity)
+        reachabilityResponse.onComplete {
+          case Success(response) =>
+            val reachability = (response.json \ "reachability").validate[Seq[ReachabilityTopologyEntry]].fold(error => { Logger.error(""); Nil }, identity)
+            if (latestReachabilityEntries != reachability){
+              lastChanged = DateTime.now()
+              latestReachabilityEntries = reachability;
+            }
+            senderRef ! ((latestReachabilityEntries, lastChanged))
+          case Failure(e) => ???
         }
-
-        sender ! reachability
 
       case ToPce(request) =>
         val findPathEndPoint = s"$endPoint/paths/find"

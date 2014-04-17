@@ -38,16 +38,19 @@ trait DiscoveryService {
       case NonFatal(_) => None
     }
 
-    val haveLatest = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).exists(modifiedSince => startTime.isBefore(modifiedSince))
+    val reachabilityResult: Future[(Seq[ReachabilityTopologyEntry], DateTime)] = (PathComputationEngine.pceRequester ? 'reachability).mapTo[(Seq[ReachabilityTopologyEntry], DateTime)]
 
-    if (haveLatest)
-      Future.successful(NotModified)
-    else {
-      val reachability = (PathComputationEngine.pceRequester ? 'reachability).mapTo[Future[Seq[ReachabilityTopologyEntry]]].flatMap(identity)
-      reachability.map(discoveryDocument).map { document =>
-        Ok(document).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(startTime)).as(ContentTypes.withCharset(contentType))
+    val result: Future[SimpleResult] = reachabilityResult.map {
+      case (reachability, created) => {
+        val haveLatest = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).exists(modifiedSince => created.isBefore(modifiedSince))
+        if (haveLatest){
+          NotModified
+        }else{
+          Ok(discoveryDocument(reachability)).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(created)).as(ContentTypes.withCharset(contentType))
+        }
       }
     }
+    result
   }
 
   def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry])(implicit request: RequestHeader): xml.Elem = {
@@ -114,15 +117,13 @@ trait DiscoveryService {
       }
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
       <other>
-        { reachabilityEntries match {
-            case Nil =>
-            case _ =>
-              <gns:TopologyReachability>
-                { reachabilityEntries.map { entry =>
-                    <Topology id={ entry.id } cost={ entry.cost.toString }/>
-                  }
+        { if (!reachabilityEntries.isEmpty) {
+            <gns:TopologyReachability>
+              { reachabilityEntries.map { entry =>
+                  <Topology id={ entry.id } cost={ entry.cost.toString } />
                 }
-              </gns:TopologyReachability>
+              }
+            </gns:TopologyReachability>
           }
         }
       </other>

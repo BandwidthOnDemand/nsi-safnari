@@ -21,6 +21,7 @@ object Configuration {
   lazy val NetworkId = current.configuration.getString("safnari.network.id")
   lazy val NetworkUrl = current.configuration.getString("safnari.network.url")
   lazy val PceAlgorithm: PathComputationAlgorithm = current.configuration.getString("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
+  lazy val PceEndpoint = getStringOrFail("pce.endpoint")
 
   def ConnectionExpirationTime = readFiniteDuration("safnari.connection.expiration.time")
 
