@@ -2,7 +2,6 @@ package controllers
 
 import akka.actor._
 import java.net.URI
-import java.util.concurrent.TimeoutException
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.Instant
@@ -13,10 +12,7 @@ import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
-import play.api.http.HeaderNames.ACCEPT
-import play.api.http.MimeTypes.JSON
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.util.{ Success, Failure }
 
 object PathComputationEngine extends Controller {
