@@ -14,6 +14,9 @@ import akka.util.Timeout
 import play.api.libs.concurrent.Akka
 import scala.concurrent.Future
 import nl.surfnet.safnari.ReachabilityTopologyEntry
+import scala.util.Try
+import scala.util.Success
+import scala.util.Failure
 
 trait DiscoveryService {
   this: Controller =>
@@ -22,7 +25,7 @@ trait DiscoveryService {
   implicit def actorSystem = Akka.system
 
   private val startTime = DateTime.now
-  private val contentType = "application/vnd.ogf.nsi.nsa.v2+xml"
+  private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v2+xml"
 
   private val timeZoneCode = "GMT"
   private val parseableTimezoneCode = s" $timeZoneCode"
@@ -38,19 +41,17 @@ trait DiscoveryService {
       case NonFatal(_) => None
     }
 
-    val reachabilityResult: Future[(Seq[ReachabilityTopologyEntry], DateTime)] = (PathComputationEngine.pceRequester ? 'reachability).mapTo[(Seq[ReachabilityTopologyEntry], DateTime)]
+    (PathComputationEngine.pceRequester ? 'reachability).mapTo[Try[(Seq[ReachabilityTopologyEntry], DateTime)]] map {
+      case Success((reachability, lastModified)) =>
+        val haveLatest = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).exists(ifModifiedSince => !ifModifiedSince.isBefore(lastModified.withMillisOfSecond(0)))
 
-    val result: Future[SimpleResult] = reachabilityResult.map {
-      case (reachability, created) => {
-        val haveLatest = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).exists(modifiedSince => created.isBefore(modifiedSince))
-        if (haveLatest){
+        if (haveLatest)
           NotModified
-        }else{
-          Ok(discoveryDocument(reachability)).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(created)).as(ContentTypes.withCharset(contentType))
-        }
-      }
+        else
+          Ok(discoveryDocument(reachability)).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(lastModified)).as(ContentTypes.withCharset(ContentTypeDiscoveryDocument))
+      case Failure(e) =>
+        ServiceUnavailable(e.getMessage())
     }
-    result
   }
 
   def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry])(implicit request: RequestHeader): xml.Elem = {
@@ -116,17 +117,14 @@ trait DiscoveryService {
         }
       }
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
-      <other>
-        { if (!reachabilityEntries.isEmpty) {
-            <gns:TopologyReachability>
-              { reachabilityEntries.map { entry =>
-                  <Topology id={ entry.id } cost={ entry.cost.toString } />
-                }
-              }
-            </gns:TopologyReachability>
-          }
-        }
-      </other>
+      { if (!reachabilityEntries.isEmpty) {
+        <other>
+          <gns:TopologyReachability>
+            { reachabilityEntries.map(entry => <Topology id={ entry.id } cost={ entry.cost.toString } />) }
+          </gns:TopologyReachability>
+        </other>
+      }
+    }
     </nsa:nsa>
   }
 }

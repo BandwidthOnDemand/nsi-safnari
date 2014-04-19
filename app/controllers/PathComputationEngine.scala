@@ -32,18 +32,13 @@ object PathComputationEngine extends Controller {
     }
   }
 
-  def pceRequester: ActorRef = {
-    current.configuration.getString("pce.actor") match {
-      case None | Some("dummy") => Akka.system.actorOf(Props[DummyPceRequesterActor])
-      case _                    => Akka.system.actorOf(Props(new PceRequesterActor(Configuration.PceEndpoint)))
-    }
-  }
+  def pceRequester: ActorRef = Akka.system.actorFor("user/pceRequester")
+  //def pceRequester: ActorSelection = Akka.system.actorSelection("user/pceRequester")
 
   class PceRequesterActor(endPoint: String) extends Actor {
     private val uuidGenerator = Uuid.randomUuidGenerator()
     private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
-    private var latestReachabilityEntries: Seq[ReachabilityTopologyEntry] = Nil
-    private var lastChanged: DateTime = _
+    private val latestReachabilityEntries: LastModifiedCache[Seq[ReachabilityTopologyEntry]] = new LastModifiedCache()
 
     def receive = {
       case 'healthCheck =>
@@ -62,13 +57,18 @@ object PathComputationEngine extends Controller {
 
         reachabilityResponse.onComplete {
           case Success(response) =>
-            val reachability = (response.json \ "reachability").validate[Seq[ReachabilityTopologyEntry]].fold(error => { Logger.error(""); Nil }, identity)
-            if (latestReachabilityEntries != reachability){
-              lastChanged = DateTime.now()
-              latestReachabilityEntries = reachability;
+            val result = (response.json \ "reachability").validate[Seq[ReachabilityTopologyEntry]] match {
+              case JsSuccess(reachability, _) =>
+                Success(latestReachabilityEntries.updateAndGet(reachability))
+              case JsError(e) =>
+                Logger.error(s"Failed to parse reachability from the pce: $e")
+                latestReachabilityEntries.get.toTry(new RuntimeException("Could not parse reachability"))
             }
-            senderRef ! ((latestReachabilityEntries, lastChanged))
-          case Failure(e) => ???
+
+            senderRef ! result
+          case Failure(e) =>
+            Logger.error("Failed to retrieve reachability from the pce", e)
+            senderRef ! latestReachabilityEntries.get.toTry(e)
         }
 
       case ToPce(request) =>
@@ -97,20 +97,42 @@ object PathComputationEngine extends Controller {
             connection ! Connection.Command(new Instant(), AckFromPce(PceFailed(request.correlationId, response.status, response.statusText, response.body)))
         }
     }
+
+    class LastModifiedCache[T] {
+      private var subject: Option[T] = None
+      private var date: DateTime = _
+
+      def get: Option[(T, DateTime)] = subject.map((_, date))
+
+      def updateAndGet(newSubject: T): (T, DateTime) = {
+        subject.fold {
+          subject = Some(newSubject)
+          date = DateTime.now()
+        } { s =>
+          if (s != newSubject) {
+            subject = Some(newSubject)
+            date = DateTime.now()
+          }
+        }
+
+        get.get
+      }
+    }
   }
 
   class DummyPceRequesterActor extends Actor {
+    private val Reachability = (
+      List(
+        ReachabilityTopologyEntry("urn:ogf:network:surfnet.nl:1990:nsa:bod-dev", 0),
+        ReachabilityTopologyEntry("urn:ogf:network:es.net:2013:nsa:oscars", 3)),
+      DateTime.now())
+
     def receive = {
       case 'healthCheck =>
         sender ! Future.successful("PCE (Dummy)" -> true)
 
       case 'reachability =>
-        val reachability =
-          ReachabilityTopologyEntry("urn:ogf:network:surfnet.nl:1990:nsa:bod-dev", 0) ::
-          ReachabilityTopologyEntry("urn:ogf:network:es.net:2013:nsa:oscars", 3) ::
-          Nil
-        val result = (reachability, DateTime.now())
-        sender ! result
+        sender ! Success(Reachability)
 
       case ToPce(pce: PathComputationRequest) =>
         Connection(sender) ! Connection.Command(new Instant(),

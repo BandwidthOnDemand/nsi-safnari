@@ -10,11 +10,15 @@ import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 import play.api.{ Application => PlayApp }
+import akka.actor.Props
+import controllers.PathComputationEngine.DummyPceRequesterActor
+import controllers.PathComputationEngine.PceRequesterActor
 
 trait GlobalSettings extends play.api.GlobalSettings {
   private var connectionManager: ConnectionManager = _
 
   override def onStart(app: PlayApp): Unit = {
+    createPceRequesterActor(app)
     connectionManager = new ConnectionManager(ConnectionProvider.connectionFactory)(app)
     if (app.configuration.getBoolean("clean.db.on.start") getOrElse false) {
       cleanDatabase(app)
@@ -22,6 +26,12 @@ trait GlobalSettings extends play.api.GlobalSettings {
 
     restoreConnectionsFromDatabase(app)
   }
+
+  def createPceRequesterActor(implicit app: PlayApp): Unit =
+    app.configuration.getString("pce.actor") match {
+      case None | Some("dummy") => Akka.system.actorOf(Props[DummyPceRequesterActor], "pceRequester")
+      case _                    => Akka.system.actorOf(Props(new PceRequesterActor(Configuration.PceEndpoint)), "pceRequester")
+    }
 
   override def onStop(app: PlayApp): Unit = {
     if (app.configuration.getBoolean("clean.db.on.stop") getOrElse false) {
