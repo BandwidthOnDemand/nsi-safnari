@@ -18,7 +18,7 @@ import scala.util.{ Success, Failure }
 object PathComputationEngine extends Controller {
   private val pceContinuations = new Continuations[PceResponse](Akka.system.scheduler)
 
-  def pceReplyUrl: String = s"http://localhost:9000${routes.PathComputationEngine.pceReply().url}"
+  def pceReplyUrl: String = s"${Configuration.BaseUrl}${routes.PathComputationEngine.pceReply().url}"
 
   def pceReply = Action(parse.json) { implicit request =>
     Json.fromJson[PceResponse](request.body) match {
