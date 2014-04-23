@@ -39,7 +39,7 @@ object Configuration {
     current.configuration.getString(ConfigUtil.joinPath("nsi", "tlsmap", provider.nsa)) match {
       case Some(hostAndPort) =>
         val splitted = hostAndPort.split(":")
-        new URI("http", "", splitted(0), Integer.parseInt(splitted(1)), provider.url.getPath, provider.url.getQuery, provider.url.getFragment)
+        new URI("http", null, splitted(0), Integer.parseInt(splitted(1)), provider.url.getPath, provider.url.getQuery, provider.url.getFragment)
       case None =>
         throw new IllegalArgumentException(s"No stunnel detour configured for NSA ${provider.nsa} while TLS was enabled.")
     }
