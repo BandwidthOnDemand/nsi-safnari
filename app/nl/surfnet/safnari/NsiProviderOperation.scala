@@ -7,7 +7,7 @@ import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 sealed trait NsiProviderOperation {
   def action: String = this.getClass().getSimpleName()
   final def soapActionUrl: String = {
-    s"http://schemas.ogf.org/nsi/2013/07/connection/service/${action.uncapitalize}"
+    s"http://schemas.ogf.org/nsi/2013/12/connection/service/${action.uncapitalize}"
   }
 }
 
