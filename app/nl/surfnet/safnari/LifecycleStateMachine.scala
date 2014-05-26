@@ -77,8 +77,10 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
         .withConnectionId(connectionId)
         .withNotificationId(newNotificationId())
         .withTimeStamp(original.error.getTimeStamp())
-        .withAdditionalInfo(original.error.getAdditionalInfo())
-        .withEvent(EventEnumType.FORCED_END))
+        .withEvent(EventEnumType.FORCED_END)
+        .withOriginatingConnectionId(original.error.getOriginatingConnectionId())
+        .withOriginatingNSA(original.error.getOriginatingNSA())
+        .withAdditionalInfo(original.error.getAdditionalInfo()))
       if (original.error.getServiceException() ne null) {
         event.error.withServiceException(new ServiceExceptionType()
           .withConnectionId(connectionId)

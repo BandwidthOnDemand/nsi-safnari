@@ -252,7 +252,7 @@ class ReservationStateMachine(
         .withNotificationId(newNotificationId())
         .withTimeStamp(timeout.getTimeStamp())
         .withTimeoutValue(timeout.getTimeoutValue())
-        .withOriginatingConnectionId(timeout.getConnectionId())
+        .withOriginatingConnectionId(timeout.getOriginatingConnectionId())
         .withOriginatingNSA(timeout.getOriginatingNSA())))
     case CommittingReservationState -> ReservedReservationState =>
       respond(ReserveCommitConfirmed(id))

@@ -76,7 +76,22 @@ class ConnectionEntitySpec extends helpers.Specification {
         case other: InboundMessage =>
           processInbound(message).right.toOption
       }
-      response.tap(_.foreach(messages = _))
+      response.tap(_.foreach { outbound =>
+        // Validate outbound messages against XML schema.
+        outbound.foreach {
+          case ToRequester(msg) =>
+            import NsiSoapConversions._
+            val conversion = NsiRequesterMessageToDocument(None)(NsiRequesterOperationToElement) andThen NsiXmlDocumentConversion
+            conversion.apply(msg).get
+          case ToProvider(msg, _) =>
+            import NsiSoapConversions._
+            val conversion = NsiProviderMessageToDocument(None)(NsiProviderOperationToElement) andThen NsiXmlDocumentConversion
+            conversion.apply(msg).get
+          case ToPce(msg) =>
+            // No schema to validate against.
+        }
+        messages = outbound
+      })
     }
 
     def connectionData = connection.query
@@ -345,7 +360,10 @@ class ConnectionEntitySpec extends helpers.Specification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
           pce.confirm(CorrelationId(0, 3), A, B),
-          upa.error(CorrelationId(0, 4), new ServiceExceptionType().withText("communication error")))
+          upa.error(CorrelationId(0, 4), new ServiceExceptionType()
+            .withNsaId("ConnectionId")
+            .withErrorId("ErrorId")
+            .withText("communication error")))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
 
@@ -415,11 +433,18 @@ class ConnectionEntitySpec extends helpers.Specification {
           pce.confirm(CorrelationId(0, 3), A),
           upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
 
-        when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType().withConnectionId("ConnectionIdA"))))
+        when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
+          .withConnectionId("ConnectionIdA")
+          .withNotificationId(32L)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+          .withOriginatingConnectionId("OriginatingConnectionId")
+          .withOriginatingNSA("OriginatingNSA"))))
 
         messages must contain(agg.response(ReserveCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
           .withConnectionId(ConnectionId)
-          .withOriginatingConnectionId("ConnectionIdA")
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+          .withOriginatingConnectionId("OriginatingConnectionId")
+          .withOriginatingNSA("OriginatingNSA")
           .withNotificationId(1))))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
@@ -654,7 +679,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId("ConnectionIdA")
         .withDataPlaneStatus(dataPlaneStatusType(true))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00")))))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
 
       dataPlaneStatus.isActive() must beTrue
       dataPlaneStatus.isVersionConsistent() must beTrue
@@ -662,7 +687,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         agg.notification(CorrelationId(0, 10), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
           .withConnectionId(ConnectionId)
           .withNotificationId(1)
-          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00"))
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
           .withDataPlaneStatus(dataPlaneStatusType(true)))))
     }
 
@@ -670,7 +695,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId("ConnectionIdA")
         .withDataPlaneStatus(dataPlaneStatusType(true))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00")))))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
 
       dataPlaneStatus.isActive() must beFalse
       messages must beEmpty
@@ -678,13 +703,13 @@ class ConnectionEntitySpec extends helpers.Specification {
       when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId("ConnectionIdB")
         .withDataPlaneStatus(dataPlaneStatusType(true))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:10")))))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:10:00Z")))))
 
       dataPlaneStatus.isActive() must beTrue
       messages must contain(agg.notification(CorrelationId(0, 15), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId(ConnectionId)
         .withNotificationId(1)
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:10"))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:10:00Z"))
         .withDataPlaneStatus(dataPlaneStatusType(true)))))
     }
 
@@ -692,12 +717,12 @@ class ConnectionEntitySpec extends helpers.Specification {
       given(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId("ConnectionIdA")
         .withDataPlaneStatus(dataPlaneStatusType(true))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:00")))))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
 
       when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId("ConnectionIdA")
         .withDataPlaneStatus(dataPlaneStatusType(false))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:15")))))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z")))))
 
       dataPlaneStatus.isActive() must beFalse
       dataPlaneStatus.isVersionConsistent() must beTrue
@@ -705,7 +730,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         agg.notification(CorrelationId(0, 12), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
           .withConnectionId(ConnectionId)
           .withNotificationId(2)
-          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09-11:15"))
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z"))
           .withDataPlaneStatus(dataPlaneStatusType(false)))))
     }
 
@@ -724,6 +749,8 @@ class ConnectionEntitySpec extends helpers.Specification {
         .withNotificationId(4)
         .withTimeStamp(TimeStamp)
         .withEvent(EventEnumType.FORCED_END)
+        .withOriginatingConnectionId("OriginatingConnectionId")
+        .withOriginatingNSA("OriginatingNSA")
         .withServiceException(ChildException))))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.FAILED)
@@ -733,6 +760,8 @@ class ConnectionEntitySpec extends helpers.Specification {
         .withNotificationId(1)
         .withTimeStamp(TimeStamp)
         .withEvent(EventEnumType.FORCED_END)
+        .withOriginatingConnectionId("OriginatingConnectionId")
+        .withOriginatingNSA("OriginatingNSA")
         .withServiceException(new ServiceExceptionType()
           .withConnectionId("ConnectionId")
           .withNsaId(AggregatorNsa)
@@ -810,12 +839,16 @@ class ConnectionEntitySpec extends helpers.Specification {
         .withConnectionId("ConnectionIdA")
         .withNotificationId(12)
         .withEvent(EventEnumType.DATAPLANE_ERROR)
+        .withOriginatingConnectionId("OriginatingConnectionId")
+        .withOriginatingNSA("OriginatingNSA")
         .withTimeStamp(TimeStamp))))
 
       messages must contain(agg.notification(CorrelationId(0, 8), ErrorEvent(new ErrorEventType()
         .withConnectionId(ConnectionId)
         .withNotificationId(1)
         .withEvent(EventEnumType.DATAPLANE_ERROR)
+        .withOriginatingConnectionId("OriginatingConnectionId")
+        .withOriginatingNSA("OriginatingNSA")
         .withTimeStamp(TimeStamp))))
     }
 
@@ -832,6 +865,8 @@ class ConnectionEntitySpec extends helpers.Specification {
         .withConnectionId("ConnectionIdA")
         .withNotificationId(12)
         .withEvent(EventEnumType.DATAPLANE_ERROR)
+        .withOriginatingConnectionId("OriginatingConnectionId")
+        .withOriginatingNSA("OriginatingNSA")
         .withTimeStamp(TimeStamp)
         .withServiceException(ChildException))))
 
@@ -839,6 +874,8 @@ class ConnectionEntitySpec extends helpers.Specification {
         .withConnectionId(ConnectionId)
         .withNotificationId(1)
         .withEvent(EventEnumType.DATAPLANE_ERROR)
+        .withOriginatingConnectionId("OriginatingConnectionId")
+        .withOriginatingNSA("OriginatingNSA")
         .withTimeStamp(TimeStamp)
         .withServiceException(new ServiceExceptionType()
           .withConnectionId(ConnectionId)

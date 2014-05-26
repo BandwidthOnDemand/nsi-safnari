@@ -206,6 +206,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         .withNotificationId(newNotificationId())
         .withTimeStamp(error.error.getTimeStamp())
         .withEvent(error.error.getEvent())
+        .withOriginatingConnectionId(error.error.getOriginatingConnectionId())
+        .withOriginatingNSA(error.error.getOriginatingNSA())
         .withAdditionalInfo(error.error.getAdditionalInfo()))
       if (error.error.getServiceException() ne null) {
         event.error.withServiceException(new ServiceExceptionType()
