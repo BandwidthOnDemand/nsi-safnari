@@ -9,10 +9,10 @@
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- daily rollover -->
-            <fileNamePattern>/logs/application.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${application.home}/logs/application.%d{yyyy-MM-dd}.log</fileNamePattern>
 
-            <!-- keep 30 days' worth of history -->
-            <maxHistory>30</maxHistory>
+            <!-- keep 90 days worth of history -->
+            <maxHistory>90</maxHistory>
         </rollingPolicy>
     </appender>
 
