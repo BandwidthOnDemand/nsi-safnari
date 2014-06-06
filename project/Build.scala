@@ -28,6 +28,7 @@ object ApplicationBuild extends Build {
   val main = play.Project(appName, appVersion, appDependencies,
     settings = play.Project.playScalaSettings ++ buildInfoSettings
   ).settings(
+    shellPrompt := { _ => "> " },
     organization := "nl.surfnet.bod",
     scalaVersion := "2.10.4",
     scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Xlint"),
