@@ -52,7 +52,7 @@ object PathComputationEngine extends Controller {
         sender ! healthy.flatMap(h => lastModified.map(d => s"PCE (Real; $d)" -> h))
 
       case 'reachability =>
-        val reachabilityResponse = WS.url(s"$endPoint/reachability").withHeaders(ACCEPT -> JSON).get()
+        val reachabilityResponse = WS.url(s"$endPoint/reachability").withRequestTimeout(20000).withHeaders(ACCEPT -> JSON).get()
         val senderRef = sender
 
         reachabilityResponse.onComplete {

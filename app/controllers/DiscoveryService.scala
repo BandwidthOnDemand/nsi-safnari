@@ -21,7 +21,7 @@ import scala.util.Failure
 trait DiscoveryService {
   this: Controller =>
 
-  implicit val timeout = Timeout(2.seconds)
+  implicit val timeout = Timeout(30.seconds)
   implicit def actorSystem = Akka.system
 
   private val startTime = DateTime.now
