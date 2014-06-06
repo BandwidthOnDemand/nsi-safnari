@@ -30,6 +30,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     val ConnectionId = "ConnectionId"
     val ReserveCorrelationId = newCorrelationId
     val CommitCorrelationId = newCorrelationId
+    val AbortCorrelationId = CommitCorrelationId
 
     val NsiReplyToUri = URI.create("http://example.com/nsi/requester")
     val PceReplyToUri = URI.create("http://example.com/pce/reply")
@@ -97,6 +98,8 @@ class ConnectionEntitySpec extends helpers.Specification {
     def connectionData = connection.query
     def segments = connection.segments
 
+    def childConnectionData(childConnectionId: ConnectionId): ConnectionData = segments.find(_.connectionId == Some(childConnectionId)).getOrElse(failure(s"no child data for $childConnectionId"))
+
     def reservationState = connectionData.getConnectionStates().getReservationState()
     def provisionState = connectionData.getConnectionStates().getProvisionState()
     def lifecycleState = connectionData.getConnectionStates().getLifecycleState()
@@ -112,7 +115,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       upa.response(CorrelationId(0, 6), ReserveCommitConfirmed("ConnectionIdA")))
   }
 
-  abstract class ReservedConnectionWithTwoSegments extends fixture {
+  abstract class ReserveHeldConnectionWithTwoSegments extends fixture {
     given(
       ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
       pce.confirm(CorrelationId(0, 1), A, B),
@@ -120,8 +123,11 @@ class ConnectionEntitySpec extends helpers.Specification {
       upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
       upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")),
       upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)),
-      upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)),
+      upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
+  }
 
+  abstract class ReservedConnectionWithTwoSegments extends ReserveHeldConnectionWithTwoSegments {
+    given(
       ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)),
       upa.response(CorrelationId(0, 8), ReserveCommitConfirmed("ConnectionIdA")),
       upa.response(CorrelationId(0, 9), ReserveCommitConfirmed("ConnectionIdB")))
@@ -493,7 +499,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     }
 
     "in reserve aborting state" should {
-      "be in reserve aborted state when reserve abort confirm is received" in new fixture {
+      "be in reserve start state when reserve abort confirm is received" in new fixture {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
           pce.confirm(CorrelationId(0, 1), A),
@@ -503,6 +509,22 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 6), ReserveAbortConfirmed("ConnectionIdA")))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+        messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) }
+        childConnectionData("ConnectionIdA").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+      }
+
+      "be in reserve start state when reserve abort confirm is received from two two children" in new ReserveHeldConnectionWithTwoSegments {
+        given(ura.request(AbortCorrelationId, ReserveAbort(ConnectionId)))
+
+        when(upa.response(CorrelationId(0, 8), ReserveAbortConfirmed("ConnectionIdA")))
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
+        childConnectionData("ConnectionIdA").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+        childConnectionData("ConnectionIdB").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
+
+        when(upa.response(CorrelationId(0, 9), ReserveAbortConfirmed("ConnectionIdB")))
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+        childConnectionData("ConnectionIdA").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+        childConnectionData("ConnectionIdB").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
         messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) }
       }
     }

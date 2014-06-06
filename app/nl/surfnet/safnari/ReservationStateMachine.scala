@@ -178,7 +178,7 @@ class ReservationStateMachine(
   when(AbortingReservationState) {
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveAbortConfirmed)), data) if data.childHasState(message.connectionId, AbortingReservationState) =>
       val newData = data.updateChild(message.connectionId, AbortedReservationState)
-      goto(newData.aggregatedReservationState)
+      goto(newData.aggregatedReservationState) using newData
   }
 
   when(TimeoutReservationState) {
