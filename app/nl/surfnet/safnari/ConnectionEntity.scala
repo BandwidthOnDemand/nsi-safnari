@@ -181,7 +181,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
           committedCriteria = Some(initialReserve.body.criteria)
           otherStateMachines = Some((
             new ProvisionStateMachine(id, newNsiHeaders, children),
-            new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children),
+            new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, rsm.children),
             new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children)))
       }
     }

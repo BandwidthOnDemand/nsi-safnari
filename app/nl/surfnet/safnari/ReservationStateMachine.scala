@@ -268,6 +268,7 @@ class ReservationStateMachine(
       respond(ReserveAbortConfirmed(id))
   }
 
+  def children = stateData.children
   def childConnectionStateByInitialCorrelationId(correlationId: CorrelationId): ReservationStateEnumType = {
     stateData.childConnectionStates.getOrElse(correlationId, CheckingReservationState).jaxb
   }

@@ -5,7 +5,7 @@ import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 case class LifecycleStateMachineData(
-  children: Map[ConnectionId, ProviderEndPoint],
+  children: ChildConnectionIds,
   childConnectionStates: Map[ConnectionId, LifecycleStateEnumType],
   command: Option[NsiProviderMessage[NsiProviderOperation]] = None,
   errorEvent: Option[ErrorEvent] = None) {
@@ -27,8 +27,8 @@ case class LifecycleStateMachineData(
     childConnectionStates.getOrElse(connectionId, CREATED) == state
 }
 
-class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, newNotifyHeaders: () => NsiHeaders, newNotificationId: () => Int, children: Map[ConnectionId, ProviderEndPoint])
-  extends FiniteStateMachine[LifecycleStateEnumType, LifecycleStateMachineData, InboundMessage, OutboundMessage](CREATED, new LifecycleStateMachineData(children, children.map(_._1 -> CREATED))) {
+class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, newNotifyHeaders: () => NsiHeaders, newNotificationId: () => Int, children: ChildConnectionIds)
+  extends FiniteStateMachine[LifecycleStateEnumType, LifecycleStateMachineData, InboundMessage, OutboundMessage](CREATED, new LifecycleStateMachineData(children, children.connectionByInitialCorrelationId.map(_._2 -> CREATED))) {
 
   when(CREATED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
@@ -64,7 +64,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   onTransition {
     case (CREATED | FAILED | PASSED_END_TIME) -> TERMINATING =>
-      stateData.children.map {
+      stateData.children.childrenByConnectionId.map {
         case (connectionId, provider) =>
           ToProvider(NsiProviderMessage(newNsiHeaders(provider), Terminate(connectionId)), provider)
       }.toVector
