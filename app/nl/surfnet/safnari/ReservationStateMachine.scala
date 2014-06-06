@@ -25,13 +25,21 @@ case class ReservationStateMachineData(
   description: Option[String],
   criteria: ReservationConfirmCriteriaType,
   segments: Vector[(CorrelationId, ComputedSegment)] = Vector.empty,
-  connectionByInitialCorrelationId: Map[CorrelationId, ConnectionId] = Map.empty,
+  children: ChildConnectionIds = ChildConnectionIds(),
   awaitingReserveReply: Set[CorrelationId] = Set.empty,
-  initialCorrelationIdByConnectionId: Map[ConnectionId, CorrelationId] = Map.empty,
   childConnectionStates: Map[CorrelationId, ReservationState] = Map.empty,
   childExceptions: Map[CorrelationId, ServiceExceptionType] = Map.empty,
   childTimeouts: Map[CorrelationId, ReserveTimeoutRequestType] = Map.empty,
   pceError: Option[NsiError] = None) {
+
+  def receivedSegments(segments: Seq[(CorrelationId, ComputedSegment)]) =
+    copy(
+      segments = segments.toVector,
+      children = children.withChildren(segments.map { case (cid, segment) => cid -> segment.provider }(collection.breakOut)),
+      awaitingReserveReply = segments.map(_._1).toSet)
+
+  def connectionByInitialCorrelationId = children.connectionByInitialCorrelationId
+  def initialCorrelationIdByConnectionId = children.initialCorrelationIdByConnectionId
 
   def aggregatedReservationState: ReservationState =
     if (awaitingReserveReply.isEmpty && childConnectionStates.isEmpty) CheckingReservationState
@@ -49,11 +57,7 @@ case class ReservationStateMachineData(
 
   def receivedReserveReply(correlationId: CorrelationId) = copy(awaitingReserveReply = awaitingReserveReply - correlationId)
 
-  def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = {
-    copy(
-      connectionByInitialCorrelationId = connectionByInitialCorrelationId.updated(correlationId, connectionId),
-      initialCorrelationIdByConnectionId = initialCorrelationIdByConnectionId.updated(connectionId, correlationId))
-  }
+  def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = copy(children = children.receivedConnectionId(correlationId, connectionId))
 
   def updateChild(connectionId: ConnectionId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None, childTimeout: Option[ReserveTimeoutRequestType] = None): ReservationStateMachineData  = {
     val correlationId = initialCorrelationIdByConnectionId.getOrElse(connectionId, throw new IllegalStateException(s"Unknown child connectionId $connectionId: $initialCorrelationIdByConnectionId"))
@@ -120,7 +124,7 @@ class ReservationStateMachine(
   when(PathComputationState) {
     case Event(FromPce(message: PathComputationConfirmed), data) =>
       val segments = message.segments.map(newCorrelationId() -> _)
-      goto(CheckingReservationState) using data.copy(segments = segments.toVector, awaitingReserveReply = segments.map(_._1).toSet)
+      goto(CheckingReservationState) using data.receivedSegments(segments)
     case Event(FromPce(message: PathComputationFailed), _) =>
       goto(FailedReservationState)
     case Event(AckFromPce(failure: PceFailed), data) =>
