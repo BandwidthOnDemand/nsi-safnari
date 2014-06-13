@@ -776,7 +776,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         .withServiceException(ChildException))))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.FAILED)
-      connection.lsm.get.childConnectionState("ConnectionIdA") must beEqualTo(LifecycleStateEnumType.FAILED)
+      connection.lsm.childConnectionState("ConnectionIdA") must beEqualTo(LifecycleStateEnumType.FAILED)
       messages must contain(agg.notification(CorrelationId(0, 9), ErrorEvent(new ErrorEventType()
         .withConnectionId("ConnectionId")
         .withNotificationId(1)
