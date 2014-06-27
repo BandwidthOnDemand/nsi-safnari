@@ -705,6 +705,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
       dataPlaneStatus.isActive() must beTrue
       dataPlaneStatus.isVersionConsistent() must beTrue
+      dataPlaneStatus.getVersion() must beEqualTo(ConfirmedCriteriaVersion)
       messages must contain(
         agg.notification(CorrelationId(0, 10), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
           .withConnectionId(ConnectionId)
@@ -933,5 +934,5 @@ class ConnectionEntitySpec extends helpers.Specification {
 
   }
 
-  private def dataPlaneStatusType(active: Boolean) = new DataPlaneStatusType().withActive(active).withVersion(0).withVersionConsistent(true)
+  private def dataPlaneStatusType(active: Boolean) = new DataPlaneStatusType().withActive(active).withVersion(ConfirmedCriteriaVersion).withVersionConsistent(true)
 }

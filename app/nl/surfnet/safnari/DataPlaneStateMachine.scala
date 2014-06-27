@@ -14,7 +14,7 @@ case class DataPlaneStateMachineData(providers: Map[ConnectionId, ProviderEndPoi
   }
 }
 
-class DataPlaneStateMachine(connectionId: ConnectionId, newNotificationHeaders: () => NsiHeaders, newNotificationId: () => Int, children: Map[ConnectionId, ProviderEndPoint])
+class DataPlaneStateMachine(connectionId: ConnectionId, newNotificationHeaders: () => NsiHeaders, newNotificationId: () => Int, currentVersion: () => Int, children: Map[ConnectionId, ProviderEndPoint])
   extends FiniteStateMachine[Boolean, DataPlaneStateMachineData, InboundMessage, OutboundMessage](false, DataPlaneStateMachineData(children, children.map(_._1 -> false), None)) {
 
   when(false)(PartialFunction.empty)
@@ -31,11 +31,11 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newNotificationHeaders: 
       Seq(ToRequester(NsiRequesterMessage(newNotificationHeaders(), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId(connectionId)
         .withNotificationId(newNotificationId())
-        .withDataPlaneStatus(new DataPlaneStatusType().withVersion(0).withActive(nextStateName).withVersionConsistent(true))
+        .withDataPlaneStatus(new DataPlaneStatusType().withVersion(currentVersion()).withActive(nextStateName).withVersionConsistent(true))
         .withTimeStamp(nextStateData.timeStamp.get)))))
   }
 
-  def dataPlaneStatus(version: Int) = new DataPlaneStatusType().withVersion(version).withActive(stateName).withVersionConsistent(true)
+  def dataPlaneStatus = new DataPlaneStatusType().withVersion(currentVersion()).withActive(stateName).withVersionConsistent(true)
 
   def childConnectionState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }

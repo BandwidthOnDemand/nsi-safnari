@@ -182,12 +182,14 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
           otherStateMachines = Some((
             new ProvisionStateMachine(id, newNsiHeaders, children),
             new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children),
-            new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children)))
+            new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, currentVersion, children)))
       }
     }
 
     output
   }
+
+  private def currentVersion() = rsm.version
 
   private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(aggregatorNsa)
 
@@ -268,12 +270,11 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def connectionStates: ConnectionStatesType = {
-    val version = rsm.version
     new ConnectionStatesType()
       .withReservationState(rsm.reservationState)
       .withProvisionState(psm.map(_.provisionState).getOrElse(ProvisionStateEnumType.RELEASED))
       .withLifecycleState(lsm.map(_.lifecycleState).getOrElse(LifecycleStateEnumType.CREATED))
-      .withDataPlaneStatus(dsm.map(_.dataPlaneStatus(version)).getOrElse(new DataPlaneStatusType()))
+      .withDataPlaneStatus(dsm.map(_.dataPlaneStatus).getOrElse(new DataPlaneStatusType()))
   }
 
   def segments: Seq[ConnectionData] = rsm.childConnections.map {
