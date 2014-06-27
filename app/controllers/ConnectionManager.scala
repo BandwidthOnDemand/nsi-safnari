@@ -290,6 +290,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
         val message = Connection.Command(endTime.toInstant, PassedEndTime(newPassedEndTimeCorrelationId, connection.id, new DateTime(endTime)))
         Logger.debug(s"Scheduling $message for execution after $delay")
         context.system.scheduler.scheduleOnce(delay) {
+          Logger.debug(s"Sending scheduled message $message")
           self ! message
         }(context.dispatcher)
       })

@@ -88,6 +88,30 @@ class NsiSoapConversionsSpec extends helpers.Specification {
       requesterMessage must beSuccessfulTry
     }
 
+    "parse terminateConfirmed operation" in {
+      val message =
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Header>
+            <ns7:nsiHeader xmlns:ns8="http://schemas.ogf.org/nsi/2013/12/services/point2point" xmlns:ns7="http://schemas.ogf.org/nsi/2013/12/framework/headers" xmlns:ns6="http://schemas.ogf.org/nsi/2013/12/framework/types" xmlns:ns5="http://schemas.ogf.org/nsi/2013/12/connection/types" xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#" xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion">
+            <protocolVersion>application/vdn.ogf.nsi.cs.v2.provider+soap</protocolVersion>
+            <correlationId>urn:uuid:65697f03-ec46-470d-8c4a-c28739cc863e</correlationId>
+            <requesterNSA>urn:ogf:network:es.net:2013:nsa:nsi-aggr-west</requesterNSA>
+            <providerNSA>urn:ogf:network:manlan.internet2.edu</providerNSA>
+            <replyTo>https://oscars.bldc.manlan.internet2.edu:8500//ConnectionService</replyTo>
+          </ns7:nsiHeader>
+        </soap:Header>
+        <soap:Body>
+          <ns5:terminateConfirmed xmlns:ns2="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:ns3="http://www.w3.org/2001/04/xmlenc#" xmlns:ns4="http://www.w3.org/2000/09/xmldsig#" xmlns:ns5="http://schemas.ogf.org/nsi/2013/12/connection/types" xmlns:ns6="http://schemas.ogf.org/nsi/2013/12/framework/types" xmlns:ns7="http://schemas.ogf.org/nsi/2013/12/framework/headers" xmlns:ns8="http://schemas.ogf.org/nsi/2013/12/services/point2point">
+            <connectionId>urn:uuid:a46f19fa-fd4d-4bc5-ad68-390604bcf6fa</connectionId>
+          </ns5:terminateConfirmed>
+        </soap:Body>
+      </soap:Envelope>.toString
+
+      val requesterMessage = requestOperationToStringConversion.invert(message)
+
+      requesterMessage must beSuccessfulTry
+    }
+
     "parse SOAP fault without serviceException" in {
       val soapFault =
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">

@@ -49,12 +49,12 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   when(FAILED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
-      goto(TERMINATING) using (data.copy(command = Some(message)))
+      goto(TERMINATING) using (data.startCommand(message, TERMINATING))
   }
 
   when(PASSED_END_TIME) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
-      goto(TERMINATING) using (data.copy(command = Some(message)))
+      goto(TERMINATING) using (data.startCommand(message, TERMINATING))
   }
 
   whenUnhandled {

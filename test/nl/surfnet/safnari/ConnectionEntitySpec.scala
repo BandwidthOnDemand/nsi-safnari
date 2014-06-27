@@ -147,6 +147,29 @@ class ConnectionEntitySpec extends helpers.Specification {
       upa.response(CorrelationId(0, 8), ProvisionConfirmed("ConnectionIdA")))
   }
 
+  trait DataPlaneActive { this: ReservedConnection =>
+    given(
+      upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+        .withConnectionId("ConnectionIdA")
+        .withDataPlaneStatus(dataPlaneStatusType(true))
+        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
+  }
+
+  trait PassedEndTime { this: ReservedConnection =>
+    DateTimeUtils.setCurrentMillisFixed(schedule.endTime.get.getMillis)
+    given(PassedEndTime(CorrelationId(3, 0), connection.id, schedule.endTime.get))
+  }
+
+  trait Failed { this: ReservedConnection =>
+    val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+
+    given(upa.notification(newCorrelationId, ErrorEvent(new ErrorEventType()
+      .withConnectionId("ConnectionIdA")
+      .withNotificationId(4)
+      .withTimeStamp(TimeStamp)
+      .withEvent(EventEnumType.FORCED_END))))
+  }
+
   trait ProvisionedSegments { this: ReservedConnectionWithTwoSegments =>
     val ProvisionCorrelationId = newCorrelationId
 
@@ -509,8 +532,9 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 6), ReserveAbortConfirmed("ConnectionIdA")))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
-        messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) }
         childConnectionData("ConnectionIdA").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+
+        messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) }
       }
 
       "be in reserve start state when reserve abort confirm is received from two two children" in new ReserveHeldConnectionWithTwoSegments {
@@ -525,6 +549,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
         childConnectionData("ConnectionIdA").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
         childConnectionData("ConnectionIdB").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
+
         messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) }
       }
     }
@@ -553,6 +578,123 @@ class ConnectionEntitySpec extends helpers.Specification {
         committed.getServiceType() must beEqualTo(RequestCriteria.getServiceType())
         committed.getChildren().getChild() must haveSize(1)
       }
+
+      "be in terminating state when terminate is received" in new ReservedConnection {
+        val TerminateCorrelationId = newCorrelationId
+
+        when(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        childConnectionData("ConnectionIdA").lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 8)), Terminate("ConnectionIdA")), A.provider))
+      }
+
+      "be in terminating state when terminate is received (multi segment)" in new ReservedConnectionWithTwoSegments {
+        val TerminateCorrelationId = newCorrelationId
+
+        when(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        childConnectionData("ConnectionIdA").lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+        childConnectionData("ConnectionIdB").lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        messages must contain(exactly[Message](
+            ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 11)), Terminate("ConnectionIdA")), A.provider),
+            ToProvider(NsiProviderMessage(toProviderHeaders(B.provider, CorrelationId(0, 12)), Terminate("ConnectionIdB")), B.provider)))
+      }
+    }
+
+    "in provisioned state" should {
+      "have data plane active when data plane state change is received" in new ReservedConnection with Provisioned {
+        when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+          .withConnectionId("ConnectionIdA")
+          .withDataPlaneStatus(dataPlaneStatusType(true))
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
+
+        dataPlaneStatus.isActive() must beTrue
+        dataPlaneStatus.isVersionConsistent() must beTrue
+        dataPlaneStatus.getVersion() must beEqualTo(ConfirmedCriteriaVersion)
+
+        messages must contain(
+          agg.notification(CorrelationId(0, 10), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+            .withConnectionId(ConnectionId)
+            .withNotificationId(1)
+            .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+            .withDataPlaneStatus(dataPlaneStatusType(true)))))
+      }
+
+      "have data plane active when data plane state change is received (multi segement)" in new ReservedConnectionWithTwoSegments with ProvisionedSegments {
+        when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+          .withConnectionId("ConnectionIdA")
+          .withDataPlaneStatus(dataPlaneStatusType(true))
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
+
+        dataPlaneStatus.isActive() must beFalse
+        messages must beEmpty
+
+        when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+          .withConnectionId("ConnectionIdB")
+          .withDataPlaneStatus(dataPlaneStatusType(true))
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:10:00Z")))))
+
+        dataPlaneStatus.isActive() must beTrue
+        messages must contain(agg.notification(CorrelationId(0, 15), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+          .withConnectionId(ConnectionId)
+          .withNotificationId(1)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:10:00Z"))
+          .withDataPlaneStatus(dataPlaneStatusType(true)))))
+      }
+
+      "be in terminating state when terminate is received" in new ReservedConnection with Provisioned with DataPlaneActive {
+        val TerminateCorrelationId = newCorrelationId
+
+        when(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        childConnectionData("ConnectionIdA").lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 12)), Terminate("ConnectionIdA")), A.provider))
+      }
+    }
+
+    "in terminating state" should {
+      "send a terminate confirmed to requester when terminate confirmed is received" in new ReservedConnection {
+        val TerminateCorrelationId = newCorrelationId
+
+        given(
+          ura.request(TerminateCorrelationId, Terminate(ConnectionId)),
+          upa.acknowledge(CorrelationId(0, 8), GenericAck()))
+
+        when(upa.response(CorrelationId(0, 8), TerminateConfirmed("ConnectionIdA")))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
+        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(TerminateCorrelationId), TerminateConfirmed(ConnectionId))))
+      }
+
+      "send a terminate confirmed to requester when terminate confirmed for each segment is received" in new ReservedConnectionWithTwoSegments {
+        val TerminateCorrelationId = newCorrelationId
+
+        given(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
+
+        when(upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA")))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
+        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok }
+        messages must beEmpty
+
+        when(upa.response(CorrelationId(0, 12), TerminateConfirmed("ConnectionIdB")))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
+        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
+        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
+        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(TerminateCorrelationId), TerminateConfirmed(ConnectionId))))
+      }
+
     }
 
     "be in released state when initial reserve" in new fixture {
@@ -572,11 +714,31 @@ class ConnectionEntitySpec extends helpers.Specification {
 
     "in released state" should {
       "become provisioning on provision request" in new ReservedConnection with Released {
-        val ProvisionCorrelationId = newCorrelationId
-
-        when(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
+        when(ura.request(newCorrelationId, Provision(ConnectionId)))
 
         messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 8)), Provision("ConnectionIdA")), A.provider))
+      }
+    }
+
+    "in passed end time state" should {
+      "be terminating when terminate request is received" in new ReservedConnection with PassedEndTime {
+        when(ura.request(newCorrelationId, Terminate(ConnectionId)))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+        childConnectionData("ConnectionIdA").lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 8)), Terminate("ConnectionIdA")), A.provider))
+      }
+    }
+
+    "in failed state" should {
+      "be terminating when terminate request is received" in new ReservedConnection with Failed {
+        when(ura.request(newCorrelationId, Terminate(ConnectionId)))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+        childConnectionData("ConnectionIdA").lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 11)), Terminate("ConnectionIdA")), A.provider))
       }
     }
 
@@ -651,89 +813,8 @@ class ConnectionEntitySpec extends helpers.Specification {
       ack must beNone
     }
 
-    "become terminating on terminate request" in new ReservedConnection {
-      val TerminateCorrelationId = newCorrelationId
-
-      when(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
-
-      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-      messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 8)), Terminate("ConnectionIdA")), A.provider))
-    }
-
-    "send a terminate confirmed to requester" in new ReservedConnection {
-      val TerminateCorrelationId = newCorrelationId
-
-      given(
-        ura.request(TerminateCorrelationId, Terminate(ConnectionId)),
-        upa.acknowledge(CorrelationId(0, 8), GenericAck()))
-
-      when(upa.response(CorrelationId(0, 8), TerminateConfirmed("ConnectionIdA")))
-
-      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(TerminateCorrelationId), TerminateConfirmed(ConnectionId))))
-    }
-
-    "send a terminate for a multi segment reservation" in new ReservedConnectionWithTwoSegments {
-      val TerminateCorrelationId = newCorrelationId
-
-      given(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
-
-      when(upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA")))
-
-      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok }
-      messages must beEmpty
-
-      when(upa.response(CorrelationId(0, 12), TerminateConfirmed("ConnectionIdB")))
-
-      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
-      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(TerminateCorrelationId), TerminateConfirmed(ConnectionId))))
-    }
-
     "have a data plane inactive" in new ReservedConnection with Provisioned {
       dataPlaneStatus.isActive() must beFalse
-    }
-
-    "have a data plane active on data plane change" in new ReservedConnection with Provisioned {
-      when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
-        .withConnectionId("ConnectionIdA")
-        .withDataPlaneStatus(dataPlaneStatusType(true))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
-
-      dataPlaneStatus.isActive() must beTrue
-      dataPlaneStatus.isVersionConsistent() must beTrue
-      dataPlaneStatus.getVersion() must beEqualTo(ConfirmedCriteriaVersion)
-      messages must contain(
-        agg.notification(CorrelationId(0, 10), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
-          .withConnectionId(ConnectionId)
-          .withNotificationId(1)
-          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
-          .withDataPlaneStatus(dataPlaneStatusType(true)))))
-    }
-
-    "have a data plane active on data plane change of all segments" in new ReservedConnectionWithTwoSegments with ProvisionedSegments {
-      when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
-        .withConnectionId("ConnectionIdA")
-        .withDataPlaneStatus(dataPlaneStatusType(true))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
-
-      dataPlaneStatus.isActive() must beFalse
-      messages must beEmpty
-
-      when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
-        .withConnectionId("ConnectionIdB")
-        .withDataPlaneStatus(dataPlaneStatusType(true))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:10:00Z")))))
-
-      dataPlaneStatus.isActive() must beTrue
-      messages must contain(agg.notification(CorrelationId(0, 15), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
-        .withConnectionId(ConnectionId)
-        .withNotificationId(1)
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:10:00Z"))
-        .withDataPlaneStatus(dataPlaneStatusType(true)))))
     }
 
     "have a data plane inactive on data plane change" in new ReservedConnection with Provisioned {
@@ -794,24 +875,6 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withChildException(ChildException)))))
     }
 
-    "become terminating on terminate after failed" in new ReservedConnection {
-      val ProviderErrorEventCorrelationId = newCorrelationId
-      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
-
-      given(upa.notification(ProviderErrorEventCorrelationId, ErrorEvent(new ErrorEventType()
-        .withConnectionId("ConnectionIdA")
-        .withNotificationId(4)
-        .withTimeStamp(TimeStamp)
-        .withEvent(EventEnumType.FORCED_END))))
-
-      val TerminateCorrelationId = newCorrelationId
-
-      when(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
-
-      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-      messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 11)), Terminate("ConnectionIdA")), A.provider))
-    }
-
     "become PassedEndTime on PassedEndTime event" in new ReservedConnection {
       DateTimeUtils.setCurrentMillisFixed(schedule.endTime.get.getMillis)
 
@@ -826,16 +889,6 @@ class ConnectionEntitySpec extends helpers.Specification {
       when(PassedEndTime(CorrelationId(3, 0), connection.id, schedule.endTime.get))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.CREATED)
-    }
-
-    "become terminating on terminate after PassedEndTime" in new ReservedConnection {
-      DateTimeUtils.setCurrentMillisFixed(schedule.endTime.get.getMillis)
-      given(PassedEndTime(CorrelationId(3, 0), connection.id, schedule.endTime.get))
-
-      when(ura.request(CorrelationId(1, 0), Terminate(ConnectionId)))
-
-      lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-      messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 7)), Terminate("ConnectionIdA")), A.provider))
     }
 
     "pass MessageDeliveryTimeout notifications to requester" in new ReservedConnection {
