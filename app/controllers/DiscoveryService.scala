@@ -108,9 +108,18 @@ trait DiscoveryService {
           case _ =>
         }
       }
+      { Configuration.DdsUrl match {
+          case Some(url) =>
+            <interface>
+              <type>application/vnd.ogf.nsi.dds.v1+xml</type>
+              <href>{ url }</href>
+            </interface>
+          case _ =>
+        }
+      }
       <interface>
         <type>application/vnd.org.ogf.nsi.cs.v2+soap</type>
-        <href> { providerUrl }</href>
+        <href>{ providerUrl }</href>
       </interface>
       { if (Configuration.NetworkId.isDefined) {
           <feature type="vnd.ogf.nsi.cs.v2.role.uPA"/>
