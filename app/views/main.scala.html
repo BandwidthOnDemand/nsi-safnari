@@ -1,4 +1,4 @@
-@(title: String, activeMenu: String)(content: Html)
+@(title: String, activeMenu: String, footer: Map[String,String])(content: Html)
 
 @menus = @{
   List(
@@ -37,7 +37,7 @@
             @content
             <footer>
                 <div class="content-some-dense">
-                    SURFnet bv | Postbus 19035, 3501 DA Utrecht | T +31 302 305 305 | F +31 302 305 329 | <a href="mailto:admin@@surfnet.nl">admin@@surfnet.nl</a><br/>
+                    @footer.get("footer") <a href="@footer.get("contactURL")">@footer.get("contactText")</a><br/>
                 </div>
             </footer>
         </div>

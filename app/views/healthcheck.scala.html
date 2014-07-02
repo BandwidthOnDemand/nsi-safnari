@@ -1,6 +1,6 @@
-@(serviceStates: Map[String, Boolean], version: String)
+@(serviceStates: Map[String, Boolean], version: String, footer: Map[String,String])
 
-@main("Healthcheck", "healthcheck") {
+@main("Healthcheck", "healthcheck", footer) {
     <div class="modal modal-relative">
         <div class="modal-header">
             <h3>Health Check <span class="header-right">@version</span></h3>

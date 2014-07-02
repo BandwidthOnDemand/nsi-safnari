@@ -1,9 +1,9 @@
-@(secure: Boolean, nsaId: String)(implicit request: play.api.mvc.RequestHeader)
+@(secure: Boolean, nsaId: String, footer: Map[String,String])(implicit request: play.api.mvc.RequestHeader)
 
 @providerWsdl = { @routes.ConnectionProvider.wsdl("").absoluteURL(secure) }
 @requesterWsdl = { @routes.ConnectionRequester.wsdl("").absoluteURL(secure) }
 
-@main("Welcome to the NSI Safnari", "usage") {
+@main("Welcome to the NSI Safnari", "usage", footer) {
     <section>
         <h1>Welcome</h1>
         <div class="content">

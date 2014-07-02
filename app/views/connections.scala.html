@@ -1,8 +1,8 @@
-@(connections: Seq[(org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType, Seq[nl.surfnet.safnari.ConnectionData])])
+@(connections: Seq[(org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType, Seq[nl.surfnet.safnari.ConnectionData])], footer: Map[String,String])
 
 @import nl.surfnet.safnari._
 
-@main("Connections", "connections") {
+@main("Connections", "connections", footer) {
 <section>
     <h1>Connections <span class="header-right">filtered: end time no older than a week</span></h1>
     <div class="content">

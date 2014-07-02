@@ -24,6 +24,9 @@ object Configuration {
   lazy val PceAlgorithm: PathComputationAlgorithm = current.configuration.getString("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
   lazy val PceEndpoint = getStringOrFail("pce.endpoint")
 
+  // Web page footer information for main.scala.html.
+  lazy val WebFooter: Map[String,String] = Map("footer" -> getStringOrFail("web.footer"), "contactURL" -> getStringOrFail("web.contactURL"), "contactText" -> getStringOrFail("web.contactText"))
+
   def ConnectionExpirationTime = readFiniteDuration("safnari.connection.expiration.time")
 
   def BaseUrl = getStringOrFail("nsi.base.url")

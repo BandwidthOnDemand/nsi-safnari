@@ -12,12 +12,13 @@ thead { background-color: @grayDark; }
 
 header {
     position: relative;
-    padding-left: 155px;
-    background: url("../images/logo.png") 10px 10px no-repeat;
+    padding-left: @titlePaddingLeft;
+    background: url(@titleImage) @titleHz @titleVr no-repeat;
 
     h1 {
-        padding-top: 30px;
+        padding-top: @titlePaddingTop;
         font-weight: normal;
+        color: @titleTextColour;
     }
 
     a {
