@@ -21,7 +21,7 @@ class Application(connectionManager: ConnectionManager) extends Controller {
 
   def index = Action { implicit request =>
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
-    Ok(views.html.index(secure, Configuration.NsaId, Configuration.WebFooter))
+    Ok(views.html.index(secure, Configuration.NsaId, Configuration.WebParams))
   }
 
   def healthcheck = Action.async {
@@ -29,7 +29,7 @@ class Application(connectionManager: ConnectionManager) extends Controller {
     val nsiHealth = (ConnectionRequester.nsiRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
 
     Future.sequence(List(nsiHealth, pceHealth)) map { healthStates =>
-      val view = views.html.healthcheck(healthStates.toMap, Configuration.VersionString, Configuration.WebFooter)
+      val view = views.html.healthcheck(healthStates.toMap, Configuration.VersionString, Configuration.WebParams)
 
       if (healthStates forall { case (_, healthy) => healthy })
         Ok(view)
@@ -54,7 +54,7 @@ class Application(connectionManager: ConnectionManager) extends Controller {
           case (criteria, _, _) => Option(criteria.getSchedule().getStartTime())
         }
 
-      Ok(views.html.connections(connections.reverse, Configuration.WebFooter))
+      Ok(views.html.connections(connections.reverse, Configuration.WebParams))
     }
   }
 
@@ -63,7 +63,7 @@ class Application(connectionManager: ConnectionManager) extends Controller {
     connectionManager.get(id).map { c =>
       connectionDetails(c) map { case (criteria, summary, segments) =>
         val messages = connectionManager.messageStore.loadAll(id)
-        Ok(views.html.connection(criteria, summary, segments, messages, Configuration.WebFooter))
+        Ok(views.html.connection(criteria, summary, segments, messages, Configuration.WebParams))
       }
     }.getOrElse {
       Future.successful(NotFound(s"Connection ($id) was not found"))

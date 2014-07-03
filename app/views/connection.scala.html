@@ -1,4 +1,4 @@
-@(criteria: org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, connection: org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType, segments: Seq[nl.surfnet.safnari.ConnectionData], messages: Seq[nl.surfnet.safnari.MessageRecord[nl.surfnet.safnari.Message]], footer: Map[String,String])
+@(criteria: org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, connection: org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType, segments: Seq[nl.surfnet.safnari.ConnectionData], messages: Seq[nl.surfnet.safnari.MessageRecord[nl.surfnet.safnari.Message]], webParams: Map[String,String])
 
 @import nl.surfnet.safnari._
 @import nl.surfnet.safnari.NsiSoapConversions._
@@ -34,7 +34,7 @@
   <pre class="prettyprint">@body</pre>
 }
 
-@main(s"Connection ${id()}", "connections", footer) {
+@main(s"Connection ${id()}", "connections", webParams) {
 
     <section id="connection">
         <h1>Connection @id()</h1>

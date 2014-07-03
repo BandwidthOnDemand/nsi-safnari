@@ -1,4 +1,4 @@
-@(title: String, activeMenu: String, footer: Map[String,String])(content: Html)
+@(title: String, activeMenu: String, webParams: Map[String,String])(content: Html)
 
 @menus = @{
   List(
@@ -15,7 +15,7 @@
         <link rel="stylesheet" media="screen" href="@routes.Assets.at("css/font-awesome.min.css")">
         <link rel="stylesheet" media="screen" href="@routes.Assets.at("css/main.min.css")">
         <link rel="stylesheet" media="screen" href="@routes.Assets.at("css/prettify.css")">
-        <link rel="shortcut icon" type="image/png" href="@routes.Assets.at("images/favicon.png")">
+        <link rel="shortcut icon" type="image/png" href="@routes.Assets.at(webParams("favicon"))">
     </head>
     <body>
         <div class="wrapper">
@@ -37,7 +37,7 @@
             @content
             <footer>
                 <div class="content-some-dense">
-                    @footer.get("footer") <a href="@footer.get("contactURL")">@footer.get("contactText")</a><br/>
+                    @webParams("footer") <a href="@webParams("contactURL")">@webParams("contactText")</a><br/>
                 </div>
             </footer>
         </div>

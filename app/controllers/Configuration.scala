@@ -25,7 +25,7 @@ object Configuration {
   lazy val PceEndpoint = getStringOrFail("pce.endpoint")
 
   // Web page footer information for main.scala.html.
-  lazy val WebFooter: Map[String,String] = Map("footer" -> getStringOrFail("web.footer"), "contactURL" -> getStringOrFail("web.contactURL"), "contactText" -> getStringOrFail("web.contactText"))
+  lazy val WebParams: Map[String,String] = Map("favicon" -> getStringOrFail("web.favicon"), "footer" -> getStringOrFail("web.footer"), "contactURL" -> getStringOrFail("web.contactURL"), "contactText" -> getStringOrFail("web.contactText"))
 
   def ConnectionExpirationTime = readFiniteDuration("safnari.connection.expiration.time")
 
