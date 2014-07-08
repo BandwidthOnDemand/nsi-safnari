@@ -1,3 +1,4 @@
+@import "variables.less";
 @import "layout.less";
 @import "generic.less";
 @import "bootstrap-navbar.less";
@@ -19,11 +20,39 @@
     .time {
         float: right;
         font-weight: normal;
-        color: #DC322F;
+        color: @messageTime;
         font-size: 0.8em;
     }
 }
 
 #connection {
     padding-bottom: 1px;
+}
+
+.lit, .atn { color: #195f91; }
+.com, .pun, .opn, .clo { color: #93a1a1; }
+.pln, .fun { color: @messageElementContent; }
+.str { color: #D14; }
+.kwd, .linenums .tag { color: @messageNsTag; }
+.tag, .typ, .dec, .var { color: @messageElementTag; }
+.atv { color: @messageNsContents; }
+
+.xml-content {
+    background-color: #ffffff;
+    border: 1px solid #BFBFBF;
+    padding-top: 1.5em;
+    margin-bottom: 20px;
+}
+
+.xml-content .message {
+    padding: .4em 40px;
+    margin-bottom: 1em;
+    background-color: @messageHeader;
+}
+
+.prettyprint {
+    background-color: #ffffff;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 0;
 }
