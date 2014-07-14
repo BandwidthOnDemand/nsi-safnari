@@ -178,6 +178,22 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         ack must beNone
       }
+
+      "terminate immediately when no child connections have been reserved yet" in new fixture {
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
+
+        when(ura.request(CorrelationId(2, 1), Terminate(ConnectionId)))
+
+        messages must haveSize(1)
+        messages must haveOneElementLike {
+          case ToRequester(NsiRequesterMessage(_, _: TerminateConfirmed)) => ok
+        }
+        lifecycleState must_== LifecycleStateEnumType.TERMINATED
+
+        when(pce.confirm(CorrelationId(0, 1), A))
+
+        messages must haveSize(0)
+      }
     }
 
     "in path computation state" should {

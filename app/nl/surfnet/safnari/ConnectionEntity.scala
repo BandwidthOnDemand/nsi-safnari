@@ -100,14 +100,18 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       case _ =>
     }
 
-    val outputs = stateMachines(message).flatMap { stateMachine =>
-      applyMessageToStateMachine(stateMachine, message)
-    }
+    if (lsm.lifecycleState == LifecycleStateEnumType.TERMINATED) {
+      Left(messageNotApplicable(message))
+    } else {
+      val outputs = stateMachines(message).flatMap { stateMachine =>
+        applyMessageToStateMachine(stateMachine, message)
+      }
 
-    if (outputs.isEmpty)
-      handleUnhandledProviderNotifications(message).toRight(messageNotApplicable(message))
-    else
-      Right(outputs.flatten)
+      if (outputs.isEmpty)
+        handleUnhandledProviderNotifications(message).toRight(messageNotApplicable(message))
+      else
+        Right(outputs.flatten)
+    }
   }
 
   def process(message: OutboundMessage): Unit = message match {

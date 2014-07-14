@@ -40,7 +40,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   extends FiniteStateMachine[LifecycleStateEnumType, LifecycleStateMachineData, InboundMessage, OutboundMessage](CREATED, LifecycleStateMachineData()) {
 
   when(CREATED) {
-    case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
+    case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) if children.childConnections.nonEmpty =>
       goto(TERMINATING) using data.startCommand(message, TERMINATING, children).copy(sendTerminateRequest = children.childrenByConnectionId)
     case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.error.getEvent() == EventEnumType.FORCED_END =>
       goto(FAILED) using data.updateChild(errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
@@ -73,6 +73,8 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   }
 
   whenUnhandled {
+    case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) if children.childConnections.isEmpty =>
+      goto(TERMINATED) using data.copy(command = Some(message))
     case Event(AckFromProvider(NsiProviderMessage(headers, ReserveResponse(connectionId))), data) =>
       stay using data.updateChild(connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
     case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveConfirmed)), data) =>
@@ -91,8 +93,8 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
         case (connectionId, provider) =>
           ToProvider(NsiProviderMessage(newNsiHeaders(provider), Terminate(connectionId)), provider)
       }.toVector
-    case TERMINATING -> TERMINATED =>
-      Seq(ToRequester(stateData.command.get reply TerminateConfirmed(connectionId)))
+    case (CREATED | FAILED | PASSED_END_TIME | TERMINATING) -> TERMINATED =>
+      Seq(ToRequester(nextStateData.command.get reply TerminateConfirmed(connectionId)))
     case CREATED -> FAILED =>
       val original = nextStateData.errorEvent.get
       val headers = newNotifyHeaders()
