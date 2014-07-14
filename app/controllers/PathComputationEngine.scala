@@ -7,7 +7,6 @@ import org.joda.time.DateTime
 import org.joda.time.Instant
 import play.api.Logger
 import play.api.Play.current
-import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
 import play.api.libs.ws.WS
@@ -15,8 +14,10 @@ import play.api.mvc._
 import scala.concurrent.Future
 import scala.util.{ Success, Failure }
 
+import controllers.ActorSupport._
+
 object PathComputationEngine extends Controller {
-  private val pceContinuations = new Continuations[PceResponse](Akka.system.scheduler)
+  private val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
 
   def pceReplyUrl: String = s"${Configuration.BaseUrl}${routes.PathComputationEngine.pceReply().url}"
 
@@ -32,7 +33,7 @@ object PathComputationEngine extends Controller {
     }
   }
 
-  def pceRequester: ActorRef = Akka.system.actorFor("user/pceRequester")
+  def pceRequester: ActorRef = actorSystem.actorFor("user/pceRequester")
   //def pceRequester: ActorSelection = Akka.system.actorSelection("user/pceRequester")
 
   class PceRequesterActor(endPoint: String) extends Actor {

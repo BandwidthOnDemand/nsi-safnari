@@ -2,7 +2,6 @@ package controllers
 
 import akka.actor._
 import akka.pattern.ask
-import akka.util.Timeout
 import java.net.URI
 import java.util.concurrent.TimeoutException
 import nl.surfnet.safnari._
@@ -12,16 +11,16 @@ import org.ogf.schemas.nsi._2013._12.connection.types.MessageDeliveryTimeoutRequ
 import org.ogf.schemas.nsi._2013._12.connection.types.QueryRecursiveResultType
 import play.api.Logger
 import play.api.Play.current
-import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc.Controller
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
+
+import controllers.ActorSupport._
 import support.ExtraBodyParsers._
 
+
 class ConnectionRequester(connectionManager: ConnectionManager) extends Controller with SoapWebService {
-  implicit val timeout = Timeout(2.seconds)
 
   val BaseWsdlFilename = "ogf_nsi_connection_requester_v2_0.wsdl"
 
@@ -45,15 +44,13 @@ class ConnectionRequester(connectionManager: ConnectionManager) extends Controll
 }
 
 object ConnectionRequester {
-  implicit def actorSystem = Akka.system
-
   def serviceUrl: String = s"${Configuration.BaseUrl}${routes.ConnectionRequester.request().url}"
   val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
   def nsiRequester: ActorRef =
     current.configuration.getString("nsi.actor") match {
-      case None | Some("dummy") => Akka.system.actorOf(Props[DummyNsiRequesterActor])
-      case _                    => Akka.system.actorOf(Props(new NsiRequesterActor(Configuration.NsaId, URI.create(serviceUrl))))
+      case None | Some("dummy") => actorSystem.actorOf(Props[DummyNsiRequesterActor])
+      case _                    => actorSystem.actorOf(Props(new NsiRequesterActor(Configuration.NsaId, URI.create(serviceUrl))))
     }
 
   class NsiRequesterActor(requesterNsa: String, requesterUrl: URI) extends Actor {

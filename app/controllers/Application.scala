@@ -2,7 +2,6 @@ package controllers
 
 import akka.actor.ActorRef
 import akka.pattern.ask
-import akka.util.Timeout
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType
@@ -12,13 +11,12 @@ import play.api._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.sys.process._
 import play.api.http.HeaderNames.X_FORWARDED_PROTO
 
-class Application(connectionManager: ConnectionManager) extends Controller {
-  implicit val timeout = Timeout(2.seconds)
+import controllers.ActorSupport._
 
+class Application(connectionManager: ConnectionManager) extends Controller {
   def index = Action { implicit request =>
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
     Ok(views.html.index(secure, Configuration.NsaId, Configuration.WebParams))

@@ -45,7 +45,7 @@ object NsiWebService {
 
     val providerUrl = if (Configuration.Use2WayTLS) Configuration.translateToStunnelAddress(provider) else provider.url
 
-    val request = WS.url(providerUrl.toASCIIString()).withSoapActionHeader(soapAction)
+    val request = WS.url(providerUrl.toASCIIString()).withRequestTimeout(20000).withSoapActionHeader(soapAction)
 
     Logger.debug(s"Sending provider ${provider.nsa} at ${request.url} the SOAP message: ${Conversion[M[T], Document].andThen(Conversion[Document, String]).apply(message)}")
 

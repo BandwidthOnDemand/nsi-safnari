@@ -1,6 +1,5 @@
 package helpers
 
-import akka.util.Timeout
 import nl.surfnet.safnari.{ CorrelationId, Uuid }
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])

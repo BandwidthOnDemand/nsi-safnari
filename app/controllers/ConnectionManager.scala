@@ -13,10 +13,12 @@ import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import play.Logger
 import scala.concurrent._
-import scala.concurrent.duration.{ Duration, DurationLong }
+import scala.concurrent.duration._
 import scala.concurrent.stm._
 import scala.reflect.ClassTag
 import scala.util.{ Failure, Try }
+
+import controllers.ActorSupport._
 
 case class Connection(actor: ActorRef) {
   def !(operation: Connection.Operation): Unit = actor ! operation
@@ -63,8 +65,6 @@ object Connection {
 }
 
 class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity))(implicit app: play.api.Application) {
-  implicit val timeout = Timeout(2.seconds)
-
   private val connections = TMap.empty[ConnectionId, Connection]
   private val globalReservationIdsMap = TMap.empty[GlobalReservationId, Connection]
   private val connectionsByRequesterCorrelationId = TMap.empty[(RequesterNsa, CorrelationId), Connection]

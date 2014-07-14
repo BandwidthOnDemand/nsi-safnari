@@ -2,7 +2,6 @@ package controllers
 
 import akka.actor._
 import akka.pattern.ask
-import akka.util.Timeout
 import java.net.URI
 import nl.surfnet.safnari.NsiSoapConversions._
 import nl.surfnet.safnari._
@@ -10,17 +9,15 @@ import org.joda.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.Play._
 import play.api._
-import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
 
+import controllers.ActorSupport._
+
 class ConnectionProvider(connectionManager: ConnectionManager) extends Controller with SoapWebService {
-  implicit val timeout = Timeout(2.seconds)
-  implicit def actorSystem = Akka.system
 
   val BaseWsdlFilename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
@@ -133,8 +130,6 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
 }
 
 object ConnectionProvider {
-  implicit def actorSystem = Akka.system
-
   private val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
   def serviceUrl: String = s"${Configuration.BaseUrl}${routes.ConnectionProvider.request().url}"
@@ -147,7 +142,7 @@ object ConnectionProvider {
   }
 
   def outboundActor(initialReserve: NsiProviderMessage[InitialReserve]) =
-    Akka.system.actorOf(Props(new OutboundRoutingActor(ConnectionRequester.nsiRequester, PathComputationEngine.pceRequester, replyToClient(initialReserve.headers))))
+    actorSystem.actorOf(Props(new OutboundRoutingActor(ConnectionRequester.nsiRequester, PathComputationEngine.pceRequester, replyToClient(initialReserve.headers))))
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiNotification => Unit) extends Actor {
     def receive = {
