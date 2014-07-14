@@ -406,6 +406,65 @@ class ConnectionEntitySpec extends helpers.Specification {
         }
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
       }
+
+      "terminate the child connection when terminating and the child connectionId is received" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A, B),
+          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+
+        when(ura.request(CorrelationId(1, 0), Terminate(ConnectionId)))
+
+        messages must haveSize(1)
+        messages must haveOneElementLike {
+          case ToProvider(NsiProviderMessage(_, body: Terminate), _) =>
+            body.connectionId must_== "ConnectionIdA"
+        }
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
+
+        messages must haveSize(2)
+        messages must haveOneElementLike {
+          case ToRequester(NsiRequesterMessage(_, body: ReserveConfirmed)) =>
+            body.connectionId must_== "ConnectionId"
+        }
+        messages must haveOneElementLike {
+          case ToProvider(NsiProviderMessage(_, body: Terminate), _) =>
+            body.connectionId must_== "ConnectionIdB"
+        }
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+      }
+
+      "terminate the connection when first child connection is FORCED_END when second child connectionId is received" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A, B),
+          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)),
+          upa.notification(CorrelationId(1, 0), ErrorEvent(new ErrorEventType().withConnectionId("ConnectionIdA").withEvent(EventEnumType.FORCED_END))))
+
+        when(ura.request(CorrelationId(1, 0), Terminate(ConnectionId)))
+
+        messages must haveSize(1)
+        messages must haveOneElementLike {
+          case ToProvider(NsiProviderMessage(_, body: Terminate), _) =>
+            body.connectionId must_== "ConnectionIdA"
+        }
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+
+        when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
+
+        messages must haveSize(2)
+        messages must haveOneElementLike {
+          case ToRequester(NsiRequesterMessage(_, body: ReserveConfirmed)) =>
+            body.connectionId must_== "ConnectionId"
+        }
+        messages must haveOneElementLike {
+          case ToProvider(NsiProviderMessage(_, body: Terminate), _) =>
+            body.connectionId must_== "ConnectionIdB"
+        }
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+      }
     }
 
     "in reserve held state" should {

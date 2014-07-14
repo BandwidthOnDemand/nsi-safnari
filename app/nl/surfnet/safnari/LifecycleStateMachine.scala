@@ -7,10 +7,12 @@ import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 case class LifecycleStateMachineData(
   childConnectionStates: Map[ConnectionId, LifecycleStateEnumType] = Map.empty,
   command: Option[NsiProviderMessage[NsiProviderOperation]] = None,
-  errorEvent: Option[ErrorEvent] = None) {
+  errorEvent: Option[ErrorEvent] = None,
+  sendTerminateRequest: Map[ConnectionId, ProviderEndPoint] = Map.empty) {
 
   def aggregatedLifecycleStatus: LifecycleStateEnumType = {
     if (childConnectionStates.values.forall(_ == CREATED)) CREATED
+    else if (childConnectionStates.values.exists(_ == FAILED)) FAILED
     else if (childConnectionStates.values.exists(_ == TERMINATING)) TERMINATING
     else if (childConnectionStates.values.forall(_ == TERMINATED)) TERMINATED
     else throw new IllegalStateException(s"cannot determine aggregated status from ${childConnectionStates.values}")
@@ -26,12 +28,20 @@ case class LifecycleStateMachineData(
     childConnectionStates.getOrElse(connectionId, CREATED) == state
 }
 
+/**
+ * Implementation of the NSI v2.0 Lifecycle State Machine. The implementation
+ * is complicated by the fact that a `Terminate` request may be received
+ * before all the child connection ids are known.
+ *
+ * To deal with this we keep a special map in the data that contains the
+ * child connection ids that need a terminate request.
+ */
 class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, newNotifyHeaders: () => NsiHeaders, newNotificationId: () => Int, children: => ChildConnectionIds)
   extends FiniteStateMachine[LifecycleStateEnumType, LifecycleStateMachineData, InboundMessage, OutboundMessage](CREATED, LifecycleStateMachineData()) {
 
   when(CREATED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
-      goto(TERMINATING) using data.startCommand(message, TERMINATING, children)
+      goto(TERMINATING) using data.startCommand(message, TERMINATING, children).copy(sendTerminateRequest = children.childrenByConnectionId)
     case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.error.getEvent() == EventEnumType.FORCED_END =>
       goto(FAILED) using data.updateChild(errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
     case Event(PassedEndTime(_, _, _), data) =>
@@ -40,36 +50,44 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
 
   when(TERMINATING) {
     case Event(FromProvider(NsiRequesterMessage(headers, message: TerminateConfirmed)), data) if data.childHasState(message.connectionId, TERMINATING) =>
-      val newData = data.updateChild(message.connectionId, TERMINATED)
-      goto(newData.aggregatedLifecycleStatus) using (newData)
+      val newData = data.updateChild(message.connectionId, TERMINATED).copy(sendTerminateRequest = Map.empty)
+      goto(newData.aggregatedLifecycleStatus) using newData
+    case Event(AckFromProvider(NsiProviderMessage(headers, body: ReserveResponse)), data) =>
+      stay using data.updateChild(body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(connectionId)))
+    case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveConfirmed)), data) =>
+      stay using data.updateChild(body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(body.connectionId)))
+    case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveFailed)), data) =>
+      stay using data.updateChild(body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(body.connectionId)))
   }
 
   when(TERMINATED)(PartialFunction.empty)
 
   when(FAILED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
-      goto(TERMINATING) using (data.copy(command = Some(message)))
+      goto(TERMINATING) using data.copy(command = Some(message), sendTerminateRequest = children.childrenByConnectionId)
   }
 
   when(PASSED_END_TIME) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
-      goto(TERMINATING) using (data.copy(command = Some(message)))
+      goto(TERMINATING) using data.copy(command = Some(message), sendTerminateRequest = children.childrenByConnectionId)
   }
 
   whenUnhandled {
     case Event(AckFromProvider(NsiProviderMessage(headers, ReserveResponse(connectionId))), data) =>
-      stay using data.updateChild(connectionId, CREATED)
+      stay using data.updateChild(connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
     case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveConfirmed)), data) =>
-      stay using data.updateChild(body.connectionId, CREATED)
+      stay using data.updateChild(body.connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
     case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveFailed)), data) =>
-      stay using data.updateChild(body.connectionId, CREATED)
-    case Event(AckFromProvider(_), _)     => stay
-    case Event(PassedEndTime(_, _, _), _) => stay
+      stay using data.updateChild(body.connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
+    case Event(AckFromProvider(_), data) =>
+      stay using data.copy(sendTerminateRequest = Map.empty)
+    case Event(PassedEndTime(_, _, _), data) =>
+      stay using data.copy(sendTerminateRequest = Map.empty)
   }
 
   onTransition {
-    case (CREATED | FAILED | PASSED_END_TIME) -> TERMINATING =>
-      children.childrenByConnectionId.map {
+    case (CREATED | FAILED | PASSED_END_TIME | TERMINATING) -> TERMINATING =>
+      nextStateData.sendTerminateRequest.map {
         case (connectionId, provider) =>
           ToProvider(NsiProviderMessage(newNsiHeaders(provider), Terminate(connectionId)), provider)
       }.toVector
