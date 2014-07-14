@@ -283,8 +283,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     private def schedulePassedEndTimeMessage(): Unit = {
       endTimeCancellable.foreach(_.cancel())
       endTimeCancellable = (for {
-        lsm <- connection.lsm if lsm.lifecycleState == LifecycleStateEnumType.CREATED
         endTime <- connection.rsm.criteria.getSchedule().endTime
+        if connection.lsm.lifecycleState == LifecycleStateEnumType.CREATED
       } yield {
         val delay = (endTime.getMillis - DateTimeUtils.currentTimeMillis()).milliseconds
         val message = Connection.Command(endTime.toInstant, PassedEndTime(newPassedEndTimeCorrelationId, connection.id, new DateTime(endTime)))
@@ -298,7 +298,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
     private def scheduleExpiration(lastMessageTimestamp: Instant): Unit = {
       expirationCancellable.foreach(_.cancel())
-      expirationCancellable = if (connection.lsm.exists(_.lifecycleState == LifecycleStateEnumType.CREATED)) None else {
+      expirationCancellable = if (connection.psm.isDefined && connection.lsm.lifecycleState == LifecycleStateEnumType.CREATED) None else {
         val expirationTime = lastMessageTimestamp.plus(Configuration.ConnectionExpirationTime.toMillis)
         val delay = (expirationTime.getMillis() - DateTimeUtils.currentTimeMillis()).milliseconds
         val message = Connection.Delete
@@ -342,4 +342,3 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
   private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(Configuration.NsaId)
 }
-

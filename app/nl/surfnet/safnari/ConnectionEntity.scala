@@ -31,7 +31,9 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   private var mostRecentChildExceptions = Map.empty[ConnectionId, ServiceExceptionType]
   private var committedCriteria: Option[ReservationConfirmCriteriaType] = None
 
-  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, newCorrelationId, newNsiHeaders, newInitialReserveNsiHeaders, newNotificationId, pathComputationAlgorithm, { error =>
+  var children = ChildConnectionIds()
+
+  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, children, newCorrelationId, newNsiHeaders, newInitialReserveNsiHeaders, newNotificationId, pathComputationAlgorithm, { error =>
     new GenericFailedType().
       withConnectionId(id).
       withConnectionStates(connectionStates).
@@ -40,13 +42,13 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         withText(error.text).
         withNsaId(aggregatorNsa))
   })
+  val lsm = new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children)
 
   private val globalReservationId: Option[GlobalReservationId] = Try(URI.create(initialReserve.body.body.getGlobalReservationId())).toOption
 
-  private var otherStateMachines: Option[(ProvisionStateMachine, LifecycleStateMachine, DataPlaneStateMachine)] = None
+  private var otherStateMachines: Option[(ProvisionStateMachine, DataPlaneStateMachine)] = None
   def psm = otherStateMachines.map(_._1)
-  def lsm = otherStateMachines.map(_._2)
-  def dsm = otherStateMachines.map(_._3)
+  def dsm = otherStateMachines.map(_._2)
 
   private var providerConversations: Map[CorrelationId, FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = Map.empty
 
@@ -57,14 +59,14 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         case Right(globalReservationIds) => globalReservationIds.contains(globalReservationId)
       })
 
-      val done = rsm.childConnections.forall { case (_, _, connectionId) => connectionId.isDefined }
+      val done = children.childConnections.forall { case (_, _, connectionId) => connectionId.isDefined }
 
       val qrsm = new QueryRecursiveStateMachine(
         id,
         pm.asInstanceOf[NsiProviderMessage[QueryRecursive]],
         initialReserve,
         connectionStates,
-        rsm.childConnections.map { case (segment, _, id) => segment.provider -> id }.toMap,
+        children.childConnections.map { case (segment, _, id) => segment.provider -> id }.toMap,
         newCorrelationId,
         newNsiHeaders)
 
@@ -84,6 +86,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def process(message: InboundMessage): Either[ServiceExceptionType, Seq[OutboundMessage]] = {
+    children = children.update(message, newCorrelationId)
+
     message match {
       case AckFromProvider(NsiProviderMessage(_, ServiceException(exception))) =>
         Option(exception.getConnectionId()).foreach { connectionId =>
@@ -96,54 +100,18 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       case _ =>
     }
 
-    val stateMachine: Option[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
-      case FromRequester(NsiProviderMessage(_, _: InitialReserve)) => Some(rsm)
-      case FromRequester(NsiProviderMessage(_, _: ReserveCommit)) => Some(rsm)
-      case FromRequester(NsiProviderMessage(_, _: ReserveAbort)) => Some(rsm)
-      case FromRequester(NsiProviderMessage(_, _: Provision)) => psm
-      case FromRequester(NsiProviderMessage(_, _: Release)) => psm
-      case FromRequester(NsiProviderMessage(_, _: Terminate)) => lsm
-      case FromRequester(NsiProviderMessage(_, _)) => None
+    if (lsm.lifecycleState == LifecycleStateEnumType.TERMINATED) {
+      Left(messageNotApplicable(message))
+    } else {
+      val outputs = stateMachines(message).flatMap { stateMachine =>
+        applyMessageToStateMachine(stateMachine, message)
+      }
 
-      case FromPce(_) => Some(rsm)
-      case AckFromPce(_) => Some(rsm)
-
-      case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout)) => Some(rsm)
-      case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm
-      case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) if error.error.getEvent() == EventEnumType.FORCED_END =>
-        lsm
-      case FromProvider(NsiRequesterMessage(_, _: ErrorEvent))             => None
-      case FromProvider(NsiRequesterMessage(_, _: MessageDeliveryTimeout)) => None
-
-      case FromProvider(NsiRequesterMessage(headers, _)) =>
-        val stateMachine = providerConversations.get(headers.correlationId)
-        if (stateMachine.isEmpty) Logger.debug(s"No active conversation for reply ${message.toShortString}, one of ${providerConversations.keySet.mkString(", ")} expected")
-        providerConversations -= headers.correlationId
-        stateMachine
-
-      case AckFromProvider(NsiProviderMessage(headers, _)) =>
-        val stateMachine = providerConversations.get(headers.correlationId)
-        if (stateMachine.isEmpty) Logger.debug(s"No active conversation for ack ${message.toShortString}")
-        stateMachine
-
-      case _: MessageDeliveryFailure =>
-        None
-
-      case message: PassedEndTime =>
-        /*
-         * Only accept PassedEndTime messages that are at or after the scheduled end time.
-         * In some (rare) cases it may be possible to receive a scheduled PassedEndTime message
-         * earlier (e.g. when the end time is modified just as the scheduler sends a
-         * PassedEndTime message).
-         */
-        for {
-          lifecycleStateMachine <- lsm
-          scheduledEndTime <- rsm.criteria.getSchedule().endTime
-          if scheduledEndTime <= DateTime.now()
-        } yield lifecycleStateMachine
+      if (outputs.isEmpty)
+        handleUnhandledProviderNotifications(message).toRight(messageNotApplicable(message))
+      else
+        Right(outputs.flatten)
     }
-
-    stateMachine.flatMap(applyMessageToStateMachine(_, message)).orElse(handleUnhandledProviderNotifications(message)).toRight(messageNotApplicable(message))
   }
 
   def process(message: OutboundMessage): Unit = message match {
@@ -166,22 +134,80 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     case _ =>
   }
 
+  private def stateMachines(message: InboundMessage): List[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
+    case FromRequester(NsiProviderMessage(_, _: InitialReserve))       => List(rsm)
+    case FromRequester(NsiProviderMessage(_, _: ReserveCommit))        => List(rsm)
+    case FromRequester(NsiProviderMessage(_, _: ReserveAbort))         => List(rsm)
+    case FromRequester(NsiProviderMessage(_, _: Provision))            => psm.toList
+    case FromRequester(NsiProviderMessage(_, _: Release))              => psm.toList
+    case FromRequester(NsiProviderMessage(_, _: Terminate))            => List(lsm)
+    case FromRequester(NsiProviderMessage(_, _))                       => Nil
+
+    case FromPce(_)                                                    => List(rsm)
+    case AckFromPce(_)                                                 => List(rsm)
+
+    case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout))       => List(rsm)
+    case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm.toList
+    case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) if error.error.getEvent() == EventEnumType.FORCED_END =>
+      List(lsm)
+    case FromProvider(NsiRequesterMessage(_, _: ErrorEvent))             => Nil
+    case FromProvider(NsiRequesterMessage(_, _: MessageDeliveryTimeout)) => Nil
+
+    case FromProvider(NsiRequesterMessage(headers, body)) =>
+      val stateMachine = providerConversations.get(headers.correlationId)
+      providerConversations -= headers.correlationId
+      stateMachine match {
+        case None =>
+          Logger.debug(s"No active conversation for reply ${message.toShortString}, one of [${providerConversations.keySet.mkString(", ")}] expected")
+          Nil
+        case Some(sm) =>
+          List(sm) ++ (body match {
+            case _: ReserveConfirmed | _: ReserveFailed => List(lsm)
+            case _                                      => Nil
+          })
+      }
+
+    case AckFromProvider(NsiProviderMessage(headers, body)) =>
+      val stateMachine = providerConversations.get(headers.correlationId)
+      if (stateMachine.isEmpty) Logger.debug(s"No active conversation for ack ${message.toShortString}")
+      stateMachine match {
+        case None =>
+          Logger.debug(s"No active conversation for ack ${message.toShortString}, one of [${providerConversations.keySet.mkString(", ")}] expected")
+          Nil
+        case Some(sm) =>
+          List(sm) ++ (body match {
+            case _: ReserveResponse => List(lsm)
+            case _                  => Nil
+          })
+      }
+
+    case _: MessageDeliveryFailure =>
+      Nil
+
+    case message: PassedEndTime =>
+      /*
+         * Only accept PassedEndTime messages that are at or after the scheduled end time.
+         * In some (rare) cases it may be possible to receive a scheduled PassedEndTime message
+         * earlier (e.g. when the end time is modified just as the scheduler sends a
+         * PassedEndTime message).
+         */
+      if (rsm.criteria.getSchedule().endTime.exists(_ <= DateTime.now)) List(lsm) else Nil
+  }
+
   private def applyMessageToStateMachine(stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage], message: InboundMessage): Option[Seq[OutboundMessage]] = {
     val output = stateMachine.process(message)
-
     output.foreach { messages =>
       registerProviderConversations(messages, stateMachine)
 
       messages.collectFirst {
         case ToRequester(NsiRequesterMessage(_, _: ReserveCommitConfirmed)) =>
-          val children = rsm.childConnections.map {
+          val children = this.children.childConnections.map {
             case (segment, _, Some(connectionId)) => connectionId -> segment.provider
             case (segment, _, None)               => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
           }.toMap
           committedCriteria = Some(initialReserve.body.criteria)
           otherStateMachines = Some((
             new ProvisionStateMachine(id, newNsiHeaders, children),
-            new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children),
             new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, currentVersion, children)))
       }
     }
@@ -240,7 +266,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def query = {
-    lazy val children = rsm.childConnections.zipWithIndex.collect {
+    lazy val children = this.children.childConnections.zipWithIndex.collect {
       case ((segment, _, Some(id)), order) => new ChildSummaryType()
         .withConnectionId(id)
         .withProviderNSA(segment.provider.nsa)
@@ -272,17 +298,17 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   def connectionStates: ConnectionStatesType = {
     new ConnectionStatesType()
       .withReservationState(rsm.reservationState)
+      .withLifecycleState(lsm.lifecycleState)
       .withProvisionState(psm.map(_.provisionState).getOrElse(ProvisionStateEnumType.RELEASED))
-      .withLifecycleState(lsm.map(_.lifecycleState).getOrElse(LifecycleStateEnumType.CREATED))
       .withDataPlaneStatus(dsm.map(_.dataPlaneStatus).getOrElse(new DataPlaneStatusType()))
   }
 
-  def segments: Seq[ConnectionData] = rsm.childConnections.map {
+  def segments: Seq[ConnectionData] = children.childConnections.map {
     case (segment, correlationId, id) => ConnectionData(
       id,
       segment.provider.nsa,
       rsm.childConnectionStateByInitialCorrelationId(correlationId),
-      id.flatMap(id => lsm.map(_.childConnectionState(id))).getOrElse(LifecycleStateEnumType.CREATED),
+      id.map(id => lsm.childConnectionState(id)).getOrElse(LifecycleStateEnumType.CREATED),
       id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
       id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(false),
       id.flatMap(mostRecentChildExceptions.get))
