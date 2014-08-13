@@ -15,7 +15,7 @@ GET    /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequester.wsd
 
 GET    /nsi-v2/:wsdlOrXsd                   controllers.SoapWebService.wsdlOrXsd(wsdlOrXsd: String)
 
-GET    /nsa-discovery                       controllers.DiscoveryService.index
+GET    /nsa-discovery                       @controllers.DiscoveryService.index
 
 POST   /pce/reply                           controllers.PathComputationEngine.pceReply
 

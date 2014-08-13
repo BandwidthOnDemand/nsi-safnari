@@ -1,9 +1,9 @@
 package controllers
 
-import akka.actor._
-import akka.pattern.ask
 import java.net.URI
-import nl.surfnet.safnari.NsiSoapConversions._
+
+import akka.actor._
+import controllers.ActorSupport._
 import nl.surfnet.safnari._
 import org.joda.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types._
@@ -11,11 +11,10 @@ import play.api.Play._
 import play.api._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
-import scala.concurrent.Future
-import scala.util.{ Failure, Success }
 import support.ExtraBodyParsers._
 
-import controllers.ActorSupport._
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 class ConnectionProvider(connectionManager: ConnectionManager) extends Controller with SoapWebService {
 
@@ -134,15 +133,15 @@ object ConnectionProvider {
 
   def serviceUrl: String = s"${Configuration.BaseUrl}${routes.ConnectionProvider.request().url}"
 
-  def connectionFactory(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
-    val outbound = outboundActor(initialReserve)
+  def connectionFactory(createOutboundActor: NsiProviderMessage[InitialReserve] => ActorRef)(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
+    val outbound = createOutboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
     (outbound, new ConnectionEntity(connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), Configuration.NsaId, Configuration.PceAlgorithm, URI.create(ConnectionRequester.serviceUrl), URI.create(PathComputationEngine.pceReplyUrl)))
   }
 
-  def outboundActor(initialReserve: NsiProviderMessage[InitialReserve]) =
-    actorSystem.actorOf(Props(new OutboundRoutingActor(ConnectionRequester.nsiRequester, PathComputationEngine.pceRequester, replyToClient(initialReserve.headers))))
+  def outboundActor(nsiRequester: => ActorRef, pceRequester: ActorRef)(initialReserve: NsiProviderMessage[InitialReserve]) =
+    actorSystem.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester, replyToClient(initialReserve.headers))))
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiNotification => Unit) extends Actor {
     def receive = {

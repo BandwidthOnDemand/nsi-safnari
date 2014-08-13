@@ -1,24 +1,19 @@
 package controllers
 
-import org.joda.time.{ DateTime, DateTimeZone }
-import org.joda.time.format.DateTimeFormat
-import play.api.mvc._
-import play.api.http.ContentTypes
-import play.api.Play._
-import play.api.libs.concurrent.Execution.Implicits._
+import akka.actor.ActorRef
 import akka.pattern.ask
-import scala.Some
-import scala.util.control.NonFatal
-import scala.concurrent.Future
-import nl.surfnet.safnari.ReachabilityTopologyEntry
-import scala.util.Try
-import scala.util.Success
-import scala.util.Failure
-
 import controllers.ActorSupport._
+import nl.surfnet.safnari.ReachabilityTopologyEntry
+import org.joda.time.format.DateTimeFormat
+import org.joda.time.{DateTime, DateTimeZone}
+import play.api.http.ContentTypes
+import play.api.libs.concurrent.Execution.Implicits._
+import play.api.mvc._
 
-trait DiscoveryService {
-  this: Controller =>
+import scala.util.{Failure, Success, Try}
+import scala.util.control.NonFatal
+
+class DiscoveryService(pceRequester: ActorRef) extends Controller {
 
   private val startTime = DateTime.now
   private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v2+xml"
@@ -37,7 +32,7 @@ trait DiscoveryService {
       case NonFatal(_) => None
     }
 
-    (PathComputationEngine.pceRequester ? 'reachability).mapTo[Try[(Seq[ReachabilityTopologyEntry], DateTime)]] map {
+    (pceRequester ? 'reachability).mapTo[Try[(Seq[ReachabilityTopologyEntry], DateTime)]] map {
       case Success((reachability, lastModified)) =>
         val haveLatest = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).exists(ifModifiedSince => !ifModifiedSince.isBefore(lastModified.withMillisOfSecond(0)))
 
@@ -133,5 +128,3 @@ trait DiscoveryService {
     </nsa:nsa>
   }
 }
-
-object DiscoveryService extends Controller with DiscoveryService

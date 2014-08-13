@@ -10,16 +10,18 @@ import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 import play.api.{ Application => PlayApp }
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import controllers.PathComputationEngine.DummyPceRequesterActor
 import controllers.PathComputationEngine.PceRequesterActor
 
 trait GlobalSettings extends play.api.GlobalSettings {
   private var connectionManager: ConnectionManager = _
+  private var pceRequester: ActorRef = _
 
   override def onStart(app: PlayApp): Unit = {
-    createPceRequesterActor(app)
-    connectionManager = new ConnectionManager(ConnectionProvider.connectionFactory)(app)
+    pceRequester = createPceRequesterActor(app)
+    val createOutboundActor = ConnectionProvider.outboundActor(ConnectionRequester.nsiRequester, pceRequester) _
+    connectionManager = new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor))(app)
     if (app.configuration.getBoolean("clean.db.on.start") getOrElse false) {
       cleanDatabase(app)
     }
@@ -27,7 +29,7 @@ trait GlobalSettings extends play.api.GlobalSettings {
     restoreConnectionsFromDatabase(app)
   }
 
-  def createPceRequesterActor(implicit app: PlayApp): Unit =
+  def createPceRequesterActor(implicit app: PlayApp): ActorRef =
     app.configuration.getString("pce.actor") match {
       case None | Some("dummy") => Akka.system.actorOf(Props[DummyPceRequesterActor], "pceRequester")
       case _                    => Akka.system.actorOf(Props(new PceRequesterActor(Configuration.PceEndpoint)), "pceRequester")
@@ -40,7 +42,9 @@ trait GlobalSettings extends play.api.GlobalSettings {
   }
 
   override def getControllerInstance[A](controllerClass: Class[A]): A = {
-    controllerClass.getConstructors().head.newInstance(connectionManager).asInstanceOf[A]
+    (if (controllerClass == classOf[DiscoveryService]) new DiscoveryService(pceRequester)
+    else if (controllerClass == classOf[Application]) new Application(connectionManager, pceRequester)
+    else controllerClass.getConstructors().head.newInstance(connectionManager)).asInstanceOf[A]
   }
 
   private def restoreConnectionsFromDatabase(implicit app: PlayApp): Unit = {

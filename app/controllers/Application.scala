@@ -2,28 +2,22 @@ package controllers
 
 import akka.actor.ActorRef
 import akka.pattern.ask
+import controllers.ActorSupport._
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
-import org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType
-import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
-import play.api.Play.current
-import play.api._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
+
 import scala.concurrent.Future
-import scala.sys.process._
-import play.api.http.HeaderNames.X_FORWARDED_PROTO
 
-import controllers.ActorSupport._
-
-class Application(connectionManager: ConnectionManager) extends Controller {
+class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) extends Controller {
   def index = Action { implicit request =>
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
     Ok(views.html.index(secure, Configuration.NsaId, Configuration.WebParams))
   }
 
   def healthcheck = Action.async {
-    val pceHealth = (PathComputationEngine.pceRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
+    val pceHealth = (pceRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
     val nsiHealth = (ConnectionRequester.nsiRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
 
     Future.sequence(List(nsiHealth, pceHealth)) map { healthStates =>
