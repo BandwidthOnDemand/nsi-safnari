@@ -109,7 +109,7 @@ class MessageStore(implicit app: play.api.Application) {
   def storeInboundWithOutboundMessages(aggregatedConnectionId: ConnectionId, createdAt: Instant, inbound: InboundMessage, outbound: Seq[OutboundMessage]) = DB.withTransaction { implicit connection =>
     val connectionPk = SQL("""SELECT id FROM connections WHERE aggregated_connection_id = {aggregated_connection_id} AND deleted_at IS NULL""")
       .on('aggregated_connection_id -> aggregatedConnectionId)
-      .singleOpt(get[Long]("id"))
+      .as(get[Long]("id").singleOpt)
       .getOrElse {
         throw new IllegalArgumentException(s"connection $aggregatedConnectionId does not exist or is already deleted")
       }
