@@ -160,7 +160,7 @@ class MessageStore(implicit app: play.api.Application) {
     val serialized = MessageToSerializedMessage(message).get
     SQL("""
         INSERT INTO messages (connection_id, correlation_id, direction, protocol, type, content, created_at, inbound_message_id)
-             VALUES ({connection_id}, {correlation_id}, {direction}, {protocol}, {type}, {content}, {created_at}, {inbound_message_id})
+             VALUES ({connection_id}, uuid({correlation_id}), {direction}, {protocol}, {type}, {content}, {created_at}, {inbound_message_id})
         """).on(
       'connection_id -> connectionPk,
       'direction -> serialized.direction,

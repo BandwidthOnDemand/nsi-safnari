@@ -1,31 +1,27 @@
 package functional
 
-import java.net.URL
-import java.util.Collections
+import java.net.{URI, URL}
+import javax.xml.transform.dom.DOMResult
 import javax.xml.ws.Holder
-import play.api.mvc._
-import play.api.test._
-import play.api.test.Helpers._
-import support.ExtraBodyParsers
-import scala.concurrent._
-import nl.surfnet.safnari._
+
+import controllers.NsiWebService
 import nl.surfnet.safnari.NsiSoapConversions._
-import play.api.libs.concurrent.Execution
-import play.api.libs.ws.WS
-import play.api.libs.json._
-import java.net.URI
-import support.ExtraBodyParsers._
+import nl.surfnet.safnari._
+import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.headers._
 import org.ogf.schemas.nsi._2013._12.framework.types._
-import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
-import javax.xml.bind.JAXBElement
-import org.w3c.dom.Element
-import javax.xml.transform.dom.DOMResult
-import org.w3c.dom.Document
-import controllers.NsiWebService
+import org.w3c.dom.{Document, Element}
+import play.api.Play.current
+import play.api.libs.json._
+import play.api.libs.ws.WS
+import play.api.mvc._
+import play.api.test._
+import support.ExtraBodyParsers._
+
+import scala.concurrent._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ReserveRequestSpec extends helpers.Specification {

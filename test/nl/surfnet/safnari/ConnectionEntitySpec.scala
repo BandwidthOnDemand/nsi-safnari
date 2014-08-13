@@ -3,6 +3,8 @@ package nl.surfnet.safnari
 import java.util.UUID
 import java.net.URI
 import javax.xml.datatype.DatatypeFactory
+import org.specs2.execute.{Failure, FailureException}
+
 import scala.collection.JavaConverters._
 import org.specs2.specification.Scope
 import org.ogf.schemas.nsi._2013._12.connection.types._
@@ -98,7 +100,8 @@ class ConnectionEntitySpec extends helpers.Specification {
     def connectionData = connection.query
     def segments = connection.segments
 
-    def childConnectionData(childConnectionId: ConnectionId): ConnectionData = segments.find(_.connectionId == Some(childConnectionId)).getOrElse(failure(s"no child data for $childConnectionId"))
+    def childConnectionData(childConnectionId: ConnectionId): ConnectionData =
+      segments.find(_.connectionId == Some(childConnectionId)).getOrElse { throw new FailureException(Failure(s"no child data for $childConnectionId")) }
 
     def reservationState = connectionData.getConnectionStates().getReservationState()
     def provisionState = connectionData.getConnectionStates().getProvisionState()
@@ -207,10 +210,10 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         when(ura.request(CorrelationId(2, 1), Terminate(ConnectionId)))
 
-        messages must haveSize(1)
-        messages must haveOneElementLike {
+        messages must have size(1)
+        messages must contain(like[Message] {
           case ToRequester(NsiRequesterMessage(_, _: TerminateConfirmed)) => ok
-        }
+        })
         lifecycleState must_== LifecycleStateEnumType.TERMINATED
 
         when(pce.confirm(CorrelationId(0, 1), A))
@@ -226,10 +229,10 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(pce.confirm(CorrelationId(0, 1), A, B))
 
         messages must haveSize(2)
-        messages must haveAllElementsLike {
-          case ToProvider(NsiProviderMessage(_, InitialReserve(_, _, Service)), A.provider) => ok
-          case ToProvider(NsiProviderMessage(_, InitialReserve(_, _, Service)), B.provider) => ok
-        }
+        messages must contain( like[Message] {
+          case ToProvider(NsiProviderMessage(_, InitialReserve(_, _, A.serviceType.service)), A.provider) => ok
+          case ToProvider(NsiProviderMessage(_, InitialReserve(_, _, B.serviceType.service)), B.provider) => ok
+        }).forall
       }
 
       "send reserve request for each segment including the session security attributes" in new fixture {
@@ -237,10 +240,10 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         when(pce.confirm(CorrelationId(0, 1), A, B))
 
-        messages must haveOneElementLike {
+        messages must contain( like[Message] {
           case ToProvider(NsiProviderMessage(headers, _), A.provider) => headers.sessionSecurityAttrs must contain(SessionSecurityAttr)
           case ToProvider(NsiProviderMessage(headers, _), B.provider) => headers.sessionSecurityAttrs must contain(SessionSecurityAttr)
-        }
+        })
       }
 
       "send reserve request including the connection trace" in new fixture {
@@ -249,12 +252,12 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         when(pce.confirm(CorrelationId(0, 1), A))
 
-        messages must haveOneElementLike {
+        messages must contain( like[Message] {
           case ToProvider(NsiProviderMessage(headers, _), A.provider) =>
             headers.connectionTrace must haveSize(2)
             headers.connectionTrace must contain(equalTo(new ConnectionType().withIndex(3).withValue(s"$AggregatorNsa:$ConnectionId")))
             headers.connectionTrace must contain(equalTo(requesterTrace))
-        }
+        })
       }
 
       "fail the connection when pce did not accept the find path request" in new fixture {
@@ -273,12 +276,12 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(pce.fail(CorrelationId(0, 1), "failed"))
 
         messages must haveSize(1)
-        messages must haveOneElementLike {
+        messages must contain( like[Message] {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.NoPathFound.id)
-        }
+        })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
       }
 
@@ -350,15 +353,15 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
         messages must beEmpty
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
-        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok }
+        segments must contain( like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        segments must contain( like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
 
         when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
         messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ReserveCorrelationId), ReserveConfirmed(ConnectionId, ConfirmCriteria))))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
-        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok }
+        segments must contain (like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        segments must contain (like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
       }
 
       "fail the reservation with a single path segment" in new fixture {
@@ -369,14 +372,14 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
 
         messages must haveSize(1)
-        messages must haveOneElementLike {
+        messages must contain( like[Message] {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
             failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.BandwidthUnavailable.id)
-        }
+        })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
       }
 
@@ -391,13 +394,13 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 5), ReserveConfirmed("connectionIdB", ConfirmCriteria)))
 
         messages must haveSize(1)
-        messages must haveOneElementLike {
+        messages must contain( like[Message] {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
-        }
+        })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
       }
 
@@ -415,13 +418,13 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 5), ReserveConfirmed("connectionIdB", ConfirmCriteria)))
 
         messages must haveSize(1)
-        messages must haveOneElementLike {
+        messages must contain(like[Message] {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
-        }
+        })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
       }
 
@@ -436,13 +439,13 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 5), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdB").withServiceException(NsiError.BandwidthUnavailable.toServiceException(B.provider.nsa)))))
 
         messages must haveSize(1)
-        messages must haveOneElementLike {
+        messages must contain(like[Message] {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
             failed.getServiceException().getChildException().asScala must haveSize(2)
-        }
+        })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
       }
 
@@ -455,23 +458,23 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(ura.request(CorrelationId(1, 0), Terminate(ConnectionId)))
 
         messages must haveSize(1)
-        messages must haveOneElementLike {
+        messages must contain(like[Message] {
           case ToProvider(NsiProviderMessage(_, body: Terminate), _) =>
             body.connectionId must_== "ConnectionIdA"
-        }
+        })
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
 
         when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
 
         messages must haveSize(2)
-        messages must haveOneElementLike {
+        messages must contain(like[Message] {
           case ToRequester(NsiRequesterMessage(_, body: ReserveConfirmed)) =>
             body.connectionId must_== "ConnectionId"
-        }
-        messages must haveOneElementLike {
+        })
+        messages must contain(like[Message] {
           case ToProvider(NsiProviderMessage(_, body: Terminate), _) =>
             body.connectionId must_== "ConnectionIdB"
-        }
+        })
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
       }
 
@@ -485,23 +488,23 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(ura.request(CorrelationId(1, 0), Terminate(ConnectionId)))
 
         messages must haveSize(1)
-        messages must haveOneElementLike {
+        messages must contain(like[Message] {
           case ToProvider(NsiProviderMessage(_, body: Terminate), _) =>
             body.connectionId must_== "ConnectionIdA"
-        }
+        })
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
 
         when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
 
         messages must haveSize(2)
-        messages must haveOneElementLike {
+        messages must contain(like[Message] {
           case ToRequester(NsiRequesterMessage(_, body: ReserveConfirmed)) =>
             body.connectionId must_== "ConnectionId"
-        }
-        messages must haveOneElementLike {
+        })
+        messages must contain(like[Message] {
           case ToProvider(NsiProviderMessage(_, body: Terminate), _) =>
             body.connectionId must_== "ConnectionIdB"
-        }
+        })
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
       }
     }
@@ -515,7 +518,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         when(ura.request(newCorrelationId, ReserveCommit(ConnectionId)))
 
-        messages must haveOneElementLike { case ToProvider(NsiProviderMessage(_, _: ReserveCommit), _) => ok }
+        messages must contain(like[Message] { case ToProvider(NsiProviderMessage(_, _: ReserveCommit), _) => ok })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_COMMITTING)
       }
 
@@ -527,7 +530,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         when(ura.request(newCorrelationId, ReserveAbort(ConnectionId)))
 
-        messages must haveOneElementLike { case ToProvider(NsiProviderMessage(_, _: ReserveAbort), _) => ok }
+        messages must contain(like[Message] { case ToProvider(NsiProviderMessage(_, _: ReserveAbort), _) => ok })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
       }
 
@@ -579,7 +582,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         when(ura.request(CorrelationId(0, 6), ReserveAbort(ConnectionId)))
 
-        messages must haveOneElementLike { case ToProvider(NsiProviderMessage(_, _: ReserveAbort), _) => ok }
+        messages must contain(like[Message] { case ToProvider(NsiProviderMessage(_, _: ReserveAbort), _) => ok })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
       }
 
@@ -591,7 +594,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         when(ura.request(CorrelationId(0, 6), ReserveAbort(ConnectionId)))
 
-        messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, _: ReserveAbortConfirmed)) => ok }
+        messages must contain(like[Message] { case ToRequester(NsiRequesterMessage(_, _: ReserveAbortConfirmed)) => ok })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
       }
     }
@@ -609,7 +612,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
         childConnectionData("ConnectionIdA").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
 
-        messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) }
+        messages must contain(like[Message] { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) })
       }
 
       "be in reserve start state when reserve abort confirm is received from two two children" in new ReserveHeldConnectionWithTwoSegments {
@@ -625,7 +628,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         childConnectionData("ConnectionIdA").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
         childConnectionData("ConnectionIdB").reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
 
-        messages must haveOneElementLike { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) }
+        messages must contain( like[Message] { case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) => operation.connectionId must beEqualTo(ConnectionId) })
       }
     }
 
@@ -758,15 +761,15 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA")))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
-        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok }
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok })
         messages must beEmpty
 
         when(upa.response(CorrelationId(0, 12), TerminateConfirmed("ConnectionIdB")))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
-        segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok }
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
         messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(TerminateCorrelationId), TerminateConfirmed(ConnectionId))))
       }
 
@@ -836,21 +839,21 @@ class ConnectionEntitySpec extends helpers.Specification {
       given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok }
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok }
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
 
       when(upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")))
 
       messages must beEmpty
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok }
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok }
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
 
       when(upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok }
-      segments must haveOneElementLike { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok }
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
       messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ProvisionCorrelationId), ProvisionConfirmed(ConnectionId))))
     }
 
@@ -1041,10 +1044,10 @@ class ConnectionEntitySpec extends helpers.Specification {
       when(ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)))))
 
       messages must haveSize(2)
-      messages must haveAllElementsLike {
+      messages must contain( like[Message] {
         case ToProvider(NsiProviderMessage(_, QueryRecursive(Some(Left("ConnectionIdA" :: Nil)))), A.provider) => ok
         case ToProvider(NsiProviderMessage(_, QueryRecursive(Some(Left("ConnectionIdB" :: Nil)))), B.provider) => ok
-      }
+      }).forall
     }
 
     "send query recursive confirm to requester when all child providers replied" in new ReservedConnectionWithTwoSegments {
@@ -1055,9 +1058,9 @@ class ConnectionEntitySpec extends helpers.Specification {
       when(upa.response(CorrelationId(0, 12), QueryRecursiveConfirmed(Nil)))
 
       messages must haveSize(1)
-      messages must haveAllElementsLike {
+      messages must contain( like[Message] {
         case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(results))) => results must haveSize(1)
-      }
+      }).forall
     }
 
   }

@@ -1,30 +1,21 @@
 package support
 
-import java.io.{ ByteArrayInputStream, ByteArrayOutputStream }
-import javax.xml.bind.{ JAXBContext, Unmarshaller }
-import scala.util.{ Failure, Success, Try }
-import play.api.http.{ ContentTypeOf, Writeable }
-import play.api.libs.iteratee._
-import play.api.libs.iteratee.Input.Empty
-import play.api.mvc._
-import play.api.mvc.BodyParsers.parse.when
-import scala.util.control.NonFatal
-import javax.xml.validation.SchemaFactory
-import javax.xml.XMLConstants
-import javax.xml.transform.stream.StreamSource
-import javax.xml.transform.Source
-import java.util.UUID
-import java.net.URI
-import play.api.Logger
-import nl.surfnet.safnari._
-import nl.surfnet.safnari.NsiSoapConversions._
-import scala.reflect.ClassTag
-import scala.concurrent.Future
-import play.api.mvc.AsyncResult
-import play.api.libs.concurrent.Execution.Implicits._
-import org.w3c.dom.Document
 import javax.xml.soap.SOAPConstants
+
+import nl.surfnet.safnari.NsiSoapConversions._
+import nl.surfnet.safnari._
+import org.w3c.dom.Document
+import play.api.Logger
+import play.api.http.{ContentTypeOf, Writeable}
+import play.api.libs.concurrent.Execution.Implicits._
+import play.api.libs.iteratee.Input.Empty
+import play.api.libs.iteratee._
+import play.api.mvc.BodyParsers.parse.when
+import play.api.mvc._
+
+import scala.concurrent.Future
 import scala.language.higherKinds
+import scala.util.{Failure, Success}
 
 object ExtraBodyParsers {
 
