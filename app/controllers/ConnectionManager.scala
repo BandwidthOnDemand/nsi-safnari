@@ -66,7 +66,7 @@ object Connection {
 
 class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity))(implicit app: play.api.Application) {
   private val connections = TMap.empty[ConnectionId, Connection]
-  private val globalReservationIdsMap = TMap.empty[GlobalReservationId, Connection]
+  private val globalReservationIdsMap = TMap.empty[GlobalReservationId, Set[Connection]]
   private val connectionsByRequesterCorrelationId = TMap.empty[(RequesterNsa, CorrelationId), Connection]
   private val childConnections = TMap.empty[ConnectionId, Connection]
   private val deleteHooks = TMap.empty[ConnectionId, InTxn => Unit]
@@ -82,12 +82,20 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
   val messageStore = new MessageStore()
 
-  def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection) = atomic { implicit txn =>
+  def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection): Unit = atomic { implicit txn =>
     connections(connectionId) = connection
     addDeleteHook(connectionId) { implicit txn => connections.remove(connectionId) }
-    globalReservationId map { globalReservationId =>
-      globalReservationIdsMap(globalReservationId) = connection
-      addDeleteHook(connectionId) { implicit txn => globalReservationIdsMap.remove(globalReservationId) }
+    globalReservationId foreach { globalReservationId =>
+      globalReservationIdsMap(globalReservationId) = globalReservationIdsMap.getOrElse(globalReservationId, Set()) + connection
+      addDeleteHook(connectionId) { implicit txn => deleteConnectionFromGlobalReservationIds(connection, globalReservationId) }
+    }
+  }
+
+  private def deleteConnectionFromGlobalReservationIds(connection: Connection, globalReservationId: GlobalReservationId)(implicit txn: InTxn): Unit = {
+    val remainingConnections = globalReservationIdsMap.getOrElse(globalReservationId, Set()) - connection
+    remainingConnections match {
+      case s if s.nonEmpty => globalReservationIdsMap(globalReservationId) = s
+      case _ => globalReservationIdsMap.remove(globalReservationId)
     }
   }
 
@@ -100,7 +108,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
   def findByGlobalReservationIds(globalReservationIds: Seq[GlobalReservationId]): Seq[Connection] = {
     val globalIdsMap = globalReservationIdsMap.single.snapshot
-    globalReservationIds.flatMap(globalIdsMap.get)
+    globalReservationIds.flatMap(globalIdsMap.getOrElse(_, Set()))
   }
 
   def findByRequesterNsa(requesterNsa: RequesterNsa)(implicit executionContext: ExecutionContext): Future[Seq[Connection]] = {

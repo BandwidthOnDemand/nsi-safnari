@@ -1,27 +1,21 @@
 package controllers
 
-import akka.actor.Actor
-import akka.actor.ActorRef
-import akka.pattern.ask
-import akka.testkit.TestActorRef
 import java.net.URI
+
+import akka.actor.Actor
+import akka.testkit.TestActorRef
+import controllers.Connection.Delete
 import nl.surfnet.safnari._
-import org.joda.time.DateTime
-import org.joda.time.Instant
+import org.joda.time.{DateTime, Instant}
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
-import org.specs2.execute.PendingUntilFixed
 import play.api.libs.concurrent.Akka
-import play.api.test.Helpers._
 import play.api.test._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionManagerSpec extends helpers.Specification {
   sequential
 
-  import NsiMessageSpec._
+  import nl.surfnet.safnari.NsiMessageSpec._
 
   class RecordingActor extends Actor {
     @volatile var messages = Vector.empty[Any]
@@ -79,6 +73,30 @@ class ConnectionManagerSpec extends helpers.Specification {
       val Some(actor2) = connectionManager.findOrCreateConnection(initialReserveMessage)
 
       actor1 must_== actor2
+    }
+
+    "accept duplicate globalReservationId" in new DummyConnectionFixture {
+      def newReserveWithGlobalReservationId(globalReservationId: String) = {
+        val message = initialReserveMessage.tap(_.body.body.setGlobalReservationId("urn:A"))
+        message.copy(message.headers.copy(correlationId = helpers.Specification.newCorrelationId))
+      }
+      val Some(connection1) = connectionManager.findOrCreateConnection(newReserveWithGlobalReservationId("urn:A"))
+      val Some(connection2) = connectionManager.findOrCreateConnection(newReserveWithGlobalReservationId("urn:A"))
+
+      connectionManager.findByGlobalReservationIds(Seq(URI.create("urn:A"))) must beEqualTo(Seq(connection1, connection2))
+    }
+
+    "delete single connection from globalReservationIdMap" in new DummyConnectionFixture {
+      def newReserveWithGlobalReservationId(globalReservationId: String) = {
+        val message = initialReserveMessage.tap(_.body.body.setGlobalReservationId("urn:A"))
+        message.copy(message.headers.copy(correlationId = helpers.Specification.newCorrelationId))
+      }
+      val Some(connection1) = connectionManager.findOrCreateConnection(newReserveWithGlobalReservationId("urn:A"))
+      val Some(connection2) = connectionManager.findOrCreateConnection(newReserveWithGlobalReservationId("urn:A"))
+
+      connection1 ! Delete
+
+      connectionManager.findByGlobalReservationIds(Seq(URI.create("urn:A"))) must beEqualTo(Seq(connection2)).eventually
     }
   }
 
