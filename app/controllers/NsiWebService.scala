@@ -5,10 +5,10 @@ import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.w3c.dom.Document
 import play.api.Logger
+import play.api.Play.current
 import play.api.http.Status._
 import play.api.libs.concurrent.Execution.Implicits._
-import play.api.libs.ws.WS
-import play.api.Play.current
+import play.api.libs.ws.{WS, WSRequestHolder}
 import support.ExtraBodyParsers._
 
 import scala.concurrent.Future
@@ -16,7 +16,7 @@ import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 object NsiWebService {
-  implicit class SoapRequestHolder(request: WS.WSRequestHolder) {
+  implicit class SoapRequestHolder(request: WSRequestHolder) {
     def withSoapActionHeader(action: String) = request.withHeaders("SOAPAction" -> ('"' + action +'"'))
   }
 
