@@ -112,11 +112,11 @@ class QueryRecursiveStateMachine(
 }
 
 object QueryRecursiveStateMachine {
-  val toConnectionIdProviderMap: PartialFunction[Pair[ProviderEndPoint, Option[ConnectionId]], Pair[ConnectionId, ProviderEndPoint]] = {
+  val toConnectionIdProviderMap: PartialFunction[(ProviderEndPoint, Option[ConnectionId]), (ConnectionId, ProviderEndPoint)] = {
     case (provider, Some(connectionId)) => connectionId -> provider
   }
 
-  val toConnectionIdStateMap: PartialFunction[Pair[ProviderEndPoint, Option[ConnectionId]], Pair[ConnectionId, QueryRecursiveState]] = {
+  val toConnectionIdStateMap: PartialFunction[(ProviderEndPoint, Option[ConnectionId]), (ConnectionId, QueryRecursiveState)] = {
     case (provider, Some(connectionId)) => connectionId -> Initial
   }
 }

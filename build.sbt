@@ -17,19 +17,20 @@ libraryDependencies ++= Seq(
   "nl.surfnet.bod" % "bod-nsi" % "0.3.3",
   "org.scala-stm" %% "scala-stm" % "0.7",
   "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
-  "play-json-zipper" %% "play-json-zipper" % "1.0",
-  "com.github.scala-incubator.io" %% "scala-io-core" % "0.4.1",
+  "com.mandubian" %% "play-json-zipper" % "1.2",
+  "com.github.scala-incubator.io" %% "scala-io-core" % "0.4.3-1",
   "org.specs2" %% "specs2-scalacheck" % "2.3.13" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.3.4" % "test"
 )
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.11.2"
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint")
 
 resolvers ++= Seq(
+    "mandubian maven bintray (play-json-zipper)" at "http://dl.bintray.com/mandubian/maven",
     "SURFnet thirdparty" at s"$nexusBaseUri/thirdparty",
     "SURFnet BoD Snapshots" at s"$nexusBaseUri/public-snapshots",
     "SURFnet BoD Releases" at s"$nexusBaseUri/public-releases"
