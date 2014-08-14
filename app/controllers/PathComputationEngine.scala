@@ -1,20 +1,20 @@
 package controllers
 
-import akka.actor._
 import java.net.URI
+
+import akka.actor._
+import controllers.ActorSupport._
 import nl.surfnet.safnari._
-import org.joda.time.DateTime
-import org.joda.time.Instant
+import org.joda.time.{DateTime, Instant}
 import play.api.Logger
 import play.api.Play.current
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
-import scala.concurrent.Future
-import scala.util.{ Success, Failure }
 
-import controllers.ActorSupport._
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 object PathComputationEngine extends Controller {
   private val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
@@ -32,9 +32,6 @@ object PathComputationEngine extends Controller {
         BadRequest
     }
   }
-
-  def pceRequester: ActorRef = actorSystem.actorFor("user/pceRequester")
-  //def pceRequester: ActorSelection = Akka.system.actorSelection("user/pceRequester")
 
   class PceRequesterActor(endPoint: String) extends Actor {
     private val uuidGenerator = Uuid.randomUuidGenerator()
