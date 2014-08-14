@@ -1,13 +1,13 @@
 package controllers
 
-import play.api.test._
-import play.api.test.Helpers._
-import scala.concurrent.Promise
+import akka.testkit.TestActorRef
+import controllers.PathComputationEngine.DummyPceRequesterActor
 import nl.surfnet.safnari._
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import org.ogf.schemas.nsi._2013._12.framework.types.TypeValuePairListType
+import play.api.test._
+import play.libs.Akka
+
+import scala.concurrent.Promise
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends helpers.Specification {
@@ -20,7 +20,10 @@ class ConnectionProviderSpec extends helpers.Specification {
   "Reserve operation" should {
 
     "return the connection id and confirm the reservation" in new WithApplication(Application) {
-      val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory))
+      implicit val actorSystem = Akka.system
+      val pceRequester = TestActorRef[DummyPceRequesterActor]
+      val createOutboundActor = ConnectionProvider.outboundActor(ConnectionRequester.nsiRequester, pceRequester) _
+      val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor)))
       val requesterOperation = Promise[NsiRequesterOperation]()
 
       val response = await(connectionProvider.handleCommand(initialReserveMessage) { requesterOperation.success(_) })

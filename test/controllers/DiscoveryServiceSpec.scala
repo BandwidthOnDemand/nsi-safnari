@@ -2,10 +2,13 @@ package controllers
 
 import java.util.Locale
 
+import akka.testkit.TestActorRef
+import controllers.PathComputationEngine.DummyPceRequesterActor
 import org.joda.time.DateTime
 import play.api.http.HeaderNames
 import play.api.mvc.Results
 import play.api.test.{FakeApplication, FakeRequest, PlaySpecification, WithApplication}
+import play.libs.Akka
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class DiscoveryServiceSpec extends PlaySpecification with Results {
@@ -15,7 +18,9 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
   "Discovery service" should {
 
     "serve discovery document with fake reachability" in new WithApplication(Application) {
-      val controller = new DiscoveryService(PathComputationEngine.pceRequester)
+      implicit val actorSystem = Akka.system
+      val pceRequester = TestActorRef[DummyPceRequesterActor]
+      val controller = new DiscoveryService(pceRequester)
 
       val result = controller.index().apply(FakeRequest())
 
@@ -26,7 +31,9 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
     }
 
     "return a not modified if if-modified-since header is in the future" in new WithApplication(Application) {
-      val controller = new DiscoveryService(PathComputationEngine.pceRequester)
+      implicit val actorSystem = Akka.system
+      val pceRequester = TestActorRef[DummyPceRequesterActor]
+      val controller = new DiscoveryService(pceRequester)
 
       val dateInTheFuture = DateTime.now().plusHours(5).toString("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ENGLISH)
 
