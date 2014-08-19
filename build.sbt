@@ -2,12 +2,6 @@ name := "nsi-safnari"
 
 version := "1.0-SNAPSHOT"
 
-lazy val mavenCommand = settingKey[String]("Command to run maven")
-
-lazy val deployDist = taskKey[File]("Deploy distribution using maven")
-
-lazy val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
-
 val nexusBaseUri = "https://atlas.dlp.surfnet.nl/nexus/content/repositories"
 
 libraryDependencies ++= Seq(
@@ -46,6 +40,8 @@ testOptions in Test := Seq(Tests.Argument(TestFrameworks.Specs2, "junitxml", "co
 buildInfoSettings
 
 sourceGenerators in Compile <+= buildInfo
+
+val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
 
 gitHeadCommitSha := Process("git rev-parse --short HEAD").lines.head
 
