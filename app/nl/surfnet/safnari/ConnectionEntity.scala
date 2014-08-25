@@ -146,10 +146,10 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     case FromPce(_)                                                    => List(rsm)
     case AckFromPce(_)                                                 => List(rsm)
 
-    case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout))       => List(rsm)
     case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm.toList
-    case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) if error.error.getEvent() == EventEnumType.FORCED_END =>
+    case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) if error.notification.getEvent() == EventEnumType.FORCED_END =>
       List(lsm)
+    case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout))         => Nil
     case FromProvider(NsiRequesterMessage(_, _: ErrorEvent))             => Nil
     case FromProvider(NsiRequesterMessage(_, _: MessageDeliveryTimeout)) => Nil
 
@@ -227,42 +227,52 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     }
   }
 
-  private def handleUnhandledProviderNotifications(message: InboundMessage): Option[Seq[OutboundMessage]] = message match {
-    case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) =>
-      val event = ErrorEvent(new ErrorEventType()
-        .withConnectionId(id)
-        .withNotificationId(newNotificationId())
-        .withTimeStamp(error.error.getTimeStamp())
-        .withEvent(error.error.getEvent())
-        .withOriginatingConnectionId(error.error.getOriginatingConnectionId())
-        .withOriginatingNSA(error.error.getOriginatingNSA())
-        .withAdditionalInfo(error.error.getAdditionalInfo()))
-      if (error.error.getServiceException() ne null) {
-        event.error.withServiceException(new ServiceExceptionType()
+  private def handleUnhandledProviderNotifications(message: InboundMessage): Option[Seq[OutboundMessage]] = {
+    val eventOption: Option[NsiNotification] = Some(message).collect {
+      case FromProvider(NsiRequesterMessage(_, message: ReserveTimeout)) =>
+        ReserveTimeout(new ReserveTimeoutRequestType()
           .withConnectionId(id)
-          .withNsaId(aggregatorNsa)
-          .withErrorId(error.error.getServiceException().getErrorId())
-          .withText(error.error.getServiceException().getText())
-          .withServiceType(error.error.getServiceException().getServiceType()) // FIXME own service type?
-          .withChildException(error.error.getServiceException()))
-      }
-      Some(Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event))))
-    case FromProvider(NsiRequesterMessage(_, timeout: MessageDeliveryTimeout)) =>
-      val event = MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
-        .withConnectionId(id)
-        .withNotificationId(newNotificationId())
-        .withCorrelationId(timeout.timeout.getCorrelationId())
-        .withTimeStamp(timeout.timeout.getTimeStamp()))
-      Some(Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event))))
-    case failure: MessageDeliveryFailure =>
-      val event = MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
-        .withConnectionId(id)
-        .withNotificationId(newNotificationId)
-        .withCorrelationId(failure.originalCorrelationId.toString)
-        .withTimeStamp(failure.timestamp.toXmlGregorianCalendar))
-      Some(Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event))))
-    case _ =>
-      None
+          .withNotificationId(newNotificationId())
+          .withTimeStamp(message.notification.getTimeStamp())
+          .withTimeoutValue(message.notification.getTimeoutValue())
+          .withOriginatingConnectionId(message.notification.getOriginatingConnectionId())
+          .withOriginatingNSA(message.notification.getOriginatingNSA()))
+      case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) =>
+        val event = ErrorEvent(new ErrorEventType()
+          .withConnectionId(id)
+          .withNotificationId(newNotificationId())
+          .withTimeStamp(error.notification.getTimeStamp())
+          .withEvent(error.notification.getEvent())
+          .withOriginatingConnectionId(error.notification.getOriginatingConnectionId())
+          .withOriginatingNSA(error.notification.getOriginatingNSA())
+          .withAdditionalInfo(error.notification.getAdditionalInfo()))
+        if (error.notification.getServiceException() ne null) {
+          event.notification.withServiceException(new ServiceExceptionType()
+            .withConnectionId(id)
+            .withNsaId(aggregatorNsa)
+            .withErrorId(error.notification.getServiceException().getErrorId())
+            .withText(error.notification.getServiceException().getText())
+            .withServiceType(error.notification.getServiceException().getServiceType()) // FIXME own service type?
+            .withChildException(error.notification.getServiceException()))
+        }
+        event
+      case FromProvider(NsiRequesterMessage(_, timeout: MessageDeliveryTimeout)) =>
+        MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
+          .withConnectionId(id)
+          .withNotificationId(newNotificationId())
+          .withCorrelationId(timeout.notification.getCorrelationId())
+          .withTimeStamp(timeout.notification.getTimeStamp()))
+      case failure: MessageDeliveryFailure =>
+        MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
+          .withConnectionId(id)
+          .withNotificationId(newNotificationId)
+          .withCorrelationId(failure.originalCorrelationId.toString)
+          .withTimeStamp(failure.timestamp.toXmlGregorianCalendar))
+    }
+
+    eventOption.map { event =>
+      Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event)))
+    }
   }
 
   def query = {

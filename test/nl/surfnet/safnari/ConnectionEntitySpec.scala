@@ -507,6 +507,74 @@ class ConnectionEntitySpec extends helpers.Specification {
         })
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
       }
+
+      "pass child reserve timeout to requester" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A),
+          upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")))
+
+        when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
+          .withConnectionId("ConnectionIdA")
+          .withNotificationId(32L)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+          .withTimeoutValue(120)
+          .withOriginatingConnectionId("OriginatingConnectionId-A")
+          .withOriginatingNSA("OriginatingNSA-A"))))
+
+        messages must contain(agg.notification(CorrelationId(0, 7), ReserveTimeout(new ReserveTimeoutRequestType()
+          .withConnectionId(ConnectionId)
+          .withNotificationId(1L)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+          .withTimeoutValue(120)
+          .withOriginatingConnectionId("OriginatingConnectionId-A")
+          .withOriginatingNSA("OriginatingNSA-A"))))
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+      }
+
+      "pass child reserve timeout to requester for each segment" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
+          pce.confirm(CorrelationId(0, 3), A, B),
+          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+
+        when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
+          .withConnectionId("ConnectionIdA")
+          .withNotificationId(32L)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+          .withTimeoutValue(120)
+          .withOriginatingConnectionId("OriginatingConnectionId-A")
+          .withOriginatingNSA("OriginatingNSA-A"))))
+
+        messages must contain(agg.notification(CorrelationId(0, 9), ReserveTimeout(new ReserveTimeoutRequestType()
+          .withConnectionId(ConnectionId)
+          .withNotificationId(1L)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+          .withTimeoutValue(120)
+          .withOriginatingConnectionId("OriginatingConnectionId-A")
+          .withOriginatingNSA("OriginatingNSA-A"))))
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+
+        when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
+          .withConnectionId("ConnectionIdB")
+          .withNotificationId(32L)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z"))
+          .withTimeoutValue(180)
+          .withOriginatingConnectionId("OriginatingConnectionId-B")
+          .withOriginatingNSA("OriginatingNSA-B"))))
+
+        messages must contain(agg.notification(CorrelationId(0, 11), ReserveTimeout(new ReserveTimeoutRequestType()
+          .withConnectionId(ConnectionId)
+          .withNotificationId(2L)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z"))
+          .withTimeoutValue(180)
+          .withOriginatingConnectionId("OriginatingConnectionId-B")
+          .withOriginatingNSA("OriginatingNSA-B"))))
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+      }
     }
 
     "in reserve held state" should {
@@ -534,7 +602,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
       }
 
-      "be in reserve timeout state when provider times out" in new fixture {
+      "stay reserve held state when provider times out" in new fixture {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)),
           pce.confirm(CorrelationId(0, 3), A),
@@ -544,17 +612,19 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withConnectionId("ConnectionIdA")
           .withNotificationId(32L)
           .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+          .withTimeoutValue(180)
           .withOriginatingConnectionId("OriginatingConnectionId")
           .withOriginatingNSA("OriginatingNSA"))))
 
-        messages must contain(agg.response(ReserveCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
+        messages must contain(agg.response(CorrelationId(0, 7), ReserveTimeout(new ReserveTimeoutRequestType()
           .withConnectionId(ConnectionId)
+          .withNotificationId(1)
           .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+          .withTimeoutValue(180)
           .withOriginatingConnectionId("OriginatingConnectionId")
-          .withOriginatingNSA("OriginatingNSA")
-          .withNotificationId(1))))
+          .withOriginatingNSA("OriginatingNSA"))))
 
-        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
       }
     }
 

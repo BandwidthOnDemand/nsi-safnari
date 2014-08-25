@@ -17,7 +17,8 @@ case object CommittingReservationState extends ReservationState(ReservationState
 case object CommitFailedReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
 case object AbortingReservationState extends ReservationState(ReservationStateEnumType.RESERVE_ABORTING)
 case object AbortedReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
-case object TimeoutReservationState extends ReservationState(ReservationStateEnumType.RESERVE_TIMEOUT)
+// RESERVE_TIMEOUT is an ultimate provider state only so not applicable to the aggregator.
+//case object TimeoutReservationState extends ReservationState(ReservationStateEnumType.RESERVE_TIMEOUT)
 
 case class ReservationStateMachineData(
   currentCommand: NsiProviderMessage[NsiProviderOperation],
@@ -27,7 +28,6 @@ case class ReservationStateMachineData(
   awaitingReserveReply: Set[CorrelationId] = Set.empty,
   childConnectionStates: Map[CorrelationId, ReservationState] = Map.empty,
   childExceptions: Map[CorrelationId, ServiceExceptionType] = Map.empty,
-  childTimeouts: Map[CorrelationId, ReserveTimeoutRequestType] = Map.empty,
   pceError: Option[NsiError] = None) {
 
   def receivedSegments(segments: Seq[(CorrelationId, ComputedSegment)]) =
@@ -39,25 +39,22 @@ case class ReservationStateMachineData(
     else if (awaitingReserveReply.nonEmpty || childConnectionStates.values.exists(_ == CheckingReservationState)) CheckingReservationState
     else if (childConnectionStates.values.exists(_ == FailedReservationState)) FailedReservationState
     else if (childConnectionStates.values.forall(_ == HeldReservationState)) HeldReservationState
-    else if (childConnectionStates.values.exists(_ == TimeoutReservationState)) TimeoutReservationState
     else if (childConnectionStates.values.exists(_ == CommittingReservationState)) CommittingReservationState
     else if (childConnectionStates.values.exists(_ == CommitFailedReservationState)) CommitFailedReservationState
     else if (childConnectionStates.values.forall(_ == ReservedReservationState)) ReservedReservationState
     else if (childConnectionStates.values.exists(_ == AbortingReservationState)) AbortingReservationState
     else if (childConnectionStates.values.forall(_ == AbortedReservationState)) AbortedReservationState
-    else if (childConnectionStates.values.exists(_ == TimeoutReservationState)) TimeoutReservationState
     else throw new IllegalStateException(s"cannot determine aggregated state from ${childConnectionStates.values.mkString(",")}")
 
   def receivedReserveReply(correlationId: CorrelationId) = copy(awaitingReserveReply = awaitingReserveReply - correlationId)
 
-  def updateChild(initialCorrelationId: CorrelationId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None, childTimeout: Option[ReserveTimeoutRequestType] = None): ReservationStateMachineData  = {
-    updateChildStatus(initialCorrelationId, reservationState, childException, childTimeout)
+  def updateChild(initialCorrelationId: CorrelationId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None): ReservationStateMachineData  = {
+    updateChildStatus(initialCorrelationId, reservationState, childException)
   }
-  def updateChildStatus(correlationId: CorrelationId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None, childTimeout: Option[ReserveTimeoutRequestType] = None): ReservationStateMachineData =
+  def updateChildStatus(correlationId: CorrelationId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None): ReservationStateMachineData =
     copy(
       childConnectionStates = childConnectionStates.updated(correlationId, reservationState),
-      childExceptions = childException.fold(childExceptions - correlationId)(exception => childExceptions.updated(correlationId, exception)),
-      childTimeouts = childTimeout.fold(childTimeouts)(timeout => childTimeouts.updated(correlationId, timeout)))
+      childExceptions = childException.fold(childExceptions - correlationId)(exception => childExceptions.updated(correlationId, exception)))
 
   def startProcessingNewCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: ReservationState, children: ChildConnectionIds) = {
     // Skip aborted state when we never received a child connection id due to an immediate service exception.
@@ -144,9 +141,6 @@ class ReservationStateMachine(
     case Event(FromRequester(message @ NsiProviderMessage(_, _: ReserveAbort)), data) =>
       val newData = data.startProcessingNewCommand(message, AbortingReservationState, children)
       goto(newData.aggregatedReservationState) using newData
-    case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveTimeout)), data) =>
-      val newData = data.updateChild(children.initialCorrelationIdFor(message.connectionId), reservationState = TimeoutReservationState, childTimeout = Some(message.timeout))
-      goto(newData.aggregatedReservationState) using newData
   }
 
   when(CommittingReservationState) {
@@ -161,15 +155,6 @@ class ReservationStateMachine(
   when(AbortingReservationState) {
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveAbortConfirmed)), data) if data.childHasState(message.connectionId, AbortingReservationState, children) =>
       val newData = data.updateChild(children.initialCorrelationIdFor(message.connectionId), AbortedReservationState)
-      goto(newData.aggregatedReservationState) using newData
-  }
-
-  when(TimeoutReservationState) {
-    case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveTimeout)), data) =>
-      val newData = data.updateChild(children.initialCorrelationIdFor(message.connectionId), reservationState = TimeoutReservationState, childTimeout = Some(message.timeout))
-      stay using newData
-    case Event(FromRequester(message @ NsiProviderMessage(_, _: ReserveAbort)), data) =>
-      val newData = data.startProcessingNewCommand(message, AbortingReservationState, children)
       goto(newData.aggregatedReservationState) using newData
   }
 
@@ -221,27 +206,18 @@ class ReservationStateMachine(
         case (seg, _, Some(connectionId)) =>
           ToProvider(NsiProviderMessage(newNsiHeaders(seg.provider), ReserveCommit(connectionId)), seg.provider)
       }.toVector
-    case (HeldReservationState | FailedReservationState | TimeoutReservationState) -> AbortingReservationState =>
+    case (HeldReservationState | FailedReservationState) -> AbortingReservationState =>
       children.childConnections.collect {
         case (seg, _, Some(connectionId)) =>
           ToProvider(NsiProviderMessage(newNsiHeaders(seg.provider), ReserveAbort(connectionId)), seg.provider)
       }.toVector
-    case HeldReservationState -> TimeoutReservationState =>
-      val (_, timeout) = nextStateData.childTimeouts.head
-      respond(ReserveTimeout(new ReserveTimeoutRequestType()
-        .withConnectionId(id)
-        .withNotificationId(newNotificationId())
-        .withTimeStamp(timeout.getTimeStamp())
-        .withTimeoutValue(timeout.getTimeoutValue())
-        .withOriginatingConnectionId(timeout.getOriginatingConnectionId())
-        .withOriginatingNSA(timeout.getOriginatingNSA())))
     case CommittingReservationState -> ReservedReservationState =>
       respond(ReserveCommitConfirmed(id))
     case CommittingReservationState -> CommitFailedReservationState =>
       respond(ReserveCommitFailed(failed(NsiError.InternalError).tap(_.getServiceException().withChildException(stateData.childExceptions.values.toSeq.asJava))))
     case ReservedReservationState -> CheckingReservationState =>
       throw new IllegalStateException("modify reserve not implemented yet")
-    case (HeldReservationState | FailedReservationState | TimeoutReservationState | AbortingReservationState) -> AbortedReservationState =>
+    case (HeldReservationState | FailedReservationState | AbortingReservationState) -> AbortedReservationState =>
       respond(ReserveAbortConfirmed(id))
   }
 

@@ -8,6 +8,7 @@ sealed trait NsiRequesterOperation {
 }
 sealed trait NsiNotification extends NsiRequesterOperation {
   def connectionId: ConnectionId
+  def notification: NotificationBaseType
 }
 sealed trait NsiCommandReply extends NsiRequesterOperation
 
@@ -34,16 +35,16 @@ case class QueryResultConfirmed(results: Seq[QueryResultResponseType]) extends N
 
 case class Error(error: GenericErrorType) extends NsiRequesterOperation
 
-case class ErrorEvent(error: ErrorEventType) extends NsiNotification {
-  override def connectionId = error.getConnectionId()
+case class ErrorEvent(override val notification: ErrorEventType) extends NsiNotification {
+  override def connectionId = notification.getConnectionId()
 }
-case class DataPlaneStateChange(notification: DataPlaneStateChangeRequestType) extends NsiNotification {
+case class DataPlaneStateChange(override val notification: DataPlaneStateChangeRequestType) extends NsiNotification {
   def connectionId: ConnectionId = notification.getConnectionId()
 }
-case class ReserveTimeout(timeout: ReserveTimeoutRequestType) extends NsiNotification {
-  def connectionId: ConnectionId = timeout.getConnectionId()
+case class ReserveTimeout(override val notification: ReserveTimeoutRequestType) extends NsiNotification {
+  def connectionId: ConnectionId = notification.getConnectionId()
 }
 
-case class MessageDeliveryTimeout(timeout: MessageDeliveryTimeoutRequestType) extends NsiNotification {
-  def connectionId: ConnectionId = timeout.getConnectionId()
+case class MessageDeliveryTimeout(override val notification: MessageDeliveryTimeoutRequestType) extends NsiNotification {
+  def connectionId: ConnectionId = notification.getConnectionId()
 }

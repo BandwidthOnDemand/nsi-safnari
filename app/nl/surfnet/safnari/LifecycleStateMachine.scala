@@ -42,7 +42,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
   when(CREATED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) if children.childConnections.nonEmpty =>
       goto(TERMINATING) using data.startCommand(message, TERMINATING, children).copy(sendTerminateRequest = children.childrenByConnectionId)
-    case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.error.getEvent() == EventEnumType.FORCED_END =>
+    case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.notification.getEvent() == EventEnumType.FORCED_END =>
       goto(FAILED) using data.updateChild(errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
     case Event(PassedEndTime(_, _, _), data) =>
       goto(PASSED_END_TIME)
@@ -101,19 +101,19 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
       val event = ErrorEvent(new ErrorEventType()
         .withConnectionId(connectionId)
         .withNotificationId(newNotificationId())
-        .withTimeStamp(original.error.getTimeStamp())
+        .withTimeStamp(original.notification.getTimeStamp())
         .withEvent(EventEnumType.FORCED_END)
-        .withOriginatingConnectionId(original.error.getOriginatingConnectionId())
-        .withOriginatingNSA(original.error.getOriginatingNSA())
-        .withAdditionalInfo(original.error.getAdditionalInfo()))
-      if (original.error.getServiceException() ne null) {
-        event.error.withServiceException(new ServiceExceptionType()
+        .withOriginatingConnectionId(original.notification.getOriginatingConnectionId())
+        .withOriginatingNSA(original.notification.getOriginatingNSA())
+        .withAdditionalInfo(original.notification.getAdditionalInfo()))
+      if (original.notification.getServiceException() ne null) {
+        event.notification.withServiceException(new ServiceExceptionType()
           .withConnectionId(connectionId)
-          .withErrorId(original.error.getServiceException().getErrorId())
-          .withText(original.error.getServiceException().getText())
+          .withErrorId(original.notification.getServiceException().getErrorId())
+          .withText(original.notification.getServiceException().getText())
           .withNsaId(headers.providerNSA)
-          .withServiceType(original.error.getServiceException().getServiceType())
-          .withChildException(original.error.getServiceException()))
+          .withServiceType(original.notification.getServiceException().getServiceType())
+          .withChildException(original.notification.getServiceException()))
       }
       Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event)))
     case CREATED -> PASSED_END_TIME =>
