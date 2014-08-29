@@ -2,6 +2,7 @@ package controllers
 
 import play.api.Play.current
 import scala.concurrent.duration._
+import scala.collection.JavaConversions._
 import java.net.URI
 import com.typesafe.config.ConfigUtil
 import nl.surfnet.safnari._
@@ -23,6 +24,18 @@ object Configuration {
   lazy val DdsUrl = current.configuration.getString("safnari.dds.url")
   lazy val PceAlgorithm: PathComputationAlgorithm = current.configuration.getString("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
   lazy val PceEndpoint = getStringOrFail("pce.endpoint")
+
+  lazy val PeersWith: List[PeerEntity] = {
+    val result = new scala.collection.mutable.ArrayBuffer[PeerEntity]
+    val configOption = current.configuration.getConfigList("safnari.peersWith")
+    if (!configOption.isEmpty) {
+      val configList = configOption.get
+      for (i <- 0 to configList.size - 1) {
+        result.add(new PeerEntity(configList.get(i).getString("id"), configList.get(i).getString("dn")))
+      }
+    }
+    result.toList
+  }
 
   // Web page footer information for main.scala.html.
   lazy val WebParams: Map[String,String] = Map("favicon" -> getStringOrFail("web.favicon"), "footer" -> getStringOrFail("web.footer"), "contactURL" -> getStringOrFail("web.contactURL"), "contactText" -> getStringOrFail("web.contactText"))

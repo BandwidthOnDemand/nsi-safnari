@@ -117,6 +117,14 @@ class DiscoveryService(pceRequester: ActorRef) extends Controller {
         }
       }
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
+      {
+        for (peer <- Configuration.PeersWith) yield {
+          peer.id match {
+            case Some(id) => <peersWith>{ id }</peersWith>
+            case _ =>
+          }
+        }
+      }
       { if (!reachabilityEntries.isEmpty) {
         <other>
           <gns:TopologyReachability>
