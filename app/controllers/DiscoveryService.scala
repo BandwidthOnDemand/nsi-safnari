@@ -3,7 +3,7 @@ package controllers
 import akka.actor.ActorRef
 import akka.pattern.ask
 import controllers.ActorSupport._
-import nl.surfnet.safnari.ReachabilityTopologyEntry
+import nl.surfnet.safnari.{PathComputationAlgorithm, ReachabilityTopologyEntry}
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.{DateTime, DateTimeZone}
 import play.api.http.ContentTypes
@@ -122,15 +122,14 @@ class DiscoveryService(pceRequester: ActorRef) extends Controller {
         }
       }
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
-      {
-        for (peer <- Configuration.PeersWith) yield {
+      { for (peer <- Configuration.PeersWith) yield {
           peer.id match {
-            case Some(id) => <peersWith>{ id }</peersWith>
+            case Some(id) => <peersWith>{id}</peersWith>
             case _ =>
           }
         }
       }
-      { if (!reachabilityEntries.isEmpty) {
+      { if (Configuration.PceAlgorithm == nl.surfnet.safnari.ChainAlgorithm && Configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty) {
         <other>
           <gns:TopologyReachability>
             { reachabilityEntries.map(entry => <Topology id={ entry.id } cost={ entry.cost.toString } />) }
