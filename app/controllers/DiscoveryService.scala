@@ -48,6 +48,7 @@ class DiscoveryService(pceRequester: ActorRef) extends Controller {
   def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry])(implicit request: RequestHeader): xml.Elem = {
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
     val providerUrl = routes.ConnectionProvider.request.absoluteURL(secure)
+    val requesterUrl = routes.ConnectionRequester.request.absoluteURL(secure)
 
     <nsa:nsa
         xmlns:vcard="urn:ietf:params:xml:ns:vcard-4.0"
@@ -92,24 +93,28 @@ class DiscoveryService(pceRequester: ActorRef) extends Controller {
       }
       { Configuration.NetworkUrl match {
           case Some(url) =>
-            <interface>
-              <type>application/vnd.ogf.nsi.topology.v2+xml</type>
-              <href>{ url }</href>
-            </interface>
+      <interface>
+        <type>application/vnd.ogf.nsi.topology.v2+xml</type>
+        <href>{ url }</href>
+      </interface>
           case _ =>
         }
       }
       { Configuration.DdsUrl match {
           case Some(url) =>
-            <interface>
-              <type>application/vnd.ogf.nsi.dds.v1+xml</type>
-              <href>{ url }</href>
-            </interface>
+      <interface>
+        <type>application/vnd.ogf.nsi.dds.v1+xml</type>
+        <href>{ url }</href>
+      </interface>
           case _ =>
         }
       }
       <interface>
-        <type>application/vnd.org.ogf.nsi.cs.v2+soap</type>
+        <type>application/vnd.ogf.nsi.cs.v2.requester+soap</type>
+        <href>{ requesterUrl }</href>
+      </interface>
+      <interface>
+        <type>application/vnd.ogf.nsi.cs.v2.provider+soap</type>
         <href>{ providerUrl }</href>
       </interface>
       { if (Configuration.NetworkId.isDefined) {
