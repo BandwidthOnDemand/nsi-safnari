@@ -1,13 +1,16 @@
 package controllers
 
+import org.joda.time.DateTime
 import play.api.Play.current
 import scala.concurrent.duration._
 import scala.collection.JavaConversions._
+import org.joda.time.DateTime
 import java.net.URI
 import com.typesafe.config.ConfigUtil
 import nl.surfnet.safnari._
 
 object Configuration {
+  val StartTime = DateTime.now
   lazy val NsaId = getStringOrFail("safnari.nsa.id")
   lazy val NsaName = getStringOrFail("safnari.nsa.name")
   lazy val AdminContactGiven = getStringOrFail("safnari.adminContact.given")

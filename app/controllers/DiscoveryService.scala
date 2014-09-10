@@ -14,10 +14,7 @@ import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
 class DiscoveryService(pceRequester: ActorRef) extends Controller {
-
-  private val startTime = DateTime.now
   private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v2+xml"
-
   private val timeZoneCode = "GMT"
   private val parseableTimezoneCode = s" $timeZoneCode"
   private val rfc1123Formatter = DateTimeFormat.forPattern(s"EEE, dd MMM yyyy HH:mm:ss '$timeZoneCode'").withLocale(java.util.Locale.ENGLISH).withZone(DateTimeZone.forID(timeZoneCode))
@@ -55,10 +52,10 @@ class DiscoveryService(pceRequester: ActorRef) extends Controller {
         xmlns:nsa="http://schemas.ogf.org/nsi/2014/02/discovery/nsa"
         xmlns:gns="http://nordu.net/namespaces/2013/12/gnsbod"
         id={ Configuration.NsaId }
-        version={ startTime.toString() }>
+        version={ Configuration.StartTime.toString() }>
       <name>{ Configuration.NsaName }</name>
       <softwareVersion>{ Configuration.VersionString }</softwareVersion>
-      <startTime>{ startTime.toString() }</startTime>
+      <startTime>{ Configuration.StartTime.toString() }</startTime>
       <adminContact>
         <vcard:vcard>
           <vcard:uid>
@@ -68,7 +65,7 @@ class DiscoveryService(pceRequester: ActorRef) extends Controller {
             <vcard:text>{ Configuration.AdminContactProdid } </vcard:text>
           </vcard:prodid>
           <vcard:rev>
-            <vcard:timestamp>{ DateTimeFormat.forPattern("yyyyMMdd'T'HHmmss'Z'").print(DateTime.now) }</vcard:timestamp>
+            <vcard:timestamp>{ DateTimeFormat.forPattern("yyyyMMdd'T'HHmmss'Z'").print(Configuration.StartTime) }</vcard:timestamp>
           </vcard:rev>
           <vcard:kind>
             <vcard:text>individual</vcard:text>
