@@ -7,6 +7,7 @@ import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
+import presenters.{ConnectionPresenter, ConnectionPathSegmentPresenter}
 
 import scala.concurrent.Future
 
@@ -42,6 +43,9 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
           case (criteria, _, _) =>
             val endTime = Option(criteria.getSchedule().getEndTime())
             endTime.map(_.compare(timeBound) > 0).getOrElse(true)
+        } map {
+          case (criteria, summary, segments) =>
+            ( criteria, ConnectionPresenter(summary), segments.map{ ConnectionPathSegmentPresenter(_) } )
         } sortBy {
           case (criteria, _, _) => Option(criteria.getSchedule().getStartTime())
         }
@@ -55,7 +59,7 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
     connectionManager.get(id).map { c =>
       connectionDetails(c) map { case (criteria, summary, segments) =>
         val messages = connectionManager.messageStore.loadAll(id)
-        Ok(views.html.connection(criteria, summary, segments, messages, Configuration.WebParams))
+        Ok(views.html.connection(criteria, ConnectionPresenter(summary), segments.map{ ConnectionPathSegmentPresenter(_) }, messages, Configuration.WebParams))
       }
     }.getOrElse {
       Future.successful(NotFound(s"Connection ($id) was not found"))

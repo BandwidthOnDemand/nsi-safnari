@@ -1,4 +1,4 @@
-@(connections: Seq[(org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType, Seq[nl.surfnet.safnari.ConnectionData])], webParams: Map[String,String])
+@(connections: Seq[(org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, presenters.ConnectionPresenter, Seq[presenters.ConnectionPathSegmentPresenter])], webParams: Map[String,String])
 
 @import nl.surfnet.safnari._
 
@@ -32,12 +32,12 @@
                                     @_connectionDetails(criteria, connection, segments)
                                 </div>
                             </td>
-                            <td><a href="@routes.Application.connection(connection.getConnectionId)">@connection.getConnectionId()</a></td>
-                            <td>@connection.getDescription()</td>
-                            <td>@connection.getConnectionStates().getLifecycleState()</td>
-                            <td>@connection.getConnectionStates().getReservationState()</td>
-                            <td>@connection.getConnectionStates().getProvisionState()</td>
-                            <td>@connection.getConnectionStates().getDataPlaneStatus().isActive()</td>
+                            <td><a href="@routes.Application.connection(connection.connectionId)">@connection.connectionId</a></td>
+                            <td>@connection.description</td>
+                            <td>@connection.lifecycleState</td>
+                            <td>@connection.reservationState</td>
+                            <td>@connection.provisionState</td>
+                            <td>@connection.dataPlaneStatus</td>
                         </tr>
                     }
                 </tbody>

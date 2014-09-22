@@ -1,5 +1,5 @@
 @* _connectionDetails Template File *@
-@(criteria: org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, connection: org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType, segments: Seq[nl.surfnet.safnari.ConnectionData])
+@(criteria: org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, connection: presenters.ConnectionPresenter, segments: Seq[presenters.ConnectionPathSegmentPresenter])
 
 @import nl.surfnet.safnari._
 
@@ -15,7 +15,7 @@
             <dt>Bandwidth</dt>
             <dd>@criteria.getPointToPointService().map(_.getCapacity()).getOrElse("unknown")</dd>
             <dt>Global id</dt>
-            <dd>@nullable(connection.getGlobalReservationId())</dd>
+            <dd>@nullable(connection.globalReservationId)</dd>
         </dl>
     </div>
     <div class="span6">
@@ -25,7 +25,7 @@
             <dt>Version</dt>
             <dd>@criteria.getVersion()</dd>
             <dt>Requester</dt>
-            <dd>@connection.getRequesterNSA()</dd>
+            <dd>@connection.requesterNsa</dd>
         </dl>
     </div>
         <dl class="dl-horizontal">
