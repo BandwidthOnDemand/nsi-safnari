@@ -52,10 +52,10 @@
             @for(segment <- segments) {
                 <tr>
                     <td>@segment.connectionId.getOrElse("<unknown>")</td>
-                    <td>@segment.providerNsa</td>
+                    <td title="@segment.providerNsa">@segment.providerNsaShort</td>
                     <td>
-                        <strong>From</strong> @segment.source<br>
-                        <strong>To</strong> @segment.destination
+                        <div title="@segment.source"><strong>From</strong>&nbsp;@segment.sourceShort</div>
+                        <div title="@segment.destination"><strong>To</strong>&nbsp;@segment.destinationShort</div>
                     </td>
                     <td>@segment.status</td>
                     <td>@segment.lastServiceException.getOrElse("none")</td>

@@ -22,7 +22,8 @@ class ConnectionPathSegmentPresenterTest extends helpers.Specification {
       }
 
       "have a provider NSA" in {
-        subject.providerNsa must beEqualTo(data.providerNsa)
+        subject.providerNsa must beEqualTo("urn:ogf:network:surfnet.nl:1900:provider")
+        subject.providerNsaShort must beEqualTo("surfnet.nl:1900:provider")
       }
 
       "have a status" in {
@@ -39,7 +40,9 @@ class ConnectionPathSegmentPresenterTest extends helpers.Specification {
 
       "have a source and destination" in {
         subject.source must beEqualTo("urn:ogf:network:surfnet.nl:1900:source")
+        subject.sourceShort must beEqualTo("surfnet.nl:1900:source")
         subject.destination must beEqualTo("urn:ogf:network:surfnet.nl:1900:destination")
+        subject.destinationShort must beEqualTo("surfnet.nl:1900:destination")
       }
     }
 

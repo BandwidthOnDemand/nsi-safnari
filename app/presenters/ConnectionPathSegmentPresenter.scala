@@ -7,11 +7,16 @@ class ConnectionPathSegmentPresenter(private val data: ConnectionData) {
 
   def connectionId = data.connectionId
   def providerNsa = data.providerNsa
+  def providerNsaShort = shorten(data.providerNsa)
   def source = data.sourceStp
+  def sourceShort = shorten(data.sourceStp)
   def destination = data.destinationStp
+  def destinationShort = shorten(data.destinationStp)
   def status = statusPresenter.status
   def dataPlaneStatus = if (data.dataPlaneStatus) "active" else "inactive"
   def lastServiceException = data.lastServiceException
+
+  private def shorten(urn: String) = urn.replace("urn:ogf:network:", "")
 }
 
 object ConnectionPathSegmentPresenter {
