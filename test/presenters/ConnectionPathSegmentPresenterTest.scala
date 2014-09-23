@@ -23,16 +23,8 @@ class ConnectionPathSegmentPresenterTest extends helpers.Specification {
         subject.providerNsa must beEqualTo(data.providerNsa)
       }
 
-      "have a reservation state" in {
-        subject.reservationState must beEqualTo(data.reservationState.value)
-      }
-
-      "have a lifecycle state" in {
-        subject.lifecycleState must beEqualTo(data.lifecycleState.value)
-      }
-
-      "have a provision state" in {
-        subject.provisionState must beEqualTo(data.provisionState.value)
+      "have a status" in {
+        subject.status must not(beEmpty)
       }
 
       "have an active data plane status" in {

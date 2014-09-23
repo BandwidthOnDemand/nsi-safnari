@@ -8,6 +8,7 @@ class ConnectionPresenterTest extends helpers.Specification {
       .withReservationState(ReservationStateEnumType.RESERVE_HELD)
       .withProvisionState(ProvisionStateEnumType.PROVISIONED)
       .withLifecycleState(LifecycleStateEnumType.CREATED)
+      .withDataPlaneStatus(new DataPlaneStatusType().withActive(false))
     def data = new QuerySummaryResultType().withConnectionId("ID").withGlobalReservationId("GLOBAL").withDescription("description")
       .withRequesterNSA("requester").withConnectionStates(states)
 
@@ -30,16 +31,8 @@ class ConnectionPresenterTest extends helpers.Specification {
         subject.requesterNsa must beEqualTo(data.getRequesterNSA)
       }
 
-      "have a reservation state" in {
-        subject.reservationState must beEqualTo(data.getConnectionStates.getReservationState.value)
-      }
-
-      "have a provision state" in {
-        subject.provisionState must beEqualTo(data.getConnectionStates.getProvisionState.value)
-      }
-
-      "have a lifecycle state" in {
-        subject.lifecycleState must beEqualTo(data.getConnectionStates.getLifecycleState.value)
+      "have a status" in {
+        subject.status must not(beEmpty)
       }
     }
 

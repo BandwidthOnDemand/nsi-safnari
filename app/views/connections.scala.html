@@ -16,10 +16,7 @@
                         <th></th>
                         <th>ConnectionId</th>
                         <th>Description</th>
-                        <th>LSM</th>
-                        <th>RSM</th>
-                        <th>PSM</th>
-                        <th>DSM</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -34,10 +31,7 @@
                             </td>
                             <td><a href="@routes.Application.connection(connection.connectionId)">@connection.connectionId</a></td>
                             <td>@connection.description</td>
-                            <td>@connection.lifecycleState</td>
-                            <td>@connection.reservationState</td>
-                            <td>@connection.provisionState</td>
-                            <td>@connection.dataPlaneStatus</td>
+                            <td>@connection.status</td>
                         </tr>
                     }
                 </tbody>

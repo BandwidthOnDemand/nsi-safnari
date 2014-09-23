@@ -43,10 +43,7 @@
             <tr>
                 <th>Child connection ID</th>
                 <th>NSA</th>
-                <th>LSM</th>
-                <th>RSM</th>
-                <th>PSM</th>
-                <th>DSM</th>
+                <th>Status</th>
                 <th>Error?</th>
             </tr>
         </thead>
@@ -55,10 +52,7 @@
                 <tr>
                     <td>@segment.connectionId.getOrElse("<unknown>")</td>
                     <td>@segment.providerNsa</td>
-                    <td>@segment.lifecycleState</td>
-                    <td>@segment.reservationState</td>
-                    <td>@segment.provisionState</td>
-                    <td>@segment.dataPlaneStatus</td>
+                    <td>@segment.status</td>
                     <td>@segment.lastServiceException.getOrElse("none")</td>
                 </tr>
             }
