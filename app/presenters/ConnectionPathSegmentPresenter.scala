@@ -7,6 +7,8 @@ class ConnectionPathSegmentPresenter(private val data: ConnectionData) {
 
   def connectionId = data.connectionId
   def providerNsa = data.providerNsa
+  def source = data.sourceStp
+  def destination = data.destinationStp
   def status = statusPresenter.status
   def dataPlaneStatus = if (data.dataPlaneStatus) "active" else "inactive"
   def lastServiceException = data.lastServiceException

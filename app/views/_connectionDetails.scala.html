@@ -43,6 +43,7 @@
             <tr>
                 <th>Child connection ID</th>
                 <th>NSA</th>
+                <th>Path</th>
                 <th>Status</th>
                 <th>Error?</th>
             </tr>
@@ -52,6 +53,10 @@
                 <tr>
                     <td>@segment.connectionId.getOrElse("<unknown>")</td>
                     <td>@segment.providerNsa</td>
+                    <td>
+                        <strong>From</strong> @segment.source<br>
+                        <strong>To</strong> @segment.destination
+                    </td>
                     <td>@segment.status</td>
                     <td>@segment.lastServiceException.getOrElse("none")</td>
                 </tr>

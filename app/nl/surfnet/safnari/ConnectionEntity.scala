@@ -1,16 +1,16 @@
 package nl.surfnet.safnari
 
-import akka.actor._
 import java.net.URI
+import java.util.concurrent.atomic.AtomicInteger
+
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
-import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import play.api.Logger
+
 import scala.math.Ordering.Implicits._
 import scala.util.Try
-import java.util.concurrent.atomic.AtomicInteger
 
 class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, val aggregatorNsa: String, pathComputationAlgorithm: PathComputationAlgorithm, nsiReplyToUri: URI, pceReplyUri: URI) {
   private def requesterNSA = initialReserve.headers.requesterNSA
@@ -317,6 +317,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     case (segment, correlationId, id) => ConnectionData(
       id,
       segment.provider.nsa,
+      segment.serviceType.service.getSourceSTP,
+      segment.serviceType.service.getDestSTP,
       rsm.childConnectionStateByInitialCorrelationId(correlationId),
       id.map(id => lsm.childConnectionState(id)).getOrElse(LifecycleStateEnumType.CREATED),
       id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),

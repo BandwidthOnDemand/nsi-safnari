@@ -6,6 +6,8 @@ import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 case class ConnectionData(
     connectionId: Option[ConnectionId],
     providerNsa: String,
+    sourceStp: String,
+    destinationStp: String,
     reservationState: ReservationStateEnumType,
     lifecycleState: LifecycleStateEnumType,
     provisionState: ProvisionStateEnumType,
