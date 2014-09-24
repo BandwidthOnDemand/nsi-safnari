@@ -2,7 +2,7 @@ package presenters
 
 import nl.surfnet.safnari.ConnectionData
 
-class ConnectionPathSegmentPresenter(private val data: ConnectionData) {
+case class ConnectionPathSegmentPresenter(private val data: ConnectionData) {
   private val statusPresenter = Nsi2StatusPresenter(data.lifecycleState, data.reservationState, data.provisionState, data.dataPlaneStatus)
 
   def connectionId = data.connectionId
@@ -17,8 +17,4 @@ class ConnectionPathSegmentPresenter(private val data: ConnectionData) {
   def lastServiceException = data.lastServiceException
 
   private def shorten(urn: String) = urn.replace("urn:ogf:network:", "")
-}
-
-object ConnectionPathSegmentPresenter {
-  def apply(data: ConnectionData) = new ConnectionPathSegmentPresenter(data)
 }

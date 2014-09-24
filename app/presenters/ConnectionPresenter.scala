@@ -3,7 +3,7 @@ package presenters
 import nl.surfnet.safnari.ConnectionId
 import org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType
 
-case class ConnectionPresenter(data: QuerySummaryResultType) {
+case class ConnectionPresenter(private val data: QuerySummaryResultType) {
   private val statusPresenter = Nsi2StatusPresenter(data.getConnectionStates)
 
   def connectionId: ConnectionId = data.getConnectionId
