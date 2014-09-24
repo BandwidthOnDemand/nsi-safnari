@@ -3,10 +3,10 @@ package presenters
 import org.ogf.schemas.nsi._2013._12.connection.types.LifecycleStateEnumType._
 import org.ogf.schemas.nsi._2013._12.connection.types.{ConnectionStatesType, LifecycleStateEnumType, ProvisionStateEnumType, ReservationStateEnumType}
 
-class Nsi2StatusPresenter(val lifecycle: LifecycleStateEnumType,
-                          val reservation: ReservationStateEnumType,
-                          val provision: ProvisionStateEnumType,
-                          val dataPlaneActive: Boolean) {
+case class Nsi2StatusPresenter(lifecycle: LifecycleStateEnumType,
+                               reservation: ReservationStateEnumType,
+                               provision: ProvisionStateEnumType,
+                               dataPlaneActive: Boolean) {
 
   def status = notifiableStates mkString ", "
 
@@ -26,8 +26,4 @@ object Nsi2StatusPresenter {
                                                                     states.getReservationState,
                                                                     states.getProvisionState,
                                                                     states.getDataPlaneStatus.isActive)
-  def apply(lifecycle: LifecycleStateEnumType,
-            reservation: ReservationStateEnumType,
-            provision: ProvisionStateEnumType,
-            dataPlaneActive: Boolean) = new Nsi2StatusPresenter(lifecycle, reservation, provision, dataPlaneActive)
 }
