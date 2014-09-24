@@ -1,27 +1,22 @@
 package nl.surfnet.safnari
 
-import java.util.UUID
 import java.net.URI
 import javax.xml.datatype.DatatypeFactory
+
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
+import org.joda.time.{DateTime, DateTimeUtils}
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.specs2.execute.{Failure, FailureException}
 
 import scala.collection.JavaConverters._
-import org.specs2.specification.Scope
-import org.ogf.schemas.nsi._2013._12.connection.types._
-import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._12.framework.types.TypeValuePairListType
-import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
-import org.joda.time.DateTime
-import org.joda.time.DateTimeUtils
-import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
-import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionEntitySpec extends helpers.Specification {
   // These tests modify global state through joda time mocking.
   sequential
 
-  import NsiMessageSpec._
+  import nl.surfnet.safnari.NsiMessageSpec._
 
   abstract class fixture extends org.specs2.mutable.After {
     override def after = DateTimeUtils.setCurrentMillisSystem()
@@ -83,11 +78,11 @@ class ConnectionEntitySpec extends helpers.Specification {
         // Validate outbound messages against XML schema.
         outbound.foreach {
           case ToRequester(msg) =>
-            import NsiSoapConversions._
+            import nl.surfnet.safnari.NsiSoapConversions._
             val conversion = NsiRequesterMessageToDocument(None)(NsiRequesterOperationToElement) andThen NsiXmlDocumentConversion
             conversion.apply(msg).get
           case ToProvider(msg, _) =>
-            import NsiSoapConversions._
+            import nl.surfnet.safnari.NsiSoapConversions._
             val conversion = NsiProviderMessageToDocument(None)(NsiProviderOperationToElement) andThen NsiXmlDocumentConversion
             conversion.apply(msg).get
           case ToPce(msg) =>
@@ -353,15 +348,15 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
         messages must beEmpty
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-        segments must contain( like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
-        segments must contain( like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
+        segments must contain( like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        segments must contain( like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
 
         when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
         messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ReserveCorrelationId), ReserveConfirmed(ConnectionId, ConfirmCriteria))))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-        segments must contain (like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
-        segments must contain (like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        segments must contain (like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        segments must contain (like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
       }
 
       "fail the reservation with a single path segment" in new fixture {
@@ -831,15 +826,15 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA")))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok })
         messages must beEmpty
 
         when(upa.response(CorrelationId(0, 12), TerminateConfirmed("ConnectionIdB")))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
         messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(TerminateCorrelationId), TerminateConfirmed(ConnectionId))))
       }
 
@@ -909,21 +904,21 @@ class ConnectionEntitySpec extends helpers.Specification {
       given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
 
       when(upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")))
 
       messages must beEmpty
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
 
       when(upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
       messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ProvisionCorrelationId), ProvisionConfirmed(ConnectionId))))
     }
 

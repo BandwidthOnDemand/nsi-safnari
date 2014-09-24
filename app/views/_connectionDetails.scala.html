@@ -1,38 +1,32 @@
 @* _connectionDetails Template File *@
-@(criteria: org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, connection: org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType, segments: Seq[nl.surfnet.safnari.ConnectionData])
-
-@import nl.surfnet.safnari._
-
-@nullable(field: AnyRef) = @{
-    if (field eq null) "-" else field
-}
+@(connection: presenters.ConnectionPresenter, segments: Seq[presenters.ConnectionPathSegmentPresenter])
 
 <div class="row-fluid">
     <div class="span6">
         <dl class="dl-horizontal">
             <dt>Start</dt>
-            <dd>@nullable(criteria.getSchedule().getStartTime())</dd>
+            <dd>@connection.startTime.getOrElse("-")</dd>
             <dt>Bandwidth</dt>
-            <dd>@criteria.getPointToPointService().map(_.getCapacity()).getOrElse("unknown")</dd>
+            <dd>@connection.bandwidth.getOrElse("unknown")</dd>
             <dt>Global id</dt>
-            <dd>@nullable(connection.getGlobalReservationId())</dd>
+            <dd>@connection.globalReservationId.getOrElse("-")</dd>
         </dl>
     </div>
     <div class="span6">
         <dl class="dl-horizontal">
             <dt>End</dt>
-            <dd>@nullable(criteria.getSchedule().getEndTime())</dd>
+            <dd>@connection.endTime.getOrElse("-")</dd>
             <dt>Version</dt>
-            <dd>@criteria.getVersion()</dd>
+            <dd>@connection.version</dd>
             <dt>Requester</dt>
-            <dd>@connection.getRequesterNSA()</dd>
+            <dd>@connection.requesterNsa</dd>
         </dl>
     </div>
         <dl class="dl-horizontal">
             <dt>Source</dt>
-            <dd>@criteria.getPointToPointService().map(_.getSourceSTP()).getOrElse("unknown")</dd>
+            <dd>@connection.sourceStp.getOrElse("unknown")</dd>
             <dt>Destination</dt>
-            <dd>@criteria.getPointToPointService().map(_.getDestSTP()).getOrElse("unknown")</dd>
+            <dd>@connection.destinationStp.getOrElse("unknown")</dd>
         </dl>
 </div>
 @if(segments.isEmpty) {
@@ -43,10 +37,8 @@
             <tr>
                 <th>Child connection ID</th>
                 <th>NSA</th>
-                <th>LSM</th>
-                <th>RSM</th>
-                <th>PSM</th>
-                <th>DSM</th>
+                <th>Path</th>
+                <th>Status</th>
                 <th>Error?</th>
             </tr>
         </thead>
@@ -54,11 +46,12 @@
             @for(segment <- segments) {
                 <tr>
                     <td>@segment.connectionId.getOrElse("<unknown>")</td>
-                    <td>@segment.providerNsa</td>
-                    <td>@segment.lifecycleState</td>
-                    <td>@segment.reservationState</td>
-                    <td>@segment.provisionState</td>
-                    <td>@segment.dataPlaneStatus</td>
+                    <td title="@segment.providerNsa">@segment.providerNsaShort</td>
+                    <td>
+                        <div title="@segment.source"><strong>From</strong>&nbsp;@segment.sourceShort</div>
+                        <div title="@segment.destination"><strong>To</strong>&nbsp;@segment.destinationShort</div>
+                    </td>
+                    <td>@segment.status</td>
                     <td>@segment.lastServiceException.getOrElse("none")</td>
                 </tr>
             }

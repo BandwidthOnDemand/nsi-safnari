@@ -1,4 +1,4 @@
-@(criteria: org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, connection: org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType, segments: Seq[nl.surfnet.safnari.ConnectionData], messages: Seq[nl.surfnet.safnari.MessageRecord[nl.surfnet.safnari.Message]], webParams: Map[String,String])
+@(connection: presenters.ConnectionPresenter, segments: Seq[presenters.ConnectionPathSegmentPresenter], messages: Seq[nl.surfnet.safnari.MessageRecord[nl.surfnet.safnari.Message]], webParams: Map[String,String])
 
 @import nl.surfnet.safnari._
 @import nl.surfnet.safnari.NsiSoapConversions._
@@ -10,10 +10,10 @@
 @import org.joda.time.Instant
 
 @id() = @{
-    if (connection.getGlobalReservationId != null && connection.getGlobalReservationId.nonEmpty)
-      s"${connection.getConnectionId} (${connection.getGlobalReservationId})"
+    if (connection.globalReservationId != null && connection.globalReservationId.nonEmpty)
+      s"${connection.connectionId} (${connection.globalReservationId})"
     else
-      s"${connection.getConnectionId}"
+      s"${connection.connectionId}"
 }
 
 @prettyXml(document: Document) = @{
@@ -39,7 +39,7 @@
     <section id="connection">
         <h1>Connection @id()</h1>
         <div class="connection-details">
-            @_connectionDetails(criteria, connection, segments)
+            @_connectionDetails(connection, segments)
         </div>
     </section>
     <section id="messages">

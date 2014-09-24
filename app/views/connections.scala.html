@@ -1,49 +1,22 @@
-@(connections: Seq[(org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultType, Seq[nl.surfnet.safnari.ConnectionData])], webParams: Map[String,String])
-
-@import nl.surfnet.safnari._
+@(connections: Map[Symbol, Seq[(presenters.ConnectionPresenter, Seq[presenters.ConnectionPathSegmentPresenter])]], webParams: Map[String, String])
 
 @main("Connections", "connections", webParams) {
-<section>
-    <h1>Connections <span class="header-right">filtered: end time no older than a week</span></h1>
-    <div class="content">
-
-        @if(connections.isEmpty) {
-            No Connections found
-        } else {
-            <table class="table table-bordered table-striped">
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th>ConnectionId</th>
-                        <th>Description</th>
-                        <th>LSM</th>
-                        <th>RSM</th>
-                        <th>PSM</th>
-                        <th>DSM</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for((criteria, connection, segments) <- connections) {
-                        <tr class="rowdetails">
-                            <td class="center">
-                                <i class="icon-plus-sign"></i>
-                                <i class="icon-minus-sign"></i>
-                                <div class="rowdetails-content">
-                                    @_connectionDetails(criteria, connection, segments)
-                                </div>
-                            </td>
-                            <td><a href="@routes.Application.connection(connection.getConnectionId)">@connection.getConnectionId()</a></td>
-                            <td>@connection.getDescription()</td>
-                            <td>@connection.getConnectionStates().getLifecycleState()</td>
-                            <td>@connection.getConnectionStates().getReservationState()</td>
-                            <td>@connection.getConnectionStates().getProvisionState()</td>
-                            <td>@connection.getConnectionStates().getDataPlaneStatus().isActive()</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
-    </div>
-</section>
-
+    <section>
+        <h1>Connections <span class="header-right">filtered: future</span></h1>
+        <div class="content">
+        @_connectionsList(connections('future))
+        </div>
+    </section>
+    <section>
+        <h1>Connections <span class="header-right">filtered: active</span></h1>
+        <div class="content">
+        @_connectionsList(connections('active))
+        </div>
+    </section>
+    <section>
+        <h1>Connections <span class="header-right">filtered: end time no older than a week</span></h1>
+        <div class="content">
+        @_connectionsList(connections('past))
+        </div>
+    </section>
 }

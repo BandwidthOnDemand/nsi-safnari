@@ -7,6 +7,7 @@ import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
+import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
 
 import scala.concurrent.Future
 
@@ -31,22 +32,25 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
   }
 
   def connections = Action.async {
-    val timeBound = DateTime.now().minusWeeks(1).toXmlGregorianCalendar
+    val now = DateTime.now
+    val timeBound = now.minusWeeks(1).toXmlGregorianCalendar
 
     // FIXME data consistency (two messages may be interleaved with other messages)
     val queryResult = Future.traverse(connectionManager.all)(connectionDetails)
 
     queryResult map { cs =>
       val connections =
-        cs filter {
-          case (criteria, _, _) =>
-            val endTime = Option(criteria.getSchedule().getEndTime())
-            endTime.map(_.compare(timeBound) > 0).getOrElse(true)
-        } sortBy {
-          case (criteria, _, _) => Option(criteria.getSchedule().getStartTime())
+        cs.map {
+          case (criteria, summary, segments) => (ConnectionPresenter(summary, criteria), segments.map{ ConnectionPathSegmentPresenter })
+        }.filter {
+          case (connection, _) => connection.endTime.forall(_.compare(timeBound) > 0)
+        }.sortBy {
+          case (connection, _) => connection.startTime
+        }.reverse.groupBy {
+          case (connection, _) => connection.qualifier(now)
         }
 
-      Ok(views.html.connections(connections.reverse, Configuration.WebParams))
+      Ok(views.html.connections(connections.withDefaultValue(Nil), Configuration.WebParams))
     }
   }
 
@@ -55,7 +59,7 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
     connectionManager.get(id).map { c =>
       connectionDetails(c) map { case (criteria, summary, segments) =>
         val messages = connectionManager.messageStore.loadAll(id)
-        Ok(views.html.connection(criteria, summary, segments, messages, Configuration.WebParams))
+        Ok(views.html.connection(ConnectionPresenter(summary, criteria), segments.map{ ConnectionPathSegmentPresenter }, messages, Configuration.WebParams))
       }
     }.getOrElse {
       Future.successful(NotFound(s"Connection ($id) was not found"))
