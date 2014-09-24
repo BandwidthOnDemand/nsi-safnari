@@ -1,4 +1,4 @@
-@(connections: Seq[(org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, presenters.ConnectionPresenter, Seq[presenters.ConnectionPathSegmentPresenter])])
+@(connections: Seq[(presenters.ConnectionPresenter, Seq[presenters.ConnectionPathSegmentPresenter])])
 
 @if(connections.isEmpty) {
     No Connections found
@@ -13,13 +13,13 @@
             </tr>
         </thead>
         <tbody>
-        @for((criteria, connection, segments) <- connections) {
+        @for((connection, segments) <- connections) {
             <tr class="rowdetails">
                 <td class="center">
                     <i class="icon-plus-sign"></i>
                     <i class="icon-minus-sign"></i>
                     <div class="rowdetails-content">
-                    @_connectionDetails(criteria, connection, segments)
+                    @_connectionDetails(connection, segments)
                     </div>
                 </td>
                 <td><a href="@routes.Application.connection(connection.connectionId)">@connection.connectionId</a></td>

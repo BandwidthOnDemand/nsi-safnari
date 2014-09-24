@@ -1,38 +1,32 @@
 @* _connectionDetails Template File *@
-@(criteria: org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, connection: presenters.ConnectionPresenter, segments: Seq[presenters.ConnectionPathSegmentPresenter])
-
-@import nl.surfnet.safnari._
-
-@nullable(field: AnyRef) = @{
-    if (field eq null) "-" else field
-}
+@(connection: presenters.ConnectionPresenter, segments: Seq[presenters.ConnectionPathSegmentPresenter])
 
 <div class="row-fluid">
     <div class="span6">
         <dl class="dl-horizontal">
             <dt>Start</dt>
-            <dd>@nullable(criteria.getSchedule().getStartTime())</dd>
+            <dd>@connection.startTime.getOrElse("-")</dd>
             <dt>Bandwidth</dt>
-            <dd>@criteria.getPointToPointService().map(_.getCapacity()).getOrElse("unknown")</dd>
+            <dd>@connection.bandwidth.getOrElse("unknown")</dd>
             <dt>Global id</dt>
-            <dd>@nullable(connection.globalReservationId)</dd>
+            <dd>@connection.globalReservationId.getOrElse("-")</dd>
         </dl>
     </div>
     <div class="span6">
         <dl class="dl-horizontal">
             <dt>End</dt>
-            <dd>@nullable(criteria.getSchedule().getEndTime())</dd>
+            <dd>@connection.endTime.getOrElse("-")</dd>
             <dt>Version</dt>
-            <dd>@criteria.getVersion()</dd>
+            <dd>@connection.version</dd>
             <dt>Requester</dt>
             <dd>@connection.requesterNsa</dd>
         </dl>
     </div>
         <dl class="dl-horizontal">
             <dt>Source</dt>
-            <dd>@criteria.getPointToPointService().map(_.getSourceSTP()).getOrElse("unknown")</dd>
+            <dd>@connection.sourceStp.getOrElse("unknown")</dd>
             <dt>Destination</dt>
-            <dd>@criteria.getPointToPointService().map(_.getDestSTP()).getOrElse("unknown")</dd>
+            <dd>@connection.destinationStp.getOrElse("unknown")</dd>
         </dl>
 </div>
 @if(segments.isEmpty) {
