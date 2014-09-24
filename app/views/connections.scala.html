@@ -1,43 +1,24 @@
-@(connections: Seq[(org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, presenters.ConnectionPresenter, Seq[presenters.ConnectionPathSegmentPresenter])], webParams: Map[String,String])
+@(connections: Map[Symbol, Seq[(org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType, presenters.ConnectionPresenter, Seq[presenters.ConnectionPathSegmentPresenter])]], webParams: Map[String, String])
 
 @import nl.surfnet.safnari._
 
 @main("Connections", "connections", webParams) {
-<section>
-    <h1>Connections <span class="header-right">filtered: end time no older than a week</span></h1>
-    <div class="content">
-
-        @if(connections.isEmpty) {
-            No Connections found
-        } else {
-            <table class="table table-bordered table-striped">
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th>ConnectionId</th>
-                        <th>Description</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for((criteria, connection, segments) <- connections) {
-                        <tr class="rowdetails">
-                            <td class="center">
-                                <i class="icon-plus-sign"></i>
-                                <i class="icon-minus-sign"></i>
-                                <div class="rowdetails-content">
-                                    @_connectionDetails(criteria, connection, segments)
-                                </div>
-                            </td>
-                            <td><a href="@routes.Application.connection(connection.connectionId)">@connection.connectionId</a></td>
-                            <td>@connection.description</td>
-                            <td>@connection.status</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
-    </div>
-</section>
-
+    <section>
+        <h1>Connections <span class="header-right">filtered: future</span></h1>
+        <div class="content">
+        @_connectionsList(connections('future))
+        </div>
+    </section>
+    <section>
+        <h1>Connections <span class="header-right">filtered: active</span></h1>
+        <div class="content">
+        @_connectionsList(connections('active))
+        </div>
+    </section>
+    <section>
+        <h1>Connections <span class="header-right">filtered: end time no older than a week</span></h1>
+        <div class="content">
+        @_connectionsList(connections('past))
+        </div>
+    </section>
 }

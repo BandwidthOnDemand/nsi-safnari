@@ -5,9 +5,10 @@ import akka.pattern.ask
 import controllers.ActorSupport._
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
+import org.ogf.schemas.nsi._2013._12.connection.types.ScheduleType
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
-import presenters.{ConnectionPresenter, ConnectionPathSegmentPresenter}
+import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
 
 import scala.concurrent.Future
 
@@ -32,25 +33,33 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
   }
 
   def connections = Action.async {
-    val timeBound = DateTime.now().minusWeeks(1).toXmlGregorianCalendar
+    val now = DateTime.now
+    val timeBound = now.minusWeeks(1).toXmlGregorianCalendar
+
+    def inFuture(schedule: ScheduleType) = Option(schedule.getStartTime).exists(_.toDateTime.compareTo(now) > 0)
+    def isActive(schedule: ScheduleType) = ! inFuture(schedule) && Option(schedule.getEndTime).map(_.toDateTime.compareTo(now) > 0).getOrElse(true)
 
     // FIXME data consistency (two messages may be interleaved with other messages)
     val queryResult = Future.traverse(connectionManager.all)(connectionDetails)
 
     queryResult map { cs =>
       val connections =
-        cs filter {
+        cs.filter {
           case (criteria, _, _) =>
             val endTime = Option(criteria.getSchedule().getEndTime())
-            endTime.map(_.compare(timeBound) > 0).getOrElse(true)
-        } map {
+            endTime.forall(_.compare(timeBound) > 0)
+        }.map {
           case (criteria, summary, segments) =>
             ( criteria, ConnectionPresenter(summary), segments.map{ ConnectionPathSegmentPresenter(_) } )
-        } sortBy {
+        }.sortBy {
           case (criteria, _, _) => Option(criteria.getSchedule().getStartTime())
+        }.reverse.groupBy {
+          case (criteria, _, _) if inFuture(criteria.getSchedule) => 'future
+          case (criteria, _, _) if isActive(criteria.getSchedule) => 'active
+          case _ => 'past
         }
 
-      Ok(views.html.connections(connections.reverse, Configuration.WebParams))
+      Ok(views.html.connections(connections.withDefaultValue(Nil), Configuration.WebParams))
     }
   }
 
