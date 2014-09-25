@@ -36,13 +36,13 @@ class DiscoveryService(pceRequester: ActorRef) extends Controller {
         if (haveLatest)
           NotModified
         else
-          Ok(discoveryDocument(reachability)).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(lastModified)).as(ContentTypes.withCharset(ContentTypeDiscoveryDocument))
+          Ok(discoveryDocument(reachability, lastModified)).withHeaders(LAST_MODIFIED -> rfc1123Formatter.print(lastModified)).as(ContentTypes.withCharset(ContentTypeDiscoveryDocument))
       case Failure(e) =>
         ServiceUnavailable(e.getMessage())
     }
   }
 
-  def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry])(implicit request: RequestHeader): xml.Elem = {
+  def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry], lastModified: DateTime)(implicit request: RequestHeader): xml.Elem = {
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
     val providerUrl = routes.ConnectionProvider.request.absoluteURL(secure)
     val requesterUrl = routes.ConnectionRequester.request.absoluteURL(secure)
@@ -52,7 +52,7 @@ class DiscoveryService(pceRequester: ActorRef) extends Controller {
         xmlns:nsa="http://schemas.ogf.org/nsi/2014/02/discovery/nsa"
         xmlns:gns="http://nordu.net/namespaces/2013/12/gnsbod"
         id={ Configuration.NsaId }
-        version={ Configuration.StartTime.toString() }>
+        version={ lastModified.toString() }>
       <name>{ Configuration.NsaName }</name>
       <softwareVersion>{ Configuration.VersionString }</softwareVersion>
       <startTime>{ Configuration.StartTime.toString() }</startTime>
