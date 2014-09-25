@@ -14,6 +14,7 @@ import play.api.libs.ws.WS
 import play.api.mvc._
 
 import scala.concurrent.Future
+import scala.concurrent.stm.Ref
 import scala.util.{Failure, Success}
 
 object PathComputationEngine extends Controller {
@@ -97,24 +98,15 @@ object PathComputationEngine extends Controller {
     }
 
     class LastModifiedCache[T] {
-      private var subject: Option[T] = None
-      private var date: DateTime = _
+      private val value = Ref(None: Option[(T, DateTime)])
 
-      def get: Option[(T, DateTime)] = subject.map((_, date))
+      def get: Option[(T, DateTime)] = value.single()
 
-      def updateAndGet(newSubject: T): (T, DateTime) = {
-        subject.fold {
-          subject = Some(newSubject)
-          date = DateTime.now()
-        } { s =>
-          if (s != newSubject) {
-            subject = Some(newSubject)
-            date = DateTime.now()
-          }
-        }
-
-        get.get
-      }
+      def updateAndGet(newSubject: T): (T, DateTime) =
+        value.single.transformAndGet {
+          case Some(unchanged@(old, _)) if old == newSubject => Some(unchanged)
+          case _ => Some(newSubject -> DateTime.now)
+        }.get
     }
   }
 
