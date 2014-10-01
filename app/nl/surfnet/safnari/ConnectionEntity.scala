@@ -37,10 +37,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     new GenericFailedType().
       withConnectionId(id).
       withConnectionStates(connectionStates).
-      withServiceException(new ServiceExceptionType().
-        withErrorId(error.id).
-        withText(error.text).
-        withNsaId(aggregatorNsa))
+      withServiceException(error.toServiceException(aggregatorNsa))
   })
   val lsm = new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children)
 
