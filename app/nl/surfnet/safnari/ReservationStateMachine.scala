@@ -1,9 +1,10 @@
 package nl.surfnet.safnari
 
 import java.net.URI
+
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+
 import scala.collection.JavaConverters._
 
 sealed abstract class ReservationState(val jaxb: ReservationStateEnumType)
@@ -106,8 +107,8 @@ class ReservationStateMachine(
   when(PathComputationState) {
     case Event(FromPce(message: PathComputationConfirmed), data) =>
       goto(CheckingReservationState) using data.receivedSegments(children.segments)
-    case Event(FromPce(message: PathComputationFailed), _) =>
-      goto(FailedReservationState)
+    case Event(FromPce(message: PathComputationFailed), data) =>
+        goto(FailedReservationState) using data.copy(pceError = Some(message.error))
     case Event(AckFromPce(failure: PceFailed), data) =>
       goto(FailedReservationState) using data.copy(pceError = Some(NsiError.TopologyError.copy(text = s"PCE failed to accept request ${failure.status} (${failure.statusText})")))
     case Event(AckFromPce(_: PceAccepted), _) =>

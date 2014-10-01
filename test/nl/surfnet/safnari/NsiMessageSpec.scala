@@ -83,8 +83,8 @@ object NsiMessageSpec {
     def confirm(correlationId: CorrelationId, segments: ComputedSegment*) = {
       FromPce(PathComputationConfirmed(correlationId, segments))
     }
-    def fail(correlationId: CorrelationId, message: String = "error-message") = {
-      FromPce(PathComputationFailed(correlationId, message))
+    def fail(correlationId: CorrelationId, error: NsiError) = {
+      FromPce(PathComputationFailed(correlationId, error))
     }
     def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: DateTime) = {
       MessageDeliveryFailure(correlationId, None, originalCorrelationId, URI.create("http://pce.local/"), timestamp, "message-delivery-timeout")

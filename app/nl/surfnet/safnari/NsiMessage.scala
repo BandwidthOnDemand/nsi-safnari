@@ -44,11 +44,14 @@ final case class NsiRequesterMessage[+T](headers: NsiHeaders, body: T) extends N
     NsiRequesterMessage(ackHeaders.forSyncAck.copy(protocolVersion = NsiHeaders.RequesterProtocolVersion), ack)
 }
 
-final case class NsiError(id: String, description: String, text: String) {
+final case class NsiErrorVariable(name: String, value: String)
+
+final case class NsiError(id: String, description: String, text: String, variable: Option[NsiErrorVariable]) {
   override def toString = s"$id: $description: $text"
 
   def toServiceException(nsaId: String, args: (String, String)*) = {
-    val variables = args.map { case (t, v) => new TypeValuePairType().withType(t).withValue(v) }
+    val pairs = variable.toSeq.map( v => v.name -> v.value ) ++ args
+    val variables = pairs map { case (t, v) => new TypeValuePairType().withType(t).withValue(v) }
 
     new ServiceExceptionType()
       .withErrorId(id)
@@ -59,6 +62,8 @@ final case class NsiError(id: String, description: String, text: String) {
 }
 
 object NsiError {
+  def apply(id: String, description: String, text: String) = new NsiError(id, description, text, None)
+
   val PayloadError = NsiError("00100", "PAYLOAD_ERROR", "")
   val MissingParameter = NsiError("00101", "MISSING_PARAMETER", "Invalid or missing parameter")
   val UnsupportedParameter = NsiError("00102", "UNSUPPORTED_PARAMETER", "Parameter provided contains an unsupported value which MUST be processed")
