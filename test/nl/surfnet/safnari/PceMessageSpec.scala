@@ -1,13 +1,12 @@
 package nl.surfnet.safnari
 
-import play.api.libs.json._
 import java.net.URI
+
+import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import org.ogf.schemas.nsi._2013._12.framework.types._
-import play.api.data.validation.ValidationError
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
-import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
+import play.api.libs.json._
 
 object PceMessageSpec {
   val sourceStp = "network-id:source"
@@ -35,7 +34,7 @@ object PceMessageSpec {
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PceMessageSpec extends helpers.Specification {
-  import PceMessageSpec._
+  import nl.surfnet.safnari.PceMessageSpec._
 
   "PceMessages" should {
 
@@ -70,7 +69,7 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "serialize computation failed response to json" in {
-      val response = PathComputationFailed(correlationId, "FailedMessage")
+      val response = PathComputationFailed(correlationId, NsiError.NoPathFound)
 
       val json = Json.toJson[PceResponse](response)
 
@@ -89,9 +88,20 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "deserialize path computation failed" in {
-      val input = """{"correlationId":"urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640","status":"FAILED","message":"oops!"}"""
+      val input =
+        """{"correlationId":"urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640","status":"FAILED",
+            "m.findPathError":{"code":"00702","label":"LABEL","description":"oops!","variable":{"@type":"type", "value":"value"}}}""".stripMargin
 
-      val output = PathComputationFailed(CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get, "oops!")
+      val output = PathComputationFailed(CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get, NsiError("00702", "LABEL", "oops!", Some(NsiErrorVariable("type", "value"))))
+
+      Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
+    }
+
+    "deserialize path computation failed from version 1 message" in {
+      val input =
+        """{"correlationId":"urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640","status":"FAILED", "message": "oops!"}""".stripMargin
+
+      val output = PathComputationFailed(CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get, NsiError.TopologyError.copy(text = "oops!"))
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
     }

@@ -1,18 +1,17 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import play.api.libs.json._
-import play.api.libs.functional.syntax._
-import java.util.UUID
-import play.api.data.validation.ValidationError
-import scala.util.Try
-import javax.xml.datatype.XMLGregorianCalendar
-import javax.xml.datatype.DatatypeFactory
-import org.ogf.schemas.nsi._2013._12.connection.types._
-import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
-import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import javax.xml.datatype.{DatatypeFactory, XMLGregorianCalendar}
+
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import org.joda.time.DateTime
+import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
+import play.api.data.validation.ValidationError
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
+
+import scala.util.Try
 
 case class ServiceType(serviceType: String, service: P2PServiceBaseType)
 
@@ -32,7 +31,7 @@ object PathComputationAlgorithm {
 }
 
 sealed trait PceResponse extends PceMessage
-case class PathComputationFailed(correlationId: CorrelationId, message: String) extends PceResponse
+case class PathComputationFailed(correlationId: CorrelationId, error: NsiError) extends PceResponse
 case class PathComputationConfirmed(correlationId: CorrelationId, segments: Seq[ComputedSegment]) extends PceResponse
 
 sealed trait PceAcknowledgement extends PceMessage
@@ -106,18 +105,46 @@ object PceMessage {
   }
   implicit val PceResponseWrites: Writes[PceResponse] = Writes {
     case PathComputationConfirmed(correlationId, segments) => Json.obj("correlationId" -> correlationId, "status" -> "SUCCESS", "path" -> segments)
-    case PathComputationFailed(correlationId, message)     => Json.obj("correlationId" -> correlationId, "status" -> "FAILED", "message" -> message)
+    case PathComputationFailed(correlationId, error)     => Json.obj("correlationId" -> correlationId, "status" -> "FAILED", "m.findPathError" -> Json.toJson(error))
   }
 
   implicit val PathComputationConfirmedReads: Reads[PathComputationConfirmed] = (
     (__ \ "correlationId").read[CorrelationId] and
     (__ \ "path").read[Seq[ComputedSegment]])(PathComputationConfirmed.apply _)
 
+  implicit val NsiErrorVariableReads: Reads[NsiErrorVariable] = (
+    (__ \ "@type").read[String] and
+    (__ \ "value").read[String]) { NsiErrorVariable }
+
+  implicit val NsiErrorVariableWrites: Writes[NsiErrorVariable] = (
+    (__ \ "@type").write[String] and
+    (__ \ "value").write[String]) (unlift(NsiErrorVariable.unapply))
+
+  implicit val NsiErrorReads: Reads[NsiError] = (
+    (__ \ "code").read[String] and
+    (__ \ "label").read[String] and
+    (__ \ "description").read[String] and
+    (__ \ "variable").readNullable[NsiErrorVariable]) {
+      (code, label, text, variable) => NsiError(code, label, text, variable)
+    }
+
+  implicit val NsiErrorWrites: Writes[NsiError] = Writes { (nsiError: NsiError) =>
+    JsObject(
+      (Seq[(String, JsValue)]()
+      :+ "code" -> JsString(nsiError.id)
+      :+ "label" -> JsString(nsiError.description)
+      :+ "description" -> JsString(nsiError.text))
+      ++ nsiError.variable.map("variable" -> Json.toJson(_))
+    )
+  }
+
   implicit val PathComputationFailedReads: Reads[PathComputationFailed] = (
     (__ \ "correlationId").read[CorrelationId] and
-    (__ \ "message").readNullable[String]) { (correlationId, optionalMessage) =>
-      PathComputationFailed(correlationId, optionalMessage.getOrElse("no error message received from PCE"))
-    }
+    (__ \ "message").read[String].map(s => NsiError.TopologyError.copy(text = s))
+      .orElse((__ \ "m.findPathError").read[NsiError])) {
+    (correlationId, error) =>
+      PathComputationFailed(correlationId, error)
+  }
 
   implicit val XMLGregorianCalendarReads: Reads[XMLGregorianCalendar] = Reads {
     case JsString(s) => Try { DatatypeFactory.newInstance().newXMLGregorianCalendar(s) }.map { x => JsSuccess(x) }.getOrElse { JsError(ValidationError("bad.timestamp", s)) }

@@ -268,7 +268,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       "fail the connection when path computation fails" in new fixture {
         given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType, ConfirmCriteria, Service)))
 
-        when(pce.fail(CorrelationId(0, 1), "failed"))
+        when(pce.fail(CorrelationId(0, 1), NsiError.NoPathFound))
 
         messages must haveSize(1)
         messages must contain( like[Message] {
