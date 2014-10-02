@@ -5,6 +5,8 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
 import java.net.URI
+import nl.surfnet.nsiv2._
+import nl.surfnet.nsiv2.messages._
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils

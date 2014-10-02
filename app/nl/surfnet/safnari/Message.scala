@@ -1,6 +1,9 @@
 package nl.surfnet.safnari
 
+import nl.surfnet.nsiv2._
+
 import java.net.URI
+import nl.surfnet.nsiv2.messages._
 import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 

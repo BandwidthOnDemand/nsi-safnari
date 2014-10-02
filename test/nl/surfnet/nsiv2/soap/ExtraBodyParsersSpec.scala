@@ -12,7 +12,7 @@ import play.api.test.Helpers._
 import play.api.libs.iteratee._
 import javax.xml.soap._
 import java.io.File
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.soap._
 import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions

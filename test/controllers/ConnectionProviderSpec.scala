@@ -13,7 +13,8 @@ import scala.concurrent.Promise
 class ConnectionProviderSpec extends helpers.Specification {
   sequential
 
-  import nl.surfnet.safnari.NsiMessageSpec._
+  import nl.surfnet.nsiv2.messages._
+  import NsiMessageSpec._
 
   def Application = FakeApplication(additionalConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
 

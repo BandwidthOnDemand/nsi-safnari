@@ -1,5 +1,6 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.messages
 
+import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 
 sealed trait NsiRequesterOperation {

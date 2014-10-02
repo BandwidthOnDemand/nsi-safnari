@@ -4,7 +4,9 @@ import akka.actor._
 import akka.pattern.ask
 import java.net.URI
 import java.util.concurrent.TimeoutException
-import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
+import nl.surfnet.nsiv2._
+import nl.surfnet.nsiv2.messages._
+import soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.Instant

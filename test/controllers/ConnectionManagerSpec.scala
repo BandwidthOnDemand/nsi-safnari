@@ -15,7 +15,8 @@ import play.api.test._
 class ConnectionManagerSpec extends helpers.Specification {
   sequential
 
-  import nl.surfnet.safnari.NsiMessageSpec._
+  import nl.surfnet.nsiv2.messages._
+  import NsiMessageSpec._
 
   class RecordingActor extends Actor {
     @volatile var messages = Vector.empty[Any]

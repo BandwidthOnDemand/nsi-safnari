@@ -1,5 +1,9 @@
 package nl.surfnet.safnari
 
+import nl.surfnet.nsiv2._
+import nl.surfnet.nsiv2.messages._
+
+import scala.Error
 import scala.collection.JavaConverters._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 
@@ -57,7 +61,7 @@ class QueryRecursiveStateMachine(
     case Event(FromProvider(NsiRequesterMessage(headers, queryResult: QueryRecursiveConfirmed)), data) =>
       val newData = data.updateChild(headers.correlationId, Collected, queryResult)
       goto(newData.aggregatedState) using newData
-    case Event(FromProvider(NsiRequesterMessage(headers, error: Error)), data) =>
+    case Event(FromProvider(NsiRequesterMessage(headers, error: messages.Error)), data) =>
       val newData = data.updateChild(headers.correlationId, Failed, error)
       goto(newData.aggregatedState) using newData
   }
@@ -91,7 +95,7 @@ class QueryRecursiveStateMachine(
       Seq(ToRequester(query reply QueryRecursiveConfirmed(queryRecursiveResultType(childRecursiveTypes) :: Nil)))
     case Collecting -> Failed =>
       val queryFailed = nextStateData.answers.collectFirst {
-        case (connectionId, failed: Error) => failed
+        case (connectionId, failed: messages.Error) => failed
       }
 
       Seq(ToRequester(query reply queryFailed.get))

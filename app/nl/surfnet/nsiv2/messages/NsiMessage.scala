@@ -1,10 +1,13 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.messages
 
 import java.net.URI
-import org.ogf.schemas.nsi._2013._12.framework.types._
-import scala.collection.JavaConverters._
-import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
+
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
+import nl.surfnet.safnari._
+import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
+import org.ogf.schemas.nsi._2013._12.framework.types._
+
+import scala.collection.JavaConverters._
 
 object NsiHeaders {
   val ProviderProtocolVersion: URI = URI.create("application/vnd.ogf.nsi.cs.v2.provider+soap")

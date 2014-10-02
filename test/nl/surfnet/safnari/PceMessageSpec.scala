@@ -8,6 +8,8 @@ import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import play.api.libs.json._
 
+import nl.surfnet.nsiv2.messages._
+
 object PceMessageSpec {
   val sourceStp = "network-id:source"
 

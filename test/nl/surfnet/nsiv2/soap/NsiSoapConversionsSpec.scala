@@ -2,6 +2,7 @@ package nl.surfnet.nsiv2.soap
 
 import org.w3c.dom.Document
 import javax.xml.parsers.DocumentBuilderFactory
+import nl.surfnet.nsiv2.messages._
 import nl.surfnet.safnari._
 import scala.util.Failure
 import scala.util.Success

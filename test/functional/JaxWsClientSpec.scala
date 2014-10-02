@@ -3,27 +3,10 @@ package functional
 import org.junit.runner.RunWith
 import play.api.test._
 import java.net.URL
-import java.util.Collection
 import java.util.Collections
-import scala.collection.JavaConverters._
-import javax.xml.ws.handler.{HandlerResolver, Handler}
-import javax.xml.ws.handler.soap.SOAPMessageContext
-import javax.xml.ws.handler.PortInfo
-import javax.xml.ws.handler.soap.SOAPHandler
-import javax.xml.ws.handler.MessageContext
-import java.util.ArrayList
-import javax.xml.soap.SOAPFactory
-import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionProviderPort
 import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
 import org.ogf.schemas.nsi._2013._12.framework.headers.CommonHeaderType
-import org.ogf.schemas.nsi._2013._12.framework.headers.{ObjectFactory => HeadersObjectFactory}
 import org.ogf.schemas.nsi._2013._12.connection.requester.ConnectionServiceRequester
-import javax.xml.bind.JAXBContext
-import javax.xml.parsers.DocumentBuilderFactory
-import com.sun.xml.internal.ws.client.ClientTransportException
-import nl.surfnet.safnari.NsiMessage
-import nl.surfnet.safnari.NsiHeaders
-import java.util.UUID
 import javax.xml.ws.Holder
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])

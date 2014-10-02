@@ -1,4 +1,4 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.messages
 
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types._
@@ -9,6 +9,8 @@ import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
 import oasis.names.tc.saml._2_0.assertion.AttributeType
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
+
+import nl.surfnet.safnari._
 
 object NsiMessageSpec {
   val AggregatorNsa = "urn:ogf:network:nsa:aggregator-nsa"

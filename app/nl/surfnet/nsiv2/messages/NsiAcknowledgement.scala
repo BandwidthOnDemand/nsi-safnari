@@ -1,4 +1,4 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.messages
 
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType

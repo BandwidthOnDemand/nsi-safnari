@@ -2,8 +2,10 @@ package nl.surfnet.nsiv2.soap
 
 import javax.xml.soap.SOAPConstants
 
-import nl.surfnet.nsiv2.soap.NsiSoapConversions._
+import nl.surfnet.nsiv2._
+import nl.surfnet.nsiv2.messages._
 import nl.surfnet.safnari._
+
 import org.w3c.dom.Document
 import play.api.Logger
 import play.api.http.{ContentTypeOf, Writeable}
@@ -16,6 +18,8 @@ import play.api.mvc._
 import scala.concurrent.Future
 import scala.language.higherKinds
 import scala.util.{Failure, Success}
+
+import soap.NsiSoapConversions._
 
 object ExtraBodyParsers {
 

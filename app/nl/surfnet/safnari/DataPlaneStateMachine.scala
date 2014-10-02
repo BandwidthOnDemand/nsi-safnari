@@ -1,6 +1,9 @@
 package nl.surfnet.safnari
 
+import nl.surfnet.nsiv2._
+
 import javax.xml.datatype.XMLGregorianCalendar
+import nl.surfnet.nsiv2.messages.{DataPlaneStateChange, NsiRequesterMessage, NsiHeaders}
 import org.ogf.schemas.nsi._2013._12.connection.types.DataPlaneStateChangeRequestType
 import org.ogf.schemas.nsi._2013._12.connection.types.DataPlaneStatusType
 

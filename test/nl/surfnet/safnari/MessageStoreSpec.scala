@@ -6,6 +6,8 @@ import org.joda.time.Instant
 import play.api.db.DB
 import play.api.test._
 
+import nl.surfnet.nsiv2.messages._
+
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class MessageStoreSpec extends helpers.Specification {
   sequential

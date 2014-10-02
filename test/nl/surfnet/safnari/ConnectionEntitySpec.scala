@@ -16,7 +16,8 @@ class ConnectionEntitySpec extends helpers.Specification {
   // These tests modify global state through joda time mocking.
   sequential
 
-  import nl.surfnet.safnari.NsiMessageSpec._
+  import nl.surfnet.nsiv2.messages._
+  import NsiMessageSpec._
 
   abstract class fixture extends org.specs2.mutable.After {
     override def after = DateTimeUtils.setCurrentMillisSystem()

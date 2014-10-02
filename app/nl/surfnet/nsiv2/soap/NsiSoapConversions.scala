@@ -13,6 +13,8 @@ import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
 import javax.xml.transform.stream.StreamSource
 import javax.xml.validation.SchemaFactory
+import nl.surfnet.nsiv2._
+import nl.surfnet.nsiv2.messages._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.headers.CommonHeaderType
@@ -20,6 +22,7 @@ import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.w3c.dom.{ Document, Element }
 import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.SAXParseException
+import scala.Error
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 import scala.util.Failure

@@ -1,7 +1,7 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.messages
 
-import org.ogf.schemas.nsi._2013._12.connection.types.ReserveType
-import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
+import nl.surfnet.safnari._
+import org.ogf.schemas.nsi._2013._12.connection.types.{ReservationConfirmCriteriaType, ReserveType}
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 
 sealed trait NsiProviderOperation {
