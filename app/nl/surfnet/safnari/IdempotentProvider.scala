@@ -1,5 +1,6 @@
 package nl.surfnet.safnari
 
+import nl.surfnet.nsiv2._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 private case class RequesterCommandStatus(command: FromRequester, outstandingCommandsOrReply: Either[Map[CorrelationId, OutboundMessage], ToRequester]) {
@@ -83,7 +84,7 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Either[
   private def sameMessage(a: NsiProviderMessage[NsiProviderOperation], b: NsiProviderMessage[NsiProviderOperation]): Boolean = {
     // JAXB documents cannot be compared directly due to broken equals implementation of the DOM tree.
     // Serialize both messages to XML and compare the resulting strings instead.
-    import NsiSoapConversions._
+    import soap.NsiSoapConversions._
     val conversion = NsiProviderMessageToDocument[NsiProviderOperation](None).andThen(DocumentToString)
     conversion(a) == conversion(b)
   }

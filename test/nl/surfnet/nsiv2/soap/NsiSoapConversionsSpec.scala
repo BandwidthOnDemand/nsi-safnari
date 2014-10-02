@@ -1,7 +1,8 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.soap
 
 import org.w3c.dom.Document
 import javax.xml.parsers.DocumentBuilderFactory
+import nl.surfnet.safnari._
 import scala.util.Failure
 import scala.util.Success
 import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType

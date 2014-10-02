@@ -2,7 +2,7 @@ package support
 
 import javax.xml.soap.SOAPConstants
 
-import nl.surfnet.safnari.NsiSoapConversions._
+import nl.surfnet.nsiv2.soap.NsiSoapConversions._
 import nl.surfnet.safnari._
 import org.w3c.dom.Document
 import play.api.Logger

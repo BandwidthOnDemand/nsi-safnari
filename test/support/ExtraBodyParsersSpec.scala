@@ -13,9 +13,10 @@ import play.api.libs.iteratee._
 import javax.xml.soap._
 import java.io.File
 import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.soap._
 import java.util.concurrent.TimeUnit
 import org.specs2.time.NoTimeConversions
-import nl.surfnet.safnari.NsiSoapConversions.NsiXmlDocumentConversion
+import NsiSoapConversions.NsiXmlDocumentConversion
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ExtraBodyParsersSpec extends helpers.Specification {

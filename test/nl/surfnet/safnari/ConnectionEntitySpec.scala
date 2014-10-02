@@ -78,11 +78,11 @@ class ConnectionEntitySpec extends helpers.Specification {
         // Validate outbound messages against XML schema.
         outbound.foreach {
           case ToRequester(msg) =>
-            import nl.surfnet.safnari.NsiSoapConversions._
+            import nl.surfnet.nsiv2.soap.NsiSoapConversions._
             val conversion = NsiRequesterMessageToDocument(None)(NsiRequesterOperationToElement) andThen NsiXmlDocumentConversion
             conversion.apply(msg).get
           case ToProvider(msg, _) =>
-            import nl.surfnet.safnari.NsiSoapConversions._
+            import nl.surfnet.nsiv2.soap.NsiSoapConversions._
             val conversion = NsiProviderMessageToDocument(None)(NsiProviderOperationToElement) andThen NsiXmlDocumentConversion
             conversion.apply(msg).get
           case ToPce(msg) =>

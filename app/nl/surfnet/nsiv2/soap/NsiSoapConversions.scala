@@ -1,4 +1,4 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.soap
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream }
 import java.net.URI
@@ -13,6 +13,7 @@ import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
 import javax.xml.transform.stream.StreamSource
 import javax.xml.validation.SchemaFactory
+import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.headers.CommonHeaderType
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType

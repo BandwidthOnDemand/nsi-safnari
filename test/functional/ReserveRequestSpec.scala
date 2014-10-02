@@ -5,7 +5,7 @@ import javax.xml.transform.dom.DOMResult
 import javax.xml.ws.Holder
 
 import controllers.NsiWebService
-import nl.surfnet.safnari.NsiSoapConversions._
+import nl.surfnet.nsiv2.soap.NsiSoapConversions._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
 import org.ogf.schemas.nsi._2013._12.connection.types._
