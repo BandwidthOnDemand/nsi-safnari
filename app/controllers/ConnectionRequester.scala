@@ -4,6 +4,7 @@ import akka.actor._
 import akka.pattern.ask
 import java.net.URI
 import java.util.concurrent.TimeoutException
+import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.Instant
@@ -17,7 +18,6 @@ import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
 import controllers.ActorSupport._
-import support.ExtraBodyParsers._
 
 
 class ConnectionRequester(connectionManager: ConnectionManager) extends Controller with SoapWebService {

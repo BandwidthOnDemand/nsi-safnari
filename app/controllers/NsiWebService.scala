@@ -1,5 +1,6 @@
 package controllers
 
+import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.nsiv2.soap.NsiSoapConversions._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
@@ -9,7 +10,6 @@ import play.api.Play.current
 import play.api.http.Status._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.ws.{WS, WSRequestHolder}
-import support.ExtraBodyParsers._
 
 import scala.concurrent.Future
 import scala.language.higherKinds

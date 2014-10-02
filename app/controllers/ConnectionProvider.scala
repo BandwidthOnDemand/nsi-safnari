@@ -4,6 +4,7 @@ import java.net.URI
 
 import akka.actor._
 import controllers.ActorSupport._
+import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
 import org.joda.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types._
@@ -11,7 +12,6 @@ import play.api.Play._
 import play.api._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
-import support.ExtraBodyParsers._
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}

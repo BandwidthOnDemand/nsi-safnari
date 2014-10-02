@@ -1,4 +1,4 @@
-package support
+package nl.surfnet.nsiv2.soap
 
 import javax.xml.soap.SOAPConstants
 
@@ -105,9 +105,9 @@ object ExtraBodyParsers {
       }
   }
 
-  private[support] def nsiProviderOperation = nsiBodyParser(NsiProviderMessageToDocument[NsiProviderOperation](None))
+  private[soap] def nsiProviderOperation = nsiBodyParser(NsiProviderMessageToDocument[NsiProviderOperation](None))
 
-  private[support] def nsiRequesterOperation = nsiBodyParser(NsiRequesterMessageToDocument[NsiRequesterOperation](None))
+  private[soap] def nsiRequesterOperation = nsiBodyParser(NsiRequesterMessageToDocument[NsiRequesterOperation](None))
 
   private def nsiBodyParser[T <: NsiMessage[_]](implicit conversion: Conversion[T, Document]): BodyParser[T] = soap(NsiXmlDocumentConversion).flatMap { soapMessage =>
     BodyParser { requestHeader =>

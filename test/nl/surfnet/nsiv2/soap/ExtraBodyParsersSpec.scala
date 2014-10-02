@@ -1,4 +1,4 @@
-package support
+package nl.surfnet.nsiv2.soap
 
 import org.specs2.mutable.Specification
 import org.specs2.execute.PendingUntilFixed
