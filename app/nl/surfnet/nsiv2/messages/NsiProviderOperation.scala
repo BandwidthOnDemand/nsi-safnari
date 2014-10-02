@@ -1,6 +1,5 @@
 package nl.surfnet.nsiv2.messages
 
-import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types.{ReservationConfirmCriteriaType, ReserveType}
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 

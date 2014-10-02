@@ -63,10 +63,6 @@ package object safnari {
     }
   }
 
-  implicit class RichString(str: String) {
-    def uncapitalize: String = str.take(1).toLowerCase + str.drop(1)
-  }
-
   implicit object XmlGregorianCalendarOrdering extends Ordering[XMLGregorianCalendar] {
     def compare(x: XMLGregorianCalendar, y: XMLGregorianCalendar): Int = x compare y
   }

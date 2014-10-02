@@ -3,7 +3,6 @@ package nl.surfnet.nsiv2.messages
 import java.net.URI
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
 import org.ogf.schemas.nsi._2013._12.framework.types._
 
