@@ -17,7 +17,7 @@ import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.headers.CommonHeaderType
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
-import org.w3c.dom.{ Document, Element, Node }
+import org.w3c.dom.{ Document, Element }
 import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.SAXParseException
 import scala.collection.JavaConverters._
@@ -25,11 +25,9 @@ import scala.reflect.ClassTag
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import javax.xml.transform.OutputKeys
 import scala.xml.parsing.NoBindingFactoryAdapter
 import javax.xml.transform.sax.SAXResult
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionTraceType
-import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 
 object NsiSoapConversions {
   implicit val ByteArrayToString = Conversion.build[Array[Byte], String] { bytes =>
