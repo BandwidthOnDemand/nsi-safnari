@@ -1,5 +1,6 @@
 package nl.surfnet.nsiv2.messages
 
+import nl.surfnet.nsiv2.messages.CorrelationId
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType

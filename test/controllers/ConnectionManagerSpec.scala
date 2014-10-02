@@ -5,6 +5,7 @@ import java.net.URI
 import akka.actor.Actor
 import akka.testkit.TestActorRef
 import controllers.Connection.Delete
+import nl.surfnet.nsiv2.messages.CorrelationId
 import nl.surfnet.safnari._
 import org.joda.time.{DateTime, Instant}
 import org.ogf.schemas.nsi._2013._12.connection.types._

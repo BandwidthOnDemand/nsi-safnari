@@ -5,6 +5,7 @@ import javax.xml.bind.JAXBElement
 import javax.xml.namespace.QName
 import javax.xml.datatype.DatatypeFactory
 import javax.xml.datatype.XMLGregorianCalendar
+import nl.surfnet.nsiv2.messages.CorrelationId
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone
 import org.ogf.schemas.nsi._2013._12.connection.types._

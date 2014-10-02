@@ -1,6 +1,7 @@
 package helpers
 
-import nl.surfnet.safnari.{ CorrelationId, Uuid }
+import nl.surfnet.nsiv2.messages.CorrelationId
+import nl.surfnet.safnari.Uuid
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 abstract class Specification

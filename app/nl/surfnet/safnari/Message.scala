@@ -1,7 +1,5 @@
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2._
-
 import java.net.URI
 import nl.surfnet.nsiv2.messages._
 import org.joda.time.DateTime

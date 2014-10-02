@@ -4,6 +4,7 @@ import java.net.URI
 
 import akka.actor._
 import controllers.ActorSupport._
+import nl.surfnet.nsiv2.messages.CorrelationId
 import nl.surfnet.safnari._
 import org.joda.time.{DateTime, Instant}
 import play.api.Logger

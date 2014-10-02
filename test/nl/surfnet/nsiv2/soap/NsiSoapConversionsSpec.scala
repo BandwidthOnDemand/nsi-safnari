@@ -1,5 +1,6 @@
 package nl.surfnet.nsiv2.soap
 
+import nl.surfnet.nsiv2.messages.CorrelationId
 import org.w3c.dom.Document
 import javax.xml.parsers.DocumentBuilderFactory
 import nl.surfnet.nsiv2.messages._

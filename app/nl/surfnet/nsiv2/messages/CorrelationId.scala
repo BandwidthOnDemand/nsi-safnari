@@ -1,6 +1,7 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.messages
 
 import java.util.UUID
+
 import scala.util.Try
 
 case class CorrelationId private (value: UUID) {

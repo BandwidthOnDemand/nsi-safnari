@@ -5,6 +5,7 @@ import javax.xml.transform.dom.DOMResult
 import javax.xml.ws.Holder
 
 import controllers.NsiWebService
+import nl.surfnet.nsiv2.messages.CorrelationId
 import nl.surfnet.nsiv2.soap.NsiSoapConversions._
 import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.nsiv2.messages._
