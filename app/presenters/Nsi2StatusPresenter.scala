@@ -11,9 +11,9 @@ case class Nsi2StatusPresenter(lifecycle: LifecycleStateEnumType,
   def status = notifiableStates mkString ", "
 
   private def notifiableStates = lifecycle match {
-    case TERMINATED => Nil
+    case TERMINATED => List(lifecycle.value)
     case CREATED => reservationState ++ provisionState
-    case _ => reservationState :+ lifecycle.value()
+    case _ => reservationState :+ lifecycle.value
   }
 
   private def reservationState = if (reservation != ReservationStateEnumType.RESERVE_START) List(reservation.value) else Nil

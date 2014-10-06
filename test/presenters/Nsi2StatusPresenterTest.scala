@@ -10,7 +10,7 @@ class Nsi2StatusPresenterTest extends helpers.Specification {
                                         ProvisionStateEnumType.RELEASED,
                                         dataPlaneActive = false)
       "have no status" in {
-        subject.status must beEmpty
+        subject.status must beEqualTo("Terminated")
       }
     }
 
