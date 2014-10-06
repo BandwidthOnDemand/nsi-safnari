@@ -25,7 +25,7 @@ case class ConnectionPresenter(private val data: QuerySummaryResultType,
     def inFuture(dt: DateTime) = dt.compareTo(now) > 0
 
     if (startTime.map(_.toDateTime).exists(inFuture)) 'future
-    else if (endTime.map(_.toDateTime).forall(inFuture)) 'active
+    else if (endTime.map(_.toDateTime).forall(inFuture)) 'current
     else 'past
   }
 }

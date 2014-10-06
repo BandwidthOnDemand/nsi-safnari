@@ -51,8 +51,8 @@ class ConnectionPresenterTest extends helpers.Specification {
         subject.dataPlaneStatus must beEqualTo("active")
       }
 
-      "qualify as 'active" in {
-        subject.qualifier(now) must beEqualTo('active)
+      "qualify as 'current" in {
+        subject.qualifier(now) must beEqualTo('current)
       }
     }
 
