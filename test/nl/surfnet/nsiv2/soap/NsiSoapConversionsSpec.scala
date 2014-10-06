@@ -1,10 +1,8 @@
 package nl.surfnet.nsiv2.soap
 
 import nl.surfnet.nsiv2.messages.CorrelationId
-import org.w3c.dom.Document
-import javax.xml.parsers.DocumentBuilderFactory
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.utils._
 import scala.util.Failure
 import scala.util.Success
 import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
@@ -129,7 +127,7 @@ class NsiSoapConversionsSpec extends helpers.Specification {
       val requesterMessage = requestOperationToStringConversion.invert(soapFault)
 
       requesterMessage must beLike {
-        case Failure(ErrorMessageException("SOAP fault without {http://schemas.ogf.org/nsi/2013/12/connection/types}serviceException. Fault string: Fault occurred while processing.")) => ok
+        case Failure(ErrorMessage("SOAP fault without {http://schemas.ogf.org/nsi/2013/12/connection/types}serviceException. Fault string: Fault occurred while processing.")) => ok
       }
     }
 

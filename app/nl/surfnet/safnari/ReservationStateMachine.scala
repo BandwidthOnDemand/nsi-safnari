@@ -2,7 +2,7 @@ package nl.surfnet.safnari
 
 import java.net.URI
 
-import nl.surfnet.nsiv2._
+import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.messages._
 
 import org.ogf.schemas.nsi._2013._12.connection.types._

@@ -6,6 +6,7 @@ import java.net.URI
 import java.util.concurrent.TimeoutException
 import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.messages._
+import soap._
 import soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
 import org.joda.time.DateTime

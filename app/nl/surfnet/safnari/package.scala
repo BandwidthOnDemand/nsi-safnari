@@ -1,19 +1,14 @@
 package nl.surfnet
 
 import java.net.URI
-import javax.xml.bind.JAXBElement
-import javax.xml.namespace.QName
 import javax.xml.datatype.DatatypeFactory
 import javax.xml.datatype.XMLGregorianCalendar
 import nl.surfnet.nsiv2.messages.CorrelationId
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import org.ogf.schemas.nsi._2013._12.framework.types.TypeValuePairListType
-import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import play.api.data.validation.ValidationError
 import play.api.libs.json._
-import scala.collection.JavaConverters._
 import scala.util.{ Failure, Success, Try }
 
 package object safnari {
@@ -38,7 +33,7 @@ package object safnari {
 
   implicit val UriFormat: Format[URI] = valueFormat("error.expected.uri")(
     parse = s => Try(URI.create(s)).toOption,
-    print = _.toASCIIString())
+    print = _.toASCIIString)
   implicit val CorrelationIdFormat: Format[CorrelationId] = valueFormat("error.expected.correlationId")(
     parse = CorrelationId.fromString,
     print = _.toString)
@@ -47,13 +42,6 @@ package object safnari {
     def tap(f: A => Unit): A = { f(a); a }
     def pp: A = { Console.err.println(a); a }
     def pp(prefix: String): A = { Console.err.println(s"$prefix: $a"); a }
-  }
-
-  def classpathResourceUri(name: String): URI = {
-    val classLoader = Thread.currentThread().getContextClassLoader()
-    val resource = classLoader.getResource(name)
-    if (resource != null) resource.toURI()
-    else throw new IllegalArgumentException(f"classpath resource '$name' not found")
   }
 
   implicit class TryOps[A](a: Try[A]) {
@@ -71,29 +59,29 @@ package object safnari {
   }
 
   implicit class ReadableInstantOps(instant: org.joda.time.ReadableInstant) {
-    def toSqlTimestamp = new java.sql.Timestamp(instant.getMillis())
+    def toSqlTimestamp = new java.sql.Timestamp(instant.getMillis)
   }
 
   private[this] val datatypeFactory = DatatypeFactory.newInstance()
   implicit class DateTimeOps(dt: org.joda.time.ReadableDateTime) {
     def toXmlGregorianCalendar = {
-      val timezoneInMinutes = dt.getZone().getOffset(dt.getMillis()) / (60 * 1000)
+      val timezoneInMinutes = dt.getZone.getOffset(dt.getMillis) / (60 * 1000)
       datatypeFactory.newXMLGregorianCalendar(
-        dt.getYear(),
-        dt.getMonthOfYear(),
-        dt.getDayOfMonth(),
-        dt.getHourOfDay(),
-        dt.getMinuteOfHour(),
-        dt.getSecondOfMinute(),
-        dt.getMillisOfSecond(),
+        dt.getYear,
+        dt.getMonthOfYear,
+        dt.getDayOfMonth,
+        dt.getHourOfDay,
+        dt.getMinuteOfHour,
+        dt.getSecondOfMinute,
+        dt.getMillisOfSecond,
         timezoneInMinutes)
     }
   }
 
   implicit class XmlGregorianCalendarOps(dt: XMLGregorianCalendar) {
     def toDateTime = {
-      val calendar = dt.toGregorianCalendar()
-      new DateTime(calendar.getTimeInMillis(), DateTimeZone.forTimeZone(dt.toGregorianCalendar().getTimeZone()))
+      val calendar = dt.toGregorianCalendar
+      new DateTime(calendar.getTimeInMillis, DateTimeZone.forTimeZone(dt.toGregorianCalendar.getTimeZone))
     }
   }
   implicit class ScheduleTypeOps(schedule: ScheduleType) {
@@ -102,52 +90,5 @@ package object safnari {
   }
   implicit class OptionOps[A](value: Option[A]) {
     def toTry(ifNone: => Throwable): Try[A] = value.map(Success(_)).getOrElse(Failure(ifNone))
-  }
-  implicit class OptionTryOps[A](value: Option[Try[A]]) {
-    def sequence: Try[Option[A]] = value match {
-      case None    => Success(None)
-      case Some(t) => t.map(Some(_))
-    }
-  }
-  implicit val ReservationCriteriaConversion = Conversion.build[ReservationConfirmCriteriaType, ReservationRequestCriteriaType] { a =>
-    Try(new ReservationRequestCriteriaType().
-      withSchedule(a.getSchedule()).
-      withAny(a.getAny()).
-      withServiceType(a.getServiceType()).
-      withVersion(a.getVersion()).
-      tap(_.getOtherAttributes().putAll(a.getOtherAttributes())))
-  } { b =>
-    for {
-      schedule <- Option(b.getSchedule()).toTry(ErrorMessageException("schedule is required"))
-      serviceType <- Option(b.getServiceType()).toTry(ErrorMessageException("serviceType is required"))
-    } yield {
-      new ReservationConfirmCriteriaType().
-        withSchedule(schedule).
-        withAny(b.getAny()).
-        withServiceType(b.getServiceType()).
-        withVersion(if (b.getVersion() == null) 1 else b.getVersion()).
-        tap(_.getOtherAttributes().putAll(b.getOtherAttributes()))
-    }
-  }
-
-  private val PointToPointObjectFactory = new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory()
-  private val P2PS_QNAME = PointToPointObjectFactory.createP2Ps(null).getName()
-
-  private object JaxbElement {
-    def unapply[A](element: JAXBElement[A]): Option[(QName, A)] = Some((element.getName(), element.getValue()))
-  }
-  implicit class XmlPointToPointServiceOps[A: HasXmlAny](a: A) {
-    def withPointToPointService(service: P2PServiceBaseType): A = {
-      val element = PointToPointObjectFactory.createP2Ps(service)
-
-      // FIXME replace if already exists?
-      HasXmlAny[A].setAny(a, Seq(element))
-
-      a
-    }
-
-    def getPointToPointService(): Option[P2PServiceBaseType] = HasXmlAny[A].getAny(a).collectFirst {
-      case JaxbElement(P2PS_QNAME, p2ps: P2PServiceBaseType) => p2ps
-    }
   }
 }

@@ -13,16 +13,14 @@ import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
 import javax.xml.transform.stream.StreamSource
 import javax.xml.validation.SchemaFactory
-import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.utils._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.headers.CommonHeaderType
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.w3c.dom.{ Document, Element }
 import org.xml.sax.helpers.DefaultHandler
 import org.xml.sax.SAXParseException
-import scala.Error
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 import scala.util.Failure
@@ -70,14 +68,14 @@ object NsiSoapConversions {
     message => Success((Some(message.headers), message.body))
   } {
     case (headers, body) =>
-      headers.orElse(defaultHeaders).map(headers => Success(NsiProviderMessage(headers, body))).getOrElse(Failure(ErrorMessageException("missing NSI headers")))
+      headers.orElse(defaultHeaders).map(headers => Success(NsiProviderMessage(headers, body))).getOrElse(Failure(ErrorMessage("missing NSI headers")))
   }).andThen(NsiHeadersAndBodyToDocument[T](bodyConversion))
 
   def NsiRequesterMessageToDocument[T](defaultHeaders: Option[NsiHeaders])(implicit bodyConversion: Conversion[T, Element]): Conversion[NsiRequesterMessage[T], Document] = (Conversion.build[NsiRequesterMessage[T], (Option[NsiHeaders], T)] {
     message => Success((Some(message.headers), message.body))
   } {
     case (headers, body) =>
-      headers.orElse(defaultHeaders).map(headers => Success(NsiRequesterMessage(headers, body))).getOrElse(Failure(ErrorMessageException("missing NSI headers")))
+      headers.orElse(defaultHeaders).map(headers => Success(NsiRequesterMessage(headers, body))).getOrElse(Failure(ErrorMessage("missing NSI headers")))
   }).andThen(NsiHeadersAndBodyToDocument[T](bodyConversion))
 
   private def marshal[T](jaxb: JAXBElement[T]): Try[Element] = Try {
@@ -164,10 +162,10 @@ object NsiSoapConversions {
   } {
     messageFactories(Map[String, NsiMessageParser[NsiProviderOperation]](
       "reserve" -> NsiMessageParser { (body: ReserveType) =>
-        if (body.getConnectionId ne null) Failure(ErrorMessageException("modify operation is not supported"))
+        if (body.getConnectionId ne null) Failure(ErrorMessage("modify operation is not supported"))
         else for {
           criteria <- Conversion.invert(body.getCriteria())
-          service <- criteria.getPointToPointService().toTry(ErrorMessageException("initial reserve is missing point2point service"))
+          service <- criteria.getPointToPointService().toTry("initial reserve is missing point2point service")
         } yield {
           InitialReserve(body, criteria, service)
         }
@@ -272,7 +270,7 @@ object NsiSoapConversions {
       .withAny(if (headers.connectionTrace.isEmpty) null else gnsFactory.createConnectionTrace(new ConnectionTraceType().withConnection(headers.connectionTrace.asJava))))
   } { header =>
     for {
-      correlationId <- CorrelationId.fromString(header.getCorrelationId()).toTry(ErrorMessageException(s"invalid correlation id ${header.getCorrelationId()}"))
+      correlationId <- CorrelationId.fromString(header.getCorrelationId()).toTry(s"invalid correlation id ${header.getCorrelationId()}")
       replyTo <- Try(Option(header.getReplyTo()).map(URI.create))
       protocolVersion <- Try(URI.create(header.getProtocolVersion()))
     } yield {
@@ -301,7 +299,7 @@ object NsiSoapConversions {
 
   private def messageFactories[T](factories: Map[String, NsiMessageParser[T]])(bodyNode: Element): Try[T] =
     for {
-      parser <- factories.get(bodyNode.getLocalName()).toTry(ErrorMessageException(s"unknown body element type '${bodyNode.getLocalName()}'"))
+      parser <- factories.get(bodyNode.getLocalName()).toTry(s"unknown body element type '${bodyNode.getLocalName()}'")
       body <- parser(bodyNode)
     } yield body
 
@@ -404,7 +402,7 @@ object NsiSoapConversions {
       } yield document
   } { document =>
     for {
-      soapEnvelope <- Option(document.getDocumentElement).toTry(ErrorMessageException("missing document root"))
+      soapEnvelope <- Option(document.getDocumentElement).toTry("missing document root")
       header <- parseNsiHeaders(soapEnvelope)
       soapBody <- findSingleChildElement(SoapNamespaceUri, "Body", soapEnvelope)
       soapFaultNode <- findOptionalChildElement(SoapNamespaceUri, "Fault", soapBody)
@@ -431,14 +429,14 @@ object NsiSoapConversions {
     faultString <- findSingleChildElement("", "faultstring", soapFault)
     serviceExceptionNode <- findOptionalChildElement(ServiceExceptionTypeName.getNamespaceURI(), ServiceExceptionTypeName.getLocalPart(), soapFault)
     serviceException <- serviceExceptionNode.map(bodyConversion.invert(_)).sequence
-    result <- serviceException.toTry(ErrorMessageException(s"SOAP fault without ${ServiceExceptionTypeName}. Fault string: ${faultString.getTextContent()}"))
+    result <- serviceException.toTry(s"SOAP fault without ${ServiceExceptionTypeName}. Fault string: ${faultString.getTextContent()}")
   } yield result
 
   private def createDocument: Document = DocumentBuilderFactory.newInstance().tap(_.setNamespaceAware(true)).newDocumentBuilder().newDocument()
 
   private def findSingleChildElement(namespaceUri: String, localName: String, parent: Element): Try[Element] = {
     findOptionalChildElement(namespaceUri, localName, parent) match {
-      case Success(None)    => Failure(ErrorMessageException(s"missing element '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one"))
+      case Success(None)    => Failure(ErrorMessage(s"missing element '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one"))
       case Success(Some(x)) => Success(x)
       case Failure(x)       => Failure(x)
     }
@@ -452,7 +450,7 @@ object NsiSoapConversions {
     } match {
       case Vector(e) => Success(Some(e))
       case Vector()  => Success(None)
-      case _         => Failure(ErrorMessageException(s"multiple elements '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one"))
+      case _         => Failure(ErrorMessage(s"multiple elements '$namespaceUri:$localName' in '${parent.getLocalName}', expected exactly one"))
     }
   }
 }

@@ -1,11 +1,7 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.messages
 
-import javax.xml.bind.JAXBElement
-import org.ogf.schemas.nsi._2013._12.connection.types.ChildSummaryType
-import org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultCriteriaType
-import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
-import org.ogf.schemas.nsi._2013._12.connection.types.ReservationRequestCriteriaType
-import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.connection.types.{ChildSummaryType, QuerySummaryResultCriteriaType, ReservationConfirmCriteriaType, ReservationRequestCriteriaType}
+
 import scala.collection.JavaConverters._
 
 /**

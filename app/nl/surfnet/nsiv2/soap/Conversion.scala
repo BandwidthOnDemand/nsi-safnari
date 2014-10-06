@@ -1,4 +1,4 @@
-package nl.surfnet.safnari
+package nl.surfnet.nsiv2.soap
 
 import scala.util.Try
 
@@ -17,6 +17,7 @@ trait Conversion[A, B] { outer =>
     }
   }
 }
+
 object Conversion {
   def apply[A, B](implicit conversion: Conversion[A, B]) = conversion
   def build[A, B](to: A => Try[B])(from: B => Try[A]): Conversion[A, B] = new Conversion[A, B] { outer =>

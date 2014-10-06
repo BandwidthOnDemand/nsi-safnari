@@ -5,8 +5,6 @@ import org.joda.time.DateTime
 import org.joda.time.DateTimeZone
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
-import org.ogf.schemas.nsi._2013._12.connection.types.ReservationRequestCriteriaType
-import org.ogf.schemas.nsi._2013._12.connection.types.ScheduleType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PackageSpec extends helpers.Specification {
@@ -64,15 +62,6 @@ class PackageSpec extends helpers.Specification {
       val actual = XmlGregorianCalendar("2013-11-29T11:33:07.023+03:30").toDateTime
       val expect = new DateTime(2013, 11, 29, 11, 33, 7, 23, DateTimeZone.forOffsetHoursMinutes(3, 30))
       actual must_== expect
-    }
-  }
-
-  "ReservationCriteriaConversion conversion" should {
-    "default the version to 1" in {
-      val reserveCriteria = new ReservationRequestCriteriaType().withSchedule(new ScheduleType()).withServiceType("servicetype")
-      val confirmCriteria = ReservationCriteriaConversion.invert(reserveCriteria)
-
-      confirmCriteria must beSuccessfulTry.which(_.getVersion() == 1)
     }
   }
 }

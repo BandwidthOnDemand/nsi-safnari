@@ -5,6 +5,7 @@ import anorm._
 import java.net.URI
 import java.util.UUID
 import nl.surfnet.nsiv2._
+import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.messages._
 import soap.NsiSoapConversions._
 import org.joda.time.Instant

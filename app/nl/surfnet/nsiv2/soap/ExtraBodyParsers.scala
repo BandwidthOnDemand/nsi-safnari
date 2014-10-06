@@ -4,7 +4,7 @@ import javax.xml.soap.SOAPConstants
 
 import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.utils._
 
 import org.w3c.dom.Document
 import play.api.Logger
