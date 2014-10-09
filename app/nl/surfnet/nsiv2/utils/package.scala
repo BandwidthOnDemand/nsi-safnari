@@ -5,10 +5,6 @@ import java.net.URI
 import scala.util.{Failure, Success, Try}
 
 package object utils {
-  implicit class AnyOps[A](a: A) {
-    def tap(f: A => Unit): A = { f(a); a }
-  }
-
   def classpathResourceUri(name: String): URI = {
     val classLoader = Thread.currentThread().getContextClassLoader
     val resource = classLoader.getResource(name)
