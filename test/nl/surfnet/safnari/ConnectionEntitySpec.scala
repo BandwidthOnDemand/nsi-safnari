@@ -4,7 +4,6 @@ import java.net.URI
 import javax.xml.datatype.DatatypeFactory
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import nl.surfnet.nsiv2.messages.CorrelationId
 import org.joda.time.{DateTime, DateTimeUtils}
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
