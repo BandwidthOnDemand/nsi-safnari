@@ -3,8 +3,6 @@ package nl.surfnet.safnari
 import java.net.URI
 import javax.xml.datatype.{DatatypeFactory, XMLGregorianCalendar}
 
-import nl.surfnet.nsiv2._
-
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import nl.surfnet.nsiv2.messages.{CorrelationId, NsiError, NsiErrorVariable}
 import org.ogf.schemas.nsi._2013._12.connection.types._
