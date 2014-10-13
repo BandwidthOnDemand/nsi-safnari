@@ -1,5 +1,6 @@
 package presenters
 
+import nl.surfnet.nsiv2.messages._
 import nl.surfnet.safnari._
 
 import org.joda.time.DateTime

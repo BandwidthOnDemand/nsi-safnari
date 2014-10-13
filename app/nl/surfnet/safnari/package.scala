@@ -1,9 +1,10 @@
 package nl.surfnet
 
+import nl.surfnet.nsiv2.messages._
+
 import java.net.URI
 import javax.xml.datatype.DatatypeFactory
 import javax.xml.datatype.XMLGregorianCalendar
-import nl.surfnet.nsiv2.messages.CorrelationId
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone
 import org.ogf.schemas.nsi._2013._12.connection.types._
@@ -62,28 +63,6 @@ package object safnari {
     def toSqlTimestamp = new java.sql.Timestamp(instant.getMillis)
   }
 
-  private[this] val datatypeFactory = DatatypeFactory.newInstance()
-  implicit class DateTimeOps(dt: org.joda.time.ReadableDateTime) {
-    def toXmlGregorianCalendar = {
-      val timezoneInMinutes = dt.getZone.getOffset(dt.getMillis) / (60 * 1000)
-      datatypeFactory.newXMLGregorianCalendar(
-        dt.getYear,
-        dt.getMonthOfYear,
-        dt.getDayOfMonth,
-        dt.getHourOfDay,
-        dt.getMinuteOfHour,
-        dt.getSecondOfMinute,
-        dt.getMillisOfSecond,
-        timezoneInMinutes)
-    }
-  }
-
-  implicit class XmlGregorianCalendarOps(dt: XMLGregorianCalendar) {
-    def toDateTime = {
-      val calendar = dt.toGregorianCalendar
-      new DateTime(calendar.getTimeInMillis, DateTimeZone.forTimeZone(dt.toGregorianCalendar.getTimeZone))
-    }
-  }
   implicit class ScheduleTypeOps(schedule: ScheduleType) {
     def startTime = Option(schedule.getStartTime).map(_.toDateTime)
     def endTime = Option(schedule.getEndTime).map(_.toDateTime)

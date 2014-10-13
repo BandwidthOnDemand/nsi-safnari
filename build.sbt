@@ -9,6 +9,7 @@ libraryDependencies ++= Seq(
   jdbc,
   anorm,
   "nl.surfnet.bod" % "bod-nsi" % "0.3.3",
+  "nl.surfnet" %% "play-nsi-support" % "1.0-SNAPSHOT",
   "org.scala-stm" %% "scala-stm" % "0.7",
   "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
   "com.mandubian" %% "play-json-zipper" % "1.2",
