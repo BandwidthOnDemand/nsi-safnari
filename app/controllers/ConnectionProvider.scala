@@ -6,6 +6,7 @@ import akka.actor._
 import controllers.ActorSupport._
 import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.messages._
+import soap.SoapWebService
 import soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
 import org.joda.time.Instant

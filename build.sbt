@@ -12,7 +12,6 @@ libraryDependencies ++= Seq(
   "org.scala-stm" %% "scala-stm" % "0.7",
   "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
   "com.mandubian" %% "play-json-zipper" % "1.2",
-  "com.github.scala-incubator.io" %% "scala-io-core" % "0.4.3-1",
   "org.specs2" %% "specs2-scalacheck" % "2.3.13" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.3.4" % "test"
 )
