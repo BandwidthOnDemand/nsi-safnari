@@ -240,6 +240,10 @@ class ConnectionManagerSpec extends helpers.Specification {
       eventually(query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.PASSED_END_TIME)
     }
 
+    "support PassedEndTime more than 248 days into the future" in new SingleConnectionActorFixture {
+      reserveWithEndTime(DateTime.now().plusDays(300))
+    }
+
     "ignore PassedEndTime message received before end time" in new SingleConnectionActorFixture {
       reserveWithEndTime(DateTime.now().plusDays(1))
 

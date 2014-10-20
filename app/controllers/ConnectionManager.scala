@@ -299,10 +299,16 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
         val delay = (endTime.getMillis - DateTimeUtils.currentTimeMillis()).milliseconds
         val message = Connection.Command(endTime.toInstant, PassedEndTime(newPassedEndTimeCorrelationId, connection.id, new DateTime(endTime)))
         Logger.debug(s"Scheduling $message for execution after $delay")
-        context.system.scheduler.scheduleOnce(delay) {
-          Logger.debug(s"Sending scheduled message $message")
-          self ! message
-        }(context.dispatcher)
+        try {
+          context.system.scheduler.scheduleOnce(delay) {
+            Logger.debug(s"Sending scheduled message $message")
+            self ! message
+          }(context.dispatcher)
+        } catch {
+          case e: IllegalArgumentException =>
+            // Akka's scheduled currently limits delays to 248 days or less. Retry scheduling later when the real delay fails.
+            context.system.scheduler.scheduleOnce(100.days)(schedulePassedEndTimeMessage)(context.dispatcher)
+        }
       })
     }
 
