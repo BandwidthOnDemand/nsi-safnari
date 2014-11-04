@@ -5,7 +5,7 @@
     font-size: 15px;
 
     .navbar-inner {
-        background-color: @blueSurf;
+        background-color: @menuBackground;
         border: 0;
         background-image: none;
         filter: none;
@@ -17,13 +17,13 @@
     .nav {
         li {
             a {
-                color: @blackLight;
+                color: @menuTextInactive;
                 text-shadow: none;
                 .box-shadow(none);
                 padding: 18px 20px;
                 position: relative;
                 letter-spacing: 0.4px;
-                &:hover { color: @white; }
+                &:hover { color: @menuTextHover; }
                 &:first-child {
                     border-top-left-radius: 8px;
                     border-bottom-left-radius: 8px;
@@ -34,8 +34,8 @@
         .active {
             a,
             a:hover {
-                color: @white;
-                background-color: @blueSurf;
+                color: @menuTextActive;
+                background-color: @menuBackground;
                 .box-shadow(none);
             }
         }
@@ -49,7 +49,7 @@
             bottom:0;
             width:0;
             height:0;
-            border-color: @white transparent;
+            border-color: @menuSelector transparent;
             border-style: solid;
             border-width: 0 12px 12px;
         }

@@ -9,6 +9,7 @@
 .message {
     font-weight: bold;
     font-size: 1.1em;
+    color: @messageTitleColour;
 
     .section-number {
         float: left;
@@ -29,10 +30,10 @@
     padding-bottom: 1px;
 }
 
-.lit, .atn { color: #195f91; }
-.com, .pun, .opn, .clo { color: #93a1a1; }
+.lit, .atn { color: @messageNsTag; }
+.com, .pun, .opn, .clo { color: @messageElementTag; }
 .pln, .fun { color: @messageElementContent; }
-.str { color: #D14; }
+.str { color: @messageElementContent; }
 .kwd, .linenums .tag { color: @messageNsTag; }
 .tag, .typ, .dec, .var { color: @messageElementTag; }
 .atv { color: @messageNsContents; }
@@ -47,7 +48,7 @@
 .xml-content .message {
     padding: .4em 40px;
     margin-bottom: 1em;
-    background-color: @messageHeader;
+    background-color: @messageHeaderBackground;
 }
 
 .prettyprint {

@@ -15,6 +15,7 @@ header {
     padding-left: @titlePaddingLeft;
     .border-radius(8px);
     background: url(@titleImage) @titleHz @titleVr no-repeat;
+    background-color: @titleBackground;
 
     h1 {
         padding-top: @titlePaddingTop;
@@ -33,20 +34,40 @@ header {
     }
 }
 
-
-section,
-footer {
-    background-color: @grayLight;
+section {
+    background-color: @contentBackground;
     .border-radius(8px);
 
     h1,
     h2 {
         padding-left: 20px;
         font-size: 15px;
-        color: @white;
-        background-color: @blueSurf;
+        color: @contentHeaderText;
+        background-color: @contentHeaderBackground;
         border-top-left-radius: 8px;
         border-top-right-radius: 8px;
+    }
+
+    a {
+        color: @contentLinkColour;
+    }
+
+    a:hover, a:focus {
+        color: @contentLinkHoverColour;
+    }
+}
+
+footer {
+    color: @footerTextColour;
+    background-color: @footerBackground;
+    .border-radius(8px);
+
+    a {
+        color: @footerLinkColour;
+    }
+
+    a:hover, a:focus {
+        color: @footerLinkHoverColour;
     }
 }
 
