@@ -7,6 +7,7 @@ import nl.surfnet.nsiv2.messages.CorrelationId
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
+import org.ogf.schemas.nsi._2013._12.services.types.TypeValueType
 import play.api.libs.json._
 
 import nl.surfnet.nsiv2.messages._
@@ -144,7 +145,11 @@ class PceMessageSpec extends helpers.Specification {
         |          "directionality": "Bidirectional",
         |          "symmetricPath": true,
         |          "sourceSTP": "urn:ogf:network:es.net:to-internet2?vlan=1780",
-        |          "destSTP": "urn:ogf:network:es.net:esnet-edge-one?vlan=1780"
+        |          "destSTP": "urn:ogf:network:es.net:esnet-edge-one?vlan=1780",
+        |          "parameter": [
+        |            { "type": "protection", "value": "PROTECTED" },
+        |            { "type": "flag" }
+        |          ]
         |        }
         |      ]
         |    }
@@ -170,7 +175,10 @@ class PceMessageSpec extends helpers.Specification {
             .withDirectionality(DirectionalityType.BIDIRECTIONAL)
             .withSymmetricPath(true)
             .withSourceSTP("urn:ogf:network:es.net:to-internet2?vlan=1780")
-            .withDestSTP("urn:ogf:network:es.net:esnet-edge-one?vlan=1780")))
+            .withDestSTP("urn:ogf:network:es.net:esnet-edge-one?vlan=1780")
+            .withParameter(
+              new TypeValueType().withType("protection").withValue("PROTECTED"),
+              new TypeValueType().withType("flag"))))
         :: Nil)
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
