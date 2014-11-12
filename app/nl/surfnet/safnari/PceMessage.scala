@@ -2,16 +2,16 @@ package nl.surfnet.safnari
 
 import java.net.URI
 import javax.xml.datatype.{DatatypeFactory, XMLGregorianCalendar}
+
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import nl.surfnet.nsiv2.messages.{CorrelationId, NsiError, NsiErrorVariable}
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
-import org.ogf.schemas.nsi._2013._12.services.types.TypeValueType
 import play.api.data.validation.ValidationError
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
-import scala.collection.JavaConverters._
+
 import scala.util.Try
 
 case class ServiceType(serviceType: String, service: P2PServiceBaseType)
@@ -71,12 +71,6 @@ object PceMessage {
     }
   }
 
-  implicit val TypeValueTypeFormat: OFormat[TypeValueType] = (
-    (__ \ "type").format[String] and
-    (__ \ "value").formatNullable[String])(
-      (typ, value) => new TypeValueType().withType(typ).withValue(value.orNull),
-      tvt => (tvt.getType, Option(tvt.getValue)))
-
   implicit val ProviderEndPointFormat: OFormat[ProviderEndPoint] = (
     (__ \ "nsa").format[String] and
     (__ \ "csProviderURL").format[URI])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply))
@@ -86,24 +80,15 @@ object PceMessage {
     (__ \ "directionality").formatNullable[String].inmap[Option[DirectionalityType]](_.map(DirectionalityType.fromValue(_)), _.map(_.value)) and
     (__ \ "symmetricPath").formatNullable[Boolean] and
     (__ \ "sourceSTP").format[String] and
-    (__ \ "destSTP").format[String] and
-    (__ \ "parameter").formatNullable[Seq[TypeValueType]]
-  ).apply({ (capacity, directionality, symmetricPath, source, dest, parameters) =>
+    (__ \ "destSTP").format[String]
+  ).apply((capacity, directionality, symmetricPath, source, dest) => {
     new P2PServiceBaseType()
       .withCapacity(capacity)
       .withDirectionality(directionality.getOrElse(DirectionalityType.BIDIRECTIONAL))
       .withSymmetricPath(symmetricPath.map(x => x: java.lang.Boolean).orNull)
       .withSourceSTP(source)
       .withDestSTP(dest)
-      .withParameter(parameters.getOrElse(Seq.empty).asJava)
-  }, { p2ps => (
-      p2ps.getCapacity(),
-      Option(p2ps.getDirectionality()),
-      Option(p2ps.isSymmetricPath()).map(_.booleanValue()),
-      p2ps.getSourceSTP(),
-      p2ps.getDestSTP(),
-      Option(p2ps.getParameter).map(_.asScala))
-  })
+  }, { p2ps => (p2ps.getCapacity(), Option(p2ps.getDirectionality()), Option(p2ps.isSymmetricPath()).map(_.booleanValue()), p2ps.getSourceSTP(), p2ps.getDestSTP()) })
 
   implicit val ServiceTypeFormat: OFormat[ServiceType] = (
     (__ \ "serviceType").format[String] and
