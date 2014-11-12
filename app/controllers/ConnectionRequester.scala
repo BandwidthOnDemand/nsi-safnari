@@ -11,8 +11,6 @@ import soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.Instant
-import org.ogf.schemas.nsi._2013._12.connection.types.MessageDeliveryTimeoutRequestType
-import org.ogf.schemas.nsi._2013._12.connection.types.QueryRecursiveResultType
 import play.api.Logger
 import play.api.Play.current
 import play.api.libs.concurrent.Execution.Implicits._
