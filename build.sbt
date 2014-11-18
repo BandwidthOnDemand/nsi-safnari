@@ -67,3 +67,4 @@ deployDist := {
   distFile
 }
 
+net.virtualvoid.sbt.graph.Plugin.graphSettings
