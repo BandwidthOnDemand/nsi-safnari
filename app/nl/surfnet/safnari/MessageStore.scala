@@ -1,9 +1,10 @@
 package nl.surfnet.safnari
 
-import anorm.SqlParser._
 import anorm._
+import anorm.SqlParser._
 import java.net.URI
 import java.util.UUID
+import java.sql.Connection
 import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.messages._
@@ -90,7 +91,7 @@ case class MessageRecord[T](id: Long, createdAt: Instant, aggregatedConnectionId
   def map[B](f: T => B) = copy(message = f(message))
 }
 
-class MessageStore(implicit app: play.api.Application) {
+class MessageStore(databaseName: String)(implicit app: play.api.Application) {
   import SerializedMessage.MessageToSerializedMessage
 
   private implicit def rowToUuid: Column[UUID] = {
@@ -103,13 +104,13 @@ class MessageStore(implicit app: play.api.Application) {
     }
   }
 
-  def create(aggregatedConnectionId: ConnectionId, createdAt: Instant, requesterNsa: RequesterNsa): Unit = DB.withTransaction { implicit connection =>
+  def create(aggregatedConnectionId: ConnectionId, createdAt: Instant, requesterNsa: RequesterNsa): Unit = DB.withTransaction(databaseName) { implicit connection =>
     SQL("""INSERT INTO connections (aggregated_connection_id, created_at, requester_nsa) VALUES ({aggregated_connection_id}, {created_at}, {requester_nsa})""")
       .on('aggregated_connection_id -> aggregatedConnectionId, 'created_at -> createdAt.toSqlTimestamp, 'requester_nsa -> requesterNsa)
       .executeInsert()
   }
 
-  def storeInboundWithOutboundMessages(aggregatedConnectionId: ConnectionId, createdAt: Instant, inbound: InboundMessage, outbound: Seq[OutboundMessage]) = DB.withTransaction { implicit connection =>
+  def storeInboundWithOutboundMessages(aggregatedConnectionId: ConnectionId, createdAt: Instant, inbound: InboundMessage, outbound: Seq[OutboundMessage]) = DB.withTransaction(databaseName) { implicit connection =>
     val connectionPk = SQL("""SELECT id FROM connections WHERE aggregated_connection_id = {aggregated_connection_id} AND deleted_at IS NULL""")
       .on('aggregated_connection_id -> aggregatedConnectionId)
       .as(get[Long]("id").singleOpt)
@@ -120,7 +121,7 @@ class MessageStore(implicit app: play.api.Application) {
     outbound.foreach(store(connectionPk, createdAt, _, Some(inboundId)))
   }
 
-  def loadAll(aggregatedConnectionId: ConnectionId): Seq[MessageRecord[Message]] = DB.withConnection { implicit connection =>
+  def loadAll(aggregatedConnectionId: ConnectionId): Seq[MessageRecord[Message]] = DB.withConnection(databaseName) { implicit connection =>
     SQL("""
         SELECT m.id, c.aggregated_connection_id, m.created_at, m.correlation_id, m.direction, m.protocol, m.type, m.content
           FROM messages m INNER JOIN connections c ON m.connection_id = c.id
@@ -131,7 +132,7 @@ class MessageStore(implicit app: play.api.Application) {
       .map(_.map(message => MessageToSerializedMessage.invert(message).get)) // FIXME error handling
   }
 
-  def loadEverything(): Seq[(ConnectionId, Seq[MessageRecord[Message]])] = DB.withConnection { implicit connection =>
+  def loadEverything(): Seq[(ConnectionId, Seq[MessageRecord[Message]])] = DB.withConnection(databaseName) { implicit connection =>
     SQL("""
         SELECT m.id, c.aggregated_connection_id, m.created_at, m.correlation_id, m.direction, m.protocol, m.type, m.content
           FROM messages m INNER JOIN connections c ON m.connection_id = c.id
@@ -148,7 +149,7 @@ class MessageStore(implicit app: play.api.Application) {
       }(collection.breakOut)
   }
 
-  def delete(aggregatedConnectionId: ConnectionId, deletedAt: Instant): Unit = DB.withTransaction { implicit connection =>
+  def delete(aggregatedConnectionId: ConnectionId, deletedAt: Instant): Unit = DB.withTransaction(databaseName) { implicit connection =>
     SQL("""UPDATE connections SET deleted_at = {deleted_at} WHERE aggregated_connection_id = {aggregated_connection_id} AND deleted_at IS NULL""")
       .on('aggregated_connection_id -> aggregatedConnectionId, 'deleted_at -> deletedAt.toSqlTimestamp)
       .executeUpdate().tap(n => Logger.debug(s"Deleted connection $aggregatedConnectionId"))
@@ -159,7 +160,7 @@ class MessageStore(implicit app: play.api.Application) {
       MessageRecord(id, new Instant(createdAt), aggregatedConnectionId, SerializedMessage(CorrelationId.fromUuid(correlationId), direction, protocol, tpe, content))
   }
 
-  private def store(connectionPk: Long, createdAt: Instant, message: Message, inboundId: Option[Long]) = DB.withTransaction { implicit connection =>
+  private def store(connectionPk: Long, createdAt: Instant, message: Message, inboundId: Option[Long])(implicit connection: Connection) = {
     val serialized = MessageToSerializedMessage(message).get
     SQL("""
         INSERT INTO messages (connection_id, correlation_id, direction, protocol, type, content, created_at, inbound_message_id)

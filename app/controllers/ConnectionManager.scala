@@ -82,7 +82,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     deleteHooks.remove(connectionId).foreach { hook => hook(txn) }
   }
 
-  val messageStore = new MessageStore()
+  val messageStore = new MessageStore("default")
 
   def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection): Unit = atomic { implicit txn =>
     connections(connectionId) = connection

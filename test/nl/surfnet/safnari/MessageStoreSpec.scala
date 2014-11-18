@@ -16,7 +16,7 @@ class MessageStoreSpec extends helpers.Specification {
     lazy val timestamp = new Instant()
     lazy val aggregatedConnectionId = newConnectionId
     lazy val messageStore = {
-      val s = new MessageStore()
+      val s = new MessageStore("default")
       s.create(aggregatedConnectionId, timestamp, "requester_nsa")
       s
     }
