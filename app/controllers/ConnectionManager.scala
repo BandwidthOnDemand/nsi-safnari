@@ -7,6 +7,7 @@ import akka.util.Timeout
 import java.net.URI
 import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.persistence._
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
@@ -82,7 +83,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     deleteHooks.remove(connectionId).foreach { hook => hook(txn) }
   }
 
-  val messageStore = new MessageStore("default")
+  import MessagePersistence.MessageToMessageData
+  val messageStore = new MessageStore[Message]("default")
 
   def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection): Unit = atomic { implicit txn =>
     connections(connectionId) = connection

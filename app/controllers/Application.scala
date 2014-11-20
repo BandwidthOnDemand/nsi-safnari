@@ -1,16 +1,15 @@
 package controllers
 
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.safnari._
-
 import akka.actor.ActorRef
 import akka.pattern.ask
 import controllers.ActorSupport._
+import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.utils._
+import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
 import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
-
 import scala.concurrent.Future
 
 class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) extends Controller {

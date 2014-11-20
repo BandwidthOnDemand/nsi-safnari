@@ -1,6 +1,7 @@
 package nl.surfnet.safnari
 
 import nl.surfnet.nsiv2._
+import nl.surfnet.nsiv2.utils._
 
 import javax.xml.datatype.XMLGregorianCalendar
 import nl.surfnet.nsiv2.messages.{DataPlaneStateChange, NsiRequesterMessage, NsiHeaders}

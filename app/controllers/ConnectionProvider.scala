@@ -16,7 +16,6 @@ import play.api._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
 
-import scala.Error
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 

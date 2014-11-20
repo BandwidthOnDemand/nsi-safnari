@@ -4,6 +4,7 @@ import java.net.URI
 import java.util.concurrent.atomic.AtomicInteger
 
 import nl.surfnet.nsiv2._
+import nl.surfnet.nsiv2.utils._
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import nl.surfnet.nsiv2.messages._
