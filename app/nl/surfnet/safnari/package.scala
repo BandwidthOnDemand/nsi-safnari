@@ -8,8 +8,6 @@ import javax.xml.datatype.XMLGregorianCalendar
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import play.api.data.validation.ValidationError
-import play.api.libs.json._
 import scala.util.{ Failure, Success, Try }
 
 package object safnari {
@@ -20,24 +18,6 @@ package object safnari {
   private val UuidGenerator = Uuid.randomUuidGenerator
 
   def newConnectionId: ConnectionId = UuidGenerator().toString
-
-  def valueFormat[T](message: String)(parse: String => Option[T], print: T => String): Format[T] = new Format[T] {
-    override def reads(json: JsValue): JsResult[T] = json match {
-      case JsString(s) => parse(s) match {
-        case Some(t) => JsSuccess(t)
-        case None    => JsError(Seq(JsPath() -> Seq(ValidationError(message, s))))
-      }
-      case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.jsstring"))))
-    }
-    override def writes(t: T): JsValue = JsString(print(t))
-  }
-
-  implicit val UriFormat: Format[URI] = valueFormat("error.expected.uri")(
-    parse = s => Try(URI.create(s)).toOption,
-    print = _.toASCIIString)
-  implicit val CorrelationIdFormat: Format[CorrelationId] = valueFormat("error.expected.correlationId")(
-    parse = CorrelationId.fromString,
-    print = _.toString)
 
   implicit class AnyOps[A](a: A) {
     def tap(f: A => Unit): A = { f(a); a }

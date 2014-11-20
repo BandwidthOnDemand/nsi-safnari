@@ -2,9 +2,7 @@ package nl.surfnet.safnari
 
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.persistence.MessageData
-import nl.surfnet.nsiv2.soap._
-import nl.surfnet.nsiv2.soap.NsiSoapConversions._
-import nl.surfnet.nsiv2.utils.ErrorMessage
+import nl.surfnet.nsiv2.soap.Conversion
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import scala.util.{ Try, Success, Failure }
