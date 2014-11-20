@@ -15,10 +15,6 @@ class MessagePersistenceSpec extends MessageStoreSpecification {
 
   private implicit val ArbitraryPathComputationAlgorithm: Arbitrary[PathComputationAlgorithm] = Arbitrary(Gen.oneOf(PathComputationAlgorithm.values))
   private implicit val ArbitraryServiceType: Arbitrary[ServiceType] = Arbitrary(Gen.resultOf(ServiceType.apply _))
-  private implicit val ArbitraryConnectionType: Arbitrary[ConnectionType] = Arbitrary(for {
-    value <- Gen.oneOf("connection-type-1", "connection-type-2", "connection-type-3")
-    index <- Gen.choose(0, 4)
-  } yield new ConnectionType().withValue(value).withIndex(index))
   private implicit val ArbitraryPathComputationRequest: Arbitrary[PathComputationRequest] = Arbitrary(Gen.resultOf(PathComputationRequest.apply _))
   private implicit val ArbitraryPceRequest: Arbitrary[PceRequest] = Arbitrary(arbitrary[PathComputationRequest])
 

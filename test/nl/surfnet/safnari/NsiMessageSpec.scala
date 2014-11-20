@@ -18,8 +18,8 @@ object NsiMessageSpec {
 
   val SessionSecurityAttr = new SessionSecurityAttrType()
     .withAttributeOrEncryptedAttribute(new AttributeType()
-    .withName("token")
-    .withAttributeValue("mytoken"))
+      .withName("token")
+      .withAttributeValue("mytoken"))
 
   def nsiProviderHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, connectionTrace: List[ConnectionType] = Nil): NsiHeaders =
     nsiHeaders(correlationId, Some(URI.create("http://nsi-agent.example.com/")), NsiHeaders.ProviderProtocolVersion, securityAttrs, connectionTrace)
