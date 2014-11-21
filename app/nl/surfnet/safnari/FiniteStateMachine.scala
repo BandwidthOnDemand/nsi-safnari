@@ -66,7 +66,7 @@ abstract class FiniteStateMachine[S, D, I, O](initialStateName: S, initialStateD
    * reminder what the new state is.
    */
   protected[this] object -> {
-    def unapply[S](in: (S, S)) = Some(in)
+    def unapply(in: (S, S)) = Some(in)
   }
 
   private var _stateName: S = initialStateName
