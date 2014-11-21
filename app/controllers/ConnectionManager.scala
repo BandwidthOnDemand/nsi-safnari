@@ -5,7 +5,6 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
 import java.net.URI
-import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.persistence._
 import nl.surfnet.safnari._
@@ -77,6 +76,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   private def addDeleteHook(connectionId: ConnectionId)(f: InTxn => Unit)(implicit tx: InTxn): Unit = {
     val existing = deleteHooks.getOrElse(connectionId, (_: InTxn) => ())
     deleteHooks.put(connectionId, { txn => existing(txn); f(txn) })
+    ()
   }
 
   private def runDeleteHook(connectionId: ConnectionId): Unit = atomic { implicit txn =>
@@ -88,7 +88,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
   def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection): Unit = atomic { implicit txn =>
     connections(connectionId) = connection
-    addDeleteHook(connectionId) { implicit txn => connections.remove(connectionId) }
+    addDeleteHook(connectionId) { implicit txn => connections.remove(connectionId); () }
     globalReservationId foreach { globalReservationId =>
       globalReservationIdsMap(globalReservationId) = globalReservationIdsMap.getOrElse(globalReservationId, Set()) + connection
       addDeleteHook(connectionId) { implicit txn => deleteConnectionFromGlobalReservationIds(connection, globalReservationId) }
@@ -99,7 +99,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     val remainingConnections = globalReservationIdsMap.getOrElse(globalReservationId, Set()) - connection
     remainingConnections match {
       case s if s.nonEmpty => globalReservationIdsMap(globalReservationId) = s
-      case _ => globalReservationIdsMap.remove(globalReservationId)
+      case _ => globalReservationIdsMap.remove(globalReservationId); ()
     }
   }
 
@@ -130,13 +130,14 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     childConnections(childConnectionId) = connection
     addDeleteHook(aggregatedConnectionId) { implicit txn =>
       childConnections.remove(childConnectionId)
+      ()
     }
   }
 
   private def registerRequesterAndCorrelationId(requesterNsa: RequesterNsa, correlationId: CorrelationId, connectionId: ConnectionId, connection: Connection): Unit = atomic { implicit txn =>
     val key = (requesterNsa, correlationId)
     connectionsByRequesterCorrelationId(key) = connection
-    addDeleteHook(connectionId) { implicit txn => connectionsByRequesterCorrelationId.remove(key) }
+    addDeleteHook(connectionId) { implicit txn => connectionsByRequesterCorrelationId.remove(key); () }
   }
 
   def findByChildConnectionId(connectionId: ConnectionId): Option[Connection] = childConnections.single.get(connectionId)
@@ -357,6 +358,4 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       childConnectionId.foreach(addChildConnectionId(Connection(self), connection.id, _))
     }
   }
-
-  private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(Configuration.NsaId)
 }

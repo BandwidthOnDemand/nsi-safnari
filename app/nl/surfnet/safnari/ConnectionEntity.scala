@@ -25,8 +25,8 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     newNsiHeaders(provider).copy(connectionTrace = newTrace)
   }
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil, Nil)
-  private var nextNotificationId = new AtomicInteger(1)
-  private var nextResultId = new AtomicInteger(1)
+  private val nextNotificationId = new AtomicInteger(1)
+  private val nextResultId = new AtomicInteger(1)
   private var nsiNotifications: List[NsiNotification] = Nil
   private var nsiResults: List[QueryResultResponseType] = Nil
   private def newNotificationId() = nextNotificationId.getAndIncrement()
@@ -58,8 +58,6 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         case Left(connectionIds)         => connectionIds.contains(id)
         case Right(globalReservationIds) => globalReservationIds.contains(globalReservationId)
       })
-
-      val done = children.childConnections.forall { case (_, _, connectionId) => connectionId.isDefined }
 
       val qrsm = new QueryRecursiveStateMachine(
         id,

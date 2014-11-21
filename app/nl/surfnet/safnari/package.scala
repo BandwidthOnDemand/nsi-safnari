@@ -20,7 +20,7 @@ package object safnari {
   def newConnectionId: ConnectionId = UuidGenerator().toString
 
   implicit class AnyOps[A](a: A) {
-    def tap(f: A => Unit): A = { f(a); a }
+    def tap[B](f: A => B): A = { f(a); a }
     def pp: A = { Console.err.println(a); a }
     def pp(prefix: String): A = { Console.err.println(s"$prefix: $a"); a }
   }

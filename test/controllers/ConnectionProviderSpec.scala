@@ -27,7 +27,7 @@ class ConnectionProviderSpec extends helpers.Specification {
       val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor)))
       val requesterOperation = Promise[NsiRequesterOperation]()
 
-      val response = await(connectionProvider.handleCommand(initialReserveMessage) { requesterOperation.success(_) })
+      val response = await(connectionProvider.handleCommand(initialReserveMessage) { reply => requesterOperation.success(reply); () })
 
       response must beLike {
         case ReserveResponse(connectionId) => connectionId must not(beEmpty)
@@ -37,7 +37,7 @@ class ConnectionProviderSpec extends helpers.Specification {
         case op: ReserveConfirmed =>
           val queryResult = Promise[NsiRequesterOperation]
 
-          await(connectionProvider.handleQuery(QuerySummary(Some(Left(Seq(op.connectionId)))), "RequesterNsa") { queryResult.success(_) })
+          await(connectionProvider.handleQuery(QuerySummary(Some(Left(Seq(op.connectionId)))), "RequesterNsa") { reply => queryResult.success(reply); () })
 
           await(queryResult.future) must beLike {
             case QuerySummaryConfirmed(Seq(reservation: QuerySummaryResultType)) =>

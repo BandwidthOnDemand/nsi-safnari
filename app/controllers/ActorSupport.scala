@@ -1,6 +1,5 @@
 package controllers
 
-import akka.actor._
 import akka.util.Timeout
 import play.api.libs.concurrent.Akka
 import scala.concurrent.duration._

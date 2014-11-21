@@ -1,7 +1,6 @@
 package presenters
 
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.safnari._
 
 import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._12.connection.types._

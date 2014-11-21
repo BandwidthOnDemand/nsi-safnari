@@ -3,7 +3,6 @@ package nl.surfnet.safnari
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 
-import scala.Error
 import scala.collection.JavaConverters._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 

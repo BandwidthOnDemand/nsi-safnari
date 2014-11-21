@@ -63,12 +63,11 @@ trait GlobalSettings extends play.api.GlobalSettings {
     }
   }
 
-  private def cleanDatabase(implicit app: PlayApp): Unit = {
-    DB.withTransaction { implicit connection =>
-      val tables = SQL("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'play_evolutions'").as(str("tablename").*).map("public." ++ _)
-      val truncate = s"TRUNCATE TABLE ${tables.mkString(",")} CASCADE"
-      Logger.debug(s"Cleaning database: $truncate")
-      SQL(truncate).executeUpdate()
-    }
+  private def cleanDatabase(implicit app: PlayApp): Unit = DB.withTransaction { implicit connection =>
+    val tables = SQL("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'play_evolutions'").as(str("tablename").*).map("public." ++ _)
+    val truncate = s"TRUNCATE TABLE ${tables.mkString(",")} CASCADE"
+    Logger.debug(s"Cleaning database: $truncate")
+    SQL(truncate).executeUpdate()
+    ()
   }
 }
