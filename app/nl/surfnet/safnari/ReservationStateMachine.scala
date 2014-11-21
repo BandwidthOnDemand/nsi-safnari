@@ -4,6 +4,7 @@ import java.net.URI
 
 import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.utils._
 
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType

@@ -1,7 +1,7 @@
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.utils._
 
 import org.ogf.schemas.nsi._2013._12.connection.types.LifecycleStateEnumType._
 import org.ogf.schemas.nsi._2013._12.connection.types._

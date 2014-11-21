@@ -55,7 +55,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       case Success(list) =>
         val resultTypes = list.flatMap {
           case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultType
-          case ToRequester(NsiRequesterMessage(_, Error(e)))                            => Seq.empty
+          case ToRequester(NsiRequesterMessage(_, ErrorReply(e)))                       => Seq.empty
         }
 
         replyTo(QueryRecursiveConfirmed(resultTypes))

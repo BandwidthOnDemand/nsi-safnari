@@ -38,7 +38,7 @@ object NsiWebService {
       (defaultHeaders, document) => NsiRequesterMessageToDocument[NsiAcknowledgement](Some(defaultHeaders)).invert(document),
       (headers, exception) => NsiRequesterMessage(headers, ServiceException(exception)))(NsiRequesterMessageToDocument(defaultHeaders = None))
 
-  private def call[T, M[_] <: NsiMessage[_]](
+  private def call[T <: NsiOperation, M[_ <: NsiOperation] <: NsiMessage[_]](
     provider: ProviderEndPoint,
     soapAction: String,
     message: M[T],
