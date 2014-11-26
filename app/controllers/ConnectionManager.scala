@@ -249,7 +249,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
         schedulePassedEndTimeMessage()
 
-        val response = result match {
+        val response: NsiAcknowledgement = result match {
           case Left(error) =>
             ServiceException(error)
           case Right(outbound) =>
