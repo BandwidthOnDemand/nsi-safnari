@@ -23,7 +23,9 @@ import controllers.ActorSupport._
 
 class ConnectionRequester(connectionManager: ConnectionManager) extends Controller with SoapWebService {
 
-  val BaseWsdlFilename = "ogf_nsi_connection_requester_v2_0.wsdl"
+  override val WsdlPathPrefix = "wsdl/2.0"
+  override val WsdlPath = ""
+  override val WsdlBasename = "ogf_nsi_connection_requester_v2_0.wsdl"
 
   override def serviceUrl: String = ConnectionRequester.serviceUrl
 

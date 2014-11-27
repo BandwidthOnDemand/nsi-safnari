@@ -13,7 +13,7 @@ GET    /nsi-v2/ConnectionServiceProvider    @controllers.ConnectionProvider.wsdl
 POST   /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequester.request
 GET    /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequester.wsdl(wsdl: String)
 
-GET    /nsi-v2/:wsdlOrXsd                   nl.surfnet.nsiv2.soap.SoapWebService.wsdlOrXsd(wsdlOrXsd: String)
+GET    /nsi-v2/:wsdlOrXsd                   @controllers.ConnectionRequester.wsdlOrXsd(wsdlOrXsd: String)
 
 GET    /nsa-discovery                       @controllers.DiscoveryService.index
 
