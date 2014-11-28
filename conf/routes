@@ -9,9 +9,9 @@ GET    /connections/:id                     @controllers.Application.connection(
 GET    /healthcheck                         @controllers.Application.healthcheck
 
 POST   /nsi-v2/ConnectionServiceProvider    @controllers.ConnectionProvider.request
-GET    /nsi-v2/ConnectionServiceProvider    @controllers.ConnectionProvider.wsdl(wsdl: String)
+GET    /nsi-v2/ConnectionServiceProvider    @controllers.ConnectionProvider.wsdl
 POST   /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequester.request
-GET    /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequester.wsdl(wsdl: String)
+GET    /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequester.wsdl
 
 GET    /nsi-v2/:wsdlOrXsd                   @controllers.ConnectionRequester.wsdlOrXsd(wsdlOrXsd: String)
 

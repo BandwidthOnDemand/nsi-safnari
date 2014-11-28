@@ -21,7 +21,7 @@ import scala.util.{Failure, Success}
 
 class ConnectionProvider(connectionManager: ConnectionManager) extends Controller with SoapWebService {
 
-  override val WsdlPathPrefix = "wsdl/2.0"
+  override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
   override val WsdlBasename = "ogf_nsi_connection_provider_v2_0.wsdl"
 

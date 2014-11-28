@@ -1,7 +1,7 @@
 @(secure: Boolean, nsaId: String, webParams: Map[String,String])(implicit request: play.api.mvc.RequestHeader)
 
-@providerWsdl = { @routes.ConnectionProvider.wsdl("").absoluteURL(secure) }
-@requesterWsdl = { @routes.ConnectionRequester.wsdl("").absoluteURL(secure) }
+@providerWsdl = { @routes.ConnectionProvider.wsdl.absoluteURL(secure) }
+@requesterWsdl = { @routes.ConnectionRequester.wsdl.absoluteURL(secure) }
 
 @main("Welcome to the NSI Safnari", "usage", webParams) {
     <section>
