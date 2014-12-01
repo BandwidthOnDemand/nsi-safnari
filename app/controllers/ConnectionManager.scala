@@ -7,6 +7,7 @@ import akka.util.Timeout
 import java.net.URI
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.persistence._
+import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
@@ -148,7 +149,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     val replayedConnections = Future.sequence(for {
       (connectionId, records @ (MessageRecord(_, _, _, FromRequester(NsiProviderMessage(headers, initialReserve: InitialReserve))) +: _)) <- messageStore.loadEverything()
     } yield {
-      val commands = records.map { record => Connection.Command(record.createdAt, record.message) }
+      val commands = records.map { record => Connection.Command(new Instant(record.createdAt.toEpochMilli()), record.message) }
       val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
       commands.foreach {
         case Connection.Command(_, FromRequester(message)) =>
@@ -179,7 +180,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
         case NsiProviderMessage(headers, initialReserve: InitialReserve) =>
           val connectionId = newConnectionId
           val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
-          messageStore.create(connectionId, new Instant(), headers.requesterNSA)
+          messageStore.create(connectionId, new Instant().toJavaInstant, headers.requesterNSA)
           Some(connectionId -> connection)
       }
       result.foreach {
@@ -288,7 +289,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
       case Delete =>
         Logger.info(s"Stopping $connection.id")
-        messageStore.delete(connection.id, new Instant())
+        messageStore.delete(connection.id, new Instant().toJavaInstant)
         runDeleteHook(connection.id)
         context.stop(self)
     }
@@ -331,7 +332,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     private def PersistMessages[E](timestamp: Instant, wrapped: InboundMessage => Either[E, Seq[OutboundMessage]]): InboundMessage => Either[E, Seq[OutboundMessage]] = { inbound =>
       val result = wrapped(inbound)
       result.right.foreach { outbound =>
-        messageStore.storeInboundWithOutboundMessages(connection.id, timestamp, inbound, outbound)
+        messageStore.storeInboundWithOutboundMessages(connection.id, timestamp.toJavaInstant, inbound, outbound)
       }
       result
     }
