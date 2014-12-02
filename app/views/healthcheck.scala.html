@@ -1,11 +1,9 @@
 @(serviceStates: Map[String, Boolean], version: String, webParams: Map[String,String])
 
 @main("Healthcheck", "healthcheck", webParams) {
-    <div class="modal modal-relative">
-        <div class="modal-header">
-            <h3>Health Check <span class="header-right">@version</span></h3>
-        </div>
-        <div class="modal-body">
+    <section>
+        <h1>Health Check<span class="header-right">@version</span></h1>
+        <div class="content">
             <table class="table" id="healthcheck">
                 <thead>
                     <tr><td>System</td><td>Status</td></tr>
@@ -20,5 +18,5 @@
                 </tbody>
             </table>
         </div>
-    </div>
+    </section>
 }
