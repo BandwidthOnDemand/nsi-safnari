@@ -191,6 +191,10 @@ class ReservationStateMachine(
             withSchedule(data.criteria.getSchedule()).
             withServiceType(data.criteria.getServiceType()).
             withVersion(data.criteria.getVersion())
+          initialReserve.body.criteria.getPointToPointService().foreach( ptp =>
+            criteria.getPointToPointService().get.withParameter(ptp.getParameter)
+          )
+
           val reserveType = new ReserveType().
             withGlobalReservationId(data.globalReservationId.map(_.toASCIIString()).orNull).
             withDescription(data.description.orNull).
