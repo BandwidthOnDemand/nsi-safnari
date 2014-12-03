@@ -127,12 +127,14 @@ object PathComputationEngine extends Controller {
         sender ! Success(Reachability)
 
       case ToPce(pce: PathComputationRequest) =>
+        val serviceType = Json.fromJson[ServiceType](Json.toJson(pce.serviceType)(PceMessage.ServiceTypeFormat))(PceMessage.ServiceTypeFormat).get
+
         Connection(sender) ! Connection.Command(new Instant(),
           FromPce(PathComputationConfirmed(
             pce.correlationId,
             Seq(ComputedSegment(
               ProviderEndPoint("urn:ogf:network:surfnet.nl:1990:nsa:bod-dev", URI.create("http://localhost:8082/bod/nsi/v2/provider")),
-              pce.serviceType)))))
+              serviceType)))))
     }
   }
 }
