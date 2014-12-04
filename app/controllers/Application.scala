@@ -59,7 +59,7 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
     // FIXME data consistency (db query + two messages may be interleaved with other messages)
     connectionManager.get(id).map { c =>
       connectionDetails(c) map { case (criteria, summary, segments) =>
-        val messages = connectionManager.messageStore.loadAll(id)
+        val messages = connectionManager.messageStore.findByConnectionId(id)
         Ok(views.html.connection(ConnectionPresenter(summary, criteria), segments.map{ ConnectionPathSegmentPresenter }, messages, Configuration.WebParams))
       }
     }.getOrElse {
