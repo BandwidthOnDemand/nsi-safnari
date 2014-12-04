@@ -9,7 +9,6 @@
 @import play.api.libs.json.{ Json, Writes, JsString }
 @import play.api.libs.json.extensions._
 @import java.time.Instant
-@import java.time.format.DateTimeFormatter
 
 @id() = @{
     if (connection.globalReservationId != null && connection.globalReservationId.nonEmpty)
@@ -32,7 +31,7 @@
 }
 
 @display(index: Int, text: String, time: Instant, body: String) = {
-  <div class="message"><span class="section-number">@(index + 1).</span> @text<span class="time">DateTimeFormatter.ofPattern("YYYY-MM-dd HH:mm:ss,SSS").format(@time)</span></div>
+  <div class="message"><span class="section-number">@(index + 1).</span> @text<span class="time">@time</span></div>
   <pre class="prettyprint">@body</pre>
 }
 
