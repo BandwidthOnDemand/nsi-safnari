@@ -34,7 +34,7 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
 
   def connections = Action.async {
     val now = DateTime.now
-    val timeBound = now.minusWeeks(1).toXmlGregorianCalendar
+    val timeBound = now.minusWeeks(1)
 
     // FIXME data consistency (two messages may be interleaved with other messages)
     val queryResult = Future.traverse(connectionManager.all)(connectionDetails)
@@ -42,9 +42,9 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
     queryResult map { cs =>
       val connections =
         cs.map {
-          case (criteria, summary, segments) => (ConnectionPresenter(summary, criteria), segments.map{ ConnectionPathSegmentPresenter })
+          case (summary, pendingCriteria, segments) => (ConnectionPresenter(summary, pendingCriteria), segments.map{ ConnectionPathSegmentPresenter })
         }.filter {
-          case (connection, _) => connection.endTime.forall(_.compare(timeBound) > 0)
+          case (connection, _) => connection.endTime.forall(_.compareTo(timeBound) > 0)
         }.sortBy {
           case (connection, _) => connection.startTime
         }.reverse.groupBy {
@@ -58,9 +58,9 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
   def connection(id: ConnectionId) = Action.async {
     // FIXME data consistency (db query + two messages may be interleaved with other messages)
     connectionManager.get(id).map { c =>
-      connectionDetails(c) map { case (criteria, summary, segments) =>
+      connectionDetails(c) map { case (summary, pendingCriteria, segments) =>
         val messages = connectionManager.messageStore.findByConnectionId(id)
-        Ok(views.html.connection(ConnectionPresenter(summary, criteria), segments.map{ ConnectionPathSegmentPresenter }, messages, Configuration.WebParams))
+        Ok(views.html.connection(ConnectionPresenter(summary, pendingCriteria), segments.map{ ConnectionPathSegmentPresenter }, messages, Configuration.WebParams))
       }
     }.getOrElse {
       Future.successful(NotFound(s"Connection ($id) was not found"))
@@ -68,10 +68,10 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
   }
 
   private def connectionDetails(connection: Connection) = for {
-    (criteria, summary) <- (connection ? Connection.Query)
+    queryResult <- (connection ? Connection.Query)
     segments <- (connection ? Connection.QuerySegments)
   } yield {
-    (criteria, summary, segments)
+    (queryResult.summary, queryResult.pendingCriteria, segments)
   }
 
 }

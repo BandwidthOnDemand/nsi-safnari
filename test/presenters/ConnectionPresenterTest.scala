@@ -14,12 +14,12 @@ class ConnectionPresenterTest extends helpers.Specification {
       .withDataPlaneStatus(new DataPlaneStatusType().withActive(false))
     def data = new QuerySummaryResultType().withConnectionId("ID").withGlobalReservationId("GLOBAL").withDescription("description")
       .withRequesterNSA("requester").withConnectionStates(states)
-    def criteria = new ReservationConfirmCriteriaType().withSchedule(new ScheduleType)
+    def criteria = new ReservationRequestCriteriaType().withSchedule(new ScheduleType)
 
     val now = DateTime.now
 
     "given a query summary result" should {
-      val subject = ConnectionPresenter(data, criteria)
+      val subject = ConnectionPresenter(data, Some(criteria))
 
       "have a connection ID" in {
         subject.connectionId must beEqualTo(data.getConnectionId)
@@ -45,7 +45,7 @@ class ConnectionPresenterTest extends helpers.Specification {
     "given an active connection" should {
       val schedule = criteria.getSchedule.withStartTime(now.minusDays(1).toXmlGregorianCalendar).withEndTime(now.plusDays(1).toXmlGregorianCalendar)
       val subject = ConnectionPresenter(data.withConnectionStates(states.withDataPlaneStatus( new DataPlaneStatusType().withActive(true) )),
-                                        criteria.withSchedule(schedule))
+                                        Some(criteria.withSchedule(schedule)))
 
       "have an active data plane" in {
         subject.dataPlaneStatus must beEqualTo("active")
@@ -59,7 +59,7 @@ class ConnectionPresenterTest extends helpers.Specification {
     "given a future connection" should {
       val schedule = criteria.getSchedule.withStartTime(now.plusDays(1).toXmlGregorianCalendar).withEndTime(now.plusDays(5).toXmlGregorianCalendar)
       val subject = ConnectionPresenter(data.withConnectionStates(states.withDataPlaneStatus( new DataPlaneStatusType().withActive(false) )),
-                                        criteria.withSchedule(schedule))
+                                        Some(criteria.withSchedule(schedule)))
 
       "have an inactive data plane" in {
         subject.dataPlaneStatus must beEqualTo("inactive")
@@ -73,7 +73,7 @@ class ConnectionPresenterTest extends helpers.Specification {
     "given a past connection" should {
       val schedule = criteria.getSchedule.withStartTime(now.minusDays(5).toXmlGregorianCalendar).withEndTime(now.minusDays(1).toXmlGregorianCalendar)
       val subject = ConnectionPresenter(data.withConnectionStates(states.withDataPlaneStatus( new DataPlaneStatusType().withActive(false) )),
-                                        criteria.withSchedule(schedule))
+                                        Some(criteria.withSchedule(schedule)))
 
       "have an inactive data plane" in {
         subject.dataPlaneStatus must beEqualTo("inactive")

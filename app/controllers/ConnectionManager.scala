@@ -34,7 +34,7 @@ object Connection {
     def resultClassTag: ClassTag[Result]
   }
   case object Query extends Operation {
-    final type Result = (ReservationConfirmCriteriaType, QuerySummaryResultType)
+    final case class Result(summary: QuerySummaryResultType, pendingCriteria: Option[ReservationRequestCriteriaType])
     final val resultClassTag = implicitly[ClassTag[Result]]
   }
   case object QuerySegments extends Operation {
@@ -119,7 +119,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   def findByRequesterNsa(requesterNsa: RequesterNsa)(implicit executionContext: ExecutionContext): Future[Seq[Connection]] = {
     val futures = all map { actor => (actor ? Connection.Query).map(actor -> _) }
     Future.fold(futures)(List[Connection]()) {
-      case (actors, (actor, (criteria, queryResult))) if (queryResult.getRequesterNSA() == requesterNsa) => actor :: actors
+      case (actors, (actor, queryResult)) if (queryResult.summary.getRequesterNSA() == requesterNsa) => actor :: actors
       case (actors, _) => actors
     }
   }
@@ -222,7 +222,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
     import Connection._
     override def receive = LoggingReceive {
-      case Query              => sender ! ((connection.rsm.criteria, connection.query))
+      case Query              => sender ! Query.Result(connection.query, Some(connection.rsm.pendingCriteria))
       case QuerySegments      => sender ! connection.segments
       case QueryNotifications => sender ! connection.notifications
       case QueryResults       => sender ! connection.results
@@ -297,7 +297,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     private def schedulePassedEndTimeMessage(): Unit = {
       endTimeCancellable.foreach(_.cancel())
       endTimeCancellable = (for {
-        endTime <- connection.rsm.criteria.getSchedule().endTime
+        criteria <- connection.rsm.committedCriteria
+        endTime <- criteria.getSchedule().endTime
         if connection.lsm.lifecycleState == LifecycleStateEnumType.CREATED
       } yield {
         val delay = (endTime.getMillis - DateTimeUtils.currentTimeMillis()).milliseconds

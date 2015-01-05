@@ -121,7 +121,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
     val connections = connectionIdsToConnections(ids, requesterNsa)
 
     connections flatMap { cs =>
-      Future.traverse(cs)(c => (c ? Connection.Query).map(_._2))
+      Future.traverse(cs)(c => (c ? Connection.Query).map(_.summary))
     }
   }
 

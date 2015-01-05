@@ -38,7 +38,7 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newNotificationHeaders: 
         .withTimeStamp(nextStateData.timeStamp.get)))))
   }
 
-  def dataPlaneStatus = new DataPlaneStatusType().withVersion(currentVersion()).withActive(stateName).withVersionConsistent(true)
+  def dataPlaneStatus = new DataPlaneStatusType().withVersion(currentVersion()).withActive(stateName).withVersionConsistent(true) // FIXME version consistent
 
   def childConnectionState(connectionId: ConnectionId) = stateData.childStates(connectionId)
 }

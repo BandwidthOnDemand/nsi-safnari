@@ -2,7 +2,6 @@ package nl.surfnet.safnari
 
 import java.net.URI
 
-import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 
@@ -29,7 +28,9 @@ case class ReservationStateMachineData(
   currentCommand: NsiProviderMessage[NsiProviderOperation],
   globalReservationId: Option[GlobalReservationId],
   description: Option[String],
-  criteria: ReservationConfirmCriteriaType,
+  pendingCriteria: ReservationRequestCriteriaType,
+  committedCriteria: Option[ReservationConfirmCriteriaType] = None,
+  segments: Seq[(CorrelationId, ComputedSegment)] = Seq.empty,
   awaitingReserveReply: Set[CorrelationId] = Set.empty,
   childConnectionStates: Map[CorrelationId, ReservationState] = Map.empty,
   childExceptions: Map[CorrelationId, ServiceExceptionType] = Map.empty,
@@ -37,6 +38,7 @@ case class ReservationStateMachineData(
 
   def receivedSegments(segments: Seq[(CorrelationId, ComputedSegment)]) =
     copy(
+      segments = segments,
       awaitingReserveReply = segments.map(_._1).toSet)
 
   def aggregatedReservationState: ReservationState =
@@ -56,10 +58,11 @@ case class ReservationStateMachineData(
   def updateChild(initialCorrelationId: CorrelationId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None): ReservationStateMachineData  = {
     updateChildStatus(initialCorrelationId, reservationState, childException)
   }
-  def updateChildStatus(correlationId: CorrelationId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None): ReservationStateMachineData =
+  def updateChildStatus(correlationId: CorrelationId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None): ReservationStateMachineData = {
     copy(
       childConnectionStates = childConnectionStates.updated(correlationId, reservationState),
       childExceptions = childException.fold(childExceptions - correlationId)(exception => childExceptions.updated(correlationId, exception)))
+  }
 
   def startProcessingNewCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: ReservationState, children: ChildConnectionIds) = {
     // Skip aborted state when we never received a child connection id due to an immediate service exception.
@@ -82,6 +85,13 @@ case class ReservationStateMachineData(
     val correlationId = children.initialCorrelationIdByConnectionId.getOrElse(connectionId, throw new IllegalStateException(s"missing child connection id for $connectionId"))
     childHasState(correlationId, state)
   }
+
+  def pendingToConfirmCriteria = pendingCriteria.toConfirmCriteria(
+    pendingCriteria.getPointToPointService().get.getSourceSTP,
+    pendingCriteria.getPointToPointService().get.getDestSTP,
+    if (pendingCriteria.getVersion eq null) committedCriteria.map(_.getVersion).getOrElse(0) else pendingCriteria.getVersion + 1)
+
+  def commitPendingCriteria = copy(committedCriteria = pendingToConfirmCriteria.toOption)
 }
 
 class ReservationStateMachine(
@@ -104,8 +114,8 @@ class ReservationStateMachine(
       initialReserve.body.criteria)) {
 
   when(InitialReservationState) {
-    case Event(FromRequester(NsiProviderMessage(_, message: InitialReserve)), _) =>
-      goto(PathComputationState)
+    case Event(FromRequester(NsiProviderMessage(_, message: InitialReserve)), data) =>
+      goto(PathComputationState) using data.copy(pendingCriteria = message.criteria)
   }
 
   when(PathComputationState) {
@@ -150,8 +160,9 @@ class ReservationStateMachine(
 
   when(CommittingReservationState) {
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveCommitConfirmed)), data) if data.childHasState(message.connectionId, CommittingReservationState, children) =>
-      val newData = data.updateChild(children.initialCorrelationIdFor(message.connectionId), ReservedReservationState)
-      goto(newData.aggregatedReservationState) using newData
+      val newData1 = data.updateChild(children.initialCorrelationIdFor(message.connectionId), ReservedReservationState)
+      val newData2 = if (newData1.aggregatedReservationState == ReservedReservationState) newData1.commitPendingCriteria else newData1
+      goto(newData2.aggregatedReservationState) using newData2
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveCommitFailed)), data) if data.childHasState(message.connectionId, CommittingReservationState, children) =>
       val newData = data.updateChild(children.initialCorrelationIdFor(message.connectionId), CommitFailedReservationState, Some(message.failed.getServiceException()))
       goto(newData.aggregatedReservationState) using newData
@@ -179,7 +190,7 @@ class ReservationStateMachine(
 
   onTransition {
     case InitialReservationState -> PathComputationState =>
-      Seq(ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, initialReserve.body.criteria.getSchedule(), ServiceType(initialReserve.body.criteria.getServiceType(), initialReserve.body.service), pathComputationAlgorithm, initialReserve.headers.connectionTrace)))
+      Seq(ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, nextStateData.pendingCriteria.getSchedule(), ServiceType(nextStateData.pendingCriteria.getServiceType(), nextStateData.pendingCriteria.getPointToPointService().get), pathComputationAlgorithm, initialReserve.headers.connectionTrace)))
 
     case PathComputationState -> CheckingReservationState =>
       val data = nextStateData
@@ -188,10 +199,10 @@ class ReservationStateMachine(
           val service = segment.serviceType.service
           val criteria = new ReservationRequestCriteriaType().
             withPointToPointService(service).
-            withSchedule(data.criteria.getSchedule()).
-            withServiceType(data.criteria.getServiceType()).
-            withVersion(data.criteria.getVersion())
-          initialReserve.body.criteria.getPointToPointService().foreach( ptp =>
+            withSchedule(data.pendingCriteria.getSchedule()).
+            withServiceType(data.pendingCriteria.getServiceType()).
+            withVersion(data.pendingCriteria.getVersion())
+          pendingCriteria.getPointToPointService().foreach( ptp =>
             criteria.getPointToPointService().get.withParameter(ptp.getParameter)
           )
 
@@ -202,14 +213,14 @@ class ReservationStateMachine(
 
           val headers = newInitialReserveNsiHeaders(segment.provider).copy(correlationId = correlationId)
 
-          ToProvider(NsiProviderMessage(headers, InitialReserve(reserveType, Conversion.invert(criteria).get, service)), segment.provider)
+          ToProvider(NsiProviderMessage(headers, InitialReserve(reserveType)), segment.provider)
       }
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoPathFound))))
     case CheckingReservationState -> FailedReservationState =>
       respond(ReserveFailed(failed(NsiError.ChildError).tap(_.getServiceException().withChildException(nextStateData.childExceptions.values.toSeq.asJava))))
     case CheckingReservationState -> HeldReservationState =>
-      respond(ReserveConfirmed(id, nextStateData.criteria))
+      respond(ReserveConfirmed(id, nextStateData.pendingToConfirmCriteria.get))
     case HeldReservationState -> CommittingReservationState =>
       children.childConnections.collect {
         case (seg, _, Some(connectionId)) =>
@@ -234,9 +245,10 @@ class ReservationStateMachine(
     stateData.childConnectionStates.getOrElse(correlationId, CheckingReservationState).jaxb
   }
 
-  def reservationState = stateName.jaxb
-  def criteria = stateData.criteria
-  def version = stateData.criteria.getVersion()
+  def reservationState = nextStateName.jaxb
+  def pendingCriteria = nextStateData.pendingCriteria
+  def committedCriteria = nextStateData.committedCriteria
+  def version = nextStateData.committedCriteria.map(_.getVersion()).getOrElse(0)
 
   private def respond(body: NsiRequesterOperation) = Seq(ToRequester(nextStateData.currentCommand reply body))
 }

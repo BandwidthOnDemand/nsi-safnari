@@ -45,7 +45,7 @@ class ConnectionManagerSpec extends helpers.Specification {
   "Connection manager" should {
     "find a created connection" in new DummyConnectionFixture {
       val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
-      val (_, data) = await(actor ? Connection.Query)
+      val data = await(actor ? Connection.Query).summary
 
       connectionManager.get(data.getConnectionId) must beSome(actor)
     }
@@ -55,7 +55,7 @@ class ConnectionManagerSpec extends helpers.Specification {
       val Some(connection) = connectionManager.findOrCreateConnection(initialReserve.message.asInstanceOf[NsiProviderMessage[NsiProviderCommand]])
       connection ! command(initialReserve)
       connection ! command(pce.confirm(CorrelationId(0, 1), A))
-      await(connection ? command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionId", initialReserveMessage.body.criteria))))
+      await(connection ? command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionId", ConfirmCriteria))))
 
       connectionManager.findByChildConnectionId("ChildConnectionId") must beSome(connection)
     }
@@ -117,11 +117,11 @@ class ConnectionManagerSpec extends helpers.Specification {
     lazy val connectionManager = createConnectionManager
     lazy val Some((connectionId, connection)) = {
       connectionManager.findOrCreateConnection(initialReserveMessage).map { c =>
-        (await(c ? Connection.Query)._2.getConnectionId(), c)
+        (await(c ? Connection.Query).summary.getConnectionId(), c)
       }
     }
 
-    def query = await(connection ? Connection.Query)._2
+    def query = await(connection ? Connection.Query).summary
 
     def reserveWithEndTime(endTime: DateTime): Unit = {
       val reserve = initialReserveMessage.tap(_.body.body.getCriteria().getSchedule().withEndTime(endTime.toXmlGregorianCalendar))
@@ -165,8 +165,8 @@ class ConnectionManagerSpec extends helpers.Specification {
       val OriginalReserve = InitialReserveType.withDescription("original")
       val ModifiedReserve = InitialReserveType.withDescription("modified")
 
-      val ack = await(connection ? command(FromRequester(NsiProviderMessage(initialReserveMessage.headers, InitialReserve(OriginalReserve, ConfirmCriteria, Service)))))
-      val error = await(connection ? command(FromRequester(NsiProviderMessage(initialReserveMessage.headers, InitialReserve(ModifiedReserve, ConfirmCriteria, Service)))))
+      val ack = await(connection ? command(FromRequester(NsiProviderMessage(initialReserveMessage.headers, InitialReserve(OriginalReserve)))))
+      val error = await(connection ? command(FromRequester(NsiProviderMessage(initialReserveMessage.headers, InitialReserve(ModifiedReserve)))))
 
       error must beLike {
         case ServiceException(details) =>
@@ -211,7 +211,7 @@ class ConnectionManagerSpec extends helpers.Specification {
       }
       retransmitted aka "retransmitted" must_== original
 
-      await(connection ? command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionA", initialReserveMessage.body.criteria))))
+      await(connection ? command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionA", ConfirmCriteria))))
 
       val retransmitted2 = output {
         await(connection ? command(FromRequester(initialReserveMessage)))
@@ -232,7 +232,7 @@ class ConnectionManagerSpec extends helpers.Specification {
         await(connection ? command(FromRequester(initialReserveMessage)))
       }
 
-      retransmitted must_== Vector(agg.response(initialReserveMessage.headers.correlationId, ReserveConfirmed(connectionId, initialReserveMessage.body.criteria)))
+      retransmitted must_== Vector(agg.response(initialReserveMessage.headers.correlationId, ReserveConfirmed(connectionId, ConfirmCriteria)))
     }
 
     "send PassedEndTime message after reservation end time" in new SingleConnectionActorFixture {

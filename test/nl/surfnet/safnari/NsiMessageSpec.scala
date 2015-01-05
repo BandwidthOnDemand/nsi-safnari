@@ -34,16 +34,19 @@ object NsiMessageSpec {
     .withSourceSTP("networkId:A")
     .withDestSTP("networkId:B")
 
+  val StartTime = DateTime.now().plusMinutes(5)
+  val EndTime = DateTime.now().plusMinutes(30)
+
   val ConfirmedCriteriaVersion = 3
-  val Schedule = new ScheduleType().withStartTime(DateTime.now().plusMinutes(5).toXmlGregorianCalendar).withEndTime(DateTime.now().plusMinutes(30).toXmlGregorianCalendar)
-  val ConfirmCriteria = new ReservationConfirmCriteriaType().withVersion(ConfirmedCriteriaVersion).withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
-  val RequestCriteria = Conversion.convert(ConfirmCriteria).get
+  def Schedule = new ScheduleType().withStartTime(StartTime.toXmlGregorianCalendar).withEndTime(EndTime.toXmlGregorianCalendar)
+  def ConfirmCriteria = new ReservationConfirmCriteriaType().withVersion(ConfirmedCriteriaVersion).withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
+  def RequestCriteria = Conversion.convert(ConfirmCriteria).get
 
   def InitialReserveType = new ReserveType().withCriteria(RequestCriteria).withDescription("description").withGlobalReservationId("global-reservation-id")
   val InitialReserveCorrelationId = helpers.Specification.newCorrelationId
 
-  def initialReserveMessage = NsiProviderMessage(nsiProviderHeaders(InitialReserveCorrelationId), InitialReserve(InitialReserveType, ConfirmCriteria, Service))
-  val reserveConfirmed = NsiRequesterMessage(nsiRequesterHeaders(InitialReserveCorrelationId), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))
+  def initialReserveMessage = NsiProviderMessage(nsiProviderHeaders(InitialReserveCorrelationId), InitialReserve(InitialReserveType))
+  def reserveConfirmed = NsiRequesterMessage(nsiRequesterHeaders(InitialReserveCorrelationId), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))
 
   val A = ComputedSegment(
     serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP("A").withDestSTP("X")),

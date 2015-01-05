@@ -189,7 +189,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
          * earlier (e.g. when the end time is modified just as the scheduler sends a
          * PassedEndTime message).
          */
-      if (rsm.criteria.getSchedule().endTime.exists(_ <= DateTime.now)) List(lsm) else Nil
+      if (rsm.committedCriteria.flatMap(_.getSchedule().endTime).exists(_ <= DateTime.now)) List(lsm) else Nil
   }
 
   private def applyMessageToStateMachine(stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage], message: InboundMessage): Option[Seq[OutboundMessage]] = {
@@ -203,7 +203,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
             case (segment, _, Some(connectionId)) => connectionId -> segment.provider
             case (segment, _, None)               => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
           }.toMap
-          committedCriteria = Some(initialReserve.body.criteria)
+          committedCriteria = rsm.committedCriteria
           otherStateMachines = Some((
             new ProvisionStateMachine(id, newNsiHeaders, children),
             new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, currentVersion, children)))
@@ -295,7 +295,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         .withVersion(criteria.getVersion())
         .withSchedule(criteria.getSchedule())
         .withServiceType(criteria.getServiceType())
-        .withPointToPointService(initialReserve.body.service)
+        .withPointToPointService(initialReserve.body.service.get)
         .withChildren(new ChildSummaryListType().withChild(children: _*))
         .tap(_.getOtherAttributes().putAll(criteria.getOtherAttributes())))
     }
