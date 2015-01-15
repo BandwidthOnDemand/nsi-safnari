@@ -31,7 +31,6 @@ case class ReservationStateMachineData(
   pendingCriteria: ReservationRequestCriteriaType,
   committedCriteria: Option[ReservationConfirmCriteriaType] = None,
   segments: Seq[(CorrelationId, ComputedSegment)] = Seq.empty,
-  awaitingReserveReply: Set[CorrelationId] = Set.empty,
   childConnectionStates: Map[CorrelationId, ReservationState] = Map.empty,
   childExceptions: Map[CorrelationId, ServiceExceptionType] = Map.empty,
   pceError: Option[NsiError] = None) {
@@ -39,11 +38,11 @@ case class ReservationStateMachineData(
   def receivedSegments(segments: Seq[(CorrelationId, ComputedSegment)]) =
     copy(
       segments = segments,
-      awaitingReserveReply = segments.map(_._1).toSet)
+      childConnectionStates = segments.map { case (correlationId, _) => correlationId -> CheckingReservationState }(collection.breakOut))
 
   def aggregatedReservationState: ReservationState =
-    if (awaitingReserveReply.isEmpty && childConnectionStates.isEmpty) CheckingReservationState
-    else if (awaitingReserveReply.nonEmpty || childConnectionStates.values.exists(_ == CheckingReservationState)) CheckingReservationState
+    if (segments.isEmpty) PathComputationState
+    else if (childConnectionStates.values.exists(_ == CheckingReservationState)) CheckingReservationState
     else if (childConnectionStates.values.exists(_ == FailedReservationState)) FailedReservationState
     else if (childConnectionStates.values.forall(_ == HeldReservationState)) HeldReservationState
     else if (childConnectionStates.values.exists(_ == CommittingReservationState)) CommittingReservationState
@@ -53,15 +52,10 @@ case class ReservationStateMachineData(
     else if (childConnectionStates.values.forall(_ == AbortedReservationState)) AbortedReservationState
     else throw new IllegalStateException(s"cannot determine aggregated state from ${childConnectionStates.values.mkString(",")}")
 
-  def receivedReserveReply(correlationId: CorrelationId) = copy(awaitingReserveReply = awaitingReserveReply - correlationId)
-
   def updateChild(initialCorrelationId: CorrelationId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None): ReservationStateMachineData  = {
-    updateChildStatus(initialCorrelationId, reservationState, childException)
-  }
-  def updateChildStatus(correlationId: CorrelationId, reservationState: ReservationState, childException: Option[ServiceExceptionType] = None): ReservationStateMachineData = {
     copy(
-      childConnectionStates = childConnectionStates.updated(correlationId, reservationState),
-      childExceptions = childException.fold(childExceptions - correlationId)(exception => childExceptions.updated(correlationId, exception)))
+      childConnectionStates = childConnectionStates.updated(initialCorrelationId, reservationState),
+      childExceptions = childException.fold(childExceptions - initialCorrelationId)(exception => childExceptions.updated(initialCorrelationId, exception)))
   }
 
   def startProcessingNewCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: ReservationState, children: ChildConnectionIds) = {
@@ -131,20 +125,17 @@ class ReservationStateMachine(
 
   when(CheckingReservationState) {
     case Event(AckFromProvider(NsiProviderMessage(headers, ReserveResponse(connectionId))), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
-      stay using data.updateChildStatus(headers.correlationId, CheckingReservationState)
+      stay using data.updateChild(headers.correlationId, CheckingReservationState)
     case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
       val newData = data
-        .receivedReserveReply(headers.correlationId)
-        .updateChildStatus(headers.correlationId, FailedReservationState, Some(serviceException))
+        .updateChild(headers.correlationId, FailedReservationState, Some(serviceException))
       goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveConfirmed)), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
       val newData = data
-        .receivedReserveReply(headers.correlationId)
         .updateChild(headers.correlationId, HeldReservationState)
       goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveFailed)), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
       val newData = data
-        .receivedReserveReply(headers.correlationId)
         .updateChild(headers.correlationId, FailedReservationState, Some(message.failed.getServiceException()))
       goto(newData.aggregatedReservationState) using newData
   }
