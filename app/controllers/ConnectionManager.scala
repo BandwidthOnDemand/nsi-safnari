@@ -222,7 +222,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
     import Connection._
     override def receive = LoggingReceive {
-      case Query              => sender ! Query.Result(connection.query, Some(connection.rsm.pendingCriteria))
+      case Query              => sender ! Query.Result(connection.query, connection.rsm.pendingCriteria)
       case QuerySegments      => sender ! connection.segments
       case QueryNotifications => sender ! connection.notifications
       case QueryResults       => sender ! connection.results

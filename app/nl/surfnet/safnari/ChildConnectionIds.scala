@@ -21,11 +21,11 @@ case class ChildConnectionIds(
 
   def awaitingConnectionId: Set[CorrelationId] = initialCorrelationIds -- connectionByInitialCorrelationId.keySet
 
-  def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = {
+  def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = if (segments.exists(_._1 == correlationId)) {
     copy(
       connectionByInitialCorrelationId = connectionByInitialCorrelationId.updated(correlationId, connectionId),
       initialCorrelationIdByConnectionId = initialCorrelationIdByConnectionId.updated(connectionId, correlationId))
-  }
+  } else this
 
   def childConnections: Seq[(ComputedSegment, CorrelationId, Option[ConnectionId])] = segments.map {
     case (correlationId, segment) =>

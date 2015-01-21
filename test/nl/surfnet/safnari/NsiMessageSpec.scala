@@ -49,10 +49,10 @@ object NsiMessageSpec {
   def reserveConfirmed = NsiRequesterMessage(nsiRequesterHeaders(InitialReserveCorrelationId), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))
 
   val A = ComputedSegment(
-    serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP("A").withDestSTP("X")),
+    serviceType = ServiceType("ServiceType", Service.shallowCopy.withSourceSTP("A").withDestSTP("X")),
     provider = ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider")))
   val B = ComputedSegment(
-    serviceType = ServiceType("ServiceType", new P2PServiceBaseType().withCapacity(100).withSourceSTP("X").withDestSTP("B")),
+    serviceType = ServiceType("ServiceType", Service.shallowCopy.withSourceSTP("X").withDestSTP("B")),
     provider = ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider")))
 
   object ura {

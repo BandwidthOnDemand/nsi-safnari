@@ -134,6 +134,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
   private def stateMachines(message: InboundMessage): List[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
     case FromRequester(NsiProviderMessage(_, _: InitialReserve))       => List(rsm)
+    case FromRequester(NsiProviderMessage(_, _: ModifyReserve))        => List(rsm)
     case FromRequester(NsiProviderMessage(_, _: ReserveCommit))        => List(rsm)
     case FromRequester(NsiProviderMessage(_, _: ReserveAbort))         => List(rsm)
     case FromRequester(NsiProviderMessage(_, _: Provision))            => psm.toList
