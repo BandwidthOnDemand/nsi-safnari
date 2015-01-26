@@ -3,7 +3,7 @@ package presenters
 import nl.surfnet.safnari.ConnectionData
 
 case class ConnectionPathSegmentPresenter(private val data: ConnectionData) {
-  private val statusPresenter = Nsi2StatusPresenter(data.lifecycleState, data.reservationState, data.provisionState, data.dataPlaneStatus)
+  private val statusPresenter = Nsi2StatusPresenter(data.lifecycleState, data.reservationState, data.provisionState, data.dataPlaneStatus.isActive)
 
   def connectionId = data.connectionId
   def providerNsa = data.providerNsa
@@ -13,7 +13,7 @@ case class ConnectionPathSegmentPresenter(private val data: ConnectionData) {
   def destination = data.destinationStp
   def destinationShort = shorten(data.destinationStp)
   def status = statusPresenter.status
-  def dataPlaneStatus = if (data.dataPlaneStatus) "active" else "inactive"
+  def dataPlaneStatus = statusPresenter.dataPlaneState
   def lastServiceException = data.lastServiceException
 
   private def shorten(urn: String) = urn.replace("urn:ogf:network:", "")

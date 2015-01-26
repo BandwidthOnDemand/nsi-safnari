@@ -96,10 +96,14 @@ case class ReservationStateMachineData(
     pendingCriteria.toConfirmCriteria(
       pendingCriteria.getPointToPointService().get.getSourceSTP,
       pendingCriteria.getPointToPointService().get.getDestSTP,
-      if (pendingCriteria.getVersion eq null) committedCriteria.map(_.getVersion).getOrElse(0) else pendingCriteria.getVersion + 1)
+      pendingVersion)
   }
 
   def commitPendingCriteria = copy(pendingCriteria = None, committedCriteria = pendingToConfirmCriteria.toOption)
+
+  def pendingVersion = pendingCriteria
+    .map { c => if (c.getVersion eq null) committedCriteria.map(_.getVersion + 1).getOrElse(1) else c.getVersion.intValue() }
+    .getOrElse(1)
 }
 
 class ReservationStateMachine(
@@ -154,18 +158,17 @@ class ReservationStateMachine(
 
   when(HeldReservationState) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: ReserveCommit)), data) =>
-      val newData = data.startProcessingNewCommand(message, CommittingReservationState, children)
+      val newData = data.startProcessingNewCommand(message, CommittingReservationState, children).commitPendingCriteria
       goto(CommittingReservationState) using newData
     case Event(FromRequester(message @ NsiProviderMessage(_, _: ReserveAbort)), data) =>
-      val newData = data.startProcessingNewCommand(message, AbortingReservationState, children)
+      val newData = data.startProcessingNewCommand(message, AbortingReservationState, children).copy(pendingCriteria = None)
       goto(newData.aggregatedReservationState) using newData
   }
 
   when(CommittingReservationState) {
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveCommitConfirmed)), data) if data.childHasState(children, message.connectionId, CommittingReservationState) =>
-      val newData1 = data.updateChild(children, message.connectionId, ReservedReservationState)
-      val newData2 = if (newData1.aggregatedReservationState == ReservedReservationState) newData1.commitPendingCriteria else newData1
-      goto(newData2.aggregatedReservationState) using newData2
+      val newData = data.updateChild(children, message.connectionId, ReservedReservationState)
+      goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveCommitFailed)), data) if data.childHasState(children, message.connectionId, CommittingReservationState) =>
       val newData = data.updateChild(children, message.connectionId, CommitFailedReservationState, Some(message.failed.getServiceException()))
       goto(newData.aggregatedReservationState) using newData
@@ -189,11 +192,25 @@ class ReservationStateMachine(
 
   when(ReservedReservationState) {
     case Event(FromRequester(command @ NsiProviderMessage(headers, ModifyReserve(reserve))), data) =>
-      val newData =
-        if ((reserve.getCriteria.getVersion ne null) && version >= reserve.getCriteria.getVersion)
-          data.copy(currentCommand = command, childExceptions = Map.empty, reserveError = Some(NsiError.PayloadError), pendingCriteria = Some(reserve.getCriteria))
-        else
-          data.copy(pendingCriteria = Some(reserve.getCriteria)).startProcessingNewCommand(command, ModifyingReservationState, children)
+      val criteria = reserve.getCriteria
+
+      val committedP2Ps = data.committedCriteria.get.getPointToPointService.get
+      val requestedP2Ps = criteria.getPointToPointService.get
+      val error = if ((criteria.getVersion ne null) && committedVersion >= criteria.getVersion)
+        Some(NsiError.PayloadError.copy(text = s"requested version ${criteria.getVersion} must be greater than committed version $committedVersion"))
+      else if (!(committedP2Ps.sourceStp isCompatibleWith requestedP2Ps.sourceStp))
+        Some(NsiError.PayloadError.copy(text = s"committed source STP ${committedP2Ps.sourceStp} is not compatible with requested source STP ${requestedP2Ps.sourceStp}"))
+      else if (!(committedP2Ps.destStp isCompatibleWith requestedP2Ps.destStp))
+        Some(NsiError.PayloadError.copy(text = s"committed destination STP ${committedP2Ps.destStp} is not compatible with requested destination STP ${requestedP2Ps.destStp}"))
+      else
+        None
+
+      val newData = error.map { error =>
+        data.copy(currentCommand = command, childExceptions = Map.empty, reserveError = Some(error), pendingCriteria = Some(criteria))
+      }.getOrElse {
+        data.copy(pendingCriteria = Some(criteria)).startProcessingNewCommand(command, ModifyingReservationState, children)
+      }
+
       goto(newData.aggregatedReservationState) using newData
   }
 
@@ -225,7 +242,7 @@ class ReservationStateMachine(
             withPointToPointService(service).
             withSchedule(pendingCriteria.getSchedule()).
             withServiceType(pendingCriteria.getServiceType()).
-            withVersion(pendingCriteria.getVersion())
+            withVersion(nextStateData.pendingVersion)
           pendingCriteria.getPointToPointService().foreach(ptp =>
             criteria.getPointToPointService().get.withParameter(ptp.getParameter))
 
@@ -273,7 +290,7 @@ class ReservationStateMachine(
             .withPointToPointService(service)
             .withSchedule(pendingCriteria.getSchedule())
             .withServiceType(pendingCriteria.getServiceType())
-            .withVersion(pendingCriteria.getVersion())
+            .withVersion(nextStateData.pendingVersion)
 
           val reserveType = new ReserveType()
             .withConnectionId(childConnectionId)
@@ -298,7 +315,7 @@ class ReservationStateMachine(
   def reservationState = nextStateName.jaxb
   def pendingCriteria = nextStateData.pendingCriteria
   def committedCriteria = nextStateData.committedCriteria
-  def version = nextStateData.committedCriteria.map(_.getVersion()).getOrElse(0)
+  def committedVersion = nextStateData.committedCriteria.map(_.getVersion()).getOrElse(0)
 
   private def respond(body: NsiRequesterOperation) = Seq(ToRequester(nextStateData.currentCommand reply body))
 }

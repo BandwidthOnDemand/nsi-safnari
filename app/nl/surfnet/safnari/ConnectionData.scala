@@ -11,5 +11,5 @@ case class ConnectionData(
     reservationState: ReservationStateEnumType,
     lifecycleState: LifecycleStateEnumType,
     provisionState: ProvisionStateEnumType,
-    dataPlaneStatus: Boolean,
+    dataPlaneStatus: DataPlaneStatusType,
     lastServiceException: Option[ServiceExceptionType])

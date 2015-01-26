@@ -18,7 +18,7 @@ case class Nsi2StatusPresenter(lifecycle: LifecycleStateEnumType,
 
   private def reservationState = if (reservation != ReservationStateEnumType.RESERVE_START) List(reservation.value) else Nil
   private def provisionState = if (provision != null) List(provision.value, dataPlaneState) else Nil
-  private def dataPlaneState = if (dataPlaneActive) "Active" else "Inactive"
+  def dataPlaneState = if (dataPlaneActive) "Active" else "Inactive"
 }
 
 object Nsi2StatusPresenter {

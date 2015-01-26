@@ -207,14 +207,12 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
           committedCriteria = rsm.committedCriteria
           otherStateMachines = Some((
             new ProvisionStateMachine(id, newNsiHeaders, children),
-            new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, currentVersion, children)))
+            new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children)))
       }
     }
 
     output
   }
-
-  private def currentVersion() = rsm.version
 
   private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(aggregatorNsa)
 
@@ -321,7 +319,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       rsm.childConnectionStateByInitialCorrelationId(correlationId),
       id.map(id => lsm.childConnectionState(id)).getOrElse(LifecycleStateEnumType.CREATED),
       id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
-      id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(false),
+      id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(new DataPlaneStatusType()),
       id.flatMap(mostRecentChildExceptions.get))
   }.toSeq
 

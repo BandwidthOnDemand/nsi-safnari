@@ -160,7 +160,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     given(
       upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId("ConnectionIdA")
-        .withDataPlaneStatus(dataPlaneStatusType(true))
+        .withDataPlaneStatus(dataPlaneStatusType(active = true, consistent = true))
         .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
   }
 
@@ -773,7 +773,7 @@ class ConnectionEntitySpec extends helpers.Specification {
             ModifyReserve(InitialReserveType.withConnectionId("ConnectionIdA")
               .tap(_.getCriteria.withPointToPointService(A.serviceType.service))
               .tap(_.getCriteria.getSchedule.withStartTime(null))
-              .tap(_.getCriteria.setVersion(null)))),
+              .tap(_.getCriteria.setVersion(4)))),
             A.provider)))
       }
 
@@ -788,7 +788,22 @@ class ConnectionEntitySpec extends helpers.Specification {
         })
       }
 
-      tag("focus")
+      "fail modify when source STP is not compatible" in new ReservedConnection {
+        val modify = ModifyReserveType
+        modify.getCriteria.getPointToPointService().get.setSourceSTP("X")
+        when(ura.request(ModifyCorrelationId, ModifyReserve(modify)))
+
+        reservationState must_== ReservationStateEnumType.RESERVE_FAILED
+      }
+
+      "fail modify when destination STP is not compatible" in new ReservedConnection {
+        val modify = ModifyReserveType
+        modify.getCriteria.getPointToPointService().get.setDestSTP("X")
+        when(ura.request(ModifyCorrelationId, ModifyReserve(modify)))
+
+        reservationState must_== ReservationStateEnumType.RESERVE_FAILED
+      }
+
       "abort failed modify request immediately" in new ReservedConnection {
         val AbortModifyCorrelationId = newCorrelationId
 
@@ -810,7 +825,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         reservationState must_== ReservationStateEnumType.RESERVE_HELD
 
         messages must contain(exactly[Message](
-          agg.response(ModifyCorrelationId, ReserveConfirmed(connection.id, ModifyReserveType.getCriteria.toConfirmCriteria("networkId:A", "networkId:B", 3).get))))
+          agg.response(ModifyCorrelationId, ReserveConfirmed(connection.id, ModifyReserveType.getCriteria.toConfirmCriteria("networkId:A", "networkId:B", 4).get))))
       }
 
       "become reserve committing when confirmed modification is committed" in new ReservedConnection with Modified {
@@ -851,7 +866,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       "have data plane active when data plane state change is received" in new ReservedConnection with Provisioned {
         when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
           .withConnectionId("ConnectionIdA")
-          .withDataPlaneStatus(dataPlaneStatusType(true))
+          .withDataPlaneStatus(dataPlaneStatusType(true, consistent = true))
           .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
 
         dataPlaneStatus.isActive() must beTrue
@@ -863,29 +878,34 @@ class ConnectionEntitySpec extends helpers.Specification {
             .withConnectionId(ConnectionId)
             .withNotificationId(1)
             .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
-            .withDataPlaneStatus(dataPlaneStatusType(true)))))
+            .withDataPlaneStatus(dataPlaneStatusType(true, consistent = true)))))
       }
 
       "have data plane active when data plane state change is received (multi segement)" in new ReservedConnectionWithTwoSegments with ProvisionedSegments {
         when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
           .withConnectionId("ConnectionIdA")
-          .withDataPlaneStatus(dataPlaneStatusType(true))
+          .withDataPlaneStatus(dataPlaneStatusType(true, consistent = true))
           .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
 
         dataPlaneStatus.isActive() must beFalse
-        messages must beEmpty
+        messages must contain(exactly[Message](
+          agg.notification(CorrelationId(0, 14), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+            .withConnectionId(ConnectionId)
+            .withNotificationId(1)
+            .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+            .withDataPlaneStatus(dataPlaneStatusType(false, consistent = false))))))
 
         when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
           .withConnectionId("ConnectionIdB")
-          .withDataPlaneStatus(dataPlaneStatusType(true))
+          .withDataPlaneStatus(dataPlaneStatusType(true, consistent = true))
           .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:10:00Z")))))
 
         dataPlaneStatus.isActive() must beTrue
-        messages must contain(agg.notification(CorrelationId(0, 15), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+        messages must contain(agg.notification(CorrelationId(0, 16), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
           .withConnectionId(ConnectionId)
-          .withNotificationId(1)
+          .withNotificationId(2)
           .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:10:00Z"))
-          .withDataPlaneStatus(dataPlaneStatusType(true)))))
+          .withDataPlaneStatus(dataPlaneStatusType(true, consistent = true)))))
       }
 
       "be in terminating state when terminate is received" in new ReservedConnection with Provisioned with DataPlaneActive {
@@ -1060,12 +1080,12 @@ class ConnectionEntitySpec extends helpers.Specification {
     "have a data plane inactive on data plane change" in new ReservedConnection with Provisioned {
       given(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId("ConnectionIdA")
-        .withDataPlaneStatus(dataPlaneStatusType(true))
+        .withDataPlaneStatus(dataPlaneStatusType(true, consistent = true))
         .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
 
       when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
         .withConnectionId("ConnectionIdA")
-        .withDataPlaneStatus(dataPlaneStatusType(false))
+        .withDataPlaneStatus(dataPlaneStatusType(false, consistent = true))
         .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z")))))
 
       dataPlaneStatus.isActive() must beFalse
@@ -1075,7 +1095,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withConnectionId(ConnectionId)
           .withNotificationId(2)
           .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z"))
-          .withDataPlaneStatus(dataPlaneStatusType(false)))))
+          .withDataPlaneStatus(dataPlaneStatusType(false, consistent = true)))))
     }
 
     "become failed on ForcedEnd error event" in new ReservedConnection {
@@ -1227,5 +1247,5 @@ class ConnectionEntitySpec extends helpers.Specification {
 
   }
 
-  private def dataPlaneStatusType(active: Boolean) = new DataPlaneStatusType().withActive(active).withVersion(ConfirmedCriteriaVersion).withVersionConsistent(true)
+  private def dataPlaneStatusType(active: Boolean, consistent: Boolean) = new DataPlaneStatusType().withActive(active).withVersion(ConfirmedCriteriaVersion).withVersionConsistent(consistent)
 }

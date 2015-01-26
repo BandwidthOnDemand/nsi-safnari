@@ -28,7 +28,7 @@ object NsiMessageSpec {
   def nsiHeaders(correlationId: CorrelationId, replyTo: Option[URI], protocolVersion: URI, securityAttrs: List[SessionSecurityAttrType] = Nil, connectionTrace: List[ConnectionType] = Nil): NsiHeaders =
     NsiHeaders(correlationId, RequesterNsa, AggregatorNsa, replyTo, protocolVersion, securityAttrs, connectionTrace)
 
-  val Service = new P2PServiceBaseType()
+  def Service = new P2PServiceBaseType()
     .withDirectionality(DirectionalityType.BIDIRECTIONAL)
     .withCapacity(100)
     .withSourceSTP("networkId:A")
