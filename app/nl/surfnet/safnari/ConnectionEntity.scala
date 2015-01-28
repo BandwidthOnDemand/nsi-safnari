@@ -32,7 +32,6 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   private def newNotificationId() = nextNotificationId.getAndIncrement()
   private def newResultId() = nextResultId.getAndIncrement()
   private var mostRecentChildExceptions = Map.empty[ConnectionId, ServiceExceptionType]
-  private var committedCriteria: Option[ReservationConfirmCriteriaType] = None
 
   var children = ChildConnectionIds()
 
@@ -198,16 +197,15 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     output.foreach { messages =>
       registerProviderConversations(messages, stateMachine)
 
-      messages.collectFirst {
+      otherStateMachines = otherStateMachines orElse messages.collectFirst {
         case ToRequester(NsiRequesterMessage(_, _: ReserveCommitConfirmed)) =>
           val children = this.children.childConnections.map {
             case (segment, _, Some(connectionId)) => connectionId -> segment.provider
-            case (segment, _, None)               => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
+            case (segment, _, None) => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
           }.toMap
-          committedCriteria = rsm.committedCriteria
-          otherStateMachines = Some((
-            new ProvisionStateMachine(id, newNsiHeaders, children),
-            new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children)))
+
+          (new ProvisionStateMachine(id, newNsiHeaders, children),
+            new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children))
       }
     }
 
@@ -289,12 +287,12 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       .withRequesterNSA(requesterNSA)
       .withConnectionStates(connectionStates)
 
-    committedCriteria.foreach { criteria =>
+    rsm.committedCriteria.foreach { criteria =>
       result.getCriteria().add(new QuerySummaryResultCriteriaType()
         .withVersion(criteria.getVersion())
         .withSchedule(criteria.getSchedule())
         .withServiceType(criteria.getServiceType())
-        .withPointToPointService(initialReserve.body.service.get)
+        .withPointToPointService(criteria.getPointToPointService().get)
         .withChildren(new ChildSummaryListType().withChild(children: _*))
         .tap(_.getOtherAttributes().putAll(criteria.getOtherAttributes())))
     }

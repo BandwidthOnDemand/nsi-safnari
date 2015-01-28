@@ -24,9 +24,11 @@ case class ConnectionPresenter(private val data: QuerySummaryResultType, val pen
   def startTime = schedule.startTime
   def endTime = schedule.endTime
   def bandwidth = pointToPointService.map(_.getCapacity)
-  def version = committedCriteria.map(_.getVersion).getOrElse(0)
   def sourceStp = pointToPointService.map(_.getSourceSTP)
   def destinationStp = pointToPointService.map(_.getDestSTP)
+
+  def committedVersion: Option[Int] = committedCriteria.map(_.getVersion)
+  def pendingVersion: Option[Int] = pendingCriteria.map(_.version orElse (committedVersion.map(_ + 1)) getOrElse 1)
 
   def qualifier(now: DateTime) = {
     def inFuture(dt: DateTime) = dt.compareTo(now) > 0

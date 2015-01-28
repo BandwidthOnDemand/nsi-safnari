@@ -1,13 +1,24 @@
-@* _connectionDetails Template File *@
 @(connection: presenters.ConnectionPresenter, segments: Seq[presenters.ConnectionPathSegmentPresenter])
+@import nl.surfnet.safnari._
+@import nl.surfnet.nsiv2.messages._
+
+@formatCommittedAndPending[A](committed: Option[A], pending: Option[A]) = @{
+  (committed, pending) match {
+    case (None, None) => "-"
+    case (Some(a), None) => a.toString
+    case (None, Some(b)) => "- (" ++ b.toString ++ ")"
+    case (Some(a), Some(b)) if a == b => a.toString
+    case (Some(a), Some(b)) => a.toString ++ " (" ++ b.toString ++ ")"
+  }
+}
 
 <div class="row-fluid">
     <div class="span6">
         <dl class="dl-horizontal">
             <dt>Start</dt>
-            <dd>@connection.startTime.getOrElse("-")</dd>
+            <dd>@formatCommittedAndPending(connection.committedCriteria.flatMap(_.schedule.startTime), connection.pendingCriteria.flatMap(_.schedule).flatMap(_.startTime))</dd>
             <dt>Bandwidth</dt>
-            <dd>@connection.bandwidth.getOrElse("unknown")</dd>
+            <dd>@formatCommittedAndPending(connection.bandwidth, connection.pendingCriteria.flatMap(_.getPointToPointService).map(_.getCapacity))</dd>
             <dt>Global id</dt>
             <dd>@connection.globalReservationId.getOrElse("-")</dd>
         </dl>
@@ -15,18 +26,18 @@
     <div class="span6">
         <dl class="dl-horizontal">
             <dt>End</dt>
-            <dd>@connection.endTime.getOrElse("-")</dd>
+            <dd>@formatCommittedAndPending(connection.committedCriteria.flatMap(_.schedule.endTime), connection.pendingCriteria.flatMap(_.schedule).flatMap(_.endTime))</dd>
             <dt>Version</dt>
-            <dd>@connection.version</dd>
+            <dd>@formatCommittedAndPending(connection.committedVersion, connection.pendingVersion)</dd>
             <dt>Requester</dt>
             <dd>@connection.requesterNsa</dd>
         </dl>
     </div>
         <dl class="dl-horizontal">
             <dt>Source</dt>
-            <dd>@connection.sourceStp.getOrElse("unknown")</dd>
+            <dd>@connection.sourceStp.getOrElse("-")</dd>
             <dt>Destination</dt>
-            <dd>@connection.destinationStp.getOrElse("unknown")</dd>
+            <dd>@connection.destinationStp.getOrElse("-")</dd>
         </dl>
 </div>
 @if(segments.isEmpty) {

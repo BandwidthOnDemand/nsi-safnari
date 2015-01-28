@@ -15,7 +15,7 @@ package object safnari {
   def newConnectionId: ConnectionId = UuidGenerator().toString
 
   implicit class ScheduleTypeOps(schedule: ScheduleType) {
-    def startTime = Option(schedule.getStartTime).map(_.toDateTime)
-    def endTime = Option(schedule.getEndTime).map(_.toDateTime)
+    def startTime = Option(schedule).flatMap(s => Option(s.getStartTime)).map(_.toDateTime)
+    def endTime = Option(schedule).flatMap(s => Option(s.getEndTime)).map(_.toDateTime)
   }
 }
