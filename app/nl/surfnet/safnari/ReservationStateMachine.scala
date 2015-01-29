@@ -52,8 +52,8 @@ case class ReservationStateMachineData(
     else if (childConnectionStates.values.exists(_ == CommitFailedReservationState)) CommitFailedReservationState
     else if (childConnectionStates.values.exists(_ == AbortingReservationState)) AbortingReservationState
     else if (childConnectionStates.values.forall(_ == HeldReservationState)) HeldReservationState
-    else if (childConnectionStates.values.forall(_ == AbortedReservationState)) AbortedReservationState
     else if (childConnectionStates.values.forall(_ == ReservedReservationState)) ReservedReservationState
+    else if (childConnectionStates.values.forall(_ == AbortedReservationState)) AbortedReservationState
     else throw new IllegalStateException(s"cannot determine aggregated state from child states ${childConnectionStates.values.mkString(",")}")
 
   def startProcessingNewCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: ReservationState, children: ChildConnectionIds) = {
@@ -176,7 +176,7 @@ class ReservationStateMachine(
 
   when(AbortingReservationState) {
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveAbortConfirmed)), data) if data.childHasState(children, message.connectionId, AbortingReservationState) =>
-      val newData = data.updateChild(children, message.connectionId, AbortedReservationState)
+      val newData = data.updateChild(children, message.connectionId, if (data.committedCriteria.isDefined) ReservedReservationState else AbortedReservationState)
       goto(newData.aggregatedReservationState) using newData
   }
 

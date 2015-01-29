@@ -48,10 +48,10 @@ object NsiMessageSpec {
   def initialReserveMessage = NsiProviderMessage(nsiProviderHeaders(InitialReserveCorrelationId), InitialReserve(InitialReserveType))
   def reserveConfirmed = NsiRequesterMessage(nsiRequesterHeaders(InitialReserveCorrelationId), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))
 
-  val A = ComputedSegment(
+  def A = ComputedSegment(
     serviceType = ServiceType("ServiceType", Service.shallowCopy.withSourceSTP("A").withDestSTP("X")),
     provider = ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider")))
-  val B = ComputedSegment(
+  def B = ComputedSegment(
     serviceType = ServiceType("ServiceType", Service.shallowCopy.withSourceSTP("X").withDestSTP("B")),
     provider = ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider")))
 
