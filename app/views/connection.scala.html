@@ -10,11 +10,8 @@
 @import play.api.libs.json.extensions._
 @import java.time.Instant
 
-@id() = @{
-    if (connection.globalReservationId != null && connection.globalReservationId.nonEmpty)
-      s"${connection.connectionId} (${connection.globalReservationId})"
-    else
-      s"${connection.connectionId}"
+@id() = {
+    @{connection.connectionId}@{connection.globalReservationId.map(s => " (" ++ s ++ ")")}@{connection.description.map(s => " - " ++ s)}
 }
 
 @prettyXml(document: Document) = @{

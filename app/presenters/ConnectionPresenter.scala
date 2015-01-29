@@ -10,8 +10,8 @@ case class ConnectionPresenter(private val data: QuerySummaryResultType, val pen
   private val statusPresenter = Nsi2StatusPresenter(data.getConnectionStates)
 
   def connectionId: ConnectionId = data.getConnectionId
-  def globalReservationId = Option(data.getGlobalReservationId)
-  def description = data.getDescription
+  def globalReservationId: Option[String] = Option(data.getGlobalReservationId).map(_.trim).filter(_.nonEmpty)
+  def description: Option[String] = Option(data.getDescription).map(_.trim).filter(_.nonEmpty)
   def requesterNsa = data.getRequesterNSA
   def status = statusPresenter.status
   def dataPlaneStatus = if (data.getConnectionStates.getDataPlaneStatus.isActive) "active" else "inactive"

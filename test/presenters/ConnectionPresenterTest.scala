@@ -26,7 +26,7 @@ class ConnectionPresenterTest extends helpers.Specification {
       }
 
       "have a description" in {
-        subject.description must beEqualTo(data.getDescription)
+        subject.description must beSome(data.getDescription)
       }
 
       "have a global reservation ID" in {
