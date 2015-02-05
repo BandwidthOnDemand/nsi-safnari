@@ -93,10 +93,9 @@ case class ReservationStateMachineData(
   }
 
   def pendingToConfirmCriteria = pendingCriteria.toTry(ErrorMessage("no pending criteria")).flatMap { pendingCriteria =>
-    pendingCriteria.toConfirmCriteria(
+    committedCriteria map pendingCriteria.toModifiedConfirmCriteria getOrElse pendingCriteria.toInitialConfirmCriteria(
       pendingCriteria.getPointToPointService().get.getSourceSTP,
-      pendingCriteria.getPointToPointService().get.getDestSTP,
-      pendingVersion)
+      pendingCriteria.getPointToPointService().get.getDestSTP)
   }
 
   def commitPendingCriteria = copy(pendingCriteria = None, committedCriteria = pendingToConfirmCriteria.toOption)
@@ -194,16 +193,7 @@ class ReservationStateMachine(
     case Event(FromRequester(command @ NsiProviderMessage(headers, ModifyReserve(reserve))), data) =>
       val criteria = reserve.getCriteria
 
-      val committedP2Ps = data.committedCriteria.get.getPointToPointService.get
-      val requestedP2Ps = criteria.getPointToPointService.get
-      val error = if ((criteria.getVersion ne null) && committedVersion >= criteria.getVersion)
-        Some(NsiError.PayloadError.copy(text = s"requested version ${criteria.getVersion} must be greater than committed version $committedVersion"))
-      else if (!(committedP2Ps.sourceStp isCompatibleWith requestedP2Ps.sourceStp))
-        Some(NsiError.PayloadError.copy(text = s"committed source STP ${committedP2Ps.sourceStp} is not compatible with requested source STP ${requestedP2Ps.sourceStp}"))
-      else if (!(committedP2Ps.destStp isCompatibleWith requestedP2Ps.destStp))
-        Some(NsiError.PayloadError.copy(text = s"committed destination STP ${committedP2Ps.destStp} is not compatible with requested destination STP ${requestedP2Ps.destStp}"))
-      else
-        None
+      val error = validateModify(criteria, data.committedCriteria.get)
 
       val newData = error.map { error =>
         data.copy(currentCommand = command, childExceptions = Map.empty, reserveError = Some(error), pendingCriteria = Some(criteria))
@@ -212,6 +202,19 @@ class ReservationStateMachine(
       }
 
       goto(newData.aggregatedReservationState) using newData
+  }
+
+  private def validateModify(requestedCriteria: ReservationRequestCriteriaType, committedCriteria: ReservationConfirmCriteriaType) = {
+    val committedP2Ps = committedCriteria.getPointToPointService.get
+    val requestedP2Ps = requestedCriteria.getPointToPointService.get
+    if ((requestedCriteria.getVersion ne null) && committedVersion >= requestedCriteria.getVersion)
+      Some(NsiError.PayloadError.copy(text = s"requested version ${requestedCriteria.getVersion} must be greater than committed version $committedVersion"))
+    else if (!(committedP2Ps.sourceStp isCompatibleWith requestedP2Ps.sourceStp))
+      Some(NsiError.PayloadError.copy(text = s"committed source STP ${committedP2Ps.sourceStp} is not compatible with requested source STP ${requestedP2Ps.sourceStp}"))
+    else if (!(committedP2Ps.destStp isCompatibleWith requestedP2Ps.destStp))
+      Some(NsiError.PayloadError.copy(text = s"committed destination STP ${committedP2Ps.destStp} is not compatible with requested destination STP ${requestedP2Ps.destStp}"))
+    else
+      None
   }
 
   when(ModifyingReservationState) {

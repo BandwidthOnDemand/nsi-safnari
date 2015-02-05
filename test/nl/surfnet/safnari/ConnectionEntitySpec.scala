@@ -849,18 +849,18 @@ class ConnectionEntitySpec extends helpers.Specification {
 
     "in modifying state" should {
       "become reserve held when modify is confirmed" in new ReservedConnection with Modified {
-        when(upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toConfirmCriteria("A", "X", 4).get)))
+        when(upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toModifiedConfirmCriteria(connection.rsm.committedCriteria.get).get)))
 
         reservationState must_== ReservationStateEnumType.RESERVE_HELD
 
         messages must contain(exactly[Message](
-          agg.response(ModifyCorrelationId, ReserveConfirmed(connection.id, ModifyReserveType.getCriteria.toConfirmCriteria("networkId:A", "networkId:B", 4).get))))
+          agg.response(ModifyCorrelationId, ReserveConfirmed(connection.id, ModifyReserveType.getCriteria.toModifiedConfirmCriteria(connection.rsm.committedCriteria.get).get))))
       }
 
       "become reserve committing when confirmed modification is committed" in new ReservedConnection with Modified {
         val ModifyCommitCorrelationId = newCorrelationId
         given(
-          upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toConfirmCriteria("A", "X", 4).get)))
+          upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toModifiedConfirmCriteria(connection.rsm.committedCriteria.get).get)))
 
         when(ura.request(ModifyCommitCorrelationId, ReserveCommit(connection.id)))
 
@@ -875,7 +875,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       "become committed when modify commit is confirmed" in new ReservedConnection with Modified {
         val ModifyCommitCorrelationId = newCorrelationId
         given(
-          upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toConfirmCriteria("A", "X", 3).get)),
+          upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toModifiedConfirmCriteria(connection.rsm.committedCriteria.get).get)),
           ura.request(ModifyCommitCorrelationId, ReserveCommit(connection.id)))
 
         when(
@@ -894,7 +894,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       "allow aborting modified reservation before commit" in new ReservedConnection with Modified {
         val AbortModifyCorrelationId = newCorrelationId
         given(
-          upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toConfirmCriteria("A", "X", 4).get)))
+          upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toModifiedConfirmCriteria(connection.rsm.committedCriteria.get).get)))
 
         when(ura.request(AbortModifyCorrelationId, ReserveAbort(connection.id))) must beSome
 
@@ -912,7 +912,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         val AbortModifyCorrelationId = newCorrelationId
         val NewModifyCorrelationId = newCorrelationId
         given(
-          upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toConfirmCriteria("A", "X", 4).get)),
+          upa.response(CorrelationId(0, 7), ReserveConfirmed("ConnectionIdA", ModifyReserveType.getCriteria.toModifiedConfirmCriteria(connection.rsm.committedCriteria.get).get)),
           ura.request(AbortModifyCorrelationId, ReserveAbort(connection.id)),
           agg.request(CorrelationId(0, 10), ReserveAbort("ConnectionIdA"), A),
           upa.response(CorrelationId(0, 10), ReserveAbortConfirmed("ConnectionIdA")))
