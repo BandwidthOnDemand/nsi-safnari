@@ -263,7 +263,6 @@ class ConnectionManagerSpec extends helpers.Specification {
 
       "delete connections with LSM state different from CREATED after a grace period" in new SingleConnectionActorFixture(additionalConfiguration = Map("safnari.connection.expiration.time" -> "250 milliseconds")) {
         reserveWithEndTime(DateTime.now())
-        eventually(query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.PASSED_END_TIME)
 
         eventually(connectionManager.get(connectionId) must beNone)
       }
