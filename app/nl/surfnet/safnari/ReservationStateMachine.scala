@@ -282,17 +282,16 @@ class ReservationStateMachine(
       val data = nextStateData
       children.childConnections.collect {
         case (segment, _, Some(childConnectionId)) =>
-          val service = segment.serviceType.service.shallowCopy
           val pendingCriteria = data.pendingCriteria.get
+          val service = segment.serviceType.service.shallowCopy
           pendingCriteria.getPointToPointService().foreach { ptp =>
             service.setCapacity(ptp.getCapacity)
-            service.withParameter(ptp.getParameter)
           }
 
           val criteria = new ReservationRequestCriteriaType()
             .withPointToPointService(service)
             .withSchedule(pendingCriteria.getSchedule())
-            .withServiceType(pendingCriteria.getServiceType())
+            .withServiceType(segment.serviceType.serviceType)
             .withVersion(nextStateData.pendingVersion)
 
           val reserveType = new ReserveType()
