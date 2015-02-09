@@ -291,7 +291,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
         Logger.info(s"Stopping $connection.id")
         messageStore.delete(connection.id, new Instant().toJavaInstant)
         runDeleteHook(connection.id)
-        context.stop(self)
+        self ! PoisonPill
     }
 
     private def schedulePassedEndTimeMessage(): Unit = {
