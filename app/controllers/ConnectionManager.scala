@@ -46,7 +46,7 @@ import scala.util.{ Failure, Try }
 import controllers.ActorSupport._
 
 case class Connection(actor: ActorRef) {
-  def !(operation: Connection.Operation): Unit = actor ! operation
+  def !(operation: Connection.Operation)(implicit sender: ActorRef): Unit = actor ! operation
   def ?(operation: Connection.Operation)(implicit timeout: Timeout): Future[operation.Result] =
     (actor ? operation).mapTo(operation.resultClassTag)
 }
@@ -242,14 +242,13 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       expirationCancellable.foreach(_.cancel)
     }
 
-    import Connection._
     override def receive = LoggingReceive {
-      case Query              => sender ! Query.Result(connection.query, connection.rsm.pendingCriteria)
-      case QuerySegments      => sender ! connection.segments
-      case QueryNotifications => sender ! connection.notifications
-      case QueryResults       => sender ! connection.results
+      case Connection.Query              => sender ! Connection.Query.Result(connection.query, connection.rsm.pendingCriteria)
+      case Connection.QuerySegments      => sender ! connection.segments
+      case Connection.QueryNotifications => sender ! connection.notifications
+      case Connection.QueryResults       => sender ! connection.results
 
-      case Connection.QueryRecursive(query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive))) =>
+      case Connection.QueryRecursive(query @ FromRequester(NsiProviderMessage(_, QueryRecursive(_)))) =>
         queryRequesters += (query.correlationId -> sender)
 
         for {
@@ -257,7 +256,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
           outbound <- outbounds
         } output ! outbound
 
-      case Command(_, inbound @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed))) =>
+      case Connection.Command(_, inbound @ FromProvider(NsiRequesterMessage(_, QueryRecursiveConfirmed(_)))) =>
         for {
           messages <- connection.queryRecursiveResult(inbound)
           msg <- messages
@@ -267,7 +266,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
           requester ! msg
         }
 
-      case Command(timestamp, inbound: InboundMessage) =>
+      case Connection.Command(timestamp, inbound: InboundMessage) =>
         val result = PersistMessages(timestamp, process)(inbound)
 
         schedulePassedEndTimeMessage()
@@ -290,16 +289,16 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
         sender ! response
 
-      case Replay(messages) =>
+      case Connection.Replay(messages) =>
         Logger.info(s"Replaying ${messages.size} messages for connection ${connection.id}")
 
         val result = Try {
           messages.foreach {
-            case Command(_, inbound: InboundMessage) =>
+            case Connection.Command(_, inbound: InboundMessage) =>
               process(inbound).left.foreach { error =>
                 Logger.warn(s"Connection ${connection.id} failed to replay message $inbound (ignored): $error")
               }
-            case Command(_, outbound: OutboundMessage) =>
+            case Connection.Command(_, outbound: OutboundMessage) =>
               connection.process(outbound)
           }
 
@@ -309,7 +308,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
         sender ! result
 
-      case Delete =>
+      case Connection.Delete =>
         Logger.info(s"Stopping $connection.id")
         messageStore.delete(connection.id, new Instant().toJavaInstant)
         runDeleteHook(connection.id)

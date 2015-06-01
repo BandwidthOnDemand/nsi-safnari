@@ -51,6 +51,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     "add child connection id" in new DummyConnectionFixture {
+      implicit val sender = Actor.noSender
       val initialReserve = ura.request(CorrelationId(0, 0), initialReserveMessage.body)
       val Some(connection) = connectionManager.findOrCreateConnection(initialReserve.message.asInstanceOf[NsiProviderMessage[NsiProviderCommand]])
       connection ! command(initialReserve)
@@ -90,6 +91,8 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     "delete single connection from globalReservationIdMap" in new DummyConnectionFixture {
+      implicit val sender = Actor.noSender
+
       def newReserveWithGlobalReservationId(globalReservationId: String) = {
         val message = initialReserveMessage.tap(_.body.body.setGlobalReservationId("urn:A"))
         message.copy(message.headers.copy(correlationId = helpers.Specification.newCorrelationId))

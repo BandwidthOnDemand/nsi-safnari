@@ -23,6 +23,7 @@
 package controllers
 
 import akka.actor._
+import akka.event.LoggingReceive
 import akka.pattern.ask
 import java.net.URI
 import java.util.concurrent.TimeoutException
@@ -119,7 +120,7 @@ object ConnectionRequester {
   }
 
   class DummyNsiRequesterActor extends Actor {
-    def receive = {
+    def receive = LoggingReceive {
       case 'healthCheck =>
         sender ! Future.successful("NSI requester (Dummy)" -> true)
       case ToProvider(message @ NsiProviderMessage(headers, reserve: InitialReserve), _) =>
