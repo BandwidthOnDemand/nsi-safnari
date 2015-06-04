@@ -29,6 +29,7 @@ import org.joda.time.DateTime
 import java.net.URI
 import com.typesafe.config.ConfigUtil
 import nl.surfnet.safnari._
+import scala.util.Try
 
 object Configuration {
   val StartTime = DateTime.now
@@ -69,12 +70,13 @@ object Configuration {
     case None                     => sys.error(s"$key not set")
   }
 
-  def translateToStunnelAddress(provider: ProviderEndPoint): URI =
-    current.configuration.getString(ConfigUtil.joinPath("nsi", "tlsmap", provider.nsa)) match {
+  def translateToStunnelAddress(nsa: String, url: URI): Try[URI] = Try {
+    current.configuration.getString(ConfigUtil.joinPath("nsi", "tlsmap", nsa)) match {
       case Some(hostAndPort) =>
         val splitted = hostAndPort.split(":")
-        new URI("http", null, splitted(0), Integer.parseInt(splitted(1)), provider.url.getPath, provider.url.getQuery, provider.url.getFragment)
+        new URI("http", null, splitted(0), Integer.parseInt(splitted(1)), url.getPath, url.getQuery, url.getFragment)
       case None =>
-        throw new IllegalArgumentException(s"No stunnel detour configured for NSA ${provider.nsa} while TLS was enabled.")
+        throw new IllegalArgumentException(s"No stunnel detour configured for NSA ${nsa} while TLS was enabled.")
     }
+  }
 }

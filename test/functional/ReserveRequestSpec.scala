@@ -46,7 +46,8 @@ class ReserveRequestSpec extends helpers.Specification {
           val connectionId = newConnectionId
           headers.replyTo.foreach { replyTo =>
             NsiWebService.callRequester(
-              ProviderEndPoint(headers.requesterNSA, replyTo),
+              headers.requesterNSA,
+              replyTo,
               message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).get))
           }
           Future.successful(message.ack(ReserveResponse(connectionId)))

@@ -34,10 +34,10 @@ import play.api.Play.current
 import play.api.http.Status._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.ws.{WS, WSRequestHolder}
-
 import scala.concurrent.Future
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
+import java.net.URI
 
 object NsiWebService {
   implicit class SoapRequestHolder(request: WSRequestHolder) {
@@ -46,56 +46,58 @@ object NsiWebService {
 
   def callProvider(provider: ProviderEndPoint, message: NsiProviderMessage[NsiProviderOperation]): Future[NsiProviderMessage[NsiAcknowledgement]] =
     call[NsiProviderOperation, NsiProviderMessage](
-      provider,
+      provider.nsa,
+      provider.url,
       message.body.soapActionUrl,
       message,
       (defaultHeaders, document) => NsiProviderMessageToDocument[NsiAcknowledgement](Some(defaultHeaders)).invert(document),
       (headers, exception) => NsiProviderMessage(headers, ServiceException(exception)))(NsiProviderMessageToDocument(defaultHeaders = None))
 
-  def callRequester(provider: ProviderEndPoint, message: NsiRequesterMessage[NsiRequesterOperation]): Future[NsiRequesterMessage[NsiAcknowledgement]] =
+  def callRequester(requesterNsa: String, requesterUri: URI, message: NsiRequesterMessage[NsiRequesterOperation]): Future[NsiRequesterMessage[NsiAcknowledgement]] =
     call[NsiRequesterOperation, NsiRequesterMessage](
-      provider,
+      requesterNsa,
+      requesterUri,
       message.body.soapActionUrl,
       message,
       (defaultHeaders, document) => NsiRequesterMessageToDocument[NsiAcknowledgement](Some(defaultHeaders)).invert(document),
       (headers, exception) => NsiRequesterMessage(headers, ServiceException(exception)))(NsiRequesterMessageToDocument(defaultHeaders = None))
 
   private def call[T <: NsiOperation, M[_ <: NsiOperation] <: NsiMessage[_]](
-    provider: ProviderEndPoint,
+    nsa: String,
+    url: URI,
     soapAction: String,
     message: M[T],
     convertAck: (NsiHeaders, Document) => Try[M[NsiAcknowledgement]],
     convertError: (NsiHeaders, ServiceExceptionType) => M[NsiAcknowledgement])(implicit messageConversion: Conversion[M[T], Document]): Future[M[NsiAcknowledgement]] = {
 
-    val providerUrl = if (Configuration.Use2WayTLS) Configuration.translateToStunnelAddress(provider) else provider.url
+    for {
+      providerUrl <- if (Configuration.Use2WayTLS) Future.fromTry(Configuration.translateToStunnelAddress(nsa, url)) else Future.successful(url)
+      request = WS.url(providerUrl.toASCIIString()).withRequestTimeout(20000).withSoapActionHeader(soapAction)
+      _ = Logger.debug(s"Sending NSA ${nsa} at ${request.url} the SOAP message: ${Conversion[M[T], Document].andThen(Conversion[Document, String]).apply(message)}")
+      ack <- request.post(message)
+    } yield {
+      val defaultAckHeaders = message.headers.forSyncAck
 
-    val request = WS.url(providerUrl.toASCIIString()).withRequestTimeout(20000).withSoapActionHeader(soapAction)
-
-    Logger.debug(s"Sending provider ${provider.nsa} at ${request.url} the SOAP message: ${Conversion[M[T], Document].andThen(Conversion[Document, String]).apply(message)}")
-
-    val defaultAckHeaders = message.headers.forSyncAck
-
-    request.post(message).map { ack =>
       ack.status match {
         case OK | CREATED | ACCEPTED | INTERNAL_SERVER_ERROR =>
-          Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
+          Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${nsa} at ${url}: ${ack.body}")
 
           DocumentToString.invert(ack.body).flatMap { document =>
             convertAck(defaultAckHeaders, document)
           } match {
             case Failure(error) =>
-              Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: $error", error)
-              convertError(defaultAckHeaders, NsiError.ChildError.copy(text = error.toString).toServiceException(provider.nsa))
+              Logger.warn(s"Communication error with provider ${nsa} at ${url}: $error", error)
+              convertError(defaultAckHeaders, NsiError.ChildError.copy(text = error.toString).toServiceException(nsa))
             case Success(ack) =>
-              Logger.debug(s"Received ack from ${provider.nsa} at ${provider.url}: $ack")
+              Logger.debug(s"Received ack from ${nsa} at ${url}: $ack")
               ack
           }
         case FORBIDDEN =>
-          Logger.warn(s"Authentication failed (${ack.status}) from ${provider.nsa} at ${provider.url}: ${ack.body}")
-          convertError(defaultAckHeaders, NsiError.AuthenticationFailure.toServiceException(provider.nsa))
+          Logger.warn(s"Authentication failed (${ack.status}) from ${nsa} at ${url}: ${ack.body}")
+          convertError(defaultAckHeaders, NsiError.AuthenticationFailure.toServiceException(nsa))
         case _ =>
-          Logger.warn(s"Communication error with provider ${provider.nsa} at ${provider.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
-          convertError(defaultAckHeaders, NsiError.ChildError.copy(text = s"Communication error: ${ack.status} ${ack.statusText}").toServiceException(provider.nsa))
+          Logger.warn(s"Communication error with provider ${nsa} at ${url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
+          convertError(defaultAckHeaders, NsiError.ChildError.copy(text = s"Communication error: ${ack.status} ${ack.statusText}").toServiceException(nsa))
       }
     }
   }
