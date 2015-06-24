@@ -49,10 +49,26 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
 
   override def serviceUrl: String = ConnectionProvider.serviceUrl
 
-  def request = NsiProviderEndPoint(Configuration.NsaId) {
-    case message @ NsiProviderMessage(headers, query: QueryRecursive)       => handleQueryRecursive(NsiProviderMessage(headers, query))(ConnectionProvider.replyToClient(headers)).map(message.ack)
-    case message @ NsiProviderMessage(headers, query: NsiProviderQuery)     => handleQuery(query, headers.requesterNSA)(ConnectionProvider.replyToClient(headers)).map(message.ack)
-    case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(ConnectionProvider.replyToClient(headers)).map(message.ack)
+  def request = NsiProviderEndPoint(Configuration.NsaId) { request =>
+    validateRequesterNsa(request).map(Future.successful) getOrElse (request match {
+      case message @ NsiProviderMessage(headers, query: QueryRecursive) => handleQueryRecursive(NsiProviderMessage(headers, query))(ConnectionProvider.replyToClient(headers)).map(message.ack)
+      case message @ NsiProviderMessage(headers, query: NsiProviderQuery) => handleQuery(query, headers.requesterNSA)(ConnectionProvider.replyToClient(headers)).map(message.ack)
+      case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(ConnectionProvider.replyToClient(headers)).map(message.ack)
+    })
+  }
+
+  private def validateRequesterNsa(message: NsiProviderMessage[_]): Option[NsiProviderMessage[NsiAcknowledgement]] = message.headers.replyTo.flatMap { replyTo =>
+    val nsa = message.headers.requesterNSA
+    if (Configuration.Use2WayTLS) {
+      Configuration.translateToStunnelAddress(nsa, replyTo) match {
+        case Success(_) =>
+          None
+        case Failure(e) =>
+          Logger.info(s"The requesterNSA '$nsa' does not match a known TLS NSA")
+          val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(nsa, "requesterNSA" -> nsa))
+          Some(message ack serviceException)
+      }
+    } else None
   }
 
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderCommand])(replyTo: NsiRequesterOperation => Unit): Future[NsiAcknowledgement] =

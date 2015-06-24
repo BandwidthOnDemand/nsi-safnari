@@ -31,7 +31,7 @@ class ConnectionManagerSpec extends helpers.Specification {
 
   private def command(message: Message, timestamp: Instant = new Instant()) = Connection.Command(timestamp, message)
 
-  class DummyConnectionFixture extends WithApplication() {
+  abstract class DummyConnectionFixture extends WithApplication() {
     implicit lazy val system = Akka.system
 
     lazy val mockUuidGenerator = Uuid.mockUuidGenerator(1)

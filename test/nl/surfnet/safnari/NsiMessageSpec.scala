@@ -13,8 +13,8 @@ import oasis.names.tc.saml._2_0.assertion.AttributeType
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 
 object NsiMessageSpec {
-  val AggregatorNsa = "urn:ogf:network:nsa:aggregator-nsa"
-  val RequesterNsa = "RequesterNSA"
+  val AggregatorNsa = "urn:ogf:network:aggregator.tld:2015:nsa:aggregator-nsa"
+  val RequesterNsa = "urn:ogf:network:requester.tld:2015:nsa:requester-nsa"
 
   val SessionSecurityAttr = new SessionSecurityAttrType()
     .withAttributeOrEncryptedAttribute(new AttributeType()

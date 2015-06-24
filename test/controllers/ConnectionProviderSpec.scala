@@ -16,17 +16,21 @@ class ConnectionProviderSpec extends helpers.Specification {
   import nl.surfnet.nsiv2.messages._
   import NsiMessageSpec._
 
-  def Application = FakeApplication(additionalConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
+  val DefaultConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy")
+
+  def Application(extraConfig: (String, String)*) = FakeApplication(additionalConfiguration = DefaultConfiguration ++ extraConfig)
+
+  abstract class Fixture(app: FakeApplication) extends WithApplication(app) {
+    implicit lazy val actorSystem = Akka.system
+    lazy val pceRequester = TestActorRef[DummyPceRequesterActor]
+    lazy val createOutboundActor = ConnectionProvider.outboundActor(ConnectionRequester.nsiRequester, pceRequester) _
+    lazy val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor)))
+    lazy val requesterOperation = Promise[NsiRequesterOperation]()
+  }
 
   "Reserve operation" should {
 
-    "return the connection id and confirm the reservation" in new WithApplication(Application) {
-      implicit val actorSystem = Akka.system
-      val pceRequester = TestActorRef[DummyPceRequesterActor]
-      val createOutboundActor = ConnectionProvider.outboundActor(ConnectionRequester.nsiRequester, pceRequester) _
-      val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor)))
-      val requesterOperation = Promise[NsiRequesterOperation]()
-
+    "return the connection id and confirm the reservation" in new Fixture(Application()) {
       val response = await(connectionProvider.handleCommand(initialReserveMessage) { reply => requesterOperation.success(reply); () })
 
       response must beLike {
@@ -46,5 +50,16 @@ class ConnectionProviderSpec extends helpers.Specification {
       }
     }
 
+  }
+
+  "Any operation" should {
+    "check requester NSA against TLS configuration" in new Fixture(Application("nsi.twoway.tls" -> "yes")) {
+      val response = connectionProvider.request.apply(FakeRequest().withBody(initialReserveMessage))
+
+      val body = scala.xml.XML.loadString(contentAsString(response))
+      body must \\("text") \> "Parameter provided contains an unsupported value which MUST be processed"
+      body must \\("variable", "type" -> "requesterNSA")
+      body must \\("variable") \("value") \> RequesterNsa
+    }
   }
 }
