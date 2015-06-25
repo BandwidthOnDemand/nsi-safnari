@@ -125,8 +125,13 @@ object ConnectionRequester {
         sender ! Future.successful("NSI requester (Dummy)" -> true)
       case ToProvider(message @ NsiProviderMessage(headers, reserve: InitialReserve), _) =>
         val connectionId = newConnectionId
+        val confirmCriteria = Conversion.invert(reserve.body.getCriteria()).get
+        confirmCriteria.getPointToPointService.foreach { service =>
+          service.setSourceSTP(qualifyStp(service.getSourceSTP))
+          service.setDestSTP(qualifyStp(service.getDestSTP))
+        }
         Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack ReserveResponse(connectionId)))
-        Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).get)))
+        Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply ReserveConfirmed(connectionId, confirmCriteria)))
       case ToProvider(message @ NsiProviderMessage(headers, reserve: ModifyReserve), _) =>
         Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack ReserveResponse(reserve.connectionId)))
         Connection(sender) ! Connection.Command(new Instant(), FromProvider(message reply ReserveConfirmed(reserve.connectionId, Conversion.invert(reserve.body.getCriteria()).get)))
@@ -146,6 +151,13 @@ object ConnectionRequester {
       case ToProvider(message @ NsiProviderMessage(headers, query: NsiProviderQuery), provider) =>
         Connection(sender) ! Connection.Command(new Instant(), AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa))))
     }
+
+    private def qualifyStp(s: String): String = Stp.fromString(s).map { stp =>
+      stp.vlan match {
+        case None => stp.toString
+        case Some(vlanRange) => stp.withLabel("vlan", vlanRange.lowerBound.toString).toString
+      }
+    }.getOrElse(s)
   }
 
 }

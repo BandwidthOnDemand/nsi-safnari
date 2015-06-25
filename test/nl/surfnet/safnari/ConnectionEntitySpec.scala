@@ -4,7 +4,6 @@ import java.net.URI
 import javax.xml.datatype.DatatypeFactory
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import org.joda.time.{ DateTime, DateTimeUtils }
 import org.ogf.schemas.nsi._2013._12.connection.types._
@@ -318,15 +317,16 @@ class ConnectionEntitySpec extends helpers.Specification {
 
     "in reserve checking state" should {
       "confirm the reservation with a single path segment" in new fixture {
+        val ConfirmCriteriaWithQualifiedStps = ConfirmCriteria.withPointToPointService(Service.withSourceSTP("networkId:A?vlan=1").withDestSTP("networkId:B?vlan=2"))
+
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A))
 
         when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
-        when(upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteria)))
+        when(upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps)))
 
-        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ReserveCorrelationId), ReserveConfirmed(ConnectionId, ConfirmCriteria))))
-        messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria)))
+        messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps)))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
       }
@@ -366,14 +366,15 @@ class ConnectionEntitySpec extends helpers.Specification {
           upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
           upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
 
-        when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+        when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=12")))))
         messages must beEmpty
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
         segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
         segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
 
-        when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
-        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ReserveCorrelationId), ReserveConfirmed(ConnectionId, ConfirmCriteria))))
+        when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:B:A?vlan=12").withDestSTP("networkId:B:B?vlan=23")))))
+
+        messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:B:B?vlan=23")))))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
         segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
