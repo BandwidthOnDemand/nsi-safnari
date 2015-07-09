@@ -51,10 +51,14 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
 
   def request = NsiProviderEndPoint(Configuration.NsaId) { request =>
     validateRequesterNsa(request).map(Future.successful) getOrElse (request match {
-      case message @ NsiProviderMessage(headers, query: QueryRecursive) => handleQueryRecursive(NsiProviderMessage(headers, query))(ConnectionProvider.replyToClient(headers)).map(message.ack)
-      case message @ NsiProviderMessage(headers, query: NsiProviderQuery) => handleQuery(query, headers.requesterNSA)(ConnectionProvider.replyToClient(headers)).map(message.ack)
-      case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(ConnectionProvider.replyToClient(headers)).map(message.ack)
+      case message @ NsiProviderMessage(headers, query: QueryRecursive) => handleQueryRecursive(NsiProviderMessage(headers, query))(sendAsyncReply(headers)).map(message.ack)
+      case message @ NsiProviderMessage(headers, query: NsiProviderQuery) => handleQuery(query, headers.requesterNSA)(sendAsyncReply(headers)).map(message.ack)
+      case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(sendAsyncReply(headers)).map(message.ack)
     })
+  }
+
+  private def sendAsyncReply(requestHeaders: NsiHeaders)(response: NsiRequesterOperation) = requestHeaders.replyTo.foreach { replyTo =>
+    ConnectionProvider.sendToClient(replyTo)(NsiRequesterMessage(requestHeaders.forAsyncReply, response))
   }
 
   private def validateRequesterNsa(message: NsiProviderMessage[_]): Option[NsiProviderMessage[NsiAcknowledgement]] = message.headers.replyTo.flatMap { replyTo =>
@@ -184,19 +188,19 @@ object ConnectionProvider {
   }
 
   def outboundActor(nsiRequester: => ActorRef, pceRequester: ActorRef)(initialReserve: NsiProviderMessage[InitialReserve]) =
-    actorSystem.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester, replyToClient(initialReserve.headers))))
+    actorSystem.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester, initialReserve.headers.replyTo.map(replyTo => sendToClient(replyTo)_).getOrElse(_ => ()))))
 
-  class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiNotification => Unit) extends Actor {
+  class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiRequesterMessage[NsiRequesterOperation] => Unit) extends Actor {
     def receive = {
       case pceRequest: ToPce                     => pceRequester forward pceRequest
       case nsiRequest: ToProvider                => nsiRequester forward nsiRequest
-      case ToRequester(NsiRequesterMessage(headers, message: NsiNotification)) => notify(message)
+      case ToRequester(notification @ NsiRequesterMessage(_, _: NsiNotification)) => notify(notification)
       case ToRequester(response)                 => handleResponse(response)
     }
   }
 
-  private def replyToClient(requestHeaders: NsiHeaders)(response: NsiRequesterOperation) = requestHeaders.replyTo.foreach { replyTo =>
-    val ackFuture = NsiWebService.callRequester(requestHeaders.requesterNSA, replyTo, NsiRequesterMessage(requestHeaders.forSyncAck, response))
+  private def sendToClient(replyTo: URI)(response: NsiRequesterMessage[NsiRequesterOperation]): Unit = {
+    val ackFuture = NsiWebService.callRequester(response.headers.requesterNSA, replyTo, response)
 
     ackFuture onComplete {
       case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
