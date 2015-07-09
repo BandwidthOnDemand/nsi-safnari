@@ -31,7 +31,7 @@ class ConnectionProviderSpec extends helpers.Specification {
   "Reserve operation" should {
 
     "return the connection id and confirm the reservation" in new Fixture(Application()) {
-      val response = await(connectionProvider.handleCommand(initialReserveMessage) { reply => requesterOperation.success(reply); () })
+      val response = await(connectionProvider.handleCommand(initialReserveMessage) { reply => requesterOperation.success(reply.body); () })
 
       response must beLike {
         case ReserveResponse(connectionId) => connectionId must not(beEmpty)
@@ -41,7 +41,7 @@ class ConnectionProviderSpec extends helpers.Specification {
         case op: ReserveConfirmed =>
           val queryResult = Promise[NsiRequesterOperation]
 
-          await(connectionProvider.handleQuery(QuerySummary(Some(Left(Seq(op.connectionId)))), "RequesterNsa") { reply => queryResult.success(reply); () })
+          await(connectionProvider.handleQuery(NsiProviderMessage(nsiRequesterHeaders(CorrelationId(0, 3)), QuerySummary(Some(Left(Seq(op.connectionId)))))) { reply => queryResult.success(reply.body); () })
 
           await(queryResult.future) must beLike {
             case QuerySummaryConfirmed(Seq(reservation: QuerySummaryResultType)) =>
