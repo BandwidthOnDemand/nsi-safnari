@@ -36,7 +36,7 @@ import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
 class DiscoveryService(pceRequester: ActorRef) extends Controller {
-  private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v2+xml"
+  private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v1+xml"
   private val timeZoneCode = "GMT"
   private val parseableTimezoneCode = s" $timeZoneCode"
   private val rfc1123Formatter = DateTimeFormat.forPattern(s"EEE, dd MMM yyyy HH:mm:ss '$timeZoneCode'").withLocale(java.util.Locale.ENGLISH).withZone(DateTimeZone.forID(timeZoneCode))
