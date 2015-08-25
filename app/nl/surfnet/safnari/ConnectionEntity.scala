@@ -336,6 +336,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       segment.provider.nsa,
       segment.serviceType.service.getSourceSTP,
       segment.serviceType.service.getDestSTP,
+      segment.serviceType.service.getEro,
       rsm.childConnectionStateByInitialCorrelationId(correlationId),
       id.map(id => lsm.childConnectionState(id)).getOrElse(LifecycleStateEnumType.CREATED),
       id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),

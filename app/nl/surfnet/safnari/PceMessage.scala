@@ -23,13 +23,15 @@
 package nl.surfnet.safnari
 
 import java.net.URI
+import java.util.Collection
 import javax.xml.datatype.{DatatypeFactory, XMLGregorianCalendar}
+import scala.collection.JavaConversions._
+import nl.surfnet.nsiv2.messages._
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import nl.surfnet.nsiv2.messages._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
+import org.ogf.schemas.nsi._2013._12.services.types._
 import play.api.data.validation.ValidationError
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -88,6 +90,19 @@ object PceMessage {
     }
   }
 
+  implicit val OrderedStpTypeFormat: OFormat[OrderedStpType] = (
+    (__ \ "@order").format[Int] and
+      (__ \ "stp").format[String]
+    ).apply((order, stp) => new OrderedStpType().withOrder(order).withStp(stp), orderedStpType => (orderedStpType.getOrder(), orderedStpType.getStp()))
+
+  implicit val TypeValueTypeFormat: OFormat[TypeValueType] = (
+    (__ \ "@type").format[String] and
+      (__ \ "value").format[String]
+    ).apply((tvType, value) => new TypeValueType().withType(tvType).withValue(value), typeValueType => (typeValueType.getType(), typeValueType.getValue()))
+
+  implicit val StpListTypeFormat: OFormat[StpListType] =
+    (__ \ "orderedSTP").format[Seq[OrderedStpType]].inmap((orderedSTP) => new StpListType().withOrderedSTP(orderedSTP), stpListType => (stpListType.getOrderedSTP()))
+
   implicit val ProviderEndPointFormat: OFormat[ProviderEndPoint] = (
     (__ \ "nsa").format[String] and
     (__ \ "csProviderURL").format[URI])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply))
@@ -97,19 +112,32 @@ object PceMessage {
     (__ \ "directionality").formatNullable[String].inmap[Option[DirectionalityType]](_.map(DirectionalityType.fromValue(_)), _.map(_.value)) and
     (__ \ "symmetricPath").formatNullable[Boolean] and
     (__ \ "sourceSTP").format[String] and
-    (__ \ "destSTP").format[String]
-  ).apply((capacity, directionality, symmetricPath, source, dest) => {
-    new P2PServiceBaseType()
-      .withCapacity(capacity)
-      .withDirectionality(directionality.getOrElse(DirectionalityType.BIDIRECTIONAL))
-      .withSymmetricPath(symmetricPath.map(x => x: java.lang.Boolean).orNull)
-      .withSourceSTP(source)
-      .withDestSTP(dest)
-  }, { p2ps => (p2ps.getCapacity(), Option(p2ps.getDirectionality()), Option(p2ps.isSymmetricPath()).map(_.booleanValue()), p2ps.getSourceSTP(), p2ps.getDestSTP()) })
+    (__ \ "destSTP").format[String] and
+    (__ \ "ero").formatNullable[StpListType] and
+    (__ \ "parameter").format[Seq[TypeValueType]]
+  ).apply(
+    (capacity, directionality, symmetricPath, source, dest, ero, parameter) => {
+      new P2PServiceBaseType()
+        .withCapacity(capacity)
+        .withDirectionality(directionality.getOrElse(DirectionalityType.BIDIRECTIONAL))
+        .withSymmetricPath(symmetricPath.map(x => x: java.lang.Boolean).orNull)
+        .withSourceSTP(source)
+        .withDestSTP(dest)
+        .withEro(ero.orNull)
+        .withParameter(parameter)
+    },
+    {
+      p2ps => (p2ps.getCapacity(), Option(p2ps.getDirectionality()), Option(p2ps.isSymmetricPath()).map(_.booleanValue()), p2ps.getSourceSTP(), p2ps.getDestSTP(), Option(p2ps.getEro()), p2ps.getParameter())
+    }
+  )
 
   implicit val ServiceTypeFormat: OFormat[ServiceType] = (
     (__ \ "serviceType").format[String] and
-    (__ \ "p.p2ps").format[Seq[P2PServiceBaseType]]).apply((st, p2ps) => ServiceType(st, p2ps.head), serviceType => (serviceType.serviceType, serviceType.service :: Nil))
+    (__ \ "p.p2ps").format[Seq[P2PServiceBaseType]]
+  ).apply(
+    (st, p2ps) => ServiceType(st, p2ps.head),
+    serviceType => (serviceType.serviceType, serviceType.service :: Nil)
+  )
 
   implicit val ComputedSegmentFormat: Format[ComputedSegment] = (ProviderEndPointFormat and ServiceTypeFormat)(ComputedSegment.apply, unlift(ComputedSegment.unapply))
 
@@ -121,6 +149,7 @@ object PceMessage {
       case errors: JsError         => errors
     }
   }
+
   implicit val PceResponseWrites: Writes[PceResponse] = Writes {
     case PathComputationConfirmed(correlationId, segments) => Json.obj("correlationId" -> correlationId, "status" -> "SUCCESS", "path" -> segments)
     case PathComputationFailed(correlationId, error)     => Json.obj("correlationId" -> correlationId, "status" -> "FAILED", "m.findPathError" -> Json.toJson(error))
