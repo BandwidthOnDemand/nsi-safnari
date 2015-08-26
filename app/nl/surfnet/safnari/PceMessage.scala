@@ -127,7 +127,8 @@ object PceMessage {
         .withParameter(parameter)
     },
     {
-      p2ps => (p2ps.getCapacity(), Option(p2ps.getDirectionality()), Option(p2ps.isSymmetricPath()).map(_.booleanValue()), p2ps.getSourceSTP(), p2ps.getDestSTP(), Option(p2ps.getEro()), p2ps.getParameter())
+      p2ps => (p2ps.getCapacity(), Option(p2ps.getDirectionality()), Option(p2ps.isSymmetricPath()).map(_.booleanValue()),
+        p2ps.getSourceSTP(), p2ps.getDestSTP(), Option(p2ps.getEro()), p2ps.getParameter())
     }
   )
 

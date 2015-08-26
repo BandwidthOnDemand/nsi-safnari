@@ -369,16 +369,16 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=12")))))
         messages must beEmpty
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
 
         when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:B:A?vlan=12").withDestSTP("networkId:B:B?vlan=23")))))
 
         messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:B:B?vlan=23")))))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
       }
 
       "fail the reservation with a single path segment" in new fixture {
@@ -1014,15 +1014,15 @@ class ConnectionEntitySpec extends helpers.Specification {
         when(upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA")))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, _, LifecycleStateEnumType.TERMINATING, _, _, _) => ok })
         messages must beEmpty
 
         when(upa.response(CorrelationId(0, 12), TerminateConfirmed("ConnectionIdB")))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
-        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, _, LifecycleStateEnumType.TERMINATED, _, _, _) => ok })
         messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(TerminateCorrelationId), TerminateConfirmed(ConnectionId))))
       }
 
@@ -1092,21 +1092,21 @@ class ConnectionEntitySpec extends helpers.Specification {
       given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
 
       when(upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")))
 
       messages must beEmpty
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
 
       when(upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
 
       provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
-      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+      segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
       messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ProvisionCorrelationId), ProvisionConfirmed(ConnectionId))))
     }
 

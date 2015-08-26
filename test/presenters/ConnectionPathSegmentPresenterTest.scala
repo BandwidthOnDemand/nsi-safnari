@@ -7,10 +7,16 @@ import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionPathSegmentPresenterTest extends helpers.Specification {
   "A ConnectionPathSegmentPresenter" >> {
-    val data = ConnectionData(Some("ID"), "urn:ogf:network:surfnet.nl:1900:provider",
+    val data = ConnectionData(
+      Some("ID"),
+      "urn:ogf:network:surfnet.nl:1900:provider",
       "urn:ogf:network:surfnet.nl:1900:source",
       "urn:ogf:network:surfnet.nl:1900:destination",
-      ReservationStateEnumType.RESERVE_START, LifecycleStateEnumType.CREATED, ProvisionStateEnumType.PROVISIONED, new DataPlaneStatusType().withVersion(1).withActive(true).withVersionConsistent(true),
+      null,
+      ReservationStateEnumType.RESERVE_START,
+      LifecycleStateEnumType.CREATED,
+      ProvisionStateEnumType.PROVISIONED,
+      new DataPlaneStatusType().withVersion(1).withActive(true).withVersionConsistent(true),
       Some(new ServiceExceptionType())
     )
 
