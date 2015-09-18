@@ -80,23 +80,23 @@ object NsiWebService {
 
       ack.status match {
         case OK | CREATED | ACCEPTED | INTERNAL_SERVER_ERROR =>
-          Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${nsa} at ${url}: ${ack.body}")
+          Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${nsa} at ${request.url}: ${ack.body}")
 
           DocumentToString.invert(ack.body).flatMap { document =>
             convertAck(defaultAckHeaders, document)
           } match {
             case Failure(error) =>
-              Logger.warn(s"Communication error with provider ${nsa} at ${url}: $error", error)
+              Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: $error", error)
               convertError(defaultAckHeaders, NsiError.ChildError.copy(text = error.toString).toServiceException(nsa))
             case Success(ack) =>
-              Logger.debug(s"Received ack from ${nsa} at ${url}: $ack")
+              Logger.debug(s"Received ack from ${nsa} at ${request.url}: $ack")
               ack
           }
         case FORBIDDEN =>
-          Logger.warn(s"Authentication failed (${ack.status}) from ${nsa} at ${url}: ${ack.body}")
+          Logger.warn(s"Authentication failed (${ack.status}) from ${nsa} at ${request.url}: ${ack.body}")
           convertError(defaultAckHeaders, NsiError.AuthenticationFailure.toServiceException(nsa))
         case _ =>
-          Logger.warn(s"Communication error with provider ${nsa} at ${url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
+          Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
           convertError(defaultAckHeaders, NsiError.ChildError.copy(text = s"Communication error: ${ack.status} ${ack.statusText}").toServiceException(nsa))
       }
     }
