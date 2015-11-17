@@ -40,7 +40,7 @@ import java.util.concurrent.TimeoutException
  *   currently active scheduler is used, even from unit tests.
  */
 class Continuations[T](scheduler: => Scheduler) {
-  private val continuations = TMap.empty[CorrelationId, (Cancellable, Promise[T])].single
+  private val continuations = TMap.empty[CorrelationId, (Seq[Cancellable], Promise[T])].single
 
   /**
    * Register a continuation. When the continuation is completed the future will be successful.
@@ -56,22 +56,29 @@ class Continuations[T](scheduler: => Scheduler) {
     }
 
     val promise = Promise[T]
-    continuations(correlationId) = (timeout, promise)
+    continuations(correlationId) = (timeout :: Nil, promise)
     promise.future
+  }
+
+  def addTimeout(correlationId: CorrelationId, within: FiniteDuration)(timeoutCallback: => Unit): Unit = {
+    continuations.get(correlationId).foreach { case (timeouts, promise) =>
+      val timeout = scheduler.scheduleOnce(within)(timeoutCallback)
+      continuations.update(correlationId, ((timeout +: timeouts), promise))
+    }
   }
 
   def unregister(correlationId: CorrelationId): Boolean = continuations.remove(correlationId) match {
     case None =>
       false
-    case Some((timeout, _)) =>
-      timeout.cancel()
+    case Some((timeouts, _)) =>
+      timeouts.foreach(_.cancel)
       true
   }
 
   def replyReceived(correlationId: CorrelationId, reply: T): Unit =
     continuations.remove(correlationId).foreach {
-      case (timeout, promise) =>
-        timeout.cancel()
+      case (timeouts, promise) =>
+        timeouts.foreach(_.cancel)
         promise.trySuccess(reply)
     }
 }

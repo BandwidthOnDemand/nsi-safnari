@@ -5,6 +5,8 @@ import java.util.concurrent.TimeoutException
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Failure
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ContinuationsSpec extends helpers.Specification {
@@ -62,6 +64,17 @@ class ContinuationsSpec extends helpers.Specification {
       }
 
       continuations.unregister(CorrelationId) aka "registered" must beFalse
+    }
+
+    "add timeout callback should not complete future" in new fixture {
+      val countDown = new CountDownLatch(1)
+      val reply = continuations.register(CorrelationId, 1.seconds)
+      continuations.addTimeout(CorrelationId, 10.milliseconds) {
+        countDown.countDown()
+      }
+
+      countDown.await(100, TimeUnit.MILLISECONDS) must beTrue
+      reply.isCompleted must beFalse
     }
   }
 }

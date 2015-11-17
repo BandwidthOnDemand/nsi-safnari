@@ -94,12 +94,14 @@ object ConnectionRequester {
         }
 
         val connection = Connection(sender)
-        continuations.register(headers.correlationId, Configuration.AsyncReplyTimeout).onComplete {
-          case Success(reply) =>
-            connection ! Connection.Command(new Instant(), FromProvider(reply))
-          case Failure(exception) =>
-            // FIXME maybe handle timeouts separately?
-            connection ! Connection.Command(new Instant(), MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, DateTime.now(), exception.toString))
+
+        continuations.register(headers.correlationId, Configuration.ConnectionExpirationTime).foreach { reply =>
+          connection ! Connection.Command(new Instant(), FromProvider(reply))
+        }
+        continuations.addTimeout(headers.correlationId, Configuration.AsyncReplyTimeout) {
+          connection ! Connection.Command(
+              new Instant(),
+              MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, DateTime.now(), s"No reply received within: ${Configuration.AsyncReplyTimeout}"))
         }
 
         val response = NsiWebService.callProvider(provider, message)

@@ -282,7 +282,7 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       case failure: MessageDeliveryFailure =>
         MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
           .withConnectionId(id)
-          .withNotificationId(newNotificationId)
+          .withNotificationId(newNotificationId())
           .withCorrelationId(failure.originalCorrelationId.toString)
           .withTimeStamp(failure.timestamp.toXmlGregorianCalendar))
     }
