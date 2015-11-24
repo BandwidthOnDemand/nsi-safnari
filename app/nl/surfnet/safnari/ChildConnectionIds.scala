@@ -24,6 +24,12 @@ package nl.surfnet.safnari
 
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.messages.{ReserveFailed, ReserveConfirmed}
+import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
+import scala.collection.JavaConversions._
+import javax.xml.bind.JAXBElement
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import scala.reflect.runtime.universe._
+import play.api.Logger
 
 case class ChildConnectionIds(
   segments: Vector[(CorrelationId, ComputedSegment)] = Vector.empty,
@@ -46,8 +52,38 @@ case class ChildConnectionIds(
   def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = if (segments.exists(_._1 == correlationId)) {
     copy(
       connectionByInitialCorrelationId = connectionByInitialCorrelationId.updated(correlationId, connectionId),
-      initialCorrelationIdByConnectionId = initialCorrelationIdByConnectionId.updated(connectionId, correlationId))
+      initialCorrelationIdByConnectionId = initialCorrelationIdByConnectionId.updated(connectionId, correlationId)
+    )
   } else this
+
+  def matchJaxb[A: TypeTag](jaxb: JAXBElement[A]) = jaxb match {
+    case p2ps: JAXBElement[P2PServiceBaseType @unchecked] if typeOf[A] =:= typeOf[P2PServiceBaseType] => true
+    case _ => false
+  }
+
+  def receivedReserveConfirmed(correlationId: CorrelationId, connectionId: ConnectionId, criteria: ReservationConfirmCriteriaType) = {
+    val targetSegment = segments.find(_._1 == correlationId)
+
+    if (targetSegment.isDefined) {
+      var newSegments = segments
+      val p2pList = criteria.getAny.map(any => any.asInstanceOf[JAXBElement[_]]).filter(matchJaxb(_))
+      if (p2pList.nonEmpty) {
+        val p2ps: P2PServiceBaseType = p2pList.head.asInstanceOf[javax.xml.bind.JAXBElement[P2PServiceBaseType]].getValue
+        val newSegment = ComputedSegment(targetSegment.get._2.provider, ServiceType(criteria.getServiceType, p2ps))
+        newSegments = segments.map {
+          case (`correlationId`, _) => (correlationId, newSegment)
+          case x => x
+        }
+      }
+
+      copy(
+        connectionByInitialCorrelationId = connectionByInitialCorrelationId.updated(correlationId, connectionId),
+        initialCorrelationIdByConnectionId = initialCorrelationIdByConnectionId.updated(connectionId, correlationId),
+        segments = newSegments
+      )
+    }
+    else this
+  }
 
   def childConnections: Seq[(ComputedSegment, CorrelationId, Option[ConnectionId])] = segments.map {
     case (correlationId, segment) =>
@@ -62,17 +98,23 @@ case class ChildConnectionIds(
   def update(message: InboundMessage, newCorrelationId: () => CorrelationId): ChildConnectionIds = message match {
     case FromPce(message: PathComputationConfirmed) =>
       copy(segments = message.segments.map(newCorrelationId() -> _)(collection.breakOut))
+
     case AckFromProvider(NsiProviderMessage(headers, ReserveResponse(connectionId))) =>
       receivedConnectionId(headers.correlationId, connectionId)
+
     case AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))) =>
       serviceException.getConnectionId match {
         case null         => this
         case connectionId => receivedConnectionId(headers.correlationId, connectionId)
       }
+
     case FromProvider(NsiRequesterMessage(headers, message: ReserveConfirmed)) =>
-      receivedConnectionId(headers.correlationId, message.connectionId)
+      // receivedConnectionId(headers.correlationId, message.connectionId)
+      receivedReserveConfirmed(headers.correlationId, message.connectionId, message.criteria)
+
     case FromProvider(NsiRequesterMessage(headers, message: ReserveFailed)) =>
       receivedConnectionId(headers.correlationId, message.connectionId)
+
     case _ =>
       this
   }

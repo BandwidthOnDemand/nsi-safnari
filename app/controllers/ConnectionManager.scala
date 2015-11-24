@@ -35,7 +35,6 @@ import org.joda.time.DateTime
 import org.joda.time.DateTimeUtils
 import org.joda.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import play.Logger
 import scala.concurrent._
 import scala.concurrent.duration._
