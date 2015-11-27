@@ -328,6 +328,8 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps)))
 
+        childConnectionData(ConnectionId).sourceStp must beEqualTo("networkId:A?vlan=1")
+        childConnectionData(ConnectionId).destinationStp must beEqualTo("networkId:B?vlan=2")
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
       }
 
