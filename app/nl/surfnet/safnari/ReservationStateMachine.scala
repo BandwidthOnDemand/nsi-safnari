@@ -381,6 +381,10 @@ class ReservationStateMachine(
     stateData.childConnectionStates.getOrElse(correlationId, CheckingReservationState).jaxb
   }
 
+  def childConnectionCriteria(correlationId: CorrelationId): ConnectionCriteria = {
+    nextStateData.childConnectionCriteria.getOrElse(correlationId, ConnectionCriteria.Initial)
+  }
+
   def reservationState = nextStateName.jaxb
   def pendingCriteria = nextStateData.criteria.requested
   def committedCriteria = nextStateData.criteria.committed

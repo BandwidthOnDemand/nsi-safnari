@@ -32,6 +32,7 @@ import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import play.api.Logger
 
 import scala.math.Ordering.Implicits._
@@ -292,16 +293,17 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
     }
   }
 
-  def query = {
-    lazy val children = this.children.childConnections.zipWithIndex.collect {
-      case ((segment, _, Some(id)), order) => new ChildSummaryType()
-        .withConnectionId(id)
-        .withProviderNSA(segment.provider.nsa)
-        .withServiceType(segment.serviceType.serviceType)
-        .withPointToPointService(segment.serviceType.service)
-        .withOrder(order)
-    }
+  private def childP2PServiceType(correlationId: CorrelationId, segment: ComputedSegment): P2PServiceBaseType = {
+    val childConnectionCriteria = rsm.childConnectionCriteria(correlationId)
 
+    val confirmCriteria = childConnectionCriteria.committed.orElse(childConnectionCriteria.confirmed)
+
+    confirmCriteria.flatMap(_.getPointToPointService())
+      .orElse(childConnectionCriteria.requested.flatMap(_.getPointToPointService()))
+      .getOrElse(segment.serviceType.service)
+  }
+
+  def query = {
     val result = new QuerySummaryResultType()
       .withGlobalReservationId(initialReserve.body.body.getGlobalReservationId())
       .withDescription(initialReserve.body.body.getDescription())
@@ -310,6 +312,17 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
       .withConnectionStates(connectionStates)
 
     rsm.committedCriteria.foreach { criteria =>
+      val children = this.children.childConnections.zipWithIndex.collect {
+        case ((segment, correlationId, Some(id)), order) =>
+          val p2ps = childP2PServiceType(correlationId, segment)
+          new ChildSummaryType()
+            .withConnectionId(id)
+            .withProviderNSA(segment.provider.nsa)
+            .withServiceType(segment.serviceType.serviceType)
+            .withPointToPointService(p2ps)
+            .withOrder(order)
+      }
+
       result.getCriteria().add(new QuerySummaryResultCriteriaType()
         .withVersion(criteria.getVersion())
         .withSchedule(criteria.getSchedule())
@@ -331,17 +344,20 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
   }
 
   def segments: Seq[ConnectionData] = children.childConnections.map {
-    case (segment, correlationId, id) => ConnectionData(
-      id,
-      segment.provider.nsa,
-      segment.serviceType.service.getSourceSTP,
-      segment.serviceType.service.getDestSTP,
-      segment.serviceType.service.getEro,
-      rsm.childConnectionStateByInitialCorrelationId(correlationId),
-      id.map(id => lsm.childConnectionState(id)).getOrElse(LifecycleStateEnumType.CREATED),
-      id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
-      id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(new DataPlaneStatusType()),
-      id.flatMap(mostRecentChildExceptions.get))
+    case (segment, correlationId, id) =>
+      val p2ps = childP2PServiceType(correlationId, segment)
+
+      ConnectionData(
+        id,
+        segment.provider.nsa,
+        p2ps.getSourceSTP(),
+        p2ps.getDestSTP(),
+        p2ps.getEro(),
+        rsm.childConnectionStateByInitialCorrelationId(correlationId),
+        id.map(id => lsm.childConnectionState(id)).getOrElse(LifecycleStateEnumType.CREATED),
+        id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
+        id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(new DataPlaneStatusType()),
+        id.flatMap(mostRecentChildExceptions.get))
   }.toSeq
 
   def notifications: Seq[NotificationBaseType] = nsiNotifications.map {
