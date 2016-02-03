@@ -47,27 +47,6 @@ case object AbortedReservationState extends ReservationState(ReservationStateEnu
 // RESERVE_TIMEOUT is an ultimate provider state only so not applicable to the aggregator.
 //case object TimeoutReservationState extends ReservationState(ReservationStateEnumType.RESERVE_TIMEOUT)
 
-final case class ConnectionCriteria(pending: Option[Either[ReservationRequestCriteriaType, ReservationConfirmCriteriaType]], committed: Option[ReservationConfirmCriteriaType]) {
-  def withRequested(requested: ReservationRequestCriteriaType) = copy(pending = Some(Left(requested)))
-  def withHeld(held: ReservationConfirmCriteriaType) = copy(pending = Some(Right(held)))
-  def commit = copy(pending = None, committed = pending.flatMap(_.right.toOption))
-  def abort = copy(pending = None)
-
-  def requested = pending.flatMap(_.left.toOption)
-  def confirmed = pending.flatMap(_.right.toOption)
-
-  def pendingVersion: Int = {
-    pending.flatMap(_.fold(
-        requested => if (requested.getVersion eq null) None else Some(requested.getVersion.intValue),
-        confirmed => Some(confirmed.getVersion)))
-      .orElse(committed.map(_.getVersion + 1))
-      .getOrElse(1)
-  }
-}
-object ConnectionCriteria {
-  val Initial = ConnectionCriteria(None, None)
-}
-
 case class ReservationStateMachineData(
     currentCommand: NsiProviderMessage[NsiProviderOperation],
     globalReservationId: Option[GlobalReservationId],
