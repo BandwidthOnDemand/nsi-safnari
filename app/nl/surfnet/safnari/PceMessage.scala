@@ -160,29 +160,31 @@ object PceMessage {
     (__ \ "correlationId").read[CorrelationId] and
     (__ \ "path").read[Seq[ComputedSegment]])(PathComputationConfirmed.apply _)
 
-  implicit val NsiErrorVariableReads: Reads[NsiErrorVariable] = (
+  private case class NsiErrorVariable(name: String, value: String)
+
+  private implicit val NsiErrorVariableReads: Reads[NsiErrorVariable] = (
     (__ \ "@type").read[String] and
     (__ \ "value").read[String]) { NsiErrorVariable }
 
-  implicit val NsiErrorVariableWrites: Writes[NsiErrorVariable] = (
+  private implicit val NsiErrorVariableWrites: Writes[NsiErrorVariable] = (
     (__ \ "@type").write[String] and
     (__ \ "value").write[String]) (unlift(NsiErrorVariable.unapply))
 
-  implicit val NsiErrorReads: Reads[NsiError] = (
+  private implicit val NsiErrorReads: Reads[NsiError] = (
     (__ \ "code").read[String] and
     (__ \ "label").read[String] and
     (__ \ "description").read[String] and
     (__ \ "variable").readNullable[NsiErrorVariable]) {
-      (code, label, text, variable) => NsiError(code, label, text, variable)
+      (code, label, text, variable) => NsiError(code, label, text, variables = variable.map(v => v.name -> v.value).toSeq)
     }
 
-  implicit val NsiErrorWrites: Writes[NsiError] = Writes { (nsiError: NsiError) =>
+  private implicit val NsiErrorWrites: Writes[NsiError] = Writes { (nsiError: NsiError) =>
     JsObject(
       (Seq[(String, JsValue)]()
       :+ "code" -> JsString(nsiError.id)
       :+ "label" -> JsString(nsiError.description)
       :+ "description" -> JsString(nsiError.text))
-      ++ nsiError.variable.map("variable" -> Json.toJson(_))
+      ++ nsiError.variables.headOption.map { case (k, v) => "variable" -> Json.toJson(NsiErrorVariable(k, v)) }
     )
   }
 

@@ -97,7 +97,7 @@ class PceMessageSpec extends helpers.Specification {
         """{"correlationId":"urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640","status":"FAILED",
             "m.findPathError":{"code":"00702","label":"LABEL","description":"oops!","variable":{"@type":"type", "value":"value"}}}""".stripMargin
 
-      val output = PathComputationFailed(CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get, NsiError("00702", "LABEL", "oops!", Some(NsiErrorVariable("type", "value"))))
+      val output = PathComputationFailed(CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get, NsiError("00702", "LABEL", "oops!", Seq("type" -> "value")))
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
     }
