@@ -26,7 +26,7 @@ import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.persistence.MessageData
 import nl.surfnet.nsiv2.soap.Conversion
 import play.api.libs.json._
-import scala.util.{ Try, Success, Failure }
+import scala.util.Success
 
 object MessagePersistence {
   import MessageData._

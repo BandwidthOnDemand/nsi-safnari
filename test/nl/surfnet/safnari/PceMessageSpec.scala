@@ -1,7 +1,6 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import java.util.Collection
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import nl.surfnet.nsiv2.messages.CorrelationId

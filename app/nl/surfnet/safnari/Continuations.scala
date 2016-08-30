@@ -23,7 +23,6 @@
 package nl.surfnet.safnari
 
 import akka.actor.Scheduler
-import java.util.concurrent.CancellationException
 import nl.surfnet.nsiv2.messages.CorrelationId
 import play.api.libs.concurrent.Execution.Implicits._
 import scala.concurrent.stm.TMap

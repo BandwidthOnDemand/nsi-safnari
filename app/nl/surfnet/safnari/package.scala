@@ -24,7 +24,6 @@ package nl.surfnet
 
 import java.net.URI
 import nl.surfnet.nsiv2.messages._
-import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._12.connection.types._
 
 package object safnari {

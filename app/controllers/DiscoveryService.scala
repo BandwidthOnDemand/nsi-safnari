@@ -25,7 +25,7 @@ package controllers
 import akka.actor.ActorRef
 import akka.pattern.ask
 import controllers.ActorSupport._
-import nl.surfnet.safnari.{PathComputationAlgorithm, ReachabilityTopologyEntry}
+import nl.surfnet.safnari.ReachabilityTopologyEntry
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.{DateTime, DateTimeZone}
 import play.api.http.ContentTypes

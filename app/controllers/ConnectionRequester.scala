@@ -24,7 +24,6 @@ package controllers
 
 import akka.actor._
 import akka.event.LoggingReceive
-import akka.pattern.ask
 import java.net.URI
 import java.util.concurrent.TimeoutException
 import nl.surfnet.nsiv2._

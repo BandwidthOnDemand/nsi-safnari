@@ -23,7 +23,6 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import java.util.Collection
 import javax.xml.datatype.{DatatypeFactory, XMLGregorianCalendar}
 import scala.collection.JavaConversions._
 import nl.surfnet.nsiv2.messages._
