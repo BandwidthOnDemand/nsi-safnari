@@ -315,7 +315,7 @@ class ReservationStateMachine(
           ToProvider(NsiProviderMessage(headers, InitialReserve(reserveType)), segment.provider)
       }
     case PathComputationState -> FailedReservationState =>
-      respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoPathFound))))
+      respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoServicePlanePathFound))))
     case CheckingReservationState -> FailedReservationState =>
       respond(ReserveFailed(failed(NsiError.ChildError).tap(_.getServiceException().withChildException(nextStateData.childExceptions.values.toSeq.asJava))))
     case (CheckingReservationState | ModifyingReservationState) -> HeldReservationState =>
@@ -333,7 +333,7 @@ class ReservationStateMachine(
     case CommittingReservationState -> ReservedReservationState =>
       respond(ReserveCommitConfirmed(id))
     case CommittingReservationState -> CommitFailedReservationState =>
-      respond(ReserveCommitFailed(failed(NsiError.InternalError).tap(_.getServiceException().withChildException(stateData.childExceptions.values.toSeq.asJava))))
+      respond(ReserveCommitFailed(failed(NsiError.GenericInternalError).tap(_.getServiceException().withChildException(stateData.childExceptions.values.toSeq.asJava))))
     case ReservedReservationState -> ModifyingReservationState =>
       val data = nextStateData
       children.childConnections.collect {
@@ -375,11 +375,11 @@ class ReservationStateMachine(
     val committedP2Ps = committedCriteria.getPointToPointService.get
     val requestedP2Ps = requestedCriteria.getPointToPointService.get
     if ((requestedCriteria.getVersion ne null) && committedVersion >= requestedCriteria.getVersion)
-      Some(NsiError.PayloadError.copy(text = s"requested version ${requestedCriteria.getVersion} must be greater than committed version $committedVersion"))
+      Some(NsiError.GenericMessagePayloadError.copy(text = s"requested version ${requestedCriteria.getVersion} must be greater than committed version $committedVersion"))
     else if (!(committedP2Ps.sourceStp isCompatibleWith requestedP2Ps.sourceStp))
-      Some(NsiError.PayloadError.copy(text = s"committed source STP ${committedP2Ps.sourceStp} is not compatible with requested source STP ${requestedP2Ps.sourceStp}"))
+      Some(NsiError.GenericMessagePayloadError.copy(text = s"committed source STP ${committedP2Ps.sourceStp} is not compatible with requested source STP ${requestedP2Ps.sourceStp}"))
     else if (!(committedP2Ps.destStp isCompatibleWith requestedP2Ps.destStp))
-      Some(NsiError.PayloadError.copy(text = s"committed destination STP ${committedP2Ps.destStp} is not compatible with requested destination STP ${requestedP2Ps.destStp}"))
+      Some(NsiError.GenericMessagePayloadError.copy(text = s"committed destination STP ${committedP2Ps.destStp} is not compatible with requested destination STP ${requestedP2Ps.destStp}"))
     else
       None
   }

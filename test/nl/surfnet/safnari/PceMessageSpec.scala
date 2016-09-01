@@ -73,7 +73,7 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "serialize computation failed response to json" in {
-      val response = PathComputationFailed(correlationId, NsiError.NoPathFound)
+      val response = PathComputationFailed(correlationId, NsiError.NoServicePlanePathFound)
 
       val json = Json.toJson[PceResponse](response)
 

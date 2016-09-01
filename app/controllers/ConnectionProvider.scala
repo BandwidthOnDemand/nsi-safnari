@@ -73,7 +73,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderCommand])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] =
     connectionManager.findOrCreateConnection(request) match {
       case None =>
-        Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))
+        Future.successful(ServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))
       case Some(connection) =>
         ConnectionProvider.requesterContinuations.register(request.headers.correlationId, Configuration.AsyncReplyTimeout).foreach(sendAsyncReply)
 
@@ -97,11 +97,11 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
           case n => sendAsyncReply(message reply QueryNotificationConfirmed(n))
         }
       }
-      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))(_ => GenericAck()))
+      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))(_ => GenericAck()))
     case QueryNotificationSync(connectionId, start, end) =>
       val ack = connectionManager.get(connectionId).map(queryNotifications(_, start, end).map(QueryNotificationSyncConfirmed))
 
-      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))))
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))))
     case QueryResult(connectionId, start, end) =>
       val connection = connectionManager.get(connectionId)
       connection.map { con =>
@@ -110,11 +110,11 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
         }
       }
 
-      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))(_ => GenericAck()))
+      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))(_ => GenericAck()))
     case QueryResultSync(connectionId, start, end) =>
       val ack = connectionManager.get(connectionId).map(queryResults(_, start, end).map(QueryResultSyncConfirmed))
 
-      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))))
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))))
     case q @ QueryRecursive(_) =>
       handleQueryRecursive(message.copy(body = q))(sendAsyncReply)
   }

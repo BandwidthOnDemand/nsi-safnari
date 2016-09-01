@@ -173,7 +173,7 @@ class ConnectionManagerSpec extends helpers.Specification {
 
       error must beLike {
         case ServiceException(details) =>
-          details must_== NsiError.PayloadError.toServiceException(AggregatorNsa).withText(s"duplicate request with existing correlation id ${initialReserveMessage.headers.correlationId} does not match the original")
+          details must_== NsiError.GenericMessagePayloadError.toServiceException(AggregatorNsa).withText(s"duplicate request with existing correlation id ${initialReserveMessage.headers.correlationId} does not match the original")
       }
     }
 

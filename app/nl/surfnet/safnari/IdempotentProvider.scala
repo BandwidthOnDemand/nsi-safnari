@@ -53,7 +53,7 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Either[
           result
         case Some(RequesterCommandStatus(original, outstandingCommandsOrReply)) =>
           if (!sameMessage(inbound.message, original.message)) {
-            Left(NsiError.PayloadError.toServiceException(providerNsa).withText(s"duplicate request with existing correlation id ${inbound.correlationId} does not match the original"))
+            Left(NsiError.GenericMessagePayloadError.toServiceException(providerNsa).withText(s"duplicate request with existing correlation id ${inbound.correlationId} does not match the original"))
           } else {
             Right(outstandingCommandsOrReply match {
               case Left(outstandingCommands) =>

@@ -288,14 +288,14 @@ class ConnectionEntitySpec extends helpers.Specification {
       "fail the connection when path computation fails" in new fixture {
         given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
-        when(pce.fail(CorrelationId(0, 1), NsiError.NoPathFound))
+        when(pce.fail(CorrelationId(0, 1), NsiError.NoServicePlanePathFound))
 
         messages must haveSize(1)
         messages must contain(like[Message] {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
-            failed.getServiceException().getErrorId() must beEqualTo(NsiError.NoPathFound.id)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.NoServicePlanePathFound.id)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
       }
@@ -388,7 +388,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A))
 
-        when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+        when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.CapacityUnavailable.toServiceException(A.provider.nsa)))))
 
         messages must haveSize(1)
         messages must contain(like[Message] {
@@ -397,7 +397,7 @@ class ConnectionEntitySpec extends helpers.Specification {
             failed.getConnectionId() must beEqualTo(ConnectionId)
             failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
-            failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.BandwidthUnavailable.id)
+            failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.CapacityUnavailable.id)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
       }
@@ -406,7 +406,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
-          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.CapacityUnavailable.toServiceException(A.provider.nsa)))))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
 
@@ -451,11 +451,11 @@ class ConnectionEntitySpec extends helpers.Specification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
-          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.CapacityUnavailable.toServiceException(A.provider.nsa)))))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
 
-        when(upa.response(CorrelationId(0, 5), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdB").withServiceException(NsiError.BandwidthUnavailable.toServiceException(B.provider.nsa)))))
+        when(upa.response(CorrelationId(0, 5), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdB").withServiceException(NsiError.CapacityUnavailable.toServiceException(B.provider.nsa)))))
 
         messages must haveSize(1)
         messages must contain(like[Message] {
@@ -667,7 +667,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A),
-          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))))
+          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.CapacityUnavailable.toServiceException(A.provider.nsa)))))
 
         when(ura.request(CorrelationId(0, 6), ReserveAbort(ConnectionId)))
 
@@ -679,7 +679,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A),
-          upa.acknowledge(CorrelationId(0, 4), ServiceException(NsiError.PayloadError.toServiceException(A.provider.nsa))))
+          upa.acknowledge(CorrelationId(0, 4), ServiceException(NsiError.GenericMessagePayloadError.toServiceException(A.provider.nsa))))
 
         when(ura.request(CorrelationId(0, 6), ReserveAbort(ConnectionId)))
 
@@ -693,7 +693,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A),
-          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.BandwidthUnavailable.toServiceException(A.provider.nsa)))),
+          upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.CapacityUnavailable.toServiceException(A.provider.nsa)))),
           ura.request(CorrelationId(0, 5), ReserveAbort(ConnectionId)))
 
         when(upa.response(CorrelationId(0, 6), ReserveAbortConfirmed("ConnectionIdA")))
@@ -796,7 +796,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
         messages must contain(like[Message] {
           case ToRequester(NsiRequesterMessage(_, ReserveFailed(failed))) =>
-            failed.getServiceException.getErrorId must_== NsiError.PayloadError.id
+            failed.getServiceException.getErrorId must_== NsiError.GenericMessagePayloadError.id
         })
       }
 

@@ -57,7 +57,7 @@ class ConnectionProviderSpec extends helpers.Specification {
       val response = connectionProvider.request.apply(FakeRequest().withBody(initialReserveMessage))
 
       val body = scala.xml.XML.loadString(contentAsString(response))
-      body must \\("text") \> "Parameter provided contains an unsupported value which MUST be processed"
+      body must \\("text") \> NsiError.UnsupportedParameter.text
       body must \\("variable", "type" -> "requesterNSA")
       body must \\("variable") \("value") \> RequesterNsa
     }

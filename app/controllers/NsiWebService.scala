@@ -94,7 +94,7 @@ object NsiWebService {
           }
         case FORBIDDEN =>
           Logger.warn(s"Authentication failed (${ack.status}) from ${nsa} at ${request.url}: ${ack.body}")
-          convertError(defaultAckHeaders, NsiError.AuthenticationFailure.toServiceException(nsa))
+          convertError(defaultAckHeaders, NsiError.Unauthorized.toServiceException(nsa))
         case _ =>
           Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
           convertError(defaultAckHeaders, NsiError.ChildError.copy(text = s"Communication error: ${ack.status} ${ack.statusText}").toServiceException(nsa))

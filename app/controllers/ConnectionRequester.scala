@@ -57,7 +57,7 @@ class ConnectionRequester(connectionManager: ConnectionManager) extends Controll
 
       val ack = connection.map { c =>
         (c ? Connection.Command(new Instant(), FromProvider(NsiRequesterMessage(headers, notification))))
-      } getOrElse Future.successful(ServiceException(NsiError.ConnectionNonExistent.toServiceException(Configuration.NsaId)))
+      } getOrElse Future.successful(ServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))
 
       ack.map(message.ack)
     case response =>
