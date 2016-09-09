@@ -115,7 +115,9 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
         }
       case failed: MessageDeliveryFailure =>
         failed.connectionId.foreach { connectionId =>
-          mostRecentChildExceptions += connectionId -> NsiError.ChildError.toServiceException("").withText(failed.toShortString)
+          val child = children.childrenByConnectionId.get(connectionId)
+          val childNsaId = child.map(_.nsa)
+          mostRecentChildExceptions += connectionId -> NsiError.GenericInternalError.toServiceException(childNsaId.getOrElse("")).withText(failed.toShortString)
         }
       case _ =>
     }

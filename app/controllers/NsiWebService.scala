@@ -87,7 +87,7 @@ object NsiWebService {
           } match {
             case Failure(error) =>
               Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: $error", error)
-              convertError(defaultAckHeaders, NsiError.ChildError.copy(text = error.toString).toServiceException(nsa))
+              convertError(defaultAckHeaders, NsiError.GenericInternalError.copy(text = error.toString).toServiceException(nsa))
             case Success(ack) =>
               Logger.debug(s"Received ack from ${nsa} at ${request.url}: $ack")
               ack
@@ -97,7 +97,7 @@ object NsiWebService {
           convertError(defaultAckHeaders, NsiError.Unauthorized.toServiceException(nsa))
         case _ =>
           Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
-          convertError(defaultAckHeaders, NsiError.ChildError.copy(text = s"Communication error: ${ack.status} ${ack.statusText}").toServiceException(nsa))
+          convertError(defaultAckHeaders, NsiError.GenericInternalError.copy(text = s"Communication error: ${ack.status} ${ack.statusText}").toServiceException(nsa))
       }
     }
   }
