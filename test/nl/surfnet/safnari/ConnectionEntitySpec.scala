@@ -395,7 +395,8 @@ class ConnectionEntitySpec extends helpers.Specification {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
-            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.CapacityUnavailable.id)
+            failed.getServiceException().getNsaId() must beEqualTo(AggregatorNsa)
             failed.getServiceException().getChildException().asScala must haveSize(1)
             failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.CapacityUnavailable.id)
         })
@@ -417,7 +418,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
-            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.CapacityUnavailable.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
@@ -441,7 +442,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
-            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+            failed.getServiceException().getErrorId() must beEqualTo("ErrorId")
             failed.getServiceException().getChildException().asScala must haveSize(1)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
@@ -462,7 +463,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
-            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildError.id)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.CapacityUnavailable.id)
             failed.getServiceException().getChildException().asScala must haveSize(2)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)

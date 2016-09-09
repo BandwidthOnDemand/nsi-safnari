@@ -317,7 +317,20 @@ class ReservationStateMachine(
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoServicePlanePathFound))))
     case CheckingReservationState -> FailedReservationState =>
-      respond(ReserveFailed(failed(NsiError.ChildError).tap(_.getServiceException().withChildException(nextStateData.childExceptions.values.toSeq.asJava))))
+      val baseError = failed(NsiError.GenericInternalError.withText("reservation failed without child errors"))
+
+      val childExceptions = nextStateData.childExceptions.values.to[Vector]
+      baseError.getServiceException.withChildException(childExceptions.asJava)
+
+      val prioritizedChildError = childExceptions.headOption
+      prioritizedChildError foreach { error =>
+        baseError.getServiceException()
+          .withErrorId(error.getErrorId)
+          .withText(error.getText)
+          .withVariables(error.getVariables)
+      }
+
+      respond(ReserveFailed(baseError))
     case (CheckingReservationState | ModifyingReservationState) -> HeldReservationState =>
       respond(ReserveConfirmed(id, nextStateData.criteria.confirmed.get))
     case HeldReservationState -> CommittingReservationState =>
