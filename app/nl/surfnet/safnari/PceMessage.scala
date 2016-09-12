@@ -23,7 +23,9 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import javax.xml.datatype.{DatatypeFactory, XMLGregorianCalendar}
+import javax.xml.XMLConstants
+import javax.xml.namespace.QName
+import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
 import scala.collection.JavaConversions._
 import nl.surfnet.nsiv2.messages._
 
@@ -159,13 +161,15 @@ object PceMessage {
     (__ \ "correlationId").read[CorrelationId] and
     (__ \ "path").read[Seq[ComputedSegment]])(PathComputationConfirmed.apply _)
 
-  private case class NsiErrorVariable(name: String, value: String)
+  private case class NsiErrorVariable(namespace: Option[String], name: String, value: String)
 
   private implicit val NsiErrorVariableReads: Reads[NsiErrorVariable] = (
+    (__ \ "@namespace").readNullable[String] and
     (__ \ "@type").read[String] and
     (__ \ "value").read[String]) { NsiErrorVariable }
 
   private implicit val NsiErrorVariableWrites: Writes[NsiErrorVariable] = (
+    (__ \ "@namespace").writeNullable[String] and
     (__ \ "@type").write[String] and
     (__ \ "value").write[String]) (unlift(NsiErrorVariable.unapply))
 
@@ -174,16 +178,23 @@ object PceMessage {
     (__ \ "label").read[String] and
     (__ \ "description").read[String] and
     (__ \ "variable").readNullable[NsiErrorVariable]) {
-      (code, label, text, variable) => NsiError(code, label, text, variables = variable.map(v => v.name -> v.value).toSeq)
+      (code, label, text, variable) => NsiError(code, label, text, variables = variable.map(v => new QName(v.namespace getOrElse XMLConstants.NULL_NS_URI, v.name) -> v.value).toSeq)
     }
 
   private implicit val NsiErrorWrites: Writes[NsiError] = Writes { (nsiError: NsiError) =>
     JsObject(
       (Seq[(String, JsValue)]()
-      :+ "code" -> JsString(nsiError.id)
-      :+ "label" -> JsString(nsiError.description)
-      :+ "description" -> JsString(nsiError.text))
-      ++ nsiError.variables.headOption.map { case (k, v) => "variable" -> Json.toJson(NsiErrorVariable(k, v)) }
+        :+ "code" -> JsString(nsiError.id)
+        :+ "label" -> JsString(nsiError.description)
+        :+ "description" -> JsString(nsiError.text)
+      ) ++ nsiError.variables.headOption.map {
+          case (k, v) =>
+            "variable" -> Json.toJson(NsiErrorVariable(
+              Option(k.getNamespaceURI).filter(_.nonEmpty),
+              k.getLocalPart,
+              v
+            ))
+        }
     )
   }
 

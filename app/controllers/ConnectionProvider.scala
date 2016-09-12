@@ -64,7 +64,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
           None
         case Failure(e) =>
           Logger.info(s"The requesterNSA '$nsa' does not match a known TLS NSA")
-          val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(nsa, "requesterNSA" -> nsa))
+          val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(nsa, NsiHeaders.REQUESTER_NSA -> nsa))
           Some(message ack serviceException)
       }
     } else None
