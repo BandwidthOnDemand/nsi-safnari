@@ -2,7 +2,7 @@ name := "nsi-safnari"
 
 version := "1.0-SNAPSHOT"
 
-val nexusBaseUri = "https://atlas.dlp.surfnet.nl/nexus/content/repositories"
+val surfnetNexusBaseUrl = "https://atlas.dlp.surfnet.nl/nexus/content/repositories"
 
 libraryDependencies ++= Seq(
   ws,
@@ -23,11 +23,15 @@ scalaVersion := "2.11.8"
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-value-discard", "-Ywarn-adapted-args")
 
+val surfnetSnapshots = "SURFnet Snapshots" at s"$surfnetNexusBaseUrl/snapshots"
+val surfnetReleases = "SURFnet Releases" at s"$surfnetNexusBaseUrl/releases"
+
 resolvers ++= Seq(
-    "mandubian maven bintray (play-json-zipper)" at "http://dl.bintray.com/mandubian/maven",
-    "SURFnet thirdparty" at s"$nexusBaseUri/thirdparty",
-    "SURFnet BoD Snapshots" at s"$nexusBaseUri/public-snapshots",
-    "SURFnet BoD Releases" at s"$nexusBaseUri/public-releases"
+  surfnetSnapshots, surfnetReleases,
+  "mandubian maven bintray (play-json-zipper)" at "http://dl.bintray.com/mandubian/maven",
+  "SURFnet thirdparty" at s"$surfnetNexusBaseUrl/thirdparty",
+  "SURFnet BoD Snapshots" at s"$surfnetNexusBaseUrl/public-snapshots",
+  "SURFnet BoD Releases" at s"$surfnetNexusBaseUrl/public-releases"
 )
 
 javaOptions in Test += "-Dconfig.file=conf/test.conf"
@@ -49,24 +53,9 @@ buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha
 
 buildInfoPackage := "nl.surfnet.safnari"
 
-mavenCommand := "mvn"
+PublishDist.publishSettings
 
-deployDist := {
-  val distFile = com.typesafe.sbt.packager.Keys.dist.value
-  val version = Keys.version.value
-  val (repoId, repoUrl) = if (version.trim.endsWith("-SNAPSHOT")) ("surfnet-snapshots", s"$nexusBaseUri/snapshots") else ("surfnet-releases", s"$nexusBaseUri/releases")
-  val groupId = organization.value
-  val artifactId = artifact.value.name
-  val maven = mavenCommand.value
-  val command = Seq(
-    maven, "-B", "deploy:deploy-file",
-    s"-DrepositoryId=$repoId", s"-Durl=$repoUrl", s"-Dfile=$distFile",
-    s"-DgroupId=$groupId", s"-DartifactId=$artifactId", s"-Dversion=$version", "-Dpackaging=zip"
-  )
-  println(s"Deploying $distFile to $repoId at $repoUrl using command:\n ${command.mkString(" ")}")
-  Process(command).lines.foreach(println)
-  distFile
-}
+publishTo := { if (isSnapshot.value) Some(surfnetSnapshots) else Some(surfnetReleases) }
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
