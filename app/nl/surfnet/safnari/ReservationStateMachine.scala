@@ -173,7 +173,7 @@ class ReservationStateMachine(
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
   newInitialReserveNsiHeaders: ProviderEndPoint => NsiHeaders,
   newNotificationId: () => Int,
-  defaultPathComputationAlgorithm: PathComputationAlgorithm,
+  pathComputationAlgorithm: PathComputationAlgorithm,
   failed: NsiError => GenericFailedType)
     extends FiniteStateMachine[ReservationState, ReservationStateMachineData, InboundMessage, OutboundMessage](
       InitialReservationState,
@@ -182,7 +182,7 @@ class ReservationStateMachine(
         Option(initialReserve.body.body.getGlobalReservationId()).map(URI.create(_)),
         Option(initialReserve.body.body.getDescription()),
         ConnectionCriteria.Initial,
-        InitialReserveAlgorithm.forAlgorithm(defaultPathComputationAlgorithm))) {
+        InitialReserveAlgorithm.forAlgorithm(pathComputationAlgorithm))) {
 
   when(InitialReservationState) {
     case Event(FromRequester(NsiProviderMessage(_, message: InitialReserve)), data) =>
@@ -325,7 +325,7 @@ class ReservationStateMachine(
         pceReplyUri,
         criteria.getSchedule(),
         ServiceType(criteria.getServiceType(), criteria.getPointToPointService().get),
-        defaultPathComputationAlgorithm,
+        pathComputationAlgorithm,
         initialReserve.headers.connectionTrace
       )))
 

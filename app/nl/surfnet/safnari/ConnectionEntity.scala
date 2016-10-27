@@ -38,7 +38,16 @@ import play.api.Logger
 import scala.math.Ordering.Implicits._
 import scala.util.Try
 
-class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve], newCorrelationId: () => CorrelationId, val aggregatorNsa: String, defaultPathComputationAlgorithm: PathComputationAlgorithm, nsiReplyToUri: URI, pceReplyUri: URI) {
+class ConnectionEntity(
+    val id: ConnectionId,
+    initialReserve: NsiProviderMessage[InitialReserve],
+    newCorrelationId: () => CorrelationId, val aggregatorNsa: String,
+    defaultPathComputationAlgorithm: PathComputationAlgorithm,
+    nsiReplyToUri: URI,
+    pceReplyUri: URI
+) {
+  private final val PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE = "pathComputationAlgorithm"
+
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion, initialReserve.headers.sessionSecurityAttrs, Nil)
   private def newInitialReserveNsiHeaders(provider: ProviderEndPoint) = {
@@ -58,12 +67,25 @@ class ConnectionEntity(val id: ConnectionId, initialReserve: NsiProviderMessage[
 
   var children = ChildConnectionIds()
 
-  val rsm = new ReservationStateMachine(id, initialReserve, pceReplyUri, children, newCorrelationId, newNsiHeaders, newInitialReserveNsiHeaders, newNotificationId, defaultPathComputationAlgorithm, { error =>
-    new GenericFailedType().
-      withConnectionId(id).
-      withConnectionStates(connectionStates).
-      withServiceException(error.toServiceException(aggregatorNsa))
-  })
+  val pathComputationAlgorithm = initialReserve.body.service.flatMap(_.parameters(PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE).flatMap(PathComputationAlgorithm.parse)).getOrElse(defaultPathComputationAlgorithm)
+
+  val rsm = new ReservationStateMachine(
+    id,
+    initialReserve,
+    pceReplyUri,
+    children,
+    newCorrelationId,
+    newNsiHeaders,
+    newInitialReserveNsiHeaders,
+    newNotificationId,
+    pathComputationAlgorithm,
+    { error =>
+      new GenericFailedType().
+        withConnectionId(id).
+        withConnectionStates(connectionStates).
+        withServiceException(error.toServiceException(aggregatorNsa))
+    }
+  )
   val lsm = new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children)
 
   private val globalReservationId: Option[GlobalReservationId] = Try(URI.create(initialReserve.body.body.getGlobalReservationId())).toOption
