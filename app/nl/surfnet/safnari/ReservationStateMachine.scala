@@ -52,16 +52,29 @@ case class ReservationStateMachineData(
     globalReservationId: Option[GlobalReservationId],
     description: Option[String],
     criteria: ConnectionCriteria,
-    segments: Seq[(CorrelationId, ComputedSegment)] = Seq.empty,
+    initialReserveAlgorithm: InitialReserveAlgorithm,
+    segments: ComputedPathSegments = Seq.empty,
     childConnectionStates: Map[CorrelationId, ReservationState] = Map.empty,
     childExceptions: Map[CorrelationId, ServiceExceptionType] = Map.empty,
     childConnectionCriteria: Map[CorrelationId, ConnectionCriteria] = Map.empty,
     pceError: Option[NsiError] = None,
     reserveError: Option[NsiError] = None) {
 
-  def receivedSegments(segments: Seq[(CorrelationId, ComputedSegment)]) = {
+  def receivedSegments(segments: ComputedPathSegments) = {
+    val algorithm = initialReserveAlgorithm.forSegments(segments)
+    copy(segments = segments, initialReserveAlgorithm = algorithm)
+  }
+
+  def initialReserveConfirmed(correlationId: CorrelationId, criteria: ReservationConfirmCriteriaType) = {
+    copy(initialReserveAlgorithm = initialReserveAlgorithm.reserveConfirmed(correlationId, criteria))
+  }
+
+  def clearNextSegments = copy(initialReserveAlgorithm = initialReserveAlgorithm.clearNextSegments)
+
+  def reserveNextSegments: ReservationStateMachineData = {
     val Some(Left(requestedCriteria)) = criteria.pending
-    val childCriteria: Map[CorrelationId, ConnectionCriteria] = segments.map {
+
+    val nextChildConnectionCriteria: Map[CorrelationId, ConnectionCriteria] = initialReserveAlgorithm.nextSegments.map {
       case (correlationId, segment) =>
         val service = segment.serviceType.service
         val criteria = new ReservationRequestCriteriaType().
@@ -74,10 +87,13 @@ case class ReservationStateMachineData(
         correlationId -> ConnectionCriteria.Initial.withRequested(criteria)
     }(collection.breakOut)
 
+    val nextChildConnectionStates = initialReserveAlgorithm.nextSegments.map {
+      case (correlationId, _) => correlationId -> CheckingReservationState
+    }
+
     copy(
-      segments = segments,
-      childConnectionCriteria = childCriteria,
-      childConnectionStates = segments.map { case (correlationId, _) => correlationId -> CheckingReservationState }(collection.breakOut))
+      childConnectionCriteria = childConnectionCriteria ++ nextChildConnectionCriteria,
+      childConnectionStates = childConnectionStates ++ nextChildConnectionStates)
   }
 
   def aggregatedReservationState: ReservationState =
@@ -157,7 +173,7 @@ class ReservationStateMachine(
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
   newInitialReserveNsiHeaders: ProviderEndPoint => NsiHeaders,
   newNotificationId: () => Int,
-  pathComputationAlgorithm: PathComputationAlgorithm,
+  defaultPathComputationAlgorithm: PathComputationAlgorithm,
   failed: NsiError => GenericFailedType)
     extends FiniteStateMachine[ReservationState, ReservationStateMachineData, InboundMessage, OutboundMessage](
       InitialReservationState,
@@ -165,7 +181,8 @@ class ReservationStateMachine(
         initialReserve,
         Option(initialReserve.body.body.getGlobalReservationId()).map(URI.create(_)),
         Option(initialReserve.body.body.getDescription()),
-        ConnectionCriteria.Initial)) {
+        ConnectionCriteria.Initial,
+        InitialReserveAlgorithm.forAlgorithm(defaultPathComputationAlgorithm))) {
 
   when(InitialReservationState) {
     case Event(FromRequester(NsiProviderMessage(_, message: InitialReserve)), data) =>
@@ -174,7 +191,7 @@ class ReservationStateMachine(
 
   when(PathComputationState) {
     case Event(FromPce(message: PathComputationConfirmed), data) =>
-      goto(CheckingReservationState) using data.receivedSegments(children.segments)
+      goto(CheckingReservationState) using data.receivedSegments(children.segments).reserveNextSegments
     case Event(FromPce(message: PathComputationFailed), data) =>
       goto(FailedReservationState) using data.copy(pceError = Some(message.error))
     case Event(AckFromPce(failure: PceFailed), data) =>
@@ -188,18 +205,24 @@ class ReservationStateMachine(
       val newData = data
         .updateChild(headers.correlationId, HeldReservationState)
         .modifyChildCriteria(children, message.connectionId)(_.withHeld(message.criteria))
+        .initialReserveConfirmed(headers.correlationId, message.criteria)
+        .reserveNextSegments
       val newData2 = if (newData.aggregatedReservationState == HeldReservationState) newData.requestedCriteriaToHeld else newData
       goto(newData2.aggregatedReservationState) using newData2
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveFailed)), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
       val newData = data
         .updateChild(headers.correlationId, FailedReservationState, Some(message.failed.getServiceException()))
         .modifyChildCriteria(children, message.connectionId)(_.abort)
+        .clearNextSegments
       goto(newData.aggregatedReservationState) using newData
     case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
       val newData = data
         .updateChild(headers.correlationId, FailedReservationState, Some(serviceException))
         .modifyChildCriteria(headers.correlationId)(_.abort)
+        .clearNextSegments
       goto(newData.aggregatedReservationState) using newData
+    case Event(AckFromProvider(_), data) =>
+      stay using data.clearNextSegments
   }
 
   when(HeldReservationState) {
@@ -297,11 +320,18 @@ class ReservationStateMachine(
   onTransition {
     case InitialReservationState -> PathComputationState =>
       val criteria = nextStateData.criteria.requested.get
-      Seq(ToPce(PathComputationRequest(newCorrelationId(), pceReplyUri, criteria.getSchedule(), ServiceType(criteria.getServiceType(), criteria.getPointToPointService().get), pathComputationAlgorithm, initialReserve.headers.connectionTrace)))
+      Seq(ToPce(PathComputationRequest(
+        newCorrelationId(),
+        pceReplyUri,
+        criteria.getSchedule(),
+        ServiceType(criteria.getServiceType(), criteria.getPointToPointService().get),
+        defaultPathComputationAlgorithm,
+        initialReserve.headers.connectionTrace
+      )))
 
-    case PathComputationState -> CheckingReservationState =>
+    case (PathComputationState | CheckingReservationState) -> CheckingReservationState =>
       val data = nextStateData
-      children.segments.map {
+      data.initialReserveAlgorithm.nextSegments.map {
         case (correlationId, segment) =>
           val criteria = nextStateData.childConnectionCriteria(correlationId)
 
@@ -313,7 +343,7 @@ class ReservationStateMachine(
           val headers = newInitialReserveNsiHeaders(segment.provider).copy(correlationId = correlationId)
 
           ToProvider(NsiProviderMessage(headers, InitialReserve(reserveType)), segment.provider)
-      }
+      }(collection.breakOut)
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoServicePlanePathFound))))
     case CheckingReservationState -> FailedReservationState =>

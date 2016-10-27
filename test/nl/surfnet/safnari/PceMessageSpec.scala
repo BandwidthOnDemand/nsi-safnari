@@ -27,7 +27,7 @@ object PceMessageSpec {
 
   val correlationId = helpers.Specification.newCorrelationId
 
-  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), ChainAlgorithm, Nil)
+  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, Nil)
 
   val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"))
   val computedSegment = ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))
@@ -46,7 +46,7 @@ class PceMessageSpec extends helpers.Specification {
     import nl.surfnet.safnari.PceMessage._
 
     "serialize request with p2pServiceBaseType to json" in {
-      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), ChainAlgorithm, Nil)
+      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, Nil)
 
       val json = Json.toJson(request)
 
@@ -62,7 +62,7 @@ class PceMessageSpec extends helpers.Specification {
       val first = new ConnectionType().withIndex(0).withValue("firstnsa")
       val second = new ConnectionType().withIndex(1).withValue("secondnsa")
       val connectionTrace = List(first, second)
-      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), ChainAlgorithm, connectionTrace)
+      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), Schedule, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, connectionTrace)
 
       val json = Json.toJson(request)
       (json \ "trace" apply 0) \ "index" must beEqualTo(JsNumber(first.getIndex))

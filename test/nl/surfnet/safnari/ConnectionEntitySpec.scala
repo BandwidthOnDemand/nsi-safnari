@@ -8,6 +8,7 @@ import nl.surfnet.nsiv2.utils._
 import org.joda.time.{ DateTime, DateTimeUtils }
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.specs2.execute.{ Failure, FailureException }
 
 import scala.collection.JavaConverters._
@@ -23,6 +24,8 @@ class ConnectionEntitySpec extends helpers.Specification {
 
   abstract class fixture extends org.specs2.mutable.After {
     override def after = DateTimeUtils.setCurrentMillisSystem()
+
+    def pathComputationAlgorithm: PathComputationAlgorithm = PathComputationAlgorithm.Chain
 
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
@@ -65,8 +68,18 @@ class ConnectionEntitySpec extends helpers.Specification {
     }
 
     private def initialReserve(reserve: FromRequester) = {
-      connection = new ConnectionEntity(ConnectionId, reserve.message.asInstanceOf[NsiProviderMessage[InitialReserve]], () => newCorrelationId, AggregatorNsa, ChainAlgorithm, NsiReplyToUri, PceReplyToUri)
+      connection = new ConnectionEntity(
+        ConnectionId,
+        reserve.message.asInstanceOf[NsiProviderMessage[InitialReserve]],
+        () => newCorrelationId,
+        AggregatorNsa,
+        pathComputationAlgorithm,
+        NsiReplyToUri,
+        PceReplyToUri
+      )
+
       processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
+
       processInbound(reserve).right.toOption
     }
 
@@ -204,7 +217,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           replyTo = PceReplyToUri,
           schedule = Schedule,
           serviceType = ServiceType("ServiceType", Service),
-          algorithm = ChainAlgorithm,
+          algorithm = PathComputationAlgorithm.Chain,
           connectionTrace = connectionTrace)))
       }
 
@@ -594,6 +607,79 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withOriginatingNSA("OriginatingNSA-B"))))
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
         childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+      }
+
+      "with sequential routing" should {
+        abstract class SequentialRoutingFixture extends fixture {
+          override def pathComputationAlgorithm = PathComputationAlgorithm.Sequential
+        }
+
+        "confirm the reservation with a single path segment with sequential routing" in new SequentialRoutingFixture {
+          val ConfirmCriteriaWithQualifiedStps = ConfirmCriteria.withPointToPointService(Service.withSourceSTP("networkId:A?vlan=1").withDestSTP("networkId:B?vlan=2"))
+
+          given(
+            ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
+            pce.confirm(CorrelationId(0, 3), A))
+
+          when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
+          when(upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps)))
+
+          messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps)))
+
+          childConnectionData(ConnectionId).sourceStp must beEqualTo("networkId:A?vlan=1")
+          childConnectionData(ConnectionId).destinationStp must beEqualTo("networkId:B?vlan=2")
+          reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+        }
+
+        "be in reservation held state when both segments are confirmed" in new SequentialRoutingFixture {
+          given(
+            ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
+            pce.confirm(CorrelationId(0, 1), A, B),
+            upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")))
+
+          segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
+
+          when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=99")))))
+
+          reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+          messages must contain(beLike[Message] {
+            case ToProvider(NsiProviderMessage(_, reserve @ InitialReserve(_)), provider) if provider == B.provider =>
+              reserve.service must beSome.which((x: P2PServiceBaseType) => x.getSourceSTP() must_== "X?vlan=99")
+          })
+
+          when(upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
+
+          reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+          segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+          segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
+
+          when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:B:A?vlan=99").withDestSTP("networkId:B:B?vlan=23")))))
+
+          messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:B:B?vlan=23")))))
+
+          reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+          segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+          segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        }
+
+        tag("focus")
+        "immediately fail the reservation with two segments when the first one fails" in new SequentialRoutingFixture {
+          given(
+            ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
+            pce.confirm(CorrelationId(0, 3), A, B))
+
+          when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.CapacityUnavailable(1000).toServiceException(A.provider.nsa)))))
+
+          messages must haveSize(1)
+          messages must contain(like[Message] {
+            case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
+              headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
+              failed.getConnectionId() must beEqualTo(ConnectionId)
+              failed.getServiceException().getErrorId() must beEqualTo(NsiError.CAPACITY_UNAVAILABLE.id)
+              failed.getServiceException().getChildException().asScala must haveSize(1)
+          })
+          reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
+        }
       }
     }
 

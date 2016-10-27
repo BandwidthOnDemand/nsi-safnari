@@ -25,6 +25,7 @@ package controllers
 import akka.actor.ActorRef
 import akka.pattern.ask
 import controllers.ActorSupport._
+import nl.surfnet.safnari.PathComputationAlgorithm
 import nl.surfnet.safnari.ReachabilityTopologyEntry
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.{DateTime, DateTimeZone}
@@ -148,7 +149,7 @@ class DiscoveryService(pceRequester: ActorRef) extends Controller {
           }
         }
       }
-      { if (Configuration.PceAlgorithm == nl.surfnet.safnari.ChainAlgorithm && Configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty) {
+      { if (Configuration.PceAlgorithm != PathComputationAlgorithm.Tree && Configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty) {
         <other>
           <gns:TopologyReachability>
             { reachabilityEntries.map(entry => <Topology id={ entry.id } cost={ entry.cost.toString } />) }

@@ -31,6 +31,8 @@ package object safnari {
   type ConnectionId = String
   type GlobalReservationId = URI
 
+  type ComputedPathSegments = Seq[(CorrelationId, ComputedSegment)]
+
   private val UuidGenerator = Uuid.randomUuidGenerator
 
   def newConnectionId: ConnectionId = UuidGenerator().toString

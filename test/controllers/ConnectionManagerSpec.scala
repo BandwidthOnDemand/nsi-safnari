@@ -39,7 +39,17 @@ class ConnectionManagerSpec extends helpers.Specification {
 
     lazy val outbound = TestActorRef(new RecordingActor)
 
-    lazy val connectionManager = new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, AggregatorNsa, ChainAlgorithm, URI.create("http://localhost"), URI.create("http://localhost"))))
+    lazy val connectionManager = new ConnectionManager((id, reserve) =>
+      (outbound, new ConnectionEntity(
+        id,
+        reserve,
+        () => newCorrelationId,
+        AggregatorNsa,
+        PathComputationAlgorithm.Chain,
+        URI.create("http://localhost"),
+        URI.create("http://localhost")
+      ))
+    )
   }
 
   "Connection manager" should {
@@ -113,7 +123,17 @@ class ConnectionManagerSpec extends helpers.Specification {
     def createConnectionManager = {
       val mockUuidGenerator = Uuid.mockUuidGenerator(1)
       def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
-      new ConnectionManager((id, reserve) => (outbound, new ConnectionEntity(id, reserve, () => newCorrelationId, AggregatorNsa, ChainAlgorithm, URI.create("http://localhost"), URI.create("http://localhost"))))
+      new ConnectionManager((id, reserve) =>
+        (outbound, new ConnectionEntity(
+          id,
+          reserve,
+          () => newCorrelationId,
+          AggregatorNsa,
+          PathComputationAlgorithm.Chain,
+          URI.create("http://localhost"),
+          URI.create("http://localhost")
+        ))
+      )
     }
 
     lazy val outbound = TestActorRef(new RecordingActor)

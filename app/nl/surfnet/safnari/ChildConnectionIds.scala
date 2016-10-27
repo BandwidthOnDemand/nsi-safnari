@@ -23,18 +23,14 @@
 package nl.surfnet.safnari
 
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.messages.{ReserveFailed, ReserveConfirmed}
 
 case class ChildConnectionIds(
-  segments: Vector[(CorrelationId, ComputedSegment)] = Vector.empty,
-  connectionByInitialCorrelationId: Map[CorrelationId, ConnectionId] = Map.empty,
-  initialCorrelationIdByConnectionId: Map[ConnectionId, CorrelationId] = Map.empty) {
+    segments: ComputedPathSegments = Seq.empty,
+    connectionByInitialCorrelationId: Map[CorrelationId, ConnectionId] = Map.empty,
+    initialCorrelationIdByConnectionId: Map[ConnectionId, CorrelationId] = Map.empty) {
 
   def segmentByCorrelationId(correlationId: CorrelationId): ComputedSegment =
     segments.find(_._1 == correlationId).getOrElse(throw new IllegalStateException(s"no computed segment for child correlationId $correlationId"))._2
-
-  def withChildren(segments: Vector[(CorrelationId, ComputedSegment)]) =
-    copy(segments = segments)
 
   def childrenByConnectionId: Map[ConnectionId, ProviderEndPoint] = (for {
     (correlationId, segment) <- segments

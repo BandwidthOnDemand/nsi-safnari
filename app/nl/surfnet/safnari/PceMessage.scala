@@ -48,11 +48,13 @@ sealed trait PceMessage {
 sealed trait PceRequest extends PceMessage
 case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, schedule: ScheduleType, serviceType: ServiceType, algorithm: PathComputationAlgorithm, connectionTrace: List[ConnectionType]) extends PceRequest
 
-sealed trait PathComputationAlgorithm { val name: String }
-case object ChainAlgorithm extends PathComputationAlgorithm { val name = "CHAIN" }
-case object TreeAlgorithm extends PathComputationAlgorithm { val name = "TREE" }
+sealed trait PathComputationAlgorithm { def name: String }
 object PathComputationAlgorithm {
-  val values: List[PathComputationAlgorithm] = List(ChainAlgorithm, TreeAlgorithm)
+  case object Chain extends PathComputationAlgorithm { val name = "CHAIN" }
+  case object Tree extends PathComputationAlgorithm { val name = "TREE" }
+  case object Sequential extends PathComputationAlgorithm { val name = "SEQUENTIAL" }
+
+  val values: Seq[PathComputationAlgorithm] = Vector(Chain, Tree, Sequential)
   def parse(value: String): Option[PathComputationAlgorithm] = values.find(_.name == value.toUpperCase())
 }
 
