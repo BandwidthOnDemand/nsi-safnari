@@ -67,7 +67,7 @@ class ConnectionEntity(
 
   var children = ChildConnectionIds()
 
-  val pathComputationAlgorithm = initialReserve.body.service.flatMap(_.parameters(PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE).flatMap(PathComputationAlgorithm.parse)).getOrElse(defaultPathComputationAlgorithm)
+  private var pathComputationAlgorithm = initialReserve.body.service.flatMap(_.parameters(PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE).flatMap(PathComputationAlgorithm.parse)).getOrElse(defaultPathComputationAlgorithm)
 
   val rsm = new ReservationStateMachine(
     id,
@@ -159,6 +159,8 @@ class ConnectionEntity(
   }
 
   def process(message: OutboundMessage): Unit = message match {
+    case ToPce(request: PathComputationRequest) =>
+      pathComputationAlgorithm = request.algorithm
     case ToRequester(NsiRequesterMessage(headers, notification: NsiNotification)) =>
       nsiNotifications = notification :: nsiNotifications
     case ToRequester(NsiRequesterMessage(headers, result: NsiCommandReply)) =>

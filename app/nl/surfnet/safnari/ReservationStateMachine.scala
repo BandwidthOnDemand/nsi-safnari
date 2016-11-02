@@ -60,10 +60,10 @@ case class ReservationStateMachineData(
     pceError: Option[NsiError] = None,
     reserveError: Option[NsiError] = None) {
 
-  def receivedSegments(segments: ComputedPathSegments) = {
-    val algorithm = initialReserveAlgorithm.forSegments(segments)
-    copy(segments = segments, initialReserveAlgorithm = algorithm)
-  }
+  def receivedSegments(algorithm: PathComputationAlgorithm, segments: ComputedPathSegments) = copy(
+    segments = segments,
+    initialReserveAlgorithm = InitialReserveAlgorithm.forAlgorithm(algorithm).forSegments(segments)
+  )
 
   def initialReserveConfirmed(correlationId: CorrelationId, criteria: ReservationConfirmCriteriaType) = {
     copy(initialReserveAlgorithm = initialReserveAlgorithm.reserveConfirmed(correlationId, criteria))
@@ -173,7 +173,7 @@ class ReservationStateMachine(
   newNsiHeaders: ProviderEndPoint => NsiHeaders,
   newInitialReserveNsiHeaders: ProviderEndPoint => NsiHeaders,
   newNotificationId: () => Int,
-  pathComputationAlgorithm: PathComputationAlgorithm,
+  pathComputationAlgorithm: => PathComputationAlgorithm,
   failed: NsiError => GenericFailedType)
     extends FiniteStateMachine[ReservationState, ReservationStateMachineData, InboundMessage, OutboundMessage](
       InitialReservationState,
@@ -191,7 +191,7 @@ class ReservationStateMachine(
 
   when(PathComputationState) {
     case Event(FromPce(message: PathComputationConfirmed), data) =>
-      goto(CheckingReservationState) using data.receivedSegments(children.segments).reserveNextSegments
+      goto(CheckingReservationState) using data.receivedSegments(pathComputationAlgorithm, children.segments).reserveNextSegments
     case Event(FromPce(message: PathComputationFailed), data) =>
       goto(FailedReservationState) using data.copy(pceError = Some(message.error))
     case Event(AckFromPce(failure: PceFailed), data) =>
