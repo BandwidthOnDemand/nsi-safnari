@@ -34,7 +34,7 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
       implicit val actorSystem = Akka.system
       val pceRequester = TestActorRef[DummyPceRequesterActor]
       val controller = new DiscoveryService(pceRequester)
-      val dateTimeFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
+      val dateTimeFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'").withLocale(java.util.Locale.ENGLISH)
 
       val dateInTheFuture = dateTimeFormatter.format(LocalDateTime.now.plus(5, ChronoUnit.HOURS))
 
