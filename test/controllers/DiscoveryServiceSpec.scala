@@ -1,10 +1,10 @@
 package controllers
 
-import java.util.Locale
-
 import akka.testkit.TestActorRef
 import controllers.PathComputationEngine.DummyPceRequesterActor
-import org.joda.time.DateTime
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal._
 import play.api.http.HeaderNames
 import play.api.mvc.Results
 import play.api.test.{FakeApplication, FakeRequest, PlaySpecification, WithApplication}
@@ -34,8 +34,9 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
       implicit val actorSystem = Akka.system
       val pceRequester = TestActorRef[DummyPceRequesterActor]
       val controller = new DiscoveryService(pceRequester)
+      val dateTimeFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
 
-      val dateInTheFuture = DateTime.now().plusHours(5).toString("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ENGLISH)
+      val dateInTheFuture = dateTimeFormatter.format(LocalDateTime.now.plus(5, ChronoUnit.HOURS))
 
       val result = controller.index().apply(FakeRequest().withHeaders(HeaderNames.IF_MODIFIED_SINCE -> dateInTheFuture))
 

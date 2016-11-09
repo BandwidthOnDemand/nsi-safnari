@@ -25,14 +25,14 @@ package controllers
 import play.api.Play.current
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
-import org.joda.time.DateTime
 import java.net.URI
+import java.time.LocalDateTime
 import com.typesafe.config.ConfigUtil
 import nl.surfnet.safnari._
 import scala.util.Try
 
 object Configuration {
-  val StartTime = DateTime.now
+  val StartTime = LocalDateTime.now
   def NsaId = getStringOrFail("safnari.nsa.id")
   def NsaName = getStringOrFail("safnari.nsa.name")
   def AdminContactGiven = getStringOrFail("safnari.adminContact.given")

@@ -23,13 +23,13 @@
 package nl.surfnet.safnari
 
 import java.net.URI
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import org.joda.time.DateTime
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
@@ -37,6 +37,10 @@ import play.api.Logger
 
 import scala.math.Ordering.Implicits._
 import scala.util.Try
+
+case class ConnectionContext(
+  clock: java.time.Clock
+)
 
 class ConnectionEntity(
     val id: ConnectionId,
@@ -127,7 +131,7 @@ class ConnectionEntity(
       qrsm.flatMap(_.process(message))
   }
 
-  def process(message: InboundMessage): Either[ServiceExceptionType, Seq[OutboundMessage]] = {
+  def process(message: InboundMessage)(implicit context: ConnectionContext): Either[ServiceExceptionType, Seq[OutboundMessage]] = {
     children = children.update(message, newCorrelationId)
 
     message match {
@@ -158,7 +162,7 @@ class ConnectionEntity(
     }
   }
 
-  def process(message: OutboundMessage): Unit = message match {
+  def process(message: OutboundMessage)(implicit context: ConnectionContext): Unit = message match {
     case ToPce(request: PathComputationRequest) =>
       pathComputationAlgorithm = request.algorithm
     case ToRequester(NsiRequesterMessage(headers, notification: NsiNotification)) =>
@@ -175,12 +179,12 @@ class ConnectionEntity(
         case ReserveAbortConfirmed(connectionId)      => new QueryResultResponseType().withReserveAbortConfirmed(genericConfirmed(connectionId))
         case ReserveCommitFailed(failed)              => new QueryResultResponseType().withReserveCommitFailed(failed)
         case TerminateConfirmed(connectionId)         => new QueryResultResponseType().withTerminateConfirmed(genericConfirmed(connectionId))
-      }).withCorrelationId(headers.correlationId.toString()).withResultId(newResultId()).withTimeStamp(DateTime.now().toXmlGregorianCalendar)
+      }).withCorrelationId(headers.correlationId.toString()).withResultId(newResultId()).withTimeStamp(Instant.now(context.clock).toXMLGregorianCalendar())
       nsiResults = nsiResult :: nsiResults
     case _ =>
   }
 
-  private def stateMachines(message: InboundMessage): List[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
+  private def stateMachines(message: InboundMessage)(implicit context: ConnectionContext): List[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
     case FromRequester(NsiProviderMessage(_, _: InitialReserve))       => List(rsm)
     case FromRequester(NsiProviderMessage(_, _: ModifyReserve))        => List(rsm)
     case FromRequester(NsiProviderMessage(_, _: ReserveCommit))        => List(rsm)
@@ -238,7 +242,7 @@ class ConnectionEntity(
          * earlier (e.g. when the end time is modified just as the scheduler sends a
          * PassedEndTime message).
          */
-      if (rsm.committedCriteria.flatMap(_.getSchedule().endTime).exists(_ <= DateTime.now)) List(lsm) else Nil
+      if (rsm.committedCriteria.flatMap(_.getSchedule().endTime.toOption(None)).exists(_ <= Instant.now(context.clock))) List(lsm) else Nil
   }
 
   private def applyMessageToStateMachine(stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage], message: InboundMessage): Option[Seq[OutboundMessage]] = {
@@ -311,7 +315,7 @@ class ConnectionEntity(
           .withConnectionId(id)
           .withNotificationId(newNotificationId())
           .withCorrelationId(failure.originalCorrelationId.toString)
-          .withTimeStamp(failure.timestamp.toXmlGregorianCalendar))
+          .withTimeStamp(failure.timestamp.toXMLGregorianCalendar()))
     }
 
     eventOption.map { event =>

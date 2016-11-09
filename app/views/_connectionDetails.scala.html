@@ -1,6 +1,7 @@
 @(connection: presenters.ConnectionPresenter, segments: Seq[presenters.ConnectionPathSegmentPresenter])
 @import nl.surfnet.safnari._
 @import nl.surfnet.nsiv2.messages._
+@import nl.surfnet.nsiv2.utils._
 
 @formatCommittedAndPending[A](committed: Option[A], pending: Option[A]) = @{
   (committed, pending) match {
@@ -16,7 +17,7 @@
     <div class="span6">
         <dl class="dl-horizontal">
             <dt>Start</dt>
-            <dd>@formatCommittedAndPending(connection.committedCriteria.flatMap(_.schedule.startTime), connection.pendingCriteria.flatMap(_.schedule).flatMap(_.startTime))</dd>
+            <dd>@formatCommittedAndPending(connection.committedCriteria.flatMap(_.schedule.startTime.toOption(None)), connection.pendingCriteria.flatMap(_.schedule).flatMap(_.startTime.toOption(None)))</dd>
             <dt>Bandwidth</dt>
             <dd>@formatCommittedAndPending(connection.bandwidth, connection.pendingCriteria.flatMap(_.getPointToPointService).map(_.getCapacity))</dd>
             <dt>Global id</dt>
@@ -26,7 +27,7 @@
     <div class="span6">
         <dl class="dl-horizontal">
             <dt>End</dt>
-            <dd>@formatCommittedAndPending(connection.committedCriteria.flatMap(_.schedule.endTime), connection.pendingCriteria.flatMap(_.schedule).flatMap(_.endTime))</dd>
+            <dd>@formatCommittedAndPending(connection.committedCriteria.flatMap(_.schedule.endTime.toOption(None)), connection.pendingCriteria.flatMap(_.schedule).flatMap(_.endTime.toOption(None)))</dd>
             <dt>Version</dt>
             <dd>@formatCommittedAndPending(connection.committedVersion, connection.pendingVersion)</dd>
             <dt>Requester</dt>

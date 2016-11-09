@@ -31,7 +31,7 @@ import nl.surfnet.nsiv2.messages._
 import soap.SoapWebService
 import soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
-import org.joda.time.Instant
+import java.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.Play._
 import play.api._
@@ -77,7 +77,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       case Some(connection) =>
         ConnectionProvider.requesterContinuations.register(request.headers.correlationId, Configuration.AsyncReplyTimeout).foreach(sendAsyncReply)
 
-        connection ? Connection.Command(new Instant(), FromRequester(request))
+        connection ? Connection.Command(Instant.now, FromRequester(request))
     }
 
   private[controllers] def handleQuery(message: NsiProviderMessage[NsiProviderQuery])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] = message.body match {

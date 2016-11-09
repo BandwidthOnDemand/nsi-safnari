@@ -1,11 +1,11 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import javax.xml.datatype.DatatypeFactory
+import java.time.{ Clock, Instant, ZoneId }
+import java.time.temporal._
+import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import nl.surfnet.nsiv2.utils._
-import org.joda.time.{ DateTime, DateTimeUtils }
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
@@ -15,16 +15,13 @@ import scala.collection.JavaConverters._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionEntitySpec extends helpers.Specification {
-  // These tests modify global state through joda time mocking.
-  sequential
-
+  import nl.surfnet.bod.nsi.Nillable
   import nl.surfnet.nsiv2
   import nsiv2.messages._
+  import nsiv2.utils._
   import NsiMessageSpec._
 
-  abstract class fixture extends org.specs2.mutable.After {
-    override def after = DateTimeUtils.setCurrentMillisSystem()
-
+  abstract class fixture extends org.specs2.matcher.Scope {
     def pathComputationAlgorithm: PathComputationAlgorithm = PathComputationAlgorithm.Chain
 
     val mockUuidGenerator = Uuid.mockUuidGenerator(1)
@@ -38,7 +35,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     val ModifyCorrelationId = helpers.Specification.newCorrelationId
     def ModifyReserveType = InitialReserveType.withConnectionId(connection.id).tap { modify =>
       modify.getCriteria.setVersion(null)
-      modify.getCriteria.getSchedule.setStartTime(null)
+      modify.getCriteria.getSchedule.withStartTime(Nillable.absent[XMLGregorianCalendar])
       modify.getCriteria.getPointToPointService.foreach(_.setCapacity(500))
     }
 
@@ -51,6 +48,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
     var connection: ConnectionEntity = _
     var processInbound: IdempotentProvider = _
+    implicit var context: ConnectionContext = ConnectionContext(clock = Clock.systemDefaultZone)
 
     def schedule = connection.rsm.committedCriteria.map(_.getSchedule) getOrElse connection.rsm.pendingCriteria.get.getSchedule()
 
@@ -183,12 +181,13 @@ class ConnectionEntitySpec extends helpers.Specification {
   }
 
   trait PassedEndTime { this: ReservedConnection =>
-    DateTimeUtils.setCurrentMillisFixed(schedule.endTime.get.getMillis)
-    given(PassedEndTime(CorrelationId(3, 0), connection.id, schedule.endTime.get))
+    val endTime = schedule.endTime.fold2(identity, Instant.now, Instant.now)
+    context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault()))
+    given(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
   }
 
   trait Failed { this: ReservedConnection =>
-    val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+    val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
 
     given(upa.notification(newCorrelationId, ErrorEvent(new ErrorEventType()
       .withConnectionId("ConnectionIdA")
@@ -314,7 +313,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       }
 
       "notify timeout when path computation times out" in new fixture {
-        val TimeoutTimestamp = DateTime.now().plusMinutes(2)
+        val TimeoutTimestamp = Instant.now().plus(2, ChronoUnit.MINUTES)
         given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
         when(pce.timeout(CorrelationId(1, 1), CorrelationId(0, 2), TimeoutTimestamp))
@@ -323,7 +322,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withConnectionId(ConnectionId)
           .withCorrelationId(CorrelationId(0, 2).toString)
           .withNotificationId(1)
-          .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
+          .withTimeStamp(TimeoutTimestamp.toXMLGregorianCalendar()))))
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
       }
     }
@@ -347,7 +346,7 @@ class ConnectionEntitySpec extends helpers.Specification {
       }
 
       "notify timeout to requester when child times out" in new fixture {
-        val TimeoutTimestamp = DateTime.now().plusMinutes(2)
+        val TimeoutTimestamp = Instant.now().plus(2, ChronoUnit.MINUTES)
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           agg.request(CorrelationId(0, 4), InitialReserve(InitialReserveType.tap(_.getCriteria.withPointToPointService(A.serviceType.service)))),
@@ -359,7 +358,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withConnectionId(ConnectionId)
           .withCorrelationId(CorrelationId(0, 4).toString)
           .withNotificationId(1)
-          .withTimeStamp(TimeoutTimestamp.toXmlGregorianCalendar))))
+          .withTimeStamp(TimeoutTimestamp.toXMLGregorianCalendar()))))
       }
 
       "ignore reserve response after async reserve confirm" in new fixture {
@@ -871,7 +870,7 @@ class ConnectionEntitySpec extends helpers.Specification {
             ModifyReserve(InitialReserveType.withConnectionId("ConnectionIdA").tap { modify =>
               modify.getCriteria.setVersion(4)
               modify.getCriteria.withPointToPointService(A.serviceType.service.withCapacity(500))
-              modify.getCriteria.getSchedule.withStartTime(null)
+              modify.getCriteria.getSchedule.withStartTime(Nillable.absent[XMLGregorianCalendar])
             })),
             A.provider)))
       }
@@ -931,7 +930,7 @@ class ConnectionEntitySpec extends helpers.Specification {
             ModifyReserve(InitialReserveType.withConnectionId("ConnectionIdA").tap { modify =>
               modify.getCriteria.setVersion(4)
               modify.getCriteria.withPointToPointService(A.serviceType.service.withCapacity(500))
-              modify.getCriteria.getSchedule.withStartTime(null)
+              modify.getCriteria.getSchedule.withStartTime(Nillable.absent[XMLGregorianCalendar])
             })),
             A.provider)))
       }
@@ -1016,7 +1015,7 @@ class ConnectionEntitySpec extends helpers.Specification {
             ModifyReserve(InitialReserveType.withConnectionId("ConnectionIdA").tap { modify =>
               modify.getCriteria.setVersion(4)
               modify.getCriteria.withPointToPointService(A.serviceType.service.withCapacity(500))
-              modify.getCriteria.getSchedule.withStartTime(null)
+              modify.getCriteria.getSchedule.withStartTime(Nillable.absent[XMLGregorianCalendar])
             })),
             A.provider)))
       }
@@ -1260,7 +1259,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
     "become failed on ForcedEnd error event" in new ReservedConnection {
       val ProviderErrorEventCorrelationId = newCorrelationId
-      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+      val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
       val ChildException = new ServiceExceptionType()
         .withConnectionId("ConnectionIdA")
         .withNsaId(A.provider.nsa)
@@ -1296,24 +1295,26 @@ class ConnectionEntitySpec extends helpers.Specification {
     }
 
     "become PassedEndTime on PassedEndTime event" in new ReservedConnection {
-      DateTimeUtils.setCurrentMillisFixed(schedule.endTime.get.getMillis)
+      val endTime = schedule.endTime.fold2(identity, Instant.now, Instant.now)
+      context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault))
 
-      when(PassedEndTime(CorrelationId(3, 0), connection.id, schedule.endTime.get))
+      when(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.PASSED_END_TIME)
     }
 
     "ignore PassedEndTime message before scheduled end time" in new ReservedConnection {
-      DateTimeUtils.setCurrentMillisFixed(schedule.endTime.get.minusMinutes(5).getMillis)
+      val endTime = schedule.endTime.fold2(_.minus(5, ChronoUnit.MINUTES), Instant.now, Instant.now)
+      context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault))
 
-      when(PassedEndTime(CorrelationId(3, 0), connection.id, schedule.endTime.get))
+      when(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
 
       lifecycleState must beEqualTo(LifecycleStateEnumType.CREATED)
     }
 
     "pass MessageDeliveryTimeout notifications to requester" in new ReservedConnection {
       val TimedOutMessageCorrelationId = newCorrelationId.toString
-      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+      val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
 
       when(upa.notification(newCorrelationId, MessageDeliveryTimeout(new MessageDeliveryTimeoutRequestType()
         .withConnectionId("ConnectionIdA")
@@ -1329,7 +1330,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     }
 
     "pass ErrorEvent notifications to requester" in new ReservedConnection {
-      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+      val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
 
       when(upa.notification(newCorrelationId, ErrorEvent(new ErrorEventType()
         .withConnectionId("ConnectionIdA")
@@ -1349,7 +1350,7 @@ class ConnectionEntitySpec extends helpers.Specification {
     }
 
     "pass ErrorEvent notifications to requester with child exceptions" in new ReservedConnection {
-      val TimeStamp = org.joda.time.DateTime.now().minusMinutes(3).toXmlGregorianCalendar
+      val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
       val ChildException = new ServiceExceptionType()
         .withConnectionId("ConnectionIdA")
         .withNsaId(A.provider.nsa)

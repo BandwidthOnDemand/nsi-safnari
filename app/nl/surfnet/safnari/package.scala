@@ -24,7 +24,6 @@ package nl.surfnet
 
 import java.net.URI
 import nl.surfnet.nsiv2.messages._
-import org.ogf.schemas.nsi._2013._12.connection.types._
 
 package object safnari {
   type RequesterNsa = String
@@ -36,9 +35,4 @@ package object safnari {
   private val UuidGenerator = Uuid.randomUuidGenerator
 
   def newConnectionId: ConnectionId = UuidGenerator().toString
-
-  implicit class ScheduleTypeOps(schedule: ScheduleType) {
-    def startTime = Option(schedule).flatMap(s => Option(s.getStartTime)).map(_.toDateTime)
-    def endTime = Option(schedule).flatMap(s => Option(s.getEndTime)).map(_.toDateTime)
-  }
 }

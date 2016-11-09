@@ -23,8 +23,9 @@
 package presenters
 
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
-import org.joda.time.DateTime
+import java.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types.{ QuerySummaryResultType, ReservationRequestCriteriaType, ScheduleType }
 import scala.collection.JavaConverters._
 
@@ -52,11 +53,11 @@ case class ConnectionPresenter(private val data: QuerySummaryResultType, val pen
   def committedVersion: Option[Int] = committedCriteria.map(_.getVersion)
   def pendingVersion: Option[Int] = pendingCriteria.map(_.version orElse (committedVersion.map(_ + 1)) getOrElse 1)
 
-  def qualifier(now: DateTime) = {
-    def inFuture(dt: DateTime) = dt.compareTo(now) > 0
+  def qualifier(now: Instant) = {
+    def inFuture(dt: Instant) = dt.isAfter(now)
 
-    if (startTime.exists(inFuture)) 'future
-    else if (endTime.forall(inFuture)) 'current
+    if (startTime.fold2(inFuture, false, false)) 'future
+    else if (endTime.fold2(inFuture, true, true)) 'current
     else 'past
   }
 }

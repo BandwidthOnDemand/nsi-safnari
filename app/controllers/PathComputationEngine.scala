@@ -29,7 +29,7 @@ import controllers.ActorSupport._
 import nl.surfnet.nsiv2.messages.CorrelationId
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
-import org.joda.time.{DateTime, Instant}
+import java.time.Instant
 import play.api.Logger
 import play.api.Play.current
 import play.api.libs.concurrent.Execution.Implicits._
@@ -101,9 +101,9 @@ object PathComputationEngine extends Controller {
         val connection = Connection(sender)
         pceContinuations.register(request.correlationId, Configuration.AsyncReplyTimeout).onComplete {
           case Success(reply) =>
-            connection ! Connection.Command(new Instant(), FromPce(reply))
+            connection ! Connection.Command(Instant.now, FromPce(reply))
           case Failure(e) =>
-            connection ! Connection.Command(new Instant(), MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), DateTime.now(), e.toString))
+            connection ! Connection.Command(Instant.now, MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), Instant.now(), e.toString))
         }
 
         val response = WS.url(findPathEndPoint).post(Json.toJson(request))
@@ -111,25 +111,25 @@ object PathComputationEngine extends Controller {
           case Failure(e) =>
             Logger.error(s"Could not reach the pce ($endPoint): $e")
             pceContinuations.unregister(request.correlationId)
-            connection ! Connection.Command(new Instant(), MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), DateTime.now(), e.toString))
+            connection ! Connection.Command(Instant.now, MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), Instant.now(), e.toString))
           case Success(response) if response.status == ACCEPTED =>
-            connection ! Connection.Command(new Instant(), AckFromPce(PceAccepted(request.correlationId)))
+            connection ! Connection.Command(Instant.now, AckFromPce(PceAccepted(request.correlationId)))
           case Success(response) =>
             Logger.error(s"Got back a ${response.status} response from the PCE: ${response.body}")
             pceContinuations.unregister(request.correlationId)
-            connection ! Connection.Command(new Instant(), AckFromPce(PceFailed(request.correlationId, response.status, response.statusText, response.body)))
+            connection ! Connection.Command(Instant.now, AckFromPce(PceFailed(request.correlationId, response.status, response.statusText, response.body)))
         }
     }
 
     class LastModifiedCache[T] {
-      private val value = Ref(None: Option[(T, DateTime)])
+      private val value = Ref(None: Option[(T, Instant)])
 
-      def get: Option[(T, DateTime)] = value.single()
+      def get: Option[(T, Instant)] = value.single()
 
-      def updateAndGet(newSubject: T): (T, DateTime) =
+      def updateAndGet(newSubject: T): (T, Instant) =
         value.single.transformAndGet {
           case Some(unchanged@(old, _)) if old == newSubject => Some(unchanged)
-          case _ => Some(newSubject -> DateTime.now)
+          case _ => Some(newSubject -> Instant.now)
         }.get
     }
   }
@@ -139,7 +139,7 @@ object PathComputationEngine extends Controller {
       List(
         ReachabilityTopologyEntry("urn:ogf:network:surfnet.nl:1990:nsa:bod-dev", 0),
         ReachabilityTopologyEntry("urn:ogf:network:es.net:2013:nsa:oscars", 3)),
-      DateTime.now())
+      Instant.now())
 
     def receive = {
       case 'healthCheck =>
@@ -151,7 +151,7 @@ object PathComputationEngine extends Controller {
       case ToPce(pce: PathComputationRequest) =>
         val serviceType = Json.fromJson[ServiceType](Json.toJson(pce.serviceType)(PceMessage.ServiceTypeFormat))(PceMessage.ServiceTypeFormat).get
 
-        Connection(sender) ! Connection.Command(new Instant(),
+        Connection(sender) ! Connection.Command(Instant.now,
           FromPce(PathComputationConfirmed(
             pce.correlationId,
             Seq(ComputedSegment(

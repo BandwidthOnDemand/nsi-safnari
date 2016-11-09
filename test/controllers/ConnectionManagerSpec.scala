@@ -8,7 +8,8 @@ import controllers.Connection.Delete
 import nl.surfnet.nsiv2.messages.CorrelationId
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
-import org.joda.time.{DateTime, Instant}
+import java.time.Instant
+import java.time.temporal._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.libs.concurrent.Akka
 import play.api.test._
@@ -29,7 +30,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
   }
 
-  private def command(message: Message, timestamp: Instant = new Instant()) = Connection.Command(timestamp, message)
+  private def command(message: Message, timestamp: Instant = Instant.now()) = Connection.Command(timestamp, message)
 
   abstract class DummyConnectionFixture extends WithApplication() {
     implicit lazy val system = Akka.system
@@ -146,8 +147,8 @@ class ConnectionManagerSpec extends helpers.Specification {
 
     def query = await(connection ? Connection.Query).summary
 
-    def reserveWithEndTime(endTime: DateTime): Unit = {
-      val reserve = initialReserveMessage.tap(_.body.body.getCriteria().getSchedule().withEndTime(endTime.toXmlGregorianCalendar))
+    def reserveWithEndTime(endTime: Instant): Unit = {
+      val reserve = initialReserveMessage.tap(_.body.body.getCriteria().getSchedule().withEndTime(endTime.toXMLGregorianCalendar()))
       val messages = Seq(
         FromRequester(reserve),
         pce.confirm(CorrelationId(0, 1), A),
@@ -259,33 +260,33 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     "send PassedEndTime message after reservation end time" in new SingleConnectionActorFixture {
-      reserveWithEndTime(DateTime.now())
+      reserveWithEndTime(Instant.now())
 
       eventually(query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.PASSED_END_TIME)
     }
 
     "support PassedEndTime more than 248 days into the future" in new SingleConnectionActorFixture {
-      reserveWithEndTime(DateTime.now().plusDays(300))
+      reserveWithEndTime(Instant.now().plus(300, ChronoUnit.DAYS))
     }
 
     "ignore PassedEndTime message received before end time" in new SingleConnectionActorFixture {
-      reserveWithEndTime(DateTime.now().plusDays(1))
+      reserveWithEndTime(Instant.now().plus(1, ChronoUnit.DAYS))
 
-      await(connection ? command(PassedEndTime(newCorrelationId, connectionId, DateTime.now())))
+      await(connection ? command(PassedEndTime(newCorrelationId, connectionId, Instant.now())))
 
       query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.CREATED
     }
 
     "be deleted after a grace period" should {
       "when never successfully reserved" in new SingleConnectionActorFixture() {
-        await(connection ? command(ura.request(CorrelationId(0, 0), initialReserveMessage.body), timestamp = new Instant().minus(Configuration.ConnectionExpirationTime.toMillis)))
+        await(connection ? command(ura.request(CorrelationId(0, 0), initialReserveMessage.body), timestamp = Instant.now().minus(Configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)))
 
         eventually(connectionManager.get(connectionId) must beNone)
         connectionManager.messageStore.loadEverything().map(_._1) must not(contain(connectionId))
       }
 
       "delete connections with LSM state different from CREATED after a grace period" in new SingleConnectionActorFixture(additionalConfiguration = Map("safnari.connection.expiration.time" -> "250 milliseconds")) {
-        reserveWithEndTime(DateTime.now())
+        reserveWithEndTime(Instant.now())
 
         eventually(connectionManager.get(connectionId) must beNone)
       }

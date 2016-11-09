@@ -24,7 +24,7 @@ package nl.surfnet.safnari
 
 import java.net.URI
 import nl.surfnet.nsiv2.messages._
-import org.joda.time.DateTime
+import java.time.Instant
 
 sealed trait Message {
   def toShortString: String
@@ -73,9 +73,9 @@ final case class ToPce(message: PceRequest) extends OutboundMessage {
   override def correlationId = message.correlationId
 }
 
-final case class MessageDeliveryFailure(override val correlationId: CorrelationId, connectionId: Option[ConnectionId], originalCorrelationId: CorrelationId, uri: URI, timestamp: DateTime, message: String) extends InboundMessage {
+final case class MessageDeliveryFailure(override val correlationId: CorrelationId, connectionId: Option[ConnectionId], originalCorrelationId: CorrelationId, uri: URI, timestamp: Instant, message: String) extends InboundMessage {
   override def toShortString = s"${getClass().getSimpleName()}(correlationId=$correlationId, connectionId=$connectionId, originalCorrelationId=$originalCorrelationId, uri=$uri, timestamp=$timestamp, message=$message)"
 }
-final case class PassedEndTime(override val correlationId: CorrelationId, connectionId: ConnectionId, timestamp: DateTime) extends InboundMessage {
+final case class PassedEndTime(override val correlationId: CorrelationId, connectionId: ConnectionId, timestamp: Instant) extends InboundMessage {
   override def toShortString = s"${getClass().getSimpleName()}(correlationId=$correlationId, connectionId=$connectionId, timestamp=$timestamp)"
 }

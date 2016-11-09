@@ -1,11 +1,10 @@
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 
 import javax.xml.datatype.XMLGregorianCalendar
-import org.joda.time.DateTime
-import org.joda.time.DateTimeZone
+import java.time.{ Instant, ZoneOffset }
+import java.time.temporal._
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 
@@ -22,11 +21,11 @@ class PackageSpec extends helpers.Specification {
       timeInMillis <- Gen.choose(0, System.currentTimeMillis() * 3)
       timezoneOffset <- Gen.choose(-14 * 60, 14 * 60)
     } yield {
-      val dt = new DateTime(timeInMillis)
+      val dt = Instant.ofEpochMilli(timeInMillis).atOffset(ZoneOffset.ofHours(timezoneOffset))
       XmlGregorianCalendar.factory.newXMLGregorianCalendar(
-        dt.getYear(), dt.getMonthOfYear(), dt.getDayOfMonth(),
-        dt.getHourOfDay(), dt.getMinuteOfHour(), dt.getSecondOfMinute(), dt.getMillisOfSecond(),
-        timezoneOffset)
+        dt.getYear(), dt.getMonthValue() - 1, dt.getDayOfMonth(),
+        dt.getHour(), dt.getMinute(), dt.getSecond(), dt.get(ChronoField.MILLI_OF_SECOND),
+        dt.getOffset().getTotalSeconds() / 60)
     })
   }
 
@@ -47,24 +46,6 @@ class PackageSpec extends helpers.Specification {
       val dates = List(XmlGregorianCalendar("2002-10-09T11:00:00"), XmlGregorianCalendar("2001-10-09T11:00:00"))
 
       dates.max must beEqualTo(XmlGregorianCalendar("2002-10-09T11:00:00"))
-    }
-  }
-
-  "XMLGregorianCalendar and DateTime" should {
-    "convert arbitrary XMLGregorianCalendar to DateTime and back" in prop { (xmlDateTime: XMLGregorianCalendar) =>
-      xmlDateTime.toDateTime.toXmlGregorianCalendar must_== xmlDateTime
-    }.set(minTestsOk = 1000, workers = 4)
-
-    "convert from DateTime to XMLGregorianCalendar" in {
-      val actual = new DateTime(2013, 11, 29, 11, 33, 7, 23, DateTimeZone.forOffsetHoursMinutes(3, 30)).toXmlGregorianCalendar
-      val expect = XmlGregorianCalendar("2013-11-29T11:33:07.023+03:30")
-      actual must_== expect
-    }
-
-    "convert from XMLGregorianCalendar to DateTime" in {
-      val actual = XmlGregorianCalendar("2013-11-29T11:33:07.023+03:30").toDateTime
-      val expect = new DateTime(2013, 11, 29, 11, 33, 7, 23, DateTimeZone.forOffsetHoursMinutes(3, 30))
-      actual must_== expect
     }
   }
 }

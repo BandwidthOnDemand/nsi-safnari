@@ -28,7 +28,7 @@ class JaxWsClientSpec extends helpers.Specification {
         .withRequesterNSA("urn:ogf:network:surfnet-fake-requester")
         .withProviderNSA(SafnariNsa))
 
-      service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String], header)
+      service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String], null, header)
     }
 
     "be able to talk to the connection requester endpoint" in new WithServer(Application, ServerPort) {

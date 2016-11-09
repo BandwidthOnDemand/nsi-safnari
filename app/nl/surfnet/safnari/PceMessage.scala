@@ -28,6 +28,7 @@ import javax.xml.namespace.QName
 import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
 import scala.collection.JavaConversions._
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.utils._
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import org.ogf.schemas.nsi._2013._12.connection.types._
@@ -237,8 +238,8 @@ object PceMessage {
           replyTo,
           "application/json",
           algorithm,
-          Option(schedule.getStartTime()),
-          Option(schedule.getEndTime()),
+          schedule.startTime.map2(_.toXMLGregorianCalendar()).toOption(None),
+          schedule.endTime.map2(_.toXMLGregorianCalendar()).toOption(None),
           Nil,
           serviceType,
           connectionTrace)

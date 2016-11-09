@@ -25,10 +25,11 @@ package controllers
 import akka.actor.ActorRef
 import akka.pattern.ask
 import controllers.ActorSupport._
+import java.time.Instant
+import java.time.temporal._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
-import org.joda.time.DateTime
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
 import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
@@ -55,8 +56,8 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
   }
 
   def connections = Action.async {
-    val now = DateTime.now
-    val timeBound = now.minusWeeks(1)
+    val now = Instant.now
+    val timeBound = now.minus(1, ChronoUnit.WEEKS)
 
     // FIXME data consistency (two messages may be interleaved with other messages)
     val queryResult = Future.traverse(connectionManager.all)(connectionDetails)
@@ -66,9 +67,9 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
         cs.map {
           case (summary, pendingCriteria, segments) => (ConnectionPresenter(summary, pendingCriteria), segments.map{ ConnectionPathSegmentPresenter })
         }.filter {
-          case (connection, _) => connection.endTime.forall(_.compareTo(timeBound) > 0)
+          case (connection, _) => connection.endTime.fold2(_.compareTo(timeBound) > 0, true, true)
         }.sortBy {
-          case (connection, _) => connection.startTime
+          case (connection, _) => connection.startTime.toOption(None)
         }.reverse.groupBy {
           case (connection, _) => connection.qualifier(now)
         }

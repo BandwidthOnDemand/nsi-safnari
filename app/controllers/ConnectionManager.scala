@@ -27,13 +27,12 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
 import java.net.URI
+import java.time.{ Clock, Instant }
+import java.time.temporal._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.persistence._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
-import org.joda.time.DateTime
-import org.joda.time.DateTimeUtils
-import org.joda.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.Logger
 import scala.concurrent._
@@ -170,7 +169,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     val replayedConnections = Future.sequence(for {
       (connectionId, records @ (MessageRecord(_, _, _, FromRequester(NsiProviderMessage(headers, initialReserve: InitialReserve))) +: _)) <- messageStore.loadEverything()
     } yield {
-      val commands = records.map { record => Connection.Command(new Instant(record.createdAt.toEpochMilli()), record.message) }
+      val commands = records.map { record => Connection.Command(Instant.ofEpochMilli(record.createdAt.toEpochMilli()), record.message) }
       val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
       commands.foreach {
         case Connection.Command(_, FromRequester(message)) =>
@@ -201,7 +200,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
         case NsiProviderMessage(headers, initialReserve: InitialReserve) =>
           val connectionId = newConnectionId
           val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
-          messageStore.create(connectionId, new Instant().toJavaInstant, headers.requesterNSA)
+          messageStore.create(connectionId, Instant.now(), headers.requesterNSA)
           Some(connectionId -> connection)
       }
       result.foreach {
@@ -227,6 +226,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     def props(connectionEntity: ConnectionEntity, outputActor: ActorRef): Props = Props(new ConnectionActor(connectionEntity, outputActor))
   }
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
+    implicit val connectionContext = ConnectionContext(clock = Clock.systemDefaultZone)
+
     private val process = new IdempotentProvider(connection.aggregatorNsa, ManageChildConnections(connection.process))
 
     private val uuidGenerator = Uuid.randomUuidGenerator()
@@ -309,7 +310,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
       case Connection.Delete =>
         Logger.info(s"Stopping $connection.id")
-        messageStore.delete(connection.id, new Instant().toJavaInstant)
+        messageStore.delete(connection.id, Instant.now())
         runDeleteHook(connection.id)
         self ! PoisonPill
     }
@@ -318,11 +319,11 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       endTimeCancellable.foreach(_.cancel())
       endTimeCancellable = (for {
         criteria <- connection.rsm.committedCriteria
-        endTime <- criteria.getSchedule().endTime
+        endTime <- criteria.getSchedule().endTime.toOption(None)
         if connection.lsm.lifecycleState == LifecycleStateEnumType.CREATED
       } yield {
-        val delay = (endTime.getMillis - DateTimeUtils.currentTimeMillis()).milliseconds
-        val message = Connection.Command(endTime.toInstant, PassedEndTime(newPassedEndTimeCorrelationId, connection.id, new DateTime(endTime)))
+        val delay = (endTime.toEpochMilli - Instant.now().toEpochMilli).milliseconds
+        val message = Connection.Command(endTime, PassedEndTime(newPassedEndTimeCorrelationId, connection.id, endTime))
         Logger.debug(s"Scheduling $message for execution after $delay")
         try {
           context.system.scheduler.scheduleOnce(delay) {
@@ -340,8 +341,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     private def scheduleExpiration(lastMessageTimestamp: Instant): Unit = {
       expirationCancellable.foreach(_.cancel())
       expirationCancellable = if (connection.psm.isDefined && connection.lsm.lifecycleState == LifecycleStateEnumType.CREATED) None else {
-        val expirationTime = lastMessageTimestamp.plus(Configuration.ConnectionExpirationTime.toMillis)
-        val delay = (expirationTime.getMillis() - DateTimeUtils.currentTimeMillis()).milliseconds
+        val expirationTime = lastMessageTimestamp.plus(Configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)
+        val delay = (expirationTime.toEpochMilli - Instant.now().toEpochMilli).milliseconds
         val message = Connection.Delete
         Logger.debug(s"Scheduling $message for execution after $delay")
         Some(context.system.scheduler.scheduleOnce(delay) {
@@ -353,7 +354,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     private def PersistMessages[E](timestamp: Instant, wrapped: InboundMessage => Either[E, Seq[OutboundMessage]]): InboundMessage => Either[E, Seq[OutboundMessage]] = { inbound =>
       val result = wrapped(inbound)
       result.right.foreach { outbound =>
-        messageStore.storeInboundWithOutboundMessages(connection.id, timestamp.toJavaInstant, inbound, outbound)
+        messageStore.storeInboundWithOutboundMessages(connection.id, timestamp, inbound, outbound)
       }
       result
     }

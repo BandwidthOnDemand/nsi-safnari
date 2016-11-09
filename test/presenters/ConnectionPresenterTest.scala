@@ -1,8 +1,8 @@
 package presenters
 
-import nl.surfnet.nsiv2.messages._
-
-import org.joda.time.DateTime
+import java.time.Instant
+import java.time.temporal._
+import nl.surfnet.nsiv2.utils._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 
 class ConnectionPresenterTest extends helpers.Specification {
@@ -16,7 +16,7 @@ class ConnectionPresenterTest extends helpers.Specification {
       .withRequesterNSA("requester").withConnectionStates(states)
     def criteria = new ReservationRequestCriteriaType().withSchedule(new ScheduleType)
 
-    val now = DateTime.now
+    val now = Instant.now
 
     "given a query summary result" should {
       val subject = ConnectionPresenter(data, Some(criteria))
@@ -43,7 +43,9 @@ class ConnectionPresenterTest extends helpers.Specification {
     }
 
     "given an active connection" should {
-      val schedule = criteria.getSchedule.withStartTime(now.minusDays(1).toXmlGregorianCalendar).withEndTime(now.plusDays(1).toXmlGregorianCalendar)
+      val schedule = criteria.getSchedule
+        .withStartTime(now.minus(1, ChronoUnit.DAYS).toXMLGregorianCalendar())
+        .withEndTime(now.plus(1, ChronoUnit.DAYS).toXMLGregorianCalendar())
       val subject = ConnectionPresenter(data.withConnectionStates(states.withDataPlaneStatus( new DataPlaneStatusType().withActive(true) )),
                                         Some(criteria.withSchedule(schedule)))
 
@@ -57,7 +59,9 @@ class ConnectionPresenterTest extends helpers.Specification {
     }
 
     "given a future connection" should {
-      val schedule = criteria.getSchedule.withStartTime(now.plusDays(1).toXmlGregorianCalendar).withEndTime(now.plusDays(5).toXmlGregorianCalendar)
+      val schedule = criteria.getSchedule
+        .withStartTime(now.plus(1, ChronoUnit.DAYS).toXMLGregorianCalendar())
+        .withEndTime(now.plus(5, ChronoUnit.DAYS).toXMLGregorianCalendar())
       val subject = ConnectionPresenter(data.withConnectionStates(states.withDataPlaneStatus( new DataPlaneStatusType().withActive(false) )),
                                         Some(criteria.withSchedule(schedule)))
 
@@ -71,7 +75,9 @@ class ConnectionPresenterTest extends helpers.Specification {
     }
 
     "given a past connection" should {
-      val schedule = criteria.getSchedule.withStartTime(now.minusDays(5).toXmlGregorianCalendar).withEndTime(now.minusDays(1).toXmlGregorianCalendar)
+      val schedule = criteria.getSchedule
+        .withStartTime(now.minus(5, ChronoUnit.DAYS).toXMLGregorianCalendar())
+        .withEndTime(now.minus(1, ChronoUnit.DAYS).toXMLGregorianCalendar())
       val subject = ConnectionPresenter(data.withConnectionStates(states.withDataPlaneStatus( new DataPlaneStatusType().withActive(false) )),
                                         Some(criteria.withSchedule(schedule)))
 

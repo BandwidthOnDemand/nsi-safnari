@@ -2,12 +2,14 @@ package nl.surfnet.safnari
 
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.soap._
+import nl.surfnet.nsiv2.utils._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import java.net.URI
-import org.joda.time.DateTime
+import java.time.Instant
+import java.time.temporal._
 import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
 import oasis.names.tc.saml._2_0.assertion.AttributeType
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
@@ -34,11 +36,11 @@ object NsiMessageSpec {
     .withSourceSTP("networkId:A")
     .withDestSTP("networkId:B")
 
-  val StartTime = DateTime.now().plusMinutes(5)
-  val EndTime = DateTime.now().plusMinutes(30)
+  val StartTime = Instant.now().plus(5, ChronoUnit.MINUTES)
+  val EndTime = Instant.now().plus(30, ChronoUnit.MINUTES)
 
   val ConfirmedCriteriaVersion = 3
-  def Schedule = new ScheduleType().withStartTime(StartTime.toXmlGregorianCalendar).withEndTime(EndTime.toXmlGregorianCalendar)
+  def Schedule = new ScheduleType().withStartTime(StartTime.toXMLGregorianCalendar()).withEndTime(EndTime.toXMLGregorianCalendar())
   def ConfirmCriteria = new ReservationConfirmCriteriaType().withVersion(ConfirmedCriteriaVersion).withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
   def RequestCriteria = Conversion.convert(ConfirmCriteria).get
 
@@ -71,7 +73,7 @@ object NsiMessageSpec {
       FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
     def notification(correlationId: CorrelationId, operation: NsiRequesterOperation) =
       FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
-    def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: DateTime) =
+    def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: Instant) =
       MessageDeliveryFailure(correlationId, None, originalCorrelationId, URI.create("http://nsi.local/"), timestamp, "message-delivery-timeout")
   }
 
@@ -91,7 +93,7 @@ object NsiMessageSpec {
     def fail(correlationId: CorrelationId, error: NsiError) = {
       FromPce(PathComputationFailed(correlationId, error))
     }
-    def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: DateTime) = {
+    def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: Instant) = {
       MessageDeliveryFailure(correlationId, None, originalCorrelationId, URI.create("http://pce.local/"), timestamp, "message-delivery-timeout")
     }
     def failedAck(correlationId: CorrelationId, status: Int = 400, statusText: String = "Bad Request", message: String = "Find path request not accepted") = {
