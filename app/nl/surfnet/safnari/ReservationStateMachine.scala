@@ -323,7 +323,8 @@ class ReservationStateMachine(
       Seq(ToPce(PathComputationRequest(
         newCorrelationId(),
         pceReplyUri,
-        criteria.getSchedule(),
+        criteria.schedule.flatMap(_.startTime.toOption(None)),
+        criteria.schedule.flatMap(_.endTime.toOption(None)),
         ServiceType(criteria.getServiceType(), criteria.getPointToPointService().get),
         pathComputationAlgorithm,
         initialReserve.headers.connectionTrace

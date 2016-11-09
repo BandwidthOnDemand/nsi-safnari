@@ -214,7 +214,8 @@ class ConnectionEntitySpec extends helpers.Specification {
         messages must contain(ToPce(PathComputationRequest(
           correlationId = CorrelationId(0, 3),
           replyTo = PceReplyToUri,
-          schedule = Schedule,
+          startTime = Schedule.startTime.toOption(None),
+          endTime = Schedule.endTime.toOption(None),
           serviceType = ServiceType("ServiceType", Service),
           algorithm = PathComputationAlgorithm.Chain,
           connectionTrace = connectionTrace)))

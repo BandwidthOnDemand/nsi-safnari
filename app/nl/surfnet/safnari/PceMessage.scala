@@ -23,6 +23,7 @@
 package nl.surfnet.safnari
 
 import java.net.URI
+import java.time.Instant
 import javax.xml.XMLConstants
 import javax.xml.namespace.QName
 import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
@@ -31,7 +32,6 @@ import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types._
 import play.api.data.validation.ValidationError
@@ -47,7 +47,7 @@ sealed trait PceMessage {
   def correlationId: CorrelationId
 }
 sealed trait PceRequest extends PceMessage
-case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, schedule: ScheduleType, serviceType: ServiceType, algorithm: PathComputationAlgorithm, connectionTrace: List[ConnectionType]) extends PceRequest
+case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, startTime: Option[Instant], endTime: Option[Instant], serviceType: ServiceType, algorithm: PathComputationAlgorithm, connectionTrace: List[ConnectionType]) extends PceRequest
 
 sealed trait PathComputationAlgorithm { def name: String }
 object PathComputationAlgorithm {
@@ -230,16 +230,15 @@ object PceMessage {
     ServiceTypeFormat and
     (__ \ "trace").format[Seq[ConnectionType]])
     .apply((correlationId, replyTo, mediaType, algorithm, start, end, constraints, serviceType, connectionTrace) => {
-      val schedule = new ScheduleType().withStartTime(start.orNull).withEndTime(end.orNull)
-      PathComputationRequest(correlationId, replyTo, schedule, serviceType, algorithm, connectionTrace.toList)
+      PathComputationRequest(correlationId, replyTo, start.map(_.toInstant), end.map(_.toInstant), serviceType, algorithm, connectionTrace.toList)
     }, {
-      case PathComputationRequest(correlationId, replyTo, schedule, serviceType, algorithm, connectionTrace) =>
+      case PathComputationRequest(correlationId, replyTo, start, end, serviceType, algorithm, connectionTrace) =>
         (correlationId,
           replyTo,
           "application/json",
           algorithm,
-          schedule.startTime.map2(_.toXMLGregorianCalendar()).toOption(None),
-          schedule.endTime.map2(_.toXMLGregorianCalendar()).toOption(None),
+          start.map(_.toXMLGregorianCalendar()),
+          end.map(_.toXMLGregorianCalendar()),
           Nil,
           serviceType,
           connectionTrace)
