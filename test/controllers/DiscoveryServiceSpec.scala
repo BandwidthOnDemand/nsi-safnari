@@ -2,7 +2,7 @@ package controllers
 
 import akka.testkit.TestActorRef
 import controllers.PathComputationEngine.DummyPceRequesterActor
-import java.time.{ LocalDateTime, ZoneId }
+import java.time.{ ZoneId, ZonedDateTime }
 import java.time.format.DateTimeFormatter
 import java.time.temporal._
 import play.api.http.HeaderNames
@@ -34,9 +34,9 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
       implicit val actorSystem = Akka.system
       val pceRequester = TestActorRef[DummyPceRequesterActor]
       val controller = new DiscoveryService(pceRequester)
-      val dateTimeFormatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'").withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of("GMT"))
+      val dateTimeFormatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of("GMT"))
 
-      val dateInTheFuture = dateTimeFormatter.format(LocalDateTime.now.plus(5, ChronoUnit.HOURS))
+      val dateInTheFuture = dateTimeFormatter.format(ZonedDateTime.now.plus(5, ChronoUnit.HOURS))
 
       val result = controller.index().apply(FakeRequest().withHeaders(HeaderNames.IF_MODIFIED_SINCE -> dateInTheFuture))
 

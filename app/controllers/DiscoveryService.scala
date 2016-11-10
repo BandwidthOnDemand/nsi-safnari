@@ -39,14 +39,11 @@ import scala.util.control.NonFatal
 
 class DiscoveryService(pceRequester: ActorRef) extends Controller {
   private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v1+xml"
-  private val timeZoneCode = "GMT"
-  private val parseableTimezoneCode = s" $timeZoneCode"
-  private val rfc1123Formatter = DateTimeFormatter.ofPattern(s"EEE, dd MMM yyyy HH:mm:ss '$timeZoneCode'").withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of(timeZoneCode))
-  private val rfc1123Parser = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss").withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of(timeZoneCode))
+  private val rfc1123Formatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of("GMT"))
 
   def index = Action.async { implicit request =>
     def parseDate(date: String): Option[Instant] = try {
-      val d = ZonedDateTime.parse(date.replace(parseableTimezoneCode, ""), rfc1123Parser).toInstant
+      val d = ZonedDateTime.parse(date, rfc1123Formatter).toInstant
       Some(d)
     } catch {
       case NonFatal(_) => None
