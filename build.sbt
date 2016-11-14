@@ -1,6 +1,6 @@
 name := "nsi-safnari"
 
-version := "1.0-SNAPSHOT"
+version := "2.1.0-SNAPSHOT"
 
 val surfnetNexusBaseUrl = "https://atlas.dlp.surfnet.nl/nexus/content/repositories"
 
