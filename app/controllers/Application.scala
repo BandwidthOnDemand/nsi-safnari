@@ -25,7 +25,7 @@ package controllers
 import akka.actor.ActorRef
 import akka.pattern.ask
 import controllers.ActorSupport._
-import java.time.Instant
+import java.time.ZonedDateTime
 import java.time.temporal._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
@@ -56,7 +56,7 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
   }
 
   def connections = Action.async {
-    val now = Instant.now
+    val now = ZonedDateTime.now
     val timeBound = now.minus(1, ChronoUnit.WEEKS)
 
     // FIXME data consistency (two messages may be interleaved with other messages)
@@ -67,11 +67,11 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
         cs.map {
           case (summary, pendingCriteria, segments) => (ConnectionPresenter(summary, pendingCriteria), segments.map{ ConnectionPathSegmentPresenter })
         }.filter {
-          case (connection, _) => connection.endTime.fold2(_.compareTo(timeBound) > 0, true, true)
+          case (connection, _) => connection.endTime.fold2(_.compareTo(timeBound.toInstant) > 0, true, true)
         }.sortBy {
           case (connection, _) => connection.startTime.toOption(None)
         }.reverse.groupBy {
-          case (connection, _) => connection.qualifier(now)
+          case (connection, _) => connection.qualifier(now.toInstant)
         }
 
       Ok(views.html.connections(connections.withDefaultValue(Nil), Configuration.WebParams))
