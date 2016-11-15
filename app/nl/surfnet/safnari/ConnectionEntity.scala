@@ -69,6 +69,8 @@ class ConnectionEntity(
   private def newResultId() = nextResultId.getAndIncrement()
   private var mostRecentChildExceptions = Map.empty[ConnectionId, ServiceExceptionType]
 
+  var lastUpdatedAt = Instant.ofEpochSecond(0);
+
   var children = ChildConnectionIds()
 
   private var pathComputationAlgorithm = initialReserve.body.service.flatMap(_.parameters(PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE).flatMap(PathComputationAlgorithm.parse)).getOrElse(defaultPathComputationAlgorithm)
@@ -101,7 +103,7 @@ class ConnectionEntity(
   private var providerConversations: Map[CorrelationId, FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = Map.empty
 
   def queryRecursive(message: FromRequester): Option[Seq[OutboundMessage]] = message match {
-    case FromRequester(pm @ NsiProviderMessage(_, QueryRecursive(ids))) =>
+    case FromRequester(pm @ NsiProviderMessage(_, QueryRecursive(ids, ifModifiedSince))) =>
       require(ids.fold(true) {
         case Left(connectionIds)         => connectionIds.contains(id)
         case Right(globalReservationIds) => globalReservationIds.contains(globalReservationId)
@@ -114,7 +116,9 @@ class ConnectionEntity(
         connectionStates,
         children.childConnections.map { case (segment, _, id) => segment.provider -> id }.toMap,
         newCorrelationId,
-        newNsiHeaders)
+        newNsiHeaders,
+        ifModifiedSince
+      )
 
       val output = qrsm.process(message)
 
@@ -131,7 +135,7 @@ class ConnectionEntity(
       qrsm.flatMap(_.process(message))
   }
 
-  def process(message: InboundMessage)(implicit context: ConnectionContext): Either[ServiceExceptionType, Seq[OutboundMessage]] = {
+  def process(message: InboundMessage)(context: ConnectionContext): Either[ServiceExceptionType, Seq[OutboundMessage]] = {
     children = children.update(message, newCorrelationId)
 
     message match {
@@ -151,18 +155,21 @@ class ConnectionEntity(
     if (lsm.lifecycleState == LifecycleStateEnumType.TERMINATED) {
       Left(messageNotApplicable(message))
     } else {
-      val outputs = stateMachines(message).flatMap { stateMachine =>
+      val outputs = stateMachines(message, context).flatMap { stateMachine =>
         applyMessageToStateMachine(stateMachine, message)
       }
 
-      if (outputs.isEmpty)
+      if (outputs.isEmpty) {
         handleUnhandledProviderNotifications(message).toRight(messageNotApplicable(message))
-      else
+      } else {
+        lastUpdatedAt = context.clock.instant
+
         Right(outputs.flatten)
+      }
     }
   }
 
-  def process(message: OutboundMessage)(implicit context: ConnectionContext): Unit = message match {
+  def process(message: OutboundMessage)(context: ConnectionContext): Unit = message match {
     case ToPce(request: PathComputationRequest) =>
       pathComputationAlgorithm = request.algorithm
     case ToRequester(NsiRequesterMessage(headers, notification: NsiNotification)) =>
@@ -184,7 +191,7 @@ class ConnectionEntity(
     case _ =>
   }
 
-  private def stateMachines(message: InboundMessage)(implicit context: ConnectionContext): List[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
+  private def stateMachines(message: InboundMessage, context: ConnectionContext): List[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
     case FromRequester(NsiProviderMessage(_, _: InitialReserve))       => List(rsm)
     case FromRequester(NsiProviderMessage(_, _: ModifyReserve))        => List(rsm)
     case FromRequester(NsiProviderMessage(_, _: ReserveCommit))        => List(rsm)

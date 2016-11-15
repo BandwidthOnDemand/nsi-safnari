@@ -27,7 +27,7 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
 import java.net.URI
-import java.time.{ Clock, Instant }
+import java.time.{ Clock, Instant, ZoneOffset }
 import java.time.temporal._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.persistence._
@@ -54,7 +54,7 @@ object Connection {
     def resultClassTag: ClassTag[Result]
   }
   case object Query extends Operation {
-    final case class Result(summary: QuerySummaryResultType, pendingCriteria: Option[ReservationRequestCriteriaType])
+    final case class Result(summary: QuerySummaryResultType, pendingCriteria: Option[ReservationRequestCriteriaType], lastModifiedAt: Instant)
     final val resultClassTag = implicitly[ClassTag[Result]]
   }
   case object QuerySegments extends Operation {
@@ -169,7 +169,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     val replayedConnections = Future.sequence(for {
       (connectionId, records @ (MessageRecord(_, _, _, FromRequester(NsiProviderMessage(headers, initialReserve: InitialReserve))) +: _)) <- messageStore.loadEverything()
     } yield {
-      val commands = records.map { record => Connection.Command(Instant.ofEpochMilli(record.createdAt.toEpochMilli()), record.message) }
+      val commands = records.map { record => Connection.Command(record.createdAt, record.message) }
       val connection = createConnection(connectionId, NsiProviderMessage(headers, initialReserve))
       commands.foreach {
         case Connection.Command(_, FromRequester(message)) =>
@@ -226,8 +226,6 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     def props(connectionEntity: ConnectionEntity, outputActor: ActorRef): Props = Props(new ConnectionActor(connectionEntity, outputActor))
   }
   private class ConnectionActor(connection: ConnectionEntity, output: ActorRef) extends Actor {
-    implicit val connectionContext = ConnectionContext(clock = Clock.systemDefaultZone)
-
     private val process = new IdempotentProvider(connection.aggregatorNsa, ManageChildConnections(connection.process))
 
     private val uuidGenerator = Uuid.randomUuidGenerator()
@@ -243,12 +241,12 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     }
 
     override def receive = LoggingReceive {
-      case Connection.Query              => sender ! Connection.Query.Result(connection.query, connection.rsm.pendingCriteria)
+      case Connection.Query              => sender ! Connection.Query.Result(connection.query, connection.rsm.pendingCriteria, connection.lastUpdatedAt)
       case Connection.QuerySegments      => sender ! connection.segments
       case Connection.QueryNotifications => sender ! connection.notifications
       case Connection.QueryResults       => sender ! connection.results
 
-      case Connection.QueryRecursive(query @ FromRequester(NsiProviderMessage(_, QueryRecursive(_)))) =>
+      case Connection.QueryRecursive(query @ FromRequester(NsiProviderMessage(_, QueryRecursive(_, _)))) =>
         queryRequesters += (query.correlationId -> sender)
 
         for {
@@ -267,7 +265,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
         }
 
       case Connection.Command(timestamp, inbound: InboundMessage) =>
-        val result = PersistMessages(timestamp, process)(inbound)
+        val context = ConnectionContext(clock = Clock.fixed(timestamp, ZoneOffset.UTC))
+        val result = PersistMessages(timestamp, process.apply)(inbound)(context)
 
         schedulePassedEndTimeMessage()
 
@@ -294,12 +293,14 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
 
         val result = Try {
           messages.foreach {
-            case Connection.Command(_, inbound: InboundMessage) =>
-              process(inbound).left.foreach { error =>
+            case Connection.Command(timestamp, inbound: InboundMessage) =>
+              val context = ConnectionContext(clock = Clock.fixed(timestamp, ZoneOffset.UTC))
+              process(inbound)(context).left.foreach { error =>
                 Logger.warn(s"Connection ${connection.id} failed to replay message $inbound (ignored): $error")
               }
-            case Connection.Command(_, outbound: OutboundMessage) =>
-              connection.process(outbound)
+            case Connection.Command(timestamp, outbound: OutboundMessage) =>
+              val context = ConnectionContext(clock = Clock.fixed(timestamp, ZoneOffset.UTC))
+              connection.process(outbound)(context)
           }
 
           schedulePassedEndTimeMessage()
@@ -351,16 +352,16 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
       }
     }
 
-    private def PersistMessages[E](timestamp: Instant, wrapped: InboundMessage => Either[E, Seq[OutboundMessage]]): InboundMessage => Either[E, Seq[OutboundMessage]] = { inbound =>
-      val result = wrapped(inbound)
+    private def PersistMessages[E](timestamp: Instant, wrapped: InboundMessage => ConnectionContext => Either[E, Seq[OutboundMessage]])(inbound: InboundMessage)(context: ConnectionContext): Either[E, Seq[OutboundMessage]] = {
+      val result = wrapped(inbound)(context)
       result.right.foreach { outbound =>
         messageStore.storeInboundWithOutboundMessages(connection.id, timestamp, inbound, outbound)
       }
       result
     }
 
-    private def ManageChildConnections[E, A](wrapped: InboundMessage => Either[E, A]): InboundMessage => Either[E, A] = { inbound =>
-      val outbound = wrapped(inbound)
+    private def ManageChildConnections[E, A](wrapped: InboundMessage => ConnectionContext => Either[E, A])(inbound: InboundMessage)(context: ConnectionContext): Either[E, A] = {
+      val outbound = wrapped(inbound)(context)
       if (outbound.isRight) {
         updateChildConnection(inbound)
       }

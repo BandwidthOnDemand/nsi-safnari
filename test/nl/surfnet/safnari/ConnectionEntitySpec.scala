@@ -48,7 +48,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
     var connection: ConnectionEntity = _
     var processInbound: IdempotentProvider = _
-    implicit var context: ConnectionContext = ConnectionContext(clock = Clock.systemDefaultZone)
+    var context: ConnectionContext = ConnectionContext(clock = Clock.systemDefaultZone)
 
     def schedule = connection.rsm.committedCriteria.map(_.getSchedule) getOrElse connection.rsm.pendingCriteria.get.getSchedule()
 
@@ -60,9 +60,9 @@ class ConnectionEntitySpec extends helpers.Specification {
       case inbound @ FromRequester(NsiProviderMessage(headers, _: InitialReserve)) =>
         initialReserve(inbound)
       case inbound: InboundMessage =>
-        processInbound(inbound) aka s"given message $inbound must be processed" must beRight
+        processInbound(inbound)(context) aka s"given message $inbound must be processed" must beRight
       case outbound: OutboundMessage =>
-        connection.process(outbound)
+        connection.process(outbound)(context)
     }
 
     private def initialReserve(reserve: FromRequester) = {
@@ -78,7 +78,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
       processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
 
-      processInbound(reserve).right.toOption
+      processInbound(reserve)(context).right.toOption
     }
 
     var messages: Seq[Message] = Nil
@@ -90,12 +90,12 @@ class ConnectionEntitySpec extends helpers.Specification {
         case reserve @ FromRequester(NsiProviderMessage(headers, _: InitialReserve)) =>
           initialReserve(reserve)
         case message: FromRequester =>
-          val first = processInbound(message).right.toOption
-          val second = processInbound(message).right.toOption
+          val first = processInbound(message)(context).right.toOption
+          val second = processInbound(message)(context).right.toOption
           second aka "idempotent retransmit" must beEqualTo(first)
           first
         case other: InboundMessage =>
-          processInbound(message).right.toOption
+          processInbound(message)(context).right.toOption
       }
       response.tap(_.foreach { outbound =>
         // Validate outbound messages against XML schema.
@@ -1385,18 +1385,18 @@ class ConnectionEntitySpec extends helpers.Specification {
     }
 
     "send query recursive to all child providers" in new ReservedConnectionWithTwoSegments {
-      when(ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)))))
+      when(ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)), None)))
 
       messages must haveSize(2)
       messages must contain(like[Message] {
-        case ToProvider(NsiProviderMessage(_, QueryRecursive(Some(Left("ConnectionIdA" :: Nil)))), provider) => provider must_== A.provider
-        case ToProvider(NsiProviderMessage(_, QueryRecursive(Some(Left("ConnectionIdB" :: Nil)))), provider) => provider must_== B.provider
+        case ToProvider(NsiProviderMessage(_, QueryRecursive(Some(Left("ConnectionIdA" :: Nil)), None)), provider) => provider must_== A.provider
+        case ToProvider(NsiProviderMessage(_, QueryRecursive(Some(Left("ConnectionIdB" :: Nil)), None)), provider) => provider must_== B.provider
       }).forall
     }
 
     "send query recursive confirm to requester when all child providers replied" in new ReservedConnectionWithTwoSegments {
       given(
-        ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)))),
+        ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)), None)),
         upa.response(CorrelationId(0, 11), QueryRecursiveConfirmed(Nil)))
 
       when(upa.response(CorrelationId(0, 12), QueryRecursiveConfirmed(Nil)))

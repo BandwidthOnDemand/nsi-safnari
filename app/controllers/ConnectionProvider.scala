@@ -28,6 +28,7 @@ import akka.actor._
 import controllers.ActorSupport._
 import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.utils._
 import soap.SoapWebService
 import soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
@@ -81,14 +82,14 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
     }
 
   private[controllers] def handleQuery(message: NsiProviderMessage[NsiProviderQuery])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] = message.body match {
-    case QuerySummary(ids) =>
-      queryConnections(ids, message.headers.requesterNSA) onSuccess {
-        case reservations => sendAsyncReply(message reply QuerySummaryConfirmed(reservations))
+    case QuerySummary(ids, ifModifiedSince) =>
+      queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) onSuccess {
+        case (reservations, lastModifiedAt) => sendAsyncReply(message reply QuerySummaryConfirmed(reservations, Some(lastModifiedAt.toXMLGregorianCalendar())))
       }
       Future.successful(GenericAck())
-    case QuerySummarySync(ids) =>
-      queryConnections(ids, message.headers.requesterNSA) map { states =>
-        QuerySummarySyncConfirmed(states)
+    case QuerySummarySync(ids, ifModifiedSince) =>
+      queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) map {
+        case (states, lastModifiedAt) => QuerySummarySyncConfirmed(states, Some(lastModifiedAt.toXMLGregorianCalendar()))
       }
     case QueryNotification(connectionId, start, end) =>
       val connection = connectionManager.get(connectionId)
@@ -115,7 +116,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       val ack = connectionManager.get(connectionId).map(queryResults(_, start, end).map(QueryResultSyncConfirmed))
 
       ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))))
-    case q @ QueryRecursive(_) =>
+    case q @ QueryRecursive(_, _) =>
       handleQueryRecursive(message.copy(body = q))(sendAsyncReply)
   }
 
@@ -152,11 +153,10 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
     results.map(rs => rs.filter(r => range.contains(r.getResultId())))
   }
 
-  private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String): Future[Seq[QuerySummaryResultType]] = {
-    val connections = connectionIdsToConnections(ids, requesterNsa)
-
-    connections flatMap { cs =>
-      Future.traverse(cs)(c => (c ? Connection.Query).map(_.summary))
+  private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String, ifModifiedSince: Option[Instant]): Future[(Seq[QuerySummaryResultType], Instant)] = {
+    connectionIdsToConnections(ids, requesterNsa) flatMap { cs =>
+      Future.traverse(cs)(c => (c ? Connection.Query).filter(c => ifModifiedSince.fold(true)(_.isBefore(c.lastModifiedAt))))
+        .map(cs => cs.map(_.summary) -> cs.map(_.lastModifiedAt).max)
     }
   }
 

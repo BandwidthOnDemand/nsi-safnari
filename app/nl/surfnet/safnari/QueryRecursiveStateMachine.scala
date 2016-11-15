@@ -22,11 +22,11 @@
  */
 package nl.surfnet.safnari
 
+import javax.xml.datatype.XMLGregorianCalendar
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
-
-import scala.collection.JavaConverters._
 import org.ogf.schemas.nsi._2013._12.connection.types._
+import scala.collection.JavaConverters._
 
 object QueryRecursiveState extends Enumeration {
   type QueryRecursiveState = Value
@@ -64,7 +64,8 @@ class QueryRecursiveStateMachine(
     connectionStates: => ConnectionStatesType,
     children: Map[ProviderEndPoint, Option[ConnectionId]],
     newCorrelationId: () => CorrelationId,
-    newNsiHeaders: ProviderEndPoint => NsiHeaders)
+    newNsiHeaders: ProviderEndPoint => NsiHeaders,
+    ifModifiedSince: Option[XMLGregorianCalendar])
   extends FiniteStateMachine[QueryRecursiveState, QueryRecursiveStateMachineData, InboundMessage, OutboundMessage](
     Initial,
     QueryRecursiveStateMachineData(
@@ -97,7 +98,7 @@ class QueryRecursiveStateMachine(
           val provider = nextStateData.providers(connectionId)
           ToProvider(NsiProviderMessage(
             newNsiHeaders(provider).copy(correlationId = correlationId),
-            QueryRecursive(Some(Left(connectionId :: Nil)))),
+            QueryRecursive(Some(Left(connectionId :: Nil)), ifModifiedSince)),
             provider)
       }.toSeq
 

@@ -40,46 +40,48 @@ private case class RequesterCommandStatus(command: FromRequester, outstandingCom
   })
 }
 
-class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Either[ServiceExceptionType, Seq[OutboundMessage]]) extends (InboundMessage => Either[ServiceExceptionType, Seq[OutboundMessage]]) {
+class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => ConnectionContext => Either[ServiceExceptionType, Seq[OutboundMessage]]) extends (InboundMessage => ConnectionContext => Either[ServiceExceptionType, Seq[OutboundMessage]]) {
   private var requesterCommands = Map.empty[CorrelationId, RequesterCommandStatus]
   private var outgoingToRequesterCommands = Map.empty[CorrelationId, CorrelationId]
 
-  override def apply(message: InboundMessage) = message match {
-    case inbound @ FromRequester(NsiProviderMessage(_, _: NsiProviderCommand)) =>
-      requesterCommands.get(inbound.correlationId) match {
-        case None =>
-          val result = wrapped(inbound)
-          result.right.foreach(recordOutput(inbound, _))
-          result
-        case Some(RequesterCommandStatus(original, outstandingCommandsOrReply)) =>
-          if (!sameMessage(inbound.message, original.message)) {
-            Left(NsiError.GenericMessagePayloadError.toServiceException(providerNsa).withText(s"duplicate request with existing correlation id ${inbound.correlationId} does not match the original"))
-          } else {
-            Right(outstandingCommandsOrReply match {
-              case Left(outstandingCommands) =>
-                outstandingCommands.values.to[Seq]
-              case Right(reply) =>
-                List(reply)
-            })
-          }
-      }
-    case _: FromRequester =>
-      wrapped(message)
-    case _: FromProvider | _: FromPce | _: MessageDeliveryFailure | _: PassedEndTime | _: AckFromProvider | _: AckFromPce =>
-      val output = wrapped(message)
-      for {
-        requesterCommandCorrelationId <- outgoingToRequesterCommands.get(message.correlationId)
-        RequesterCommandStatus(originalRequest, _) <- requesterCommands.get(requesterCommandCorrelationId)
-        messages <- output.right.toOption
-      } {
-        recordOutput(originalRequest, messages)
-        message match {
-          case _: FromProvider | _: FromPce =>
-            requesterCommands += originalRequest.correlationId -> requesterCommands(originalRequest.correlationId).commandReplyReceived(message)
-          case _ =>
+  override def apply(message: InboundMessage) = {
+    context => message match {
+      case inbound @ FromRequester(NsiProviderMessage(_, _: NsiProviderCommand)) =>
+        requesterCommands.get(inbound.correlationId) match {
+          case None =>
+            val result = wrapped(inbound)(context)
+            result.right.foreach(recordOutput(inbound, _))
+            result
+          case Some(RequesterCommandStatus(original, outstandingCommandsOrReply)) =>
+            if (!sameMessage(inbound.message, original.message)) {
+              Left(NsiError.GenericMessagePayloadError.toServiceException(providerNsa).withText(s"duplicate request with existing correlation id ${inbound.correlationId} does not match the original"))
+            } else {
+              Right(outstandingCommandsOrReply match {
+                case Left(outstandingCommands) =>
+                  outstandingCommands.values.to[Seq]
+                case Right(reply) =>
+                  List(reply)
+              })
+            }
         }
-      }
-      output
+      case _: FromRequester =>
+        wrapped(message)(context)
+      case _: FromProvider | _: FromPce | _: MessageDeliveryFailure | _: PassedEndTime | _: AckFromProvider | _: AckFromPce =>
+        val output = wrapped(message)(context)
+        for {
+          requesterCommandCorrelationId <- outgoingToRequesterCommands.get(message.correlationId)
+          RequesterCommandStatus(originalRequest, _) <- requesterCommands.get(requesterCommandCorrelationId)
+          messages <- output.right.toOption
+        } {
+          recordOutput(originalRequest, messages)
+          message match {
+            case _: FromProvider | _: FromPce =>
+              requesterCommands += originalRequest.correlationId -> requesterCommands(originalRequest.correlationId).commandReplyReceived(message)
+            case _ =>
+          }
+        }
+        output
+    }
   }
 
   private def recordOutput(requesterCommand: FromRequester, output: Seq[OutboundMessage]): Unit = {
