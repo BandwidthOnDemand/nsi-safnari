@@ -84,12 +84,12 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
   private[controllers] def handleQuery(message: NsiProviderMessage[NsiProviderQuery])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] = message.body match {
     case QuerySummary(ids, ifModifiedSince) =>
       queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) onSuccess {
-        case (reservations, lastModifiedAt) => sendAsyncReply(message reply QuerySummaryConfirmed(reservations, Some(lastModifiedAt.toXMLGregorianCalendar())))
+        case (reservations, lastModifiedAt) => sendAsyncReply(message reply QuerySummaryConfirmed(reservations, lastModifiedAt.map(_.toXMLGregorianCalendar())))
       }
       Future.successful(GenericAck())
     case QuerySummarySync(ids, ifModifiedSince) =>
       queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) map {
-        case (states, lastModifiedAt) => QuerySummarySyncConfirmed(states, Some(lastModifiedAt.toXMLGregorianCalendar()))
+        case (states, lastModifiedAt) => QuerySummarySyncConfirmed(states, lastModifiedAt.map(_.toXMLGregorianCalendar()))
       }
     case QueryNotification(connectionId, start, end) =>
       val connection = connectionManager.get(connectionId)
@@ -153,10 +153,11 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
     results.map(rs => rs.filter(r => range.contains(r.getResultId())))
   }
 
-  private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String, ifModifiedSince: Option[Instant]): Future[(Seq[QuerySummaryResultType], Instant)] = {
+  private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String, ifModifiedSince: Option[Instant]): Future[(Seq[QuerySummaryResultType], Option[Instant])] = {
+    val maxInstant = (a: Instant, b: Instant) => if (a.isBefore(b)) b else a
     connectionIdsToConnections(ids, requesterNsa) flatMap { cs =>
       Future.traverse(cs)(c => (c ? Connection.Query).filter(c => ifModifiedSince.fold(true)(_.isBefore(c.lastModifiedAt))))
-        .map(cs => cs.map(_.summary) -> cs.map(_.lastModifiedAt).max)
+        .map(cs => cs.map(_.summary) -> cs.map(_.lastModifiedAt).reduceOption(maxInstant).orElse(ifModifiedSince))
     }
   }
 
