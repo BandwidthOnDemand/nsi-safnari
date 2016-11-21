@@ -545,7 +545,8 @@ class ConnectionEntitySpec extends helpers.Specification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A),
-          upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")))
+          upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA"))
+        )
 
         when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
           .withConnectionId("ConnectionIdA")
@@ -562,15 +563,17 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withTimeoutValue(120)
           .withOriginatingConnectionId("OriginatingConnectionId-A")
           .withOriginatingNSA("OriginatingNSA-A"))))
-        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
+        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
       }
 
       "pass child reserve timeout to requester for each segment" in new fixture {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
-          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)))
+          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)),
+          upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB"))
+        )
 
         when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
           .withConnectionId("ConnectionIdA")
@@ -587,8 +590,8 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withTimeoutValue(120)
           .withOriginatingConnectionId("OriginatingConnectionId-A")
           .withOriginatingNSA("OriginatingNSA-A"))))
+        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
 
         when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
           .withConnectionId("ConnectionIdB")
@@ -605,8 +608,8 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withTimeoutValue(180)
           .withOriginatingConnectionId("OriginatingConnectionId-B")
           .withOriginatingNSA("OriginatingNSA-B"))))
-        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+        childConnectionData("ConnectionIdB").reservationState aka "child B reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
       }
 
       "with sequential routing" should {
@@ -662,7 +665,6 @@ class ConnectionEntitySpec extends helpers.Specification {
           segments must contain(like[ConnectionData] { case ConnectionData(Some("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
         }
 
-        tag("focus")
         "immediately fail the reservation with two segments when the first one fails" in new SequentialRoutingFixture {
           given(
             ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
@@ -708,7 +710,7 @@ class ConnectionEntitySpec extends helpers.Specification {
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
       }
 
-      "stay reserve held state when provider times out" in new fixture {
+      "be in reserve timeout state when provider times out" in new fixture {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A),
@@ -730,7 +732,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withOriginatingConnectionId("OriginatingConnectionId")
           .withOriginatingNSA("OriginatingNSA"))))
 
-        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
       }
     }
 

@@ -84,6 +84,7 @@ class ConnectionEntity(
     newNsiHeaders,
     newInitialReserveNsiHeaders,
     newNotificationId,
+    newNotifyHeaders,
     pathComputationAlgorithm,
     { error =>
       new GenericFailedType().
@@ -207,8 +208,8 @@ class ConnectionEntity(
     case FromProvider(NsiRequesterMessage(_, _: DataPlaneStateChange)) => dsm.toList
     case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) if error.notification.getEvent() == EventEnumType.FORCED_END =>
       List(lsm)
-    case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout))         => Nil
     case FromProvider(NsiRequesterMessage(_, _: ErrorEvent))             => Nil
+    case FromProvider(NsiRequesterMessage(_, _: ReserveTimeout))         => List(rsm)
     case FromProvider(NsiRequesterMessage(_, _: MessageDeliveryTimeout)) => Nil
 
     case FromProvider(NsiRequesterMessage(headers, body)) =>
@@ -284,14 +285,6 @@ class ConnectionEntity(
 
   private def handleUnhandledProviderNotifications(message: InboundMessage): Option[Seq[OutboundMessage]] = {
     val eventOption: Option[NsiNotification] = Some(message).collect {
-      case FromProvider(NsiRequesterMessage(_, message: ReserveTimeout)) =>
-        ReserveTimeout(new ReserveTimeoutRequestType()
-          .withConnectionId(id)
-          .withNotificationId(newNotificationId())
-          .withTimeStamp(message.notification.getTimeStamp())
-          .withTimeoutValue(message.notification.getTimeoutValue())
-          .withOriginatingConnectionId(message.notification.getOriginatingConnectionId())
-          .withOriginatingNSA(message.notification.getOriginatingNSA()))
       case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) =>
         val event = ErrorEvent(new ErrorEventType()
           .withConnectionId(id)
