@@ -34,7 +34,7 @@ class ConnectionEntitySpec extends helpers.Specification {
 
     val ModifyCorrelationId = helpers.Specification.newCorrelationId
     def ModifyReserveType = InitialReserveType.withConnectionId(connection.id).tap { modify =>
-      modify.getCriteria.setVersion(null)
+      modify.getCriteria.setVersion(modify.getCriteria.getVersion + 1)
       modify.getCriteria.getSchedule.withStartTime(Nillable.absent[XMLGregorianCalendar])
       modify.getCriteria.getPointToPointService.foreach(_.setCapacity(500))
     }

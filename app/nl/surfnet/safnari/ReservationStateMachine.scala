@@ -461,8 +461,9 @@ class ReservationStateMachine(
   private def validateModify(requestedCriteria: ReservationRequestCriteriaType, committedCriteria: ReservationConfirmCriteriaType) = {
     val committedP2Ps = committedCriteria.getPointToPointService.get
     val requestedP2Ps = requestedCriteria.getPointToPointService.get
-    if ((requestedCriteria.getVersion ne null) && committedVersion >= requestedCriteria.getVersion)
-      Some(NsiError.GenericMessagePayloadError.copy(text = s"requested version ${requestedCriteria.getVersion} must be greater than committed version $committedVersion"))
+    val requestedVersion: Int = if (requestedCriteria.getVersion ne null) requestedCriteria.getVersion else 0
+    if (committedVersion >= requestedVersion)
+      Some(NsiError.GenericMessagePayloadError.copy(text = s"requested version ${requestedVersion} must be greater than committed version ${committedVersion}"))
     else if (!(committedP2Ps.sourceStp isCompatibleWith requestedP2Ps.sourceStp))
       Some(NsiError.GenericMessagePayloadError.copy(text = s"committed source STP ${committedP2Ps.sourceStp} is not compatible with requested source STP ${requestedP2Ps.sourceStp}"))
     else if (!(committedP2Ps.destStp isCompatibleWith requestedP2Ps.destStp))
