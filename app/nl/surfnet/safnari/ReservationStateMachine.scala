@@ -53,10 +53,10 @@ case class ReservationStateMachineData(
     criteria: ConnectionCriteria,
     initialReserveAlgorithm: InitialReserveAlgorithm,
     segments: ComputedPathSegments = Seq.empty,
-    currentNotification: Option[NsiNotification] = None,
     childConnectionStates: Map[CorrelationId, ReservationState] = Map.empty,
     childExceptions: Map[CorrelationId, ServiceExceptionType] = Map.empty,
     childConnectionCriteria: Map[CorrelationId, ConnectionCriteria] = Map.empty,
+    childReserveTimeouts: List[ReserveTimeout] = List(),
     pceError: Option[NsiError] = None,
     reserveError: Option[NsiError] = None) {
 
@@ -160,6 +160,11 @@ case class ReservationStateMachineData(
   def commitPendingCriteria = copy(criteria = criteria.commit)
 
   def pendingVersion = criteria.pendingVersion
+
+  def processReserveTimeouts(children: ChildConnectionIds) = aggregatedReservationState match {
+    case HeldReservationState => childReserveTimeouts.foldLeft(this)((acc, timeout) => acc.updateChildByConnectionId(children, timeout.connectionId, TimeoutReservationState))
+    case _ => this
+  }
 }
 
 class ReservationStateMachine(
@@ -207,7 +212,8 @@ class ReservationStateMachine(
         .initialReserveConfirmed(headers.correlationId, message.criteria)
         .reserveNextSegments
       val newData2 = if (newData.aggregatedReservationState == HeldReservationState) newData.requestedCriteriaToHeld else newData
-      goto(newData2.aggregatedReservationState) using newData2
+      val newData3 = newData2.processReserveTimeouts(children)
+      goto(newData3.aggregatedReservationState) using newData3
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveFailed)), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
       val newData = data
         .updateChild(headers.correlationId, FailedReservationState, Some(message.failed.getServiceException()))
@@ -221,9 +227,7 @@ class ReservationStateMachine(
         .clearNextSegments
       goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveTimeout)), data) =>
-      val newData = data
-        .updateChildByConnectionId(children, message.connectionId, TimeoutReservationState)
-        .copy(currentNotification = Some(message))
+      val newData = data.copy(childReserveTimeouts = data.childReserveTimeouts :+ message)
       goto(newData.aggregatedReservationState) using newData
     case Event(AckFromProvider(_), data) =>
       stay using data.clearNextSegments
@@ -238,8 +242,8 @@ class ReservationStateMachine(
       goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveTimeout)), data) =>
       val newData = data
-        .updateChildByConnectionId(children, message.connectionId, TimeoutReservationState)
-        .copy(currentNotification = Some(message))
+        .copy(childReserveTimeouts = data.childReserveTimeouts :+ message)
+        .processReserveTimeouts(children)
       goto(newData.aggregatedReservationState) using newData
   }
 
@@ -317,6 +321,11 @@ class ReservationStateMachine(
         .modifyChildCriteria(children, message.connectionId)(_.withHeld(message.criteria))
       val newData2 = if (newData.aggregatedReservationState == HeldReservationState) newData.requestedCriteriaToHeld else newData
       goto(newData2.aggregatedReservationState) using newData2
+    case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveTimeout)), data) =>
+      val newData = data
+        .copy(childReserveTimeouts = data.childReserveTimeouts :+ message)
+        .processReserveTimeouts(children)
+      goto(newData.aggregatedReservationState) using newData
   }
 
   when(CommitFailedReservationState)(PartialFunction.empty)
@@ -354,11 +363,8 @@ class ReservationStateMachine(
 
           ToProvider(NsiProviderMessage(headers, InitialReserve(reserveType)), segment.provider)
       }(collection.breakOut)
-      val reserveTimeout = nextStateData.childConnectionStates
-        .filter { case ((id, state)) => stateData.childConnectionStates.get(id) != Some(state) }
-        .filter(_._2 == TimeoutReservationState)
-        .toList.flatMap(_ => notifyReserveTimeout)
-      nextSegments ++ reserveTimeout
+
+      nextSegments ++ notifyReserveTimeout
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoServicePlanePathFound))))
     case CheckingReservationState -> FailedReservationState =>
@@ -388,7 +394,9 @@ class ReservationStateMachine(
         case (seg, _, Some(connectionId)) =>
           ToProvider(NsiProviderMessage(newNsiHeaders(seg.provider), ReserveAbort(connectionId)), seg.provider)
       }.toVector
-    case (CheckingReservationState | HeldReservationState | TimeoutReservationState) -> TimeoutReservationState =>
+    case (CheckingReservationState | ModifyingReservationState) -> TimeoutReservationState =>
+      respond(ReserveConfirmed(id, nextStateData.criteria.confirmed.get)) ++ notifyReserveTimeout
+    case (HeldReservationState | TimeoutReservationState) -> TimeoutReservationState =>
       notifyReserveTimeout
     case CommittingReservationState -> ReservedReservationState =>
       respond(ReserveCommitConfirmed(id))
@@ -431,26 +439,24 @@ class ReservationStateMachine(
 
   private def respond(body: NsiRequesterOperation) = Seq(ToRequester(nextStateData.currentCommand reply body))
 
-  private def notifyReserveTimeout = nextStateData.currentNotification match {
-    case Some(message: ReserveTimeout) => Seq(
-      ToRequester(
-        NsiRequesterMessage(
-          newNotifyHeaders(),
-          ReserveTimeout(
-            new ReserveTimeoutRequestType()
-              .withConnectionId(id)
-              .withNotificationId(newNotificationId())
-              .withTimeStamp(message.notification.getTimeStamp())
-              .withTimeoutValue(message.notification.getTimeoutValue())
-              .withOriginatingConnectionId(message.notification.getOriginatingConnectionId())
-              .withOriginatingNSA(message.notification.getOriginatingNSA())
-          )
+  private def notifyReserveTimeout = nextStateData.childReserveTimeouts.filterNot(
+    x => stateData.childReserveTimeouts.exists(_.connectionId == x.connectionId)
+  ).map(message =>
+    ToRequester(
+      NsiRequesterMessage(
+        newNotifyHeaders(),
+        ReserveTimeout(
+          new ReserveTimeoutRequestType()
+            .withConnectionId(id)
+            .withNotificationId(newNotificationId())
+            .withTimeStamp(message.notification.getTimeStamp())
+            .withTimeoutValue(message.notification.getTimeoutValue())
+            .withOriginatingConnectionId(message.notification.getOriginatingConnectionId())
+            .withOriginatingNSA(message.notification.getOriginatingNSA())
         )
       )
     )
-    case _ => Seq()
-  }
-
+  )
 
   private def validateModify(requestedCriteria: ReservationRequestCriteriaType, committedCriteria: ReservationConfirmCriteriaType) = {
     val committedP2Ps = committedCriteria.getPointToPointService.get

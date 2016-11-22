@@ -563,8 +563,8 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withTimeoutValue(120)
           .withOriginatingConnectionId("OriginatingConnectionId-A")
           .withOriginatingNSA("OriginatingNSA-A"))))
-        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
-        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
       }
 
       "pass child reserve timeout to requester for each segment" in new fixture {
@@ -590,7 +590,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withTimeoutValue(120)
           .withOriginatingConnectionId("OriginatingConnectionId-A")
           .withOriginatingNSA("OriginatingNSA-A"))))
-        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
+        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
 
         when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
@@ -608,8 +608,37 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withTimeoutValue(180)
           .withOriginatingConnectionId("OriginatingConnectionId-B")
           .withOriginatingNSA("OriginatingNSA-B"))))
-        childConnectionData("ConnectionIdB").reservationState aka "child B reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
+        childConnectionData("ConnectionIdB").reservationState aka "child B reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+      }
+
+      "confirm reservation on B confirmed when A is timed out" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
+          pce.confirm(CorrelationId(0, 3), A, B),
+          upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)),
+          upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB"))
+        )
+
+        when(upa.notification(newCorrelationId, ReserveTimeout(new ReserveTimeoutRequestType()
+          .withConnectionId("ConnectionIdA")
+          .withNotificationId(32L)
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z"))
+          .withTimeoutValue(120)
+          .withOriginatingConnectionId("OriginatingConnectionId-A")
+          .withOriginatingNSA("OriginatingNSA-A"))))
+        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
+        reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
+
+        when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria)))
+
+        childConnectionData("ConnectionIdB").reservationState aka "child B reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
+
+        messages must contain(like[Message] {
+          case ToRequester(NsiRequesterMessage(_, body: ReserveConfirmed)) =>
+            body.connectionId must_== "ConnectionId"
+        })
       }
 
       "with sequential routing" should {
@@ -731,6 +760,8 @@ class ConnectionEntitySpec extends helpers.Specification {
           .withTimeoutValue(180)
           .withOriginatingConnectionId("OriginatingConnectionId")
           .withOriginatingNSA("OriginatingNSA"))))
+
+        childConnectionData("ConnectionIdA").reservationState aka "child A reservation state" must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
       }
