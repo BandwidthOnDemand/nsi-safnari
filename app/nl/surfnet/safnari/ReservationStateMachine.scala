@@ -321,6 +321,11 @@ class ReservationStateMachine(
         .modifyChildCriteria(children, message.connectionId)(_.withHeld(message.criteria))
       val newData2 = if (newData.aggregatedReservationState == HeldReservationState) newData.requestedCriteriaToHeld else newData
       goto(newData2.aggregatedReservationState) using newData2
+    case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveFailed)), data) if data.childHasState(children, message.connectionId, ModifyingReservationState) =>
+      val newData = data
+        .updateChildByConnectionId(children, message.connectionId, FailedReservationState, Some(message.failed.getServiceException()))
+        .modifyChildCriteria(children, message.connectionId)(_.abort)
+      goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, message: ReserveTimeout)), data) =>
       val newData = data
         .copy(childReserveTimeouts = data.childReserveTimeouts :+ message)
@@ -367,7 +372,7 @@ class ReservationStateMachine(
       nextSegments ++ notifyReserveTimeout
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoServicePlanePathFound))))
-    case CheckingReservationState -> FailedReservationState =>
+    case (CheckingReservationState | ModifyingReservationState) -> FailedReservationState =>
       val baseError = failed(NsiError.GenericInternalError.withText("reservation failed without child errors"))
 
       val childExceptions = nextStateData.childExceptions.values.to[Vector]

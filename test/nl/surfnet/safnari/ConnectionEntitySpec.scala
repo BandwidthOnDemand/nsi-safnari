@@ -1053,6 +1053,16 @@ class ConnectionEntitySpec extends helpers.Specification {
             })),
             A.provider)))
       }
+
+      "become failed when modify is declined" in new ReservedConnection with Modified {
+        when(upa.response(CorrelationId(0, 7), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.CapacityUnavailable(1000).toServiceException(A.provider.nsa)))))
+
+        messages must contain(like[Message] {
+          case ToRequester(NsiRequesterMessage(_, ReserveFailed(failed))) =>
+            failed.getServiceException.getErrorId must_== NsiError.CapacityUnavailable(1000).id
+        })
+        reservationState must_== ReservationStateEnumType.RESERVE_FAILED
+      }
     }
 
     "in provisioned state" should {
