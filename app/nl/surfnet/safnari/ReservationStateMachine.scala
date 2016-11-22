@@ -76,14 +76,11 @@ case class ReservationStateMachineData(
 
     val nextChildConnectionCriteria: Map[CorrelationId, ConnectionCriteria] = initialReserveAlgorithm.nextSegments.map {
       case (correlationId, segment) =>
-        val service = segment.serviceType.service
-        val criteria = new ReservationRequestCriteriaType().
-          withPointToPointService(service).
-          withSchedule(requestedCriteria.getSchedule()).
-          withServiceType(requestedCriteria.getServiceType()).
-          withVersion(pendingVersion)
-        requestedCriteria.getPointToPointService().foreach(ptp =>
-          criteria.getPointToPointService().get.withParameter(ptp.getParameter))
+        val criteria = new ReservationRequestCriteriaType()
+          .withPointToPointService(segment.serviceType.service)
+          .withSchedule(requestedCriteria.getSchedule())
+          .withServiceType(requestedCriteria.getServiceType())
+          .withVersion(pendingVersion)
         correlationId -> ConnectionCriteria.Initial.withRequested(criteria)
     }(collection.breakOut)
 
