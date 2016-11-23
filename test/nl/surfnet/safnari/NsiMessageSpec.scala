@@ -24,11 +24,11 @@ object NsiMessageSpec {
       .withAttributeValue("mytoken"))
 
   def nsiProviderHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, connectionTrace: List[ConnectionType] = Nil): NsiHeaders =
-    nsiHeaders(correlationId, Some(URI.create("http://nsi-agent.example.com/")), NsiHeaders.ProviderProtocolVersion, securityAttrs, connectionTrace)
+    nsiHeaders(correlationId, Some(URI.create("http://nsi-agent.example.com/")), NsiHeaders.ProviderProtocolVersion, securityAttrs).withConnectionTrace(connectionTrace)
   def nsiRequesterHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil): NsiHeaders =
     nsiHeaders(correlationId, None, NsiHeaders.RequesterProtocolVersion, securityAttrs)
   def nsiHeaders(correlationId: CorrelationId, replyTo: Option[URI], protocolVersion: URI, securityAttrs: List[SessionSecurityAttrType] = Nil, connectionTrace: List[ConnectionType] = Nil): NsiHeaders =
-    NsiHeaders(correlationId, RequesterNsa, AggregatorNsa, replyTo, protocolVersion, securityAttrs, connectionTrace)
+    NsiHeaders(correlationId, RequesterNsa, AggregatorNsa, replyTo, protocolVersion, securityAttrs).withConnectionTrace(connectionTrace)
 
   def Service = new P2PServiceBaseType()
     .withDirectionality(DirectionalityType.BIDIRECTIONAL)

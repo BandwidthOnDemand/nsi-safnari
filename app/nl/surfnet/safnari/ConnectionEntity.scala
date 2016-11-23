@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 
-import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
@@ -53,13 +52,20 @@ class ConnectionEntity(
   private final val PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE = "pathComputationAlgorithm"
 
   private def requesterNSA = initialReserve.headers.requesterNSA
-  private def newNsiHeaders(provider: ProviderEndPoint) = NsiHeaders(newCorrelationId(), aggregatorNsa, provider.nsa, Some(nsiReplyToUri), NsiHeaders.ProviderProtocolVersion, initialReserve.headers.sessionSecurityAttrs, Nil)
+  private def newNsiHeaders(provider: ProviderEndPoint) = initialReserve.headers.copy(
+    correlationId = newCorrelationId(),
+    requesterNSA = aggregatorNsa,
+    providerNSA = provider.nsa,
+    replyTo = Some(nsiReplyToUri),
+    protocolVersion = NsiHeaders.ProviderProtocolVersion,
+    sessionSecurityAttrs = initialReserve.headers.sessionSecurityAttrs,
+    any = Nil,
+    otherAttributes = Map.empty)
+
   private def newInitialReserveNsiHeaders(provider: ProviderEndPoint) = {
-    val oldTrace = initialReserve.headers.connectionTrace
-    val index = if (oldTrace.isEmpty) 0 else oldTrace.map(_.getIndex()).max + 1
-    val newTrace = new ConnectionType().withIndex(index).withValue(s"$aggregatorNsa:$id") :: initialReserve.headers.connectionTrace
-    newNsiHeaders(provider).copy(connectionTrace = newTrace)
+    newNsiHeaders(provider).copy(any = initialReserve.headers.any, otherAttributes = initialReserve.headers.otherAttributes).addConnectionTrace(s"$aggregatorNsa:$id")
   }
+
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil, Nil)
   private val nextNotificationId = new AtomicInteger(1)
   private val nextResultId = new AtomicInteger(1)
