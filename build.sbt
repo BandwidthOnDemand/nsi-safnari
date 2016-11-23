@@ -57,6 +57,13 @@ PublishDist.publishSettings
 
 publishTo := { if (isSnapshot.value) Some(surfnetSnapshots) else Some(surfnetReleases) }
 
+// Disable ScalaDoc generation
+sources in (Compile, doc) := Seq.empty
+publishArtifact in (Compile, packageDoc) := false
+
+sources in (Test, doc) := Seq.empty
+publishArtifact in (Test, packageDoc) := false
+
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 lazy val licenseText = settingKey[String]("Project license text.")
