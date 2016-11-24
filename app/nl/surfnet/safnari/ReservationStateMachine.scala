@@ -57,7 +57,7 @@ case class ReservationStateMachineData(
     childConnectionStates: Map[CorrelationId, ReservationState] = Map.empty,
     childExceptions: Map[CorrelationId, ServiceExceptionType] = Map.empty,
     childConnectionCriteria: Map[CorrelationId, ConnectionCriteria] = Map.empty,
-    childReserveTimeouts: List[ReserveTimeout] = List(),
+    childReserveTimeouts: Vector[ReserveTimeout] = Vector.empty,
     pceError: Option[NsiError] = None,
     reserveError: Option[NsiError] = None) {
 
@@ -118,7 +118,8 @@ case class ReservationStateMachineData(
         case (correlationId, _) =>
           correlationId -> (if (children hasConnectionId correlationId) transitionalState else stateForChildConnectionsWithoutConnectionId)
       },
-      childExceptions = Map.empty)
+      childExceptions = Map.empty,
+      childReserveTimeouts = Vector.empty)
   }
 
   def childHasState(initialCorrelationId: CorrelationId, state: ReservationState): Boolean = {
@@ -348,9 +349,13 @@ class ReservationStateMachine(
 
   whenUnhandled {
     case Event(AckFromProvider(_), _) => stay
+    case Event(FromProvider(NsiRequesterMessage(_, message: ReserveTimeout)), data) =>
+      stay using data
+        .copy(childReserveTimeouts = data.childReserveTimeouts :+ message)
+        .processReserveTimeouts(children)
   }
 
-  onTransition {
+  onTransition(({
     case InitialReservationState -> PathComputationState =>
       val criteria = nextStateData.criteria.requested.get
       Seq(ToPce(PathComputationRequest(
@@ -379,7 +384,7 @@ class ReservationStateMachine(
           ToProvider(NsiProviderMessage(headers, InitialReserve(reserveType)), segment.provider)
       }(collection.breakOut)
 
-      nextSegments ++ notifyReserveTimeout
+      nextSegments
     case PathComputationState -> FailedReservationState =>
       respond(ReserveFailed(failed(nextStateData.pceError.getOrElse(NsiError.NoServicePlanePathFound))))
     case (CheckingReservationState | ModifyingReservationState) -> FailedReservationState =>
@@ -410,9 +415,7 @@ class ReservationStateMachine(
           ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command, seg.provider), ReserveAbort(connectionId)), seg.provider)
       }.toVector
     case (CheckingReservationState | ModifyingReservationState) -> TimeoutReservationState =>
-      respond(ReserveConfirmed(id, nextStateData.criteria.confirmed.get)) ++ notifyReserveTimeout
-    case (HeldReservationState | TimeoutReservationState) -> TimeoutReservationState =>
-      notifyReserveTimeout
+      respond(ReserveConfirmed(id, nextStateData.criteria.confirmed.get))
     case CommittingReservationState -> ReservedReservationState =>
       respond(ReserveCommitConfirmed(id))
     case CommittingReservationState -> CommitFailedReservationState =>
@@ -437,7 +440,10 @@ class ReservationStateMachine(
       respond(ReserveFailed(failed(nextStateData.reserveError.get)))
     case (HeldReservationState | FailedReservationState | AbortingReservationState) -> (AbortedReservationState | ReservedReservationState) =>
       respond(ReserveAbortConfirmed(id))
-  }
+    case _ =>
+      // Ensure the andThen notify reserve timeout below is called
+      Vector.empty
+  }: TransitionHandler).andThen(_ ++ notifyReserveTimeout))
 
   def childConnectionStateByInitialCorrelationId(correlationId: CorrelationId): ReservationStateEnumType = {
     stateData.childConnectionStates.getOrElse(correlationId, CheckingReservationState).jaxb
