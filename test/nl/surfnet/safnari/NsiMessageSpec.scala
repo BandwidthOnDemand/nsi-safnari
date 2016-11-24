@@ -4,15 +4,14 @@ import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.utils._
 import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
 import org.ogf.schemas.nsi._2013._12.framework.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import java.net.URI
 import java.time.Instant
 import java.time.temporal._
-import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
 import oasis.names.tc.saml._2_0.assertion.AttributeType
-import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 
 object NsiMessageSpec {
   val AggregatorNsa = "urn:ogf:network:aggregator.tld:2015:nsa:aggregator-nsa"
@@ -23,12 +22,12 @@ object NsiMessageSpec {
       .withName("token")
       .withAttributeValue("mytoken"))
 
-  def nsiProviderHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, connectionTrace: List[ConnectionType] = Nil): NsiHeaders =
-    nsiHeaders(correlationId, Some(URI.create("http://nsi-agent.example.com/")), NsiHeaders.ProviderProtocolVersion, securityAttrs).withConnectionTrace(connectionTrace)
+  def nsiProviderHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil): NsiHeaders =
+    nsiHeaders(correlationId, Some(URI.create("http://nsi-agent.example.com/")), NsiHeaders.ProviderProtocolVersion, securityAttrs, any)
   def nsiRequesterHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil): NsiHeaders =
     nsiHeaders(correlationId, None, NsiHeaders.RequesterProtocolVersion, securityAttrs)
-  def nsiHeaders(correlationId: CorrelationId, replyTo: Option[URI], protocolVersion: URI, securityAttrs: List[SessionSecurityAttrType] = Nil, connectionTrace: List[ConnectionType] = Nil): NsiHeaders =
-    NsiHeaders(correlationId, RequesterNsa, AggregatorNsa, replyTo, protocolVersion, securityAttrs).withConnectionTrace(connectionTrace)
+  def nsiHeaders(correlationId: CorrelationId, replyTo: Option[URI], protocolVersion: URI, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil): NsiHeaders =
+    NsiHeaders(correlationId, RequesterNsa, AggregatorNsa, replyTo, protocolVersion, securityAttrs, any)
 
   def Service = new P2PServiceBaseType()
     .withDirectionality(DirectionalityType.BIDIRECTIONAL)
@@ -58,8 +57,8 @@ object NsiMessageSpec {
     provider = ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider")))
 
   object ura {
-    def request(correlationId: CorrelationId, operation: NsiProviderOperation, sessionSecurityAttrs: List[SessionSecurityAttrType] = Nil, connectionTrace: List[ConnectionType] = Nil) = {
-      val headers = nsiProviderHeaders(correlationId, sessionSecurityAttrs, connectionTrace)
+    def request(correlationId: CorrelationId, operation: NsiProviderOperation, sessionSecurityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil) = {
+      val headers = nsiProviderHeaders(correlationId, sessionSecurityAttrs, any)
       FromRequester(NsiProviderMessage(headers, operation))
     }
   }

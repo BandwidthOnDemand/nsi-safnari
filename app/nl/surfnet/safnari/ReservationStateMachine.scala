@@ -29,6 +29,7 @@ import nl.surfnet.nsiv2.utils._
 
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
+import org.ogf.schemas.nsi._2015._04.connection.pathtrace.PathTraceType
 
 import scala.collection.JavaConverters._
 
@@ -189,7 +190,12 @@ class ReservationStateMachine(
         InitialReserveAlgorithm.forAlgorithm(pathComputationAlgorithm))) {
 
   private def newInitialReserveNsiHeaders(provider: ProviderEndPoint) = {
-    newRequestHeaders(initialReserve, provider).addConnectionTrace(s"$aggregatorNsa:$id")
+    val pathTrace = initialReserve.headers.pathTrace getOrElse {
+      new PathTraceType().withId(aggregatorNsa).withConnectionId(id)
+    }
+    newRequestHeaders(initialReserve, provider)
+      .addConnectionTrace(s"$aggregatorNsa:$id")
+      .withPathTrace(pathTrace)
   }
 
   when(InitialReservationState) {

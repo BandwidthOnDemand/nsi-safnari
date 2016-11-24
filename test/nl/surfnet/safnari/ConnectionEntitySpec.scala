@@ -5,10 +5,11 @@ import java.time.{ Clock, Instant, ZoneId }
 import java.time.temporal._
 import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
 
-import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
+import net.nordu.namespaces._2013._12.gnsbod.{ ConnectionTraceType, ConnectionType, ObjectFactory => ConnectionTraceTypeOF }
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2015._04.connection.pathtrace.{ PathTraceType, ObjectFactory => PathTraceTypeOF }
 import org.specs2.execute.{ Failure, FailureException }
 
 import scala.collection.JavaConverters._
@@ -208,8 +209,8 @@ class ConnectionEntitySpec extends helpers.Specification {
   "A connection" >> {
     "in initial state" should {
       "send a path computation request when reserve is received" in new fixture {
-        val connectionTrace = new ConnectionType().withIndex(0).withValue("foo") :: Nil
-        when(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType), Nil, connectionTrace))
+        val connectionTrace = new ConnectionType().withIndex(0).withValue("foo")
+        when(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType), Nil, new ConnectionTraceTypeOF().createConnectionTrace(new ConnectionTraceType().withConnection(connectionTrace)) :: Nil))
 
         messages must contain(ToPce(PathComputationRequest(
           correlationId = CorrelationId(0, 3),
@@ -218,7 +219,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           endTime = Schedule.endTime.toOption(None),
           serviceType = ServiceType("ServiceType", Service),
           algorithm = PathComputationAlgorithm.Chain,
-          connectionTrace = connectionTrace)))
+          connectionTrace = connectionTrace :: Nil)))
       }
 
       "reject commit" in new fixture {
@@ -274,8 +275,33 @@ class ConnectionEntitySpec extends helpers.Specification {
         })
       }
 
+      "send reserve request with added path trace element" in new fixture {
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
+
+        when(pce.confirm(CorrelationId(0, 1), A))
+
+        messages must contain(like[Message] {
+          case ToProvider(NsiProviderMessage(headers, _), provider) =>
+            headers.pathTrace must beSome(new PathTraceType().withId(AggregatorNsa).withConnectionId(ConnectionId))
+        })
+      }
+
+      "send reserve request with existing path trace element" in new fixture {
+        val pathTrace = new PathTraceType().withId("RootAG").withConnectionId("RootAG-ConnectionId")
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType), Nil, new PathTraceTypeOF().createPathTrace(pathTrace) :: Nil))
+
+        when(pce.confirm(CorrelationId(0, 1), A))
+
+        messages must contain(like[Message] {
+          case ToProvider(NsiProviderMessage(headers, _), provider) =>
+            headers.pathTrace must beSome(pathTrace)
+        })
+      }
+
       "send reserve request including the connection trace" in new fixture {
-        val requesterTrace = new ConnectionType().withIndex(2).withValue("urn:ogf:network:someone:noId")
+        val requesterTrace = new ConnectionTraceTypeOF().createConnectionTrace(new ConnectionTraceType().withConnection(
+            new ConnectionType().withIndex(2).withValue("urn:ogf:network:someone:noId")
+        ))
         given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType), Nil, requesterTrace :: Nil))
 
         when(pce.confirm(CorrelationId(0, 1), A))
@@ -284,7 +310,7 @@ class ConnectionEntitySpec extends helpers.Specification {
           case ToProvider(NsiProviderMessage(headers, _), provider) if provider == A.provider =>
             headers.connectionTrace must haveSize(2)
             headers.connectionTrace must contain(equalTo(new ConnectionType().withIndex(3).withValue(s"$AggregatorNsa:$ConnectionId")))
-            headers.connectionTrace must contain(equalTo(requesterTrace))
+            headers.connectionTrace must contain(equalTo(requesterTrace.getValue.getConnection.get(0)))
         })
       }
 
