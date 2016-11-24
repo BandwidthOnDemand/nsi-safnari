@@ -178,7 +178,7 @@ object ConnectionProvider {
     val outbound = createOutboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
-    (outbound, new ConnectionEntity(connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), Configuration.NsaId, Configuration.PceAlgorithm, URI.create(ConnectionRequester.serviceUrl), URI.create(PathComputationEngine.pceReplyUrl)))
+    (outbound, new ConnectionEntity(Configuration.NsaId, connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), Configuration.PceAlgorithm, URI.create(ConnectionRequester.serviceUrl), URI.create(PathComputationEngine.pceReplyUrl)))
   }
 
   def outboundActor(nsiRequester: => ActorRef, pceRequester: ActorRef)(initialReserve: NsiProviderMessage[InitialReserve]) =

@@ -47,7 +47,7 @@ case object AbortedReservationState extends ReservationState(ReservationStateEnu
 case object TimeoutReservationState extends ReservationState(ReservationStateEnumType.RESERVE_TIMEOUT)
 
 case class ReservationStateMachineData(
-    currentCommand: NsiProviderMessage[NsiProviderOperation],
+    command: NsiProviderMessage[NsiProviderOperation],
     globalReservationId: Option[GlobalReservationId],
     description: Option[String],
     criteria: ConnectionCriteria,
@@ -112,7 +112,7 @@ case class ReservationStateMachineData(
     // Skip aborted state when we never received a child connection id due to an immediate service exception.
     val stateForChildConnectionsWithoutConnectionId = if (transitionalState == AbortingReservationState) AbortedReservationState else transitionalState
     copy(
-      currentCommand = command,
+      command = command,
       childConnectionStates = childConnectionStates.map {
         case (correlationId, _) =>
           correlationId -> (if (children hasConnectionId correlationId) transitionalState else stateForChildConnectionsWithoutConnectionId)
@@ -168,13 +168,13 @@ case class ReservationStateMachineData(
 }
 
 class ReservationStateMachine(
+  aggregatorNsa: String,
   id: ConnectionId,
   initialReserve: NsiProviderMessage[InitialReserve],
   pceReplyUri: URI,
   children: => ChildConnectionIds,
   newCorrelationId: () => CorrelationId,
-  newNsiHeaders: ProviderEndPoint => NsiHeaders,
-  newInitialReserveNsiHeaders: ProviderEndPoint => NsiHeaders,
+  newRequestHeaders: (NsiProviderMessage[NsiProviderOperation], ProviderEndPoint) => NsiHeaders,
   newNotificationId: () => Int,
   newNotifyHeaders: () => NsiHeaders,
   pathComputationAlgorithm: => PathComputationAlgorithm,
@@ -187,6 +187,10 @@ class ReservationStateMachine(
         Option(initialReserve.body.body.getDescription()),
         ConnectionCriteria.Initial,
         InitialReserveAlgorithm.forAlgorithm(pathComputationAlgorithm))) {
+
+  private def newInitialReserveNsiHeaders(provider: ProviderEndPoint) = {
+    newRequestHeaders(initialReserve, provider).addConnectionTrace(s"$aggregatorNsa:$id")
+  }
 
   when(InitialReservationState) {
     case Event(FromRequester(NsiProviderMessage(_, message: InitialReserve)), data) =>
@@ -273,7 +277,7 @@ class ReservationStateMachine(
     case Event(FromRequester(command @ NsiProviderMessage(_, ReserveAbort(_))), data) =>
       val newData =
         if (data.reserveError.isDefined)
-          data.copy(currentCommand = command, reserveError = None, criteria = data.criteria.abort)
+          data.copy(command = command, reserveError = None, criteria = data.criteria.abort)
         else
           data.startProcessingNewCommand(command, AbortingReservationState, children).copy(criteria = data.criteria.abort)
       goto(newData.aggregatedReservationState) using newData
@@ -286,7 +290,7 @@ class ReservationStateMachine(
       val error = validateModify(pendingCriteria, data.criteria.committed.get)
 
       val newData = error.map { error =>
-        data.copy(currentCommand = command, childExceptions = Map.empty, reserveError = Some(error))
+        data.copy(command = command, childExceptions = Map.empty, reserveError = Some(error))
       }.getOrElse {
         val data2 = data
           .startProcessingNewCommand(command, ModifyingReservationState, children)
@@ -392,12 +396,12 @@ class ReservationStateMachine(
     case HeldReservationState -> CommittingReservationState =>
       children.childConnections.collect {
         case (seg, _, Some(connectionId)) =>
-          ToProvider(NsiProviderMessage(newNsiHeaders(seg.provider), ReserveCommit(connectionId)), seg.provider)
+          ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command, seg.provider), ReserveCommit(connectionId)), seg.provider)
       }.toVector
     case (HeldReservationState | FailedReservationState) -> AbortingReservationState =>
       children.childConnections.collect {
         case (seg, _, Some(connectionId)) =>
-          ToProvider(NsiProviderMessage(newNsiHeaders(seg.provider), ReserveAbort(connectionId)), seg.provider)
+          ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command, seg.provider), ReserveAbort(connectionId)), seg.provider)
       }.toVector
     case (CheckingReservationState | ModifyingReservationState) -> TimeoutReservationState =>
       respond(ReserveConfirmed(id, nextStateData.criteria.confirmed.get)) ++ notifyReserveTimeout
@@ -419,7 +423,7 @@ class ReservationStateMachine(
             .withDescription(data.description.orNull)
             .withCriteria(criteria.requested.get)
 
-          val headers = newNsiHeaders(segment.provider)
+          val headers = newRequestHeaders(data.command, segment.provider)
 
           ToProvider(NsiProviderMessage(headers, ModifyReserve(reserveType)), segment.provider)
       }
@@ -442,7 +446,7 @@ class ReservationStateMachine(
   def committedCriteria = nextStateData.criteria.committed
   def committedVersion = committedCriteria.map(_.getVersion()).getOrElse(0)
 
-  private def respond(body: NsiRequesterOperation) = Seq(ToRequester(nextStateData.currentCommand reply body))
+  private def respond(body: NsiRequesterOperation) = Seq(ToRequester(nextStateData.command reply body))
 
   private def notifyReserveTimeout = nextStateData.childReserveTimeouts.filterNot(
     x => stateData.childReserveTimeouts.exists(_.connectionId == x.connectionId)

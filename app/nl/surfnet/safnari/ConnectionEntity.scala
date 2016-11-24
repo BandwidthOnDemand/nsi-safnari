@@ -42,9 +42,10 @@ case class ConnectionContext(
 )
 
 class ConnectionEntity(
+    val aggregatorNsa: String,
     val id: ConnectionId,
     initialReserve: NsiProviderMessage[InitialReserve],
-    newCorrelationId: () => CorrelationId, val aggregatorNsa: String,
+    newCorrelationId: () => CorrelationId,
     defaultPathComputationAlgorithm: PathComputationAlgorithm,
     nsiReplyToUri: URI,
     pceReplyUri: URI
@@ -52,19 +53,12 @@ class ConnectionEntity(
   private final val PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE = "pathComputationAlgorithm"
 
   private def requesterNSA = initialReserve.headers.requesterNSA
-  private def newNsiHeaders(provider: ProviderEndPoint) = initialReserve.headers.copy(
+  private def newRequestHeaders(requesterMessage: NsiProviderMessage[NsiProviderOperation], provider: ProviderEndPoint) = requesterMessage.headers.copy(
     correlationId = newCorrelationId(),
     requesterNSA = aggregatorNsa,
     providerNSA = provider.nsa,
     replyTo = Some(nsiReplyToUri),
-    protocolVersion = NsiHeaders.ProviderProtocolVersion,
-    sessionSecurityAttrs = initialReserve.headers.sessionSecurityAttrs,
-    any = Nil,
-    otherAttributes = Map.empty)
-
-  private def newInitialReserveNsiHeaders(provider: ProviderEndPoint) = {
-    newNsiHeaders(provider).copy(any = initialReserve.headers.any, otherAttributes = initialReserve.headers.otherAttributes).addConnectionTrace(s"$aggregatorNsa:$id")
-  }
+    protocolVersion = NsiHeaders.ProviderProtocolVersion)
 
   private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil, Nil)
   private val nextNotificationId = new AtomicInteger(1)
@@ -82,13 +76,13 @@ class ConnectionEntity(
   private var pathComputationAlgorithm = initialReserve.body.service.flatMap(_.parameters(PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE).flatMap(PathComputationAlgorithm.parse)).getOrElse(defaultPathComputationAlgorithm)
 
   val rsm = new ReservationStateMachine(
+    aggregatorNsa,
     id,
     initialReserve,
     pceReplyUri,
     children,
     newCorrelationId,
-    newNsiHeaders,
-    newInitialReserveNsiHeaders,
+    newRequestHeaders,
     newNotificationId,
     newNotifyHeaders,
     pathComputationAlgorithm,
@@ -99,7 +93,7 @@ class ConnectionEntity(
         withServiceException(error.toServiceException(aggregatorNsa))
     }
   )
-  val lsm = new LifecycleStateMachine(id, newNsiHeaders, newNotifyHeaders, newNotificationId, children)
+  val lsm = new LifecycleStateMachine(id, newRequestHeaders, newNotifyHeaders, newNotificationId, children)
 
   private val globalReservationId: Option[GlobalReservationId] = Try(URI.create(initialReserve.body.body.getGlobalReservationId())).toOption
 
@@ -123,7 +117,7 @@ class ConnectionEntity(
         connectionStates,
         children.childConnections.map { case (segment, _, id) => segment.provider -> id }.toMap,
         newCorrelationId,
-        newNsiHeaders,
+        newRequestHeaders(pm, _),
         ifModifiedSince
       )
 
@@ -271,7 +265,7 @@ class ConnectionEntity(
             case (segment, _, None) => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
           }.toMap
 
-          (new ProvisionStateMachine(id, newNsiHeaders, children),
+          (new ProvisionStateMachine(id, newRequestHeaders, children),
             new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children))
       }
     }

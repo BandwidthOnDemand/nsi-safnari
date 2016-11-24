@@ -67,10 +67,10 @@ class ConnectionEntitySpec extends helpers.Specification {
 
     private def initialReserve(reserve: FromRequester) = {
       connection = new ConnectionEntity(
+        AggregatorNsa,
         ConnectionId,
         reserve.message.asInstanceOf[NsiProviderMessage[InitialReserve]],
         () => newCorrelationId,
-        AggregatorNsa,
         pathComputationAlgorithm,
         NsiReplyToUri,
         PceReplyToUri

@@ -47,8 +47,14 @@ case class ProvisionStateMachineData(children: Map[ConnectionId, ProviderEndPoin
     childStates.getOrElse(connectionId, RELEASED) == state
 }
 
-class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, children: Map[ConnectionId, ProviderEndPoint])
-  extends FiniteStateMachine[ProvisionStateEnumType, ProvisionStateMachineData, InboundMessage, OutboundMessage](RELEASED, ProvisionStateMachineData(children, children.map(_._1 -> RELEASED))) {
+class ProvisionStateMachine(
+  connectionId: ConnectionId,
+  newRequestHeaders: (NsiProviderMessage[NsiProviderOperation], ProviderEndPoint) => NsiHeaders,
+  children: Map[ConnectionId, ProviderEndPoint]
+) extends FiniteStateMachine[ProvisionStateEnumType, ProvisionStateMachineData, InboundMessage, OutboundMessage](
+  RELEASED,
+  ProvisionStateMachineData(children, children.map(_._1 -> RELEASED))
+) {
 
   when(RELEASED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Provision)), data) =>
@@ -80,12 +86,12 @@ class ProvisionStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
     case RELEASED -> PROVISIONING =>
       stateData.children.map {
         case (connectionId, provider) =>
-          ToProvider(NsiProviderMessage(newNsiHeaders(provider), Provision(connectionId)), provider)
+          ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command.get, provider), Provision(connectionId)), provider)
       }.toVector
     case PROVISIONED -> RELEASING =>
       stateData.children.map {
         case (connectionId, provider) =>
-          ToProvider(NsiProviderMessage(newNsiHeaders(provider), Release(connectionId)), provider)
+          ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command.get, provider), Release(connectionId)), provider)
       }.toVector
     case RELEASING -> RELEASED =>
       Seq(ToRequester(stateData.command.get reply ReleaseConfirmed(connectionId)))

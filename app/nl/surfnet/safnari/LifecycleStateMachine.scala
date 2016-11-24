@@ -61,8 +61,13 @@ case class LifecycleStateMachineData(
  * To deal with this we keep a special map in the data that contains the
  * child connection ids that need a terminate request.
  */
-class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderEndPoint => NsiHeaders, newNotifyHeaders: () => NsiHeaders, newNotificationId: () => Int, children: => ChildConnectionIds)
-  extends FiniteStateMachine[LifecycleStateEnumType, LifecycleStateMachineData, InboundMessage, OutboundMessage](CREATED, LifecycleStateMachineData()) {
+class LifecycleStateMachine(
+  connectionId: ConnectionId,
+  newRequestHeaders: (NsiProviderMessage[NsiProviderOperation], ProviderEndPoint) => NsiHeaders,
+  newNotifyHeaders: () => NsiHeaders,
+  newNotificationId: () => Int,
+  children: => ChildConnectionIds
+) extends FiniteStateMachine[LifecycleStateEnumType, LifecycleStateMachineData, InboundMessage, OutboundMessage](CREATED, LifecycleStateMachineData()) {
 
   when(CREATED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) if children.childConnections.nonEmpty =>
@@ -116,7 +121,7 @@ class LifecycleStateMachine(connectionId: ConnectionId, newNsiHeaders: ProviderE
     case (CREATED | FAILED | PASSED_END_TIME | TERMINATING) -> TERMINATING =>
       nextStateData.sendTerminateRequest.map {
         case (connectionId, provider) =>
-          ToProvider(NsiProviderMessage(newNsiHeaders(provider), Terminate(connectionId)), provider)
+          ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command.get, provider), Terminate(connectionId)), provider)
       }.toVector
     case (CREATED | FAILED | PASSED_END_TIME | TERMINATING) -> TERMINATED =>
       Seq(ToRequester(nextStateData.command.get reply TerminateConfirmed(connectionId)))

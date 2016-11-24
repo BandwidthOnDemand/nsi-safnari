@@ -42,10 +42,10 @@ class ConnectionManagerSpec extends helpers.Specification {
 
     lazy val connectionManager = new ConnectionManager((id, reserve) =>
       (outbound, new ConnectionEntity(
+        AggregatorNsa,
         id,
         reserve,
         () => newCorrelationId,
-        AggregatorNsa,
         PathComputationAlgorithm.Chain,
         URI.create("http://localhost"),
         URI.create("http://localhost")
@@ -126,10 +126,10 @@ class ConnectionManagerSpec extends helpers.Specification {
       def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
       new ConnectionManager((id, reserve) =>
         (outbound, new ConnectionEntity(
+          AggregatorNsa,
           id,
           reserve,
           () => newCorrelationId,
-          AggregatorNsa,
           PathComputationAlgorithm.Chain,
           URI.create("http://localhost"),
           URI.create("http://localhost")
