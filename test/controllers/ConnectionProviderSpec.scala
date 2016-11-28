@@ -2,19 +2,17 @@ package controllers
 
 import akka.testkit.TestActorRef
 import controllers.PathComputationEngine.DummyPceRequesterActor
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.messages._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.test._
 import play.libs.Akka
 
 import scala.concurrent.Promise
+import helpers.NsiMessages._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends helpers.Specification {
   sequential
-
-  import nl.surfnet.nsiv2.messages._
-  import NsiMessageSpec._
 
   val DefaultConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy")
 

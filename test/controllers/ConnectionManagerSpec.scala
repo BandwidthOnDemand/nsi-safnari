@@ -5,7 +5,7 @@ import java.net.URI
 import akka.actor.Actor
 import akka.testkit.TestActorRef
 import controllers.Connection.Delete
-import nl.surfnet.nsiv2.messages.CorrelationId
+import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import java.time.Instant
@@ -13,13 +13,12 @@ import java.time.temporal._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.libs.concurrent.Akka
 import play.api.test._
+import helpers.NsiMessages._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionManagerSpec extends helpers.Specification {
   sequential
 
-  import nl.surfnet.nsiv2.messages._
-  import NsiMessageSpec._
 
   class RecordingActor extends Actor {
     @volatile var messages = Vector.empty[Any]

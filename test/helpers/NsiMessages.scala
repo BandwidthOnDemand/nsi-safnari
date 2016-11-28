@@ -1,4 +1,4 @@
-package nl.surfnet.safnari
+package helpers
 
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.soap._
@@ -12,8 +12,9 @@ import java.net.URI
 import java.time.Instant
 import java.time.temporal._
 import oasis.names.tc.saml._2_0.assertion.AttributeType
+import nl.surfnet.safnari._
 
-object NsiMessageSpec {
+object NsiMessages {
   val AggregatorNsa = "urn:ogf:network:aggregator.tld:2015:nsa:aggregator-nsa"
   val RequesterNsa = "urn:ogf:network:requester.tld:2015:nsa:requester-nsa"
 
@@ -24,8 +25,8 @@ object NsiMessageSpec {
 
   def nsiProviderHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil): NsiHeaders =
     nsiHeaders(correlationId, Some(URI.create("http://nsi-agent.example.com/")), NsiHeaders.ProviderProtocolVersion, securityAttrs, any)
-  def nsiRequesterHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil): NsiHeaders =
-    nsiHeaders(correlationId, None, NsiHeaders.RequesterProtocolVersion, securityAttrs)
+  def nsiRequesterHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil): NsiHeaders =
+    nsiHeaders(correlationId, None, NsiHeaders.RequesterProtocolVersion, securityAttrs, any)
   def nsiHeaders(correlationId: CorrelationId, replyTo: Option[URI], protocolVersion: URI, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil): NsiHeaders =
     NsiHeaders(correlationId, RequesterNsa, AggregatorNsa, replyTo, protocolVersion, securityAttrs, any)
 
@@ -68,8 +69,8 @@ object NsiMessageSpec {
       AckFromProvider(NsiProviderMessage(nsiProviderHeaders(correlationId), acknowledgment))
     def error(correlationId: CorrelationId, exception: ServiceExceptionType) =
       AckFromProvider(NsiProviderMessage(nsiProviderHeaders(correlationId), ServiceException(exception)))
-    def response(correlationId: CorrelationId, operation: NsiRequesterOperation) =
-      FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
+    def response(correlationId: CorrelationId, operation: NsiRequesterOperation, any: List[AnyRef] = Nil) =
+      FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId, Nil, any), operation))
     def notification(correlationId: CorrelationId, operation: NsiRequesterOperation) =
       FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
     def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: Instant) =

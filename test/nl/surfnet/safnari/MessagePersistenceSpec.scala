@@ -9,7 +9,7 @@ import org.scalacheck.Gen
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class MessagePersistenceSpec extends MessageStoreSpecification {
-  import NsiMessageSpec._
+  import helpers.NsiMessages._
   import Generators._
 
   private implicit val ArbitraryPathComputationAlgorithm: Arbitrary[PathComputationAlgorithm] = Arbitrary(Gen.oneOf(PathComputationAlgorithm.values))
