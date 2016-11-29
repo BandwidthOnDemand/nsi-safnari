@@ -30,7 +30,7 @@ import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 case class LifecycleStateMachineData(
-  childConnectionStates: Map[ConnectionId, LifecycleStateEnumType] = Map.empty,
+  childConnectionStates: Map[CorrelationId, LifecycleStateEnumType] = Map.empty,
   command: Option[NsiProviderMessage[NsiProviderOperation]] = None,
   errorEvent: Option[ErrorEvent] = None,
   sendTerminateRequest: Map[ConnectionId, ProviderEndPoint] = Map.empty) {
@@ -44,13 +44,13 @@ case class LifecycleStateMachineData(
   }
 
   def startCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: LifecycleStateEnumType, children: ChildConnectionIds) =
-    copy(command = Some(command), childConnectionStates = children.childrenByConnectionId.map(_._1 -> transitionalState))
+    copy(command = Some(command), childConnectionStates = children.segments.map(_._1 -> transitionalState)(collection.breakOut))
 
-  def updateChild(connectionId: ConnectionId, state: LifecycleStateEnumType) =
-    copy(childConnectionStates = childConnectionStates.updated(connectionId, state))
+  def updateChild(children: ChildConnectionIds, connectionId: ConnectionId, state: LifecycleStateEnumType) =
+    copy(childConnectionStates = childConnectionStates.updated(children.initialCorrelationIdFor(connectionId), state))
 
-  def childHasState(connectionId: ConnectionId, state: LifecycleStateEnumType) =
-    childConnectionStates.getOrElse(connectionId, CREATED) == state
+  def childHasState(children: ChildConnectionIds, connectionId: ConnectionId, state: LifecycleStateEnumType) =
+    childConnectionStates.getOrElse(children.initialCorrelationIdFor(connectionId), CREATED) == state
 }
 
 /**
@@ -73,21 +73,21 @@ class LifecycleStateMachine(
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) if children.childConnections.nonEmpty =>
       goto(TERMINATING) using data.startCommand(message, TERMINATING, children).copy(sendTerminateRequest = children.childrenByConnectionId)
     case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.notification.getEvent() == EventEnumType.FORCED_END =>
-      goto(FAILED) using data.updateChild(errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
+      goto(FAILED) using data.updateChild(children, errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
     case Event(PassedEndTime(_, _, _), data) =>
       goto(PASSED_END_TIME)
   }
 
   when(TERMINATING) {
-    case Event(FromProvider(NsiRequesterMessage(headers, message: TerminateConfirmed)), data) if data.childHasState(message.connectionId, TERMINATING) =>
-      val newData = data.updateChild(message.connectionId, TERMINATED).copy(sendTerminateRequest = Map.empty)
+    case Event(FromProvider(NsiRequesterMessage(headers, message: TerminateConfirmed)), data) if data.childHasState(children, message.connectionId, TERMINATING) =>
+      val newData = data.updateChild(children, message.connectionId, TERMINATED).copy(sendTerminateRequest = Map.empty)
       goto(newData.aggregatedLifecycleStatus) using newData
     case Event(AckFromProvider(NsiProviderMessage(headers, body: ReserveResponse)), data) =>
-      stay using data.updateChild(body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(connectionId)))
+      stay using data.updateChild(children, body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(connectionId)))
     case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveConfirmed)), data) =>
-      stay using data.updateChild(body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(body.connectionId)))
+      stay using data.updateChild(children, body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(body.connectionId)))
     case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveFailed)), data) =>
-      stay using data.updateChild(body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(body.connectionId)))
+      stay using data.updateChild(children, body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(body.connectionId)))
   }
 
   when(TERMINATED)(PartialFunction.empty)
@@ -106,11 +106,11 @@ class LifecycleStateMachine(
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) if children.childConnections.isEmpty =>
       goto(TERMINATED) using data.copy(command = Some(message))
     case Event(AckFromProvider(NsiProviderMessage(headers, ReserveResponse(connectionId))), data) =>
-      stay using data.updateChild(connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
+      stay using data.updateChild(children, connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
     case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveConfirmed)), data) =>
-      stay using data.updateChild(body.connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
+      stay using data.updateChild(children, body.connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
     case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveFailed)), data) =>
-      stay using data.updateChild(body.connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
+      stay using data.updateChild(children, body.connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
     case Event(AckFromProvider(_), data) =>
       stay using data.copy(sendTerminateRequest = Map.empty)
     case Event(PassedEndTime(_, _, _), data) =>
@@ -151,5 +151,6 @@ class LifecycleStateMachine(
   }
 
   def lifecycleState = stateName
-  def childConnectionState(connectionId: ConnectionId) = stateData.childConnectionStates.getOrElse(connectionId, CREATED)
+  def childConnectionState(connectionId: ConnectionId) =
+    stateData.childConnectionStates.getOrElse(children.initialCorrelationIdFor(connectionId), CREATED)
 }
