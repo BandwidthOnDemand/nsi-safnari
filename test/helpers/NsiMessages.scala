@@ -1,18 +1,19 @@
 package helpers
 
+import java.net.URI
+import java.time.Instant
+import java.time.temporal._
+import javax.xml.bind.JAXBElement
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.utils._
+import nl.surfnet.safnari._
+import oasis.names.tc.saml._2_0.assertion.AttributeType
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
 import org.ogf.schemas.nsi._2013._12.framework.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
-import java.net.URI
-import java.time.Instant
-import java.time.temporal._
-import oasis.names.tc.saml._2_0.assertion.AttributeType
-import nl.surfnet.safnari._
 
 object NsiMessages {
   val AggregatorNsa = "urn:ogf:network:aggregator.tld:2015:nsa:aggregator-nsa"
@@ -23,12 +24,12 @@ object NsiMessages {
       .withName("token")
       .withAttributeValue("mytoken"))
 
-  def nsiProviderHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil): NsiHeaders =
+  def nsiProviderHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[JAXBElement[_]] = Nil): NsiHeaders =
     nsiHeaders(correlationId, Some(URI.create("http://nsi-agent.example.com/")), NsiHeaders.ProviderProtocolVersion, securityAttrs, any)
-  def nsiRequesterHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil): NsiHeaders =
+  def nsiRequesterHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[JAXBElement[_]] = Nil): NsiHeaders =
     nsiHeaders(correlationId, None, NsiHeaders.RequesterProtocolVersion, securityAttrs, any)
-  def nsiHeaders(correlationId: CorrelationId, replyTo: Option[URI], protocolVersion: URI, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil): NsiHeaders =
-    NsiHeaders(correlationId, RequesterNsa, AggregatorNsa, replyTo, protocolVersion, securityAttrs, any)
+  def nsiHeaders(correlationId: CorrelationId, replyTo: Option[URI], protocolVersion: URI, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[JAXBElement[_]] = Nil): NsiHeaders =
+    NsiHeaders(correlationId, RequesterNsa, AggregatorNsa, replyTo, protocolVersion, securityAttrs, AnyXml(any))
 
   def Service = new P2PServiceBaseType()
     .withDirectionality(DirectionalityType.BIDIRECTIONAL)
@@ -58,7 +59,7 @@ object NsiMessages {
     provider = ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider")))
 
   object ura {
-    def request(correlationId: CorrelationId, operation: NsiProviderOperation, sessionSecurityAttrs: List[SessionSecurityAttrType] = Nil, any: List[AnyRef] = Nil) = {
+    def request(correlationId: CorrelationId, operation: NsiProviderOperation, sessionSecurityAttrs: List[SessionSecurityAttrType] = Nil, any: List[JAXBElement[_]] = Nil) = {
       val headers = nsiProviderHeaders(correlationId, sessionSecurityAttrs, any)
       FromRequester(NsiProviderMessage(headers, operation))
     }
@@ -69,7 +70,7 @@ object NsiMessages {
       AckFromProvider(NsiProviderMessage(nsiProviderHeaders(correlationId), acknowledgment))
     def error(correlationId: CorrelationId, exception: ServiceExceptionType) =
       AckFromProvider(NsiProviderMessage(nsiProviderHeaders(correlationId), ServiceException(exception)))
-    def response(correlationId: CorrelationId, operation: NsiRequesterOperation, any: List[AnyRef] = Nil) =
+    def response(correlationId: CorrelationId, operation: NsiRequesterOperation, any: List[JAXBElement[_]] = Nil) =
       FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId, Nil, any), operation))
     def notification(correlationId: CorrelationId, operation: NsiRequesterOperation) =
       FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
@@ -78,10 +79,17 @@ object NsiMessages {
   }
 
   object agg {
-    def request(correlationId: CorrelationId, operation: NsiProviderOperation, segment: ComputedSegment = A) =
-      ToProvider(NsiProviderMessage(nsiProviderHeaders(correlationId), operation), segment.provider)
-    def response(correlationId: CorrelationId, operation: NsiRequesterOperation) =
-      ToRequester(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
+    val ProviderReplyToUri = URI.create("http://example.com/nsi/requester")
+    val PceReplyToUri = URI.create("http://example.com/pce/reply")
+
+    def request(correlationId: CorrelationId, operation: NsiProviderOperation, segment: ComputedSegment = A, any: List[JAXBElement[_]] = Nil) = {
+      val headers = NsiHeaders(correlationId, AggregatorNsa, segment.provider.nsa, Some(ProviderReplyToUri), NsiHeaders.ProviderProtocolVersion, any = AnyXml(any))
+      ToProvider(NsiProviderMessage(headers, operation), segment.provider)
+    }
+    def response(correlationId: CorrelationId, operation: NsiRequesterOperation, any: List[JAXBElement[_]] = Nil) = {
+      val headers = NsiHeaders(correlationId, RequesterNsa, AggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, any = AnyXml(any))
+      ToRequester(NsiRequesterMessage(headers, operation))
+    }
     def notification(correlationId: CorrelationId, operation: NsiNotification) =
       ToRequester(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
   }

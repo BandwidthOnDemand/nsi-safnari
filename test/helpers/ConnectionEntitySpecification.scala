@@ -1,6 +1,5 @@
 package helpers
 
-import java.net.URI
 import java.time.{ Clock, Instant, ZoneId }
 import java.time.temporal._
 import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
@@ -38,8 +37,8 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
 
     def BadModifyReserve = ModifyReserve(ModifyReserveType.tap(_.getCriteria.getPointToPointService.foreach(_.setSourceSTP("modified"))))
 
-    val NsiReplyToUri = URI.create("http://example.com/nsi/requester")
-    val PceReplyToUri = URI.create("http://example.com/pce/reply")
+    val NsiReplyToUri = agg.ProviderReplyToUri
+    val PceReplyToUri = agg.PceReplyToUri
 
     def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(correlationId, AggregatorNsa, provider.nsa, Some(NsiReplyToUri), NsiHeaders.ProviderProtocolVersion)
 

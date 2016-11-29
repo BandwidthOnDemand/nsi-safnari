@@ -60,7 +60,7 @@ class ConnectionEntity(
     replyTo = Some(nsiReplyToUri),
     protocolVersion = NsiHeaders.ProviderProtocolVersion)
 
-  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil, Nil)
+  private def newNotifyHeaders() = NsiHeaders(newCorrelationId(), requesterNSA, aggregatorNsa, None, NsiHeaders.RequesterProtocolVersion, Nil)
   private val nextNotificationId = new AtomicInteger(1)
   private val nextResultId = new AtomicInteger(1)
   private var nsiNotifications: List[NsiNotification] = Nil

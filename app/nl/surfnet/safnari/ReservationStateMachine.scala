@@ -29,7 +29,7 @@ import nl.surfnet.nsiv2.utils._
 
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2015._04.connection.pathtrace.PathTraceType
+import org.ogf.schemas.nsi._2015._04.connection.pathtrace.{ PathTraceType, PathType, SegmentType }
 
 import scala.collection.JavaConverters._
 
@@ -60,7 +60,8 @@ case class ReservationStateMachineData(
     childReserveTimeouts: Vector[NsiRequesterMessage[ReserveTimeout]] = Vector.empty,
     childResponses: Map[CorrelationId, NsiRequesterMessage[NsiCommandReply]] = Map.empty,
     pceError: Option[NsiError] = None,
-    reserveError: Option[NsiError] = None) {
+    reserveError: Option[NsiError] = None,
+    aggregatedPathTrace: Option[PathTraceType] = None) {
 
   def receivedSegments(algorithm: PathComputationAlgorithm, segments: ComputedPathSegments) = copy(
     segments = segments,
@@ -182,6 +183,37 @@ case class ReservationStateMachineData(
     case HeldReservationState => childReserveTimeouts.foldLeft(this)((acc, timeout) => acc.updateChildByConnectionId(children, timeout, TimeoutReservationState))
     case _ => this
   }
+
+  def aggregatePathTrace(aggregatorNsa: String, connectionId: ConnectionId): ReservationStateMachineData = command match {
+    case NsiProviderMessage(headers, _: InitialReserve) =>
+      val pathTrace = headers.pathTrace.map { original =>
+        new PathTraceType().withId(original.getId()).withConnectionId(original.getConnectionId())
+      } getOrElse {
+        new PathTraceType().withId(aggregatorNsa).withConnectionId(connectionId)
+      }
+
+      val pathTraceSegments = segments.flatMap {
+        case (correlationId, _) =>
+          for {
+            reply <- childResponses.get(correlationId).to[Vector]
+            pathTrace <- reply.headers.pathTrace.to[Vector]
+            if !pathTrace.getPath().isEmpty()
+            path = pathTrace.getPath().get(0)
+            segment <- path.getSegment.asScala.to[Vector]
+          } yield segment
+      }.zipWithIndex.map {
+        case (segment, order) =>
+          new SegmentType().withId(segment.getId()).withConnectionId(segment.getConnectionId()).withOrder(order).withStp(segment.getStp())
+      }
+
+      if (pathTraceSegments.isEmpty) {
+        this
+      } else {
+        copy(aggregatedPathTrace = Some(pathTrace.withPath(new PathType().withSegment(pathTraceSegments.asJava))))
+      }
+    case _ =>
+      this
+  }
 }
 
 class ReservationStateMachine(
@@ -237,7 +269,10 @@ class ReservationStateMachine(
         .modifyChildCriteria(children, message.connectionId)(_.withHeld(message.criteria))
         .initialReserveConfirmed(headers.correlationId, message.criteria)
         .reserveNextSegments
-      val newData2 = if (newData.aggregatedReservationState == HeldReservationState) newData.requestedCriteriaToHeld else newData
+      val newData2 = newData.aggregatedReservationState match {
+        case HeldReservationState => newData.requestedCriteriaToHeld.aggregatePathTrace(aggregatorNsa, id)
+        case _                    => newData
+      }
       val newData3 = newData2.processReserveTimeouts(children)
       goto(newData3.aggregatedReservationState) using newData3
     case Event(FromProvider(reply @ NsiRequesterMessage(headers, message: ReserveFailed)), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
@@ -417,20 +452,23 @@ class ReservationStateMachine(
       }
 
       respond(ReserveFailed(baseError))
-    case (CheckingReservationState | ModifyingReservationState) -> HeldReservationState =>
+    case CheckingReservationState -> (HeldReservationState | TimeoutReservationState) =>
+      val replyHeaders = nextStateData.aggregatedPathTrace.foldLeft(nextStateData.command.headers.forAsyncReply)(_ withPathTrace _)
+      Seq(ToRequester(NsiRequesterMessage(replyHeaders, ReserveConfirmed(id, nextStateData.criteria.confirmed.get))))
+    case ModifyingReservationState -> (HeldReservationState | TimeoutReservationState) =>
       respond(ReserveConfirmed(id, nextStateData.criteria.confirmed.get))
     case HeldReservationState -> CommittingReservationState =>
+      val completedPathTrace = if (initialReserve.headers.pathTrace.isEmpty) nextStateData.aggregatedPathTrace else nextStateData.command.headers.pathTrace
       children.childConnections.collect {
         case (seg, _, Some(connectionId)) =>
-          ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command, seg.provider), ReserveCommit(connectionId)), seg.provider)
+          val headers = newRequestHeaders(nextStateData.command, seg.provider)
+          ToProvider(NsiProviderMessage(completedPathTrace.foldLeft(headers)(_ withPathTrace _), ReserveCommit(connectionId)), seg.provider)
       }.toVector
     case (HeldReservationState | FailedReservationState) -> AbortingReservationState =>
       children.childConnections.collect {
         case (seg, _, Some(connectionId)) =>
           ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command, seg.provider), ReserveAbort(connectionId)), seg.provider)
       }.toVector
-    case (CheckingReservationState | ModifyingReservationState) -> TimeoutReservationState =>
-      respond(ReserveConfirmed(id, nextStateData.criteria.confirmed.get))
     case CommittingReservationState -> ReservedReservationState =>
       respond(ReserveCommitConfirmed(id))
     case CommittingReservationState -> CommitFailedReservationState =>
