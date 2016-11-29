@@ -281,14 +281,14 @@ class ReservationStateMachine(
         .modifyChildCriteria(children, message.connectionId)(_.abort)
         .clearNextSegments
       goto(newData.aggregatedReservationState) using newData
+    case Event(FromProvider(message @ NsiRequesterMessage(headers, timeout: ReserveTimeout)), data) =>
+      val newData = data.copy(childReserveTimeouts = data.childReserveTimeouts :+ message.copy(body = timeout))
+      goto(newData.aggregatedReservationState) using newData
     case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
       val newData = data
         .updateChild(headers.correlationId, FailedReservationState, Some(serviceException))
         .modifyChildCriteria(headers.correlationId)(_.abort)
         .clearNextSegments
-      goto(newData.aggregatedReservationState) using newData
-    case Event(FromProvider(message @ NsiRequesterMessage(headers, timeout: ReserveTimeout)), data) =>
-      val newData = data.copy(childReserveTimeouts = data.childReserveTimeouts :+ message.copy(body = timeout))
       goto(newData.aggregatedReservationState) using newData
     case Event(AckFromProvider(_), data) =>
       stay using data.clearNextSegments
