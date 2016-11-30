@@ -57,7 +57,7 @@
         <tbody>
             @for(segment <- segments) {
                 <tr>
-                    <td>@segment.connectionId.getOrElse("<unknown>")</td>
+                    <td>@segment.connectionId.present.getOrElse("<unknown>")</td>
                     <td title="@segment.providerNsa">@segment.providerNsaShort</td>
                     <td>
                         <div title="@segment.source"><strong>From</strong>&nbsp;@segment.sourceShort</div>

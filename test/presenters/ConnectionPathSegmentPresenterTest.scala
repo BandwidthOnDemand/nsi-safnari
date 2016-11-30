@@ -1,6 +1,6 @@
 package presenters
 
-import nl.surfnet.safnari.ConnectionData
+import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types.{DataPlaneStatusType, ProvisionStateEnumType, LifecycleStateEnumType, ReservationStateEnumType}
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
@@ -8,7 +8,7 @@ import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 class ConnectionPathSegmentPresenterTest extends helpers.Specification {
   "A ConnectionPathSegmentPresenter" >> {
     val data = ConnectionData(
-      Some("ID"),
+      Present("ID"),
       "urn:ogf:network:surfnet.nl:1900:provider",
       "urn:ogf:network:surfnet.nl:1900:source",
       "urn:ogf:network:surfnet.nl:1900:destination",

@@ -22,18 +22,25 @@
  */
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._12.connection.types._
-import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._12.services.types.StpListType
+sealed trait FutureVal[+A] {
+  def flatMap[B](f: (A) => FutureVal[B]): FutureVal[B] = this match {
+    case Present(x) => f(x)
+    case Pending => Pending
+    case Never => Never
+  }
 
-case class ConnectionData(
-    connectionId: FutureVal[ConnectionId],
-    providerNsa: String,
-    sourceStp: String,
-    destinationStp: String,
-    ero: StpListType,
-    reservationState: ReservationStateEnumType,
-    lifecycleState: LifecycleStateEnumType,
-    provisionState: ProvisionStateEnumType,
-    dataPlaneStatus: DataPlaneStatusType,
-    lastServiceException: Option[ServiceExceptionType])
+  def map[B](f: (A) => B): FutureVal[B] = this match {
+    case Present(x) => Present(f(x))
+    case Pending => Pending
+    case Never => Never
+  }
+
+  def present: Option[A] = this match {
+    case Present(x) => Some(x)
+    case _ => None
+  }
+}
+
+final case class Present[A](a: A) extends FutureVal[A]
+case object Pending extends FutureVal[Nothing]
+case object Never extends FutureVal[Nothing]

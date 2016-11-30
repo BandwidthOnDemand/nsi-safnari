@@ -460,13 +460,13 @@ class ReservationStateMachine(
     case HeldReservationState -> CommittingReservationState =>
       val completedPathTrace = if (initialReserve.headers.pathTrace.isEmpty) nextStateData.aggregatedPathTrace else nextStateData.command.headers.pathTrace
       children.childConnections.collect {
-        case (seg, _, Some(connectionId)) =>
+        case (seg, _, Present(connectionId)) =>
           val headers = newRequestHeaders(nextStateData.command, seg.provider)
           ToProvider(NsiProviderMessage(completedPathTrace.foldLeft(headers)(_ withPathTrace _), ReserveCommit(connectionId)), seg.provider)
       }.toVector
     case (HeldReservationState | FailedReservationState) -> AbortingReservationState =>
       children.childConnections.collect {
-        case (seg, _, Some(connectionId)) =>
+        case (seg, _, Present(connectionId)) =>
           ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command, seg.provider), ReserveAbort(connectionId)), seg.provider)
       }.toVector
     case CommittingReservationState -> ReservedReservationState =>
@@ -476,7 +476,7 @@ class ReservationStateMachine(
     case ReservedReservationState -> ModifyingReservationState =>
       val data = nextStateData
       children.childConnections.collect {
-        case (segment, initialCorrelationId, Some(childConnectionId)) =>
+        case (segment, initialCorrelationId, Present(childConnectionId)) =>
           val criteria = nextStateData.childConnectionCriteria(initialCorrelationId)
 
           val reserveType = new ReserveType()

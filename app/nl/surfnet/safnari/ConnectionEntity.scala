@@ -261,8 +261,8 @@ class ConnectionEntity(
       otherStateMachines = otherStateMachines orElse messages.collectFirst {
         case ToRequester(NsiRequesterMessage(_, _: ReserveCommitConfirmed)) =>
           val children = this.children.childConnections.map {
-            case (segment, _, Some(connectionId)) => connectionId -> segment.provider
-            case (segment, _, None) => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
+            case (segment, _, Present(connectionId)) => connectionId -> segment.provider
+            case (segment, _, (Pending | Never)) => throw new IllegalStateException(s"reserveConfirmed with unknown child connectionId for $segment")
           }.toMap
 
           (new ProvisionStateMachine(id, newRequestHeaders, children),
@@ -343,7 +343,7 @@ class ConnectionEntity(
 
     rsm.committedCriteria.foreach { criteria =>
       val children = this.children.childConnections.zipWithIndex.collect {
-        case ((segment, correlationId, Some(id)), order) =>
+        case ((segment, correlationId, Present(id)), order) =>
           val p2ps = childP2PServiceType(correlationId, segment)
           new ChildSummaryType()
             .withConnectionId(id)
@@ -384,10 +384,10 @@ class ConnectionEntity(
         p2ps.getDestSTP(),
         p2ps.getEro(),
         rsm.childConnectionStateByInitialCorrelationId(correlationId),
-        id.map(id => lsm.childConnectionState(id)).getOrElse(LifecycleStateEnumType.CREATED),
-        id.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
-        id.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(new DataPlaneStatusType()),
-        id.flatMap(mostRecentChildExceptions.get))
+        id.map(id => lsm.childConnectionState(id)).present.getOrElse(LifecycleStateEnumType.CREATED),
+        id.present.flatMap(id => psm.map(_.childConnectionState(id))).getOrElse(ProvisionStateEnumType.RELEASED),
+        id.present.flatMap(id => dsm.map(_.childConnectionState(id))).getOrElse(new DataPlaneStatusType()),
+        id.present.flatMap(mostRecentChildExceptions.get))
   }.toSeq
 
   def notifications: Seq[NotificationBaseType] = nsiNotifications.map {

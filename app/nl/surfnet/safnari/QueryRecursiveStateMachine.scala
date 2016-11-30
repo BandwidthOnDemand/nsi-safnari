@@ -62,7 +62,7 @@ class QueryRecursiveStateMachine(
     query: NsiProviderMessage[QueryRecursive],
     initialReserve: NsiProviderMessage[InitialReserve],
     connectionStates: => ConnectionStatesType,
-    children: Map[ProviderEndPoint, Option[ConnectionId]],
+    children: Map[ProviderEndPoint, FutureVal[ConnectionId]],
     newCorrelationId: () => CorrelationId,
     newNsiHeaders: ProviderEndPoint => NsiHeaders,
     ifModifiedSince: Option[XMLGregorianCalendar])
@@ -138,11 +138,11 @@ class QueryRecursiveStateMachine(
 }
 
 object QueryRecursiveStateMachine {
-  val toConnectionIdProviderMap: PartialFunction[(ProviderEndPoint, Option[ConnectionId]), (ConnectionId, ProviderEndPoint)] = {
-    case (provider, Some(connectionId)) => connectionId -> provider
+  val toConnectionIdProviderMap: PartialFunction[(ProviderEndPoint, FutureVal[ConnectionId]), (ConnectionId, ProviderEndPoint)] = {
+    case (provider, Present(connectionId)) => connectionId -> provider
   }
 
-  val toConnectionIdStateMap: PartialFunction[(ProviderEndPoint, Option[ConnectionId]), (ConnectionId, QueryRecursiveState)] = {
-    case (provider, Some(connectionId)) => connectionId -> Initial
+  val toConnectionIdStateMap: PartialFunction[(ProviderEndPoint, FutureVal[ConnectionId]), (ConnectionId, QueryRecursiveState)] = {
+    case (provider, Present(connectionId)) => connectionId -> Initial
   }
 }

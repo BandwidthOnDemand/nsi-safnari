@@ -26,7 +26,7 @@ import nl.surfnet.nsiv2.messages._
 
 case class ChildConnectionIds(
     segments: ComputedPathSegments = Seq.empty,
-    connectionByInitialCorrelationId: Map[CorrelationId, ConnectionId] = Map.empty,
+    connectionByInitialCorrelationId: Map[CorrelationId, FutureVal[ConnectionId]] = Map.empty,
     initialCorrelationIdByConnectionId: Map[ConnectionId, CorrelationId] = Map.empty) {
 
   def segmentByCorrelationId(correlationId: CorrelationId): ComputedSegment =
@@ -34,26 +34,29 @@ case class ChildConnectionIds(
 
   def childrenByConnectionId: Map[ConnectionId, ProviderEndPoint] = (for {
     (correlationId, segment) <- segments
-    connectionId <- connectionByInitialCorrelationId.get(correlationId)
+    Present(connectionId) <- connectionByInitialCorrelationId.get(correlationId)
   } yield connectionId -> segment.provider)(collection.breakOut)
 
   def awaitingConnectionId: Set[CorrelationId] = initialCorrelationIds -- connectionByInitialCorrelationId.keySet
 
   def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = if (segments.exists(_._1 == correlationId)) {
     copy(
-      connectionByInitialCorrelationId = connectionByInitialCorrelationId.updated(correlationId, connectionId),
+      connectionByInitialCorrelationId = connectionByInitialCorrelationId.updated(correlationId, Present(connectionId)),
       initialCorrelationIdByConnectionId = initialCorrelationIdByConnectionId.updated(connectionId, correlationId))
   } else this
 
-  def childConnections: Seq[(ComputedSegment, CorrelationId, Option[ConnectionId])] = segments.map {
+  def childConnections: Seq[(ComputedSegment, CorrelationId, FutureVal[ConnectionId])] = segments.map {
     case (correlationId, segment) =>
-      (segment, correlationId, connectionByInitialCorrelationId.get(correlationId))
+      (segment, correlationId, connectionByInitialCorrelationId.get(correlationId).getOrElse(Pending))
   }
 
   def initialCorrelationIdFor(connectionId: ConnectionId): CorrelationId =
     initialCorrelationIdByConnectionId.getOrElse(connectionId, throw new IllegalStateException(s"unknown child connection id $connectionId"))
 
-  def hasConnectionId(initialCorrelationId: CorrelationId): Boolean = connectionByInitialCorrelationId contains initialCorrelationId
+  def hasConnectionId(initialCorrelationId: CorrelationId): Boolean = connectionByInitialCorrelationId.get(initialCorrelationId) match {
+    case Some(Present(_)) => true
+    case _ => false
+  }
 
   def update(message: InboundMessage, newCorrelationId: () => CorrelationId): ChildConnectionIds = message match {
     case FromPce(message: PathComputationConfirmed) =>
@@ -62,7 +65,7 @@ case class ChildConnectionIds(
       receivedConnectionId(headers.correlationId, connectionId)
     case AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))) =>
       serviceException.getConnectionId match {
-        case null         => this
+        case null         => copy(connectionByInitialCorrelationId = connectionByInitialCorrelationId.updated(headers.correlationId, Never))
         case connectionId => receivedConnectionId(headers.correlationId, connectionId)
       }
     case FromProvider(NsiRequesterMessage(headers, message: ReserveConfirmed)) =>

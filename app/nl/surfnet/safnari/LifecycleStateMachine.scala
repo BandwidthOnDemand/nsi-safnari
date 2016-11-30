@@ -43,11 +43,26 @@ case class LifecycleStateMachineData(
     else throw new IllegalStateException(s"cannot determine aggregated status from ${childConnectionStates.values}")
   }
 
-  def startCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: LifecycleStateEnumType, children: ChildConnectionIds) =
-    copy(command = Some(command), childConnectionStates = children.segments.map(_._1 -> transitionalState)(collection.breakOut))
+  def startTerminate(command: NsiProviderMessage[NsiProviderOperation], children: ChildConnectionIds) = {
+    def transitionalState(id: CorrelationId) = children.connectionByInitialCorrelationId.get(id) match {
+      case Some(Never) => TERMINATED
+      case None => TERMINATED // Initial Reserve for this segment was not yet started
+      case _ => TERMINATING
+    }
+
+    copy(command = Some(command), childConnectionStates = children.segments.map {
+      case (correlationId, _) => correlationId -> transitionalState(correlationId)
+    }(collection.breakOut))
+  }
+
+  def updateChild(correlationId: CorrelationId, state: LifecycleStateEnumType) =
+    copy(childConnectionStates = childConnectionStates.updated(correlationId, state))
 
   def updateChild(children: ChildConnectionIds, connectionId: ConnectionId, state: LifecycleStateEnumType) =
     copy(childConnectionStates = childConnectionStates.updated(children.initialCorrelationIdFor(connectionId), state))
+
+  def childHasState(correlationId: CorrelationId, state: LifecycleStateEnumType) =
+    childConnectionStates.getOrElse(correlationId, CREATED) == state
 
   def childHasState(children: ChildConnectionIds, connectionId: ConnectionId, state: LifecycleStateEnumType) =
     childConnectionStates.getOrElse(children.initialCorrelationIdFor(connectionId), CREATED) == state
@@ -71,7 +86,9 @@ class LifecycleStateMachine(
 
   when(CREATED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) if children.childConnections.nonEmpty =>
-      goto(TERMINATING) using data.startCommand(message, TERMINATING, children).copy(sendTerminateRequest = children.childrenByConnectionId)
+      val newData = data.startTerminate(message, children)
+        .copy(sendTerminateRequest = children.childrenByConnectionId)
+      goto(newData.aggregatedLifecycleStatus) using newData
     case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.notification.getEvent() == EventEnumType.FORCED_END =>
       goto(FAILED) using data.updateChild(children, errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
     case Event(PassedEndTime(_, _, _), data) =>
@@ -94,12 +111,12 @@ class LifecycleStateMachine(
 
   when(FAILED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
-      goto(TERMINATING) using data.startCommand(message, TERMINATING, children).copy(sendTerminateRequest = children.childrenByConnectionId)
+      goto(TERMINATING) using data.startTerminate(message, children).copy(sendTerminateRequest = children.childrenByConnectionId)
   }
 
   when(PASSED_END_TIME) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
-      goto(TERMINATING) using data.startCommand(message, TERMINATING, children).copy(sendTerminateRequest = children.childrenByConnectionId)
+      goto(TERMINATING) using data.startTerminate(message, children).copy(sendTerminateRequest = children.childrenByConnectionId)
   }
 
   whenUnhandled {

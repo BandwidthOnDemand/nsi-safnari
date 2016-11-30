@@ -115,7 +115,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
     def segments = connection.segments
 
     def childConnectionData(childConnectionId: ConnectionId): ConnectionData =
-      segments.find(_.connectionId == Some(childConnectionId)).getOrElse { throw new FailureException(Failure(s"no child data for $childConnectionId")) }
+      segments.find(_.connectionId == Present(childConnectionId)).getOrElse { throw new FailureException(Failure(s"no child data for $childConnectionId")) }
 
     def reservationState = connectionData.getConnectionStates().getReservationState()
     def provisionState = connectionData.getConnectionStates().getProvisionState()
