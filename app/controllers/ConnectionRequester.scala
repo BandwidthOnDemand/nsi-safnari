@@ -126,7 +126,7 @@ object ConnectionRequester {
       case ToProvider(message @ NsiProviderMessage(headers, reserve: InitialReserve), _) =>
         val connectionId = newConnectionId
         val confirmCriteria = Conversion.invert(reserve.body.getCriteria()).get
-        confirmCriteria.getPointToPointService.foreach { service =>
+        confirmCriteria.pointToPointService.foreach { service =>
           service.setSourceSTP(qualifyStp(service.getSourceSTP))
           service.setDestSTP(qualifyStp(service.getDestSTP))
         }

@@ -29,13 +29,12 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
     val AbortCorrelationId = CommitCorrelationId
 
     val ModifyCorrelationId = helpers.Specification.newCorrelationId
-    def ModifyReserveType = InitialReserveType.withConnectionId(connection.id).tap { modify =>
-      modify.getCriteria.setVersion(modify.getCriteria.getVersion + 1)
-      modify.getCriteria.getSchedule.withStartTime(Nillable.absent[XMLGregorianCalendar])
-      modify.getCriteria.getPointToPointService.foreach(_.setCapacity(500))
-    }
-
-    def BadModifyReserve = ModifyReserve(ModifyReserveType.tap(_.getCriteria.getPointToPointService.foreach(_.setSourceSTP("modified"))))
+    def ModifyReserveType = new ReserveType().withConnectionId(connection.id)
+      .withCriteria(new ReservationRequestCriteriaType()
+        .withVersion(InitialReserveType.getCriteria.getVersion + 1)
+        .withSchedule(new ScheduleType().withStartTime(Nillable.absent[XMLGregorianCalendar]))
+        .withModifiedCapacity(500)
+      )
 
     val NsiReplyToUri = agg.ProviderReplyToUri
     val PceReplyToUri = agg.PceReplyToUri

@@ -66,7 +66,7 @@ object InitialReserveAlgorithm {
         case Seq() =>
           SequentialInitialReserveAlgorithm(Map.empty, None, Seq.empty)
         case next +: remaining =>
-          val service = criteria.getPointToPointService().getOrElse {
+          val service = criteria.pointToPointService.getOrElse {
             throw new RuntimeException("P2PService is missing")
           }
 

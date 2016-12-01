@@ -169,8 +169,8 @@ case class ReservationStateMachineData(
 
   private def requestedToConfirmCriteria: Option[ReservationConfirmCriteriaType] = criteria.requested.flatMap { requestedCriteria =>
     (criteria.committed map requestedCriteria.toModifiedConfirmCriteria getOrElse requestedCriteria.toInitialConfirmCriteria(
-      childConnectionCriteria(segments.head._1).confirmed.get.getPointToPointService.get.getSourceSTP,
-      childConnectionCriteria(segments.last._1).confirmed.get.getPointToPointService.get.getDestSTP)).toOption
+      childConnectionCriteria(segments.head._1).confirmed.get.pointToPointService.get.getSourceSTP,
+      childConnectionCriteria(segments.last._1).confirmed.get.pointToPointService.get.getDestSTP)).toOption
   }
 
   def requestedCriteriaToHeld = copy(criteria = requestedToConfirmCriteria.fold(criteria.abort)(criteria.withHeld))
@@ -357,16 +357,12 @@ class ReservationStateMachine(
           childConnectionCriteria = data.segments.map {
             case (initialCorrelationId, segment) =>
               val childCriteria = data.childConnectionCriteria(initialCorrelationId)
-              val service = segment.serviceType.service.shallowCopy
-              pendingCriteria.getPointToPointService().foreach { ptp =>
-                service.setCapacity(ptp.getCapacity)
-              }
 
               val criteria = new ReservationRequestCriteriaType()
-                .withPointToPointService(service)
                 .withSchedule(pendingCriteria.getSchedule())
-                .withServiceType(segment.serviceType.serviceType)
                 .withVersion(data2.pendingVersion)
+              criteria.getAny().addAll(pendingCriteria.getAny())
+              criteria.getOtherAttributes().putAll(pendingCriteria.getOtherAttributes())
 
               initialCorrelationId -> childCriteria.withRequested(criteria)
           }(collection.breakOut))
@@ -413,7 +409,7 @@ class ReservationStateMachine(
         pceReplyUri,
         criteria.schedule.flatMap(_.startTime.toOption(None)),
         criteria.schedule.flatMap(_.endTime.toOption(None)),
-        ServiceType(criteria.getServiceType(), criteria.getPointToPointService().get),
+        ServiceType(criteria.getServiceType(), criteria.pointToPointService.get),
         pathComputationAlgorithm,
         initialReserve.headers.connectionTrace
       )))
@@ -481,8 +477,6 @@ class ReservationStateMachine(
 
           val reserveType = new ReserveType()
             .withConnectionId(childConnectionId)
-            .withGlobalReservationId(data.globalReservationId.map(_.toASCIIString()).orNull)
-            .withDescription(data.description.orNull)
             .withCriteria(criteria.requested.get)
 
           val headers = newRequestHeaders(data.command, segment.provider)
@@ -533,15 +527,11 @@ class ReservationStateMachine(
   )
 
   private def validateModify(requestedCriteria: ReservationRequestCriteriaType, committedCriteria: ReservationConfirmCriteriaType) = {
-    val committedP2Ps = committedCriteria.getPointToPointService.get
-    val requestedP2Ps = requestedCriteria.getPointToPointService.get
     val requestedVersion: Int = if (requestedCriteria.getVersion ne null) requestedCriteria.getVersion else 0
     if (committedVersion >= requestedVersion)
       Some(NsiError.GenericMessagePayloadError.copy(text = s"requested version ${requestedVersion} must be greater than committed version ${committedVersion}"))
-    else if (!(committedP2Ps.sourceStp isCompatibleWith requestedP2Ps.sourceStp))
-      Some(NsiError.GenericMessagePayloadError.copy(text = s"committed source STP ${committedP2Ps.sourceStp} is not compatible with requested source STP ${requestedP2Ps.sourceStp}"))
-    else if (!(committedP2Ps.destStp isCompatibleWith requestedP2Ps.destStp))
-      Some(NsiError.GenericMessagePayloadError.copy(text = s"committed destination STP ${committedP2Ps.destStp} is not compatible with requested destination STP ${requestedP2Ps.destStp}"))
+    else if (requestedCriteria.modifiedParameters.exists(_.getType == PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE))
+      Some(NsiError.GenericMessagePayloadError.copy(text = s"parameter ${PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE} is not modifiable"))
     else
       None
   }

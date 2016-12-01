@@ -8,6 +8,7 @@ import net.nordu.namespaces._2013._12.gnsbod.{ ConnectionTraceType, ConnectionTy
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
+import org.ogf.schemas.nsi._2013._12.services.types.TypeValueType
 
 import scala.collection.JavaConverters._
 
@@ -746,14 +747,21 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         reservationState must_== ReservationStateEnumType.RESERVE_CHECKING
 
         messages must contain(exactly[Message](
-          ToProvider(NsiProviderMessage(
-            toProviderHeaders(A.provider, CorrelationId(0, 7)),
-            ModifyReserve(InitialReserveType.withConnectionId("ConnectionIdA").tap { modify =>
-              modify.getCriteria.setVersion(4)
-              modify.getCriteria.withPointToPointService(A.serviceType.service.withCapacity(500))
-              modify.getCriteria.getSchedule.withStartTime(Nillable.absent[XMLGregorianCalendar])
-            })),
-            A.provider)))
+          ToProvider(
+            NsiProviderMessage(
+              toProviderHeaders(A.provider, CorrelationId(0, 7)),
+              ModifyReserve(
+                new ReserveType().withConnectionId("ConnectionIdA").withCriteria(
+                  new ReservationRequestCriteriaType()
+                    .withVersion(4)
+                    .withModifiedCapacity(500)
+                    .withSchedule(new ScheduleType().withStartTime(Nillable.absent[XMLGregorianCalendar]))
+                )
+              )
+            ),
+            A.provider
+          )
+        ))
       }
 
       "fail modify when requested version is less than committed version" in new ReservedConnection {
@@ -767,53 +775,12 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         })
       }
 
-      "fail modify when source STP is not compatible" in new ReservedConnection {
-        val modify = ModifyReserveType
-        modify.getCriteria.getPointToPointService().get.setSourceSTP("X")
+      "fail modify when unmodifiable parameter is provided" in new ReservedConnection {
+        val modify = ModifyReserveType.tap(_.getCriteria.withModifiedParameters(new TypeValueType().withType(PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE).withValue(PathComputationAlgorithm.Tree.name)))
+
         when(ura.request(ModifyCorrelationId, ModifyReserve(modify)))
 
         reservationState must_== ReservationStateEnumType.RESERVE_FAILED
-      }
-
-      "fail modify when destination STP is not compatible" in new ReservedConnection {
-        val modify = ModifyReserveType
-        modify.getCriteria.getPointToPointService().get.setDestSTP("X")
-        when(ura.request(ModifyCorrelationId, ModifyReserve(modify)))
-
-        reservationState must_== ReservationStateEnumType.RESERVE_FAILED
-      }
-
-      "abort failed modify request immediately" in new ReservedConnection {
-        val AbortModifyCorrelationId = newCorrelationId
-        given(ura.request(ModifyCorrelationId, BadModifyReserve))
-
-        when(ura.request(AbortModifyCorrelationId, ReserveAbort(connection.id))) must beSome
-
-        reservationState must_== ReservationStateEnumType.RESERVE_START
-
-        messages must contain(exactly[Message](
-          agg.response(AbortModifyCorrelationId, ReserveAbortConfirmed(connection.id))))
-      }
-
-      "allow modify after aborting failed modify" in new ReservedConnection {
-        val AbortModifyCorrelationId = newCorrelationId
-        val NewModifyCorrelationId = newCorrelationId
-        given(
-          ura.request(ModifyCorrelationId, BadModifyReserve),
-          ura.request(AbortModifyCorrelationId, ReserveAbort(connection.id)))
-
-        when(ura.request(NewModifyCorrelationId, ModifyReserve(ModifyReserveType))) must beSome
-
-        reservationState must_== ReservationStateEnumType.RESERVE_CHECKING
-        messages must contain(exactly[Message](
-          ToProvider(NsiProviderMessage(
-            toProviderHeaders(A.provider, CorrelationId(0, 9)),
-            ModifyReserve(InitialReserveType.withConnectionId("ConnectionIdA").tap { modify =>
-              modify.getCriteria.setVersion(4)
-              modify.getCriteria.withPointToPointService(A.serviceType.service.withCapacity(500))
-              modify.getCriteria.getSchedule.withStartTime(Nillable.absent[XMLGregorianCalendar])
-            })),
-            A.provider)))
       }
     }
 
@@ -858,7 +825,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
 
         connection.rsm.pendingCriteria must beNone
         connection.rsm.committedCriteria must beSome
-        connection.query.getCriteria.get(0).getPointToPointService.map(_.getCapacity) must beSome(500)
+        connection.query.getCriteria.get(0).pointToPointService.map(_.getCapacity) must beSome(500)
       }
 
       "allow aborting modified reservation before commit" in new ReservedConnection with Modified {
@@ -893,11 +860,13 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         messages must contain(exactly[Message](
           ToProvider(NsiProviderMessage(
             toProviderHeaders(A.provider, CorrelationId(0, 11)),
-            ModifyReserve(InitialReserveType.withConnectionId("ConnectionIdA").tap { modify =>
-              modify.getCriteria.setVersion(4)
-              modify.getCriteria.withPointToPointService(A.serviceType.service.withCapacity(500))
-              modify.getCriteria.getSchedule.withStartTime(Nillable.absent[XMLGregorianCalendar])
-            })),
+            ModifyReserve(
+              new ReserveType().withConnectionId("ConnectionIdA").withCriteria(
+                new ReservationRequestCriteriaType()
+                  .withVersion(4)
+                  .withModifiedCapacity(500)
+                  .withSchedule(new ScheduleType().withStartTime(Nillable.absent[XMLGregorianCalendar]))
+              ))),
             A.provider)))
       }
 

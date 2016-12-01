@@ -328,8 +328,8 @@ class ConnectionEntity(
 
     val confirmCriteria = childConnectionCriteria.committed.orElse(childConnectionCriteria.confirmed)
 
-    confirmCriteria.flatMap(_.getPointToPointService())
-      .orElse(childConnectionCriteria.requested.flatMap(_.getPointToPointService()))
+    confirmCriteria.flatMap(_.pointToPointService)
+      .orElse(childConnectionCriteria.requested.flatMap(_.pointToPointService))
       .getOrElse(segment.serviceType.service)
   }
 
@@ -357,7 +357,7 @@ class ConnectionEntity(
         .withVersion(criteria.getVersion())
         .withSchedule(criteria.getSchedule())
         .withServiceType(criteria.getServiceType())
-        .withPointToPointService(criteria.getPointToPointService().get)
+        .withPointToPointService(criteria.pointToPointService.get)
         .withChildren(new ChildSummaryListType().withChild(children: _*))
         .tap(_.getOtherAttributes().putAll(criteria.getOtherAttributes())))
     }

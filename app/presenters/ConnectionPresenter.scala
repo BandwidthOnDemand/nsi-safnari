@@ -42,7 +42,7 @@ case class ConnectionPresenter(private val data: QuerySummaryResultType, val pen
   def committedCriteria = if (data.getCriteria.isEmpty) None else Some(data.getCriteria.asScala.maxBy(_.getVersion))
 
   private val schedule = committedCriteria.map(_.getSchedule).orElse(pendingCriteria.map(_.getSchedule)).getOrElse(new ScheduleType())
-  private val pointToPointService = committedCriteria.flatMap(_.getPointToPointService()).orElse(pendingCriteria.flatMap(_.getPointToPointService()))
+  private val pointToPointService = committedCriteria.flatMap(_.pointToPointService).orElse(pendingCriteria.flatMap(_.pointToPointService))
 
   def startTime = schedule.startTime
   def endTime = schedule.endTime

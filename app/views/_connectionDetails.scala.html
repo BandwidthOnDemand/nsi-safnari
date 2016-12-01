@@ -19,7 +19,7 @@
             <dt>Start</dt>
             <dd>@formatCommittedAndPending(connection.committedCriteria.flatMap(_.schedule.startTime.toOption(None)), connection.pendingCriteria.flatMap(_.schedule).flatMap(_.startTime.toOption(None)))</dd>
             <dt>Bandwidth</dt>
-            <dd>@formatCommittedAndPending(connection.bandwidth, connection.pendingCriteria.flatMap(_.getPointToPointService).map(_.getCapacity))</dd>
+            <dd>@formatCommittedAndPending(connection.bandwidth, connection.pendingCriteria.flatMap(_.pointToPointService).map(_.getCapacity))</dd>
             <dt>Global id</dt>
             <dd>@connection.globalReservationId.getOrElse("-")</dd>
         </dl>
