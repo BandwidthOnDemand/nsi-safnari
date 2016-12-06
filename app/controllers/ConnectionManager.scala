@@ -136,14 +136,6 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     globalReservationIds.flatMap(globalIdsMap.getOrElse(_, Set()))
   }
 
-  def findByRequesterNsa(requesterNsa: RequesterNsa)(implicit executionContext: ExecutionContext): Future[Seq[Connection]] = {
-    val futures = all map { actor => (actor ? Connection.Query).map(actor -> _) }
-    Future.fold(futures)(List[Connection]()) {
-      case (actors, (actor, queryResult)) if (queryResult.summary.getRequesterNSA() == requesterNsa) => actor :: actors
-      case (actors, _) => actors
-    }
-  }
-
   private def findByRequesterCorrelationId(requesterNsa: RequesterNsa, correlationId: CorrelationId): Option[Connection] =
     connectionsByRequesterCorrelationId.single.get((requesterNsa, correlationId))
 

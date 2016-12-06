@@ -121,11 +121,9 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
   }
 
   private[controllers] def handleQueryRecursive(message: NsiProviderMessage[QueryRecursive])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] = {
-    val connections = connectionIdsToConnections(message.body.ids, message.headers.requesterNSA)
+    val connections = connectionIdsToConnections(message.body.ids)
 
-    val answers = connections.flatMap { cs =>
-      Future.traverse(cs)(c => (c ? Connection.QueryRecursive(FromRequester(message))))
-    }
+    val answers = Future.traverse(connections)(c => (c ? Connection.QueryRecursive(FromRequester(message))))
 
     answers onComplete {
       case Failure(e) => println(s"Answers Future failed: $e")
@@ -155,16 +153,15 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
 
   private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String, ifModifiedSince: Option[Instant]): Future[(Seq[QuerySummaryResultType], Option[Instant])] = {
     val maxInstant = (a: Instant, b: Instant) => if (a.isBefore(b)) b else a
-    connectionIdsToConnections(ids, requesterNsa) flatMap { cs =>
-      Future.traverse(cs)(c => (c ? Connection.Query).filter(c => ifModifiedSince.fold(true)(_.isBefore(c.lastModifiedAt))))
-        .map(cs => cs.map(_.summary) -> cs.map(_.lastModifiedAt).reduceOption(maxInstant).orElse(ifModifiedSince))
-    }
+    val connections = connectionIdsToConnections(ids)
+    Future.traverse(connections)(c => (c ? Connection.Query).filter(c => ifModifiedSince.fold(true)(_.isBefore(c.lastModifiedAt))))
+      .map(cs => cs.map(_.summary) -> cs.map(_.lastModifiedAt).reduceOption(maxInstant).orElse(ifModifiedSince))
   }
 
-  private def connectionIdsToConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String): Future[Seq[Connection]] = ids match {
-    case Some(Left(connectionIds))         => Future.successful(connectionManager.find(connectionIds))
-    case Some(Right(globalReservationIds)) => Future.successful(connectionManager.findByGlobalReservationIds(globalReservationIds))
-    case None                              => connectionManager.findByRequesterNsa(requesterNsa)
+  private def connectionIdsToConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]]): Seq[Connection] = ids match {
+    case Some(Left(connectionIds))         => connectionManager.find(connectionIds)
+    case Some(Right(globalReservationIds)) => connectionManager.findByGlobalReservationIds(globalReservationIds)
+    case None                              => connectionManager.all
   }
 
 }
