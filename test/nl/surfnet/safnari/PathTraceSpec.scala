@@ -2,35 +2,9 @@ package nl.surfnet.safnari
 
 import helpers.NsiMessages._
 import nl.surfnet.nsiv2.messages._
-import org.ogf.schemas.nsi._2015._04.connection.pathtrace.StpType
-import org.ogf.schemas.nsi._2015._04.connection.pathtrace.{ PathTraceType, PathType, ObjectFactory => PathTraceTypeOF, SegmentType }
-import scala.collection.JavaConverters._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PathTraceSpec extends helpers.ConnectionEntitySpecification {
-
-  def emptyPathTrace(
-    nsa: String,
-    connectionId: ConnectionId) = pathTrace(nsa, connectionId)
-
-  def pathTrace(
-    nsa: String,
-    connectionId: ConnectionId,
-    segments: ((String, ConnectionId), List[String])*) = {
-    val result = new PathTraceType().withId(nsa).withConnectionId(connectionId)
-    if (segments.nonEmpty) {
-      result.getPath.add(
-        new PathType().withSegment((for {
-          (((nsa, connectionId), stps), order) <- segments.zipWithIndex
-        } yield {
-          new SegmentType().withId(nsa).withConnectionId(connectionId).withOrder(order).withStp((for {
-            (stp, index) <- stps.zipWithIndex
-          } yield new StpType().withOrder(index).withValue(stp)).asJava)
-        }).asJava)
-      )
-    }
-    new PathTraceTypeOF().createPathTrace(result)
-  }
 
   "Root aggregator" should {
     "add path trace element to reserve request" in new fixture {
@@ -54,14 +28,14 @@ class PathTraceSpec extends helpers.ConnectionEntitySpecification {
         upa.response(
           CorrelationId(0, 4),
           ReserveConfirmed("ConnectionIdA", ConfirmCriteria),
-          any = pathTrace(AggregatorNsa, ConnectionId, ("ChildA", "ConnectionIdA") -> List("stp-1", "stp-2")) :: Nil
+          any = pathTrace(AggregatorNsa, ConnectionId, (A.provider.nsa, "ConnectionIdA") -> List("stp-1", "stp-2")) :: Nil
         )
       )
 
       messages must contain(agg.response(
         ReserveCorrelationId,
         ReserveConfirmed(ConnectionId, ConfirmCriteria),
-        any = pathTrace(AggregatorNsa, ConnectionId, ("ChildA", "ConnectionIdA") -> List("stp-1", "stp-2")) :: Nil
+        any = pathTrace(AggregatorNsa, ConnectionId, (A.provider.nsa, "ConnectionIdA") -> List("stp-1", "stp-2")) :: Nil
       ))
     }
 

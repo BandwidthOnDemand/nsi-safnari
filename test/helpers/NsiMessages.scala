@@ -14,18 +14,22 @@ import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
 import org.ogf.schemas.nsi._2013._12.framework.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
+import org.ogf.schemas.nsi._2015._04.connection.pathtrace.{ PathTraceType, PathType, ObjectFactory => PathTraceTypeOF, SegmentType, StpType }
+import scala.collection.JavaConverters._
 
 object NsiMessages {
   val AggregatorNsa = "urn:ogf:network:aggregator.tld:2015:nsa:aggregator-nsa"
   val RequesterNsa = "urn:ogf:network:requester.tld:2015:nsa:requester-nsa"
+
+  val Aggregator = ProviderEndPoint(AggregatorNsa, URI.create("http://nsi-agent.example.com/provider"))
 
   val SessionSecurityAttr = new SessionSecurityAttrType()
     .withAttributeOrEncryptedAttribute(new AttributeType()
       .withName("token")
       .withAttributeValue("mytoken"))
 
-  def nsiProviderHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[JAXBElement[_]] = Nil): NsiHeaders =
-    nsiHeaders(correlationId, Some(URI.create("http://nsi-agent.example.com/")), NsiHeaders.ProviderProtocolVersion, securityAttrs, any)
+  def nsiProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[JAXBElement[_]] = Nil): NsiHeaders =
+    NsiHeaders(correlationId, AggregatorNsa, provider.nsa, Some(URI.create("http://nsi-agent.example.com/")), NsiHeaders.ProviderProtocolVersion, securityAttrs, XmlAny(any))
   def nsiRequesterHeaders(correlationId: CorrelationId, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[JAXBElement[_]] = Nil): NsiHeaders =
     nsiHeaders(correlationId, None, NsiHeaders.RequesterProtocolVersion, securityAttrs, any)
   def nsiHeaders(correlationId: CorrelationId, replyTo: Option[URI], protocolVersion: URI, securityAttrs: List[SessionSecurityAttrType] = Nil, any: List[JAXBElement[_]] = Nil): NsiHeaders =
@@ -48,7 +52,7 @@ object NsiMessages {
   def InitialReserveType = new ReserveType().withCriteria(RequestCriteria).withDescription("description").withGlobalReservationId("global-reservation-id")
   val InitialReserveCorrelationId = helpers.Specification.newCorrelationId
 
-  def initialReserveMessage = NsiProviderMessage(nsiProviderHeaders(InitialReserveCorrelationId), InitialReserve(InitialReserveType))
+  def initialReserveMessage = NsiProviderMessage(nsiProviderHeaders(Aggregator, InitialReserveCorrelationId).copy(requesterNSA = RequesterNsa), InitialReserve(InitialReserveType))
   def reserveConfirmed = NsiRequesterMessage(nsiRequesterHeaders(InitialReserveCorrelationId), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))
 
   def A = ComputedSegment(
@@ -58,25 +62,50 @@ object NsiMessages {
     serviceType = ServiceType("ServiceType", Service.shallowCopy.withSourceSTP("X").withDestSTP("B")),
     provider = ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider")))
 
+  def emptyPathTrace(
+    nsa: String,
+    connectionId: ConnectionId) = pathTrace(nsa, connectionId)
+
+  def pathTrace(
+    nsa: String,
+    connectionId: ConnectionId,
+    segments: ((String, ConnectionId), List[String])*) = {
+    val result = new PathTraceType().withId(nsa).withConnectionId(connectionId)
+    if (segments.nonEmpty) {
+      result.getPath.add(
+        new PathType().withSegment((for {
+          (((nsa, connectionId), stps), order) <- segments.zipWithIndex
+        } yield {
+          new SegmentType().withId(nsa).withConnectionId(connectionId).withOrder(order).withStp((for {
+            (stp, index) <- stps.zipWithIndex
+          } yield new StpType().withOrder(index).withValue(stp)).asJava)
+        }).asJava)
+      )
+    }
+    new PathTraceTypeOF().createPathTrace(result)
+  }
+
   object ura {
     def request(correlationId: CorrelationId, operation: NsiProviderOperation, sessionSecurityAttrs: List[SessionSecurityAttrType] = Nil, any: List[JAXBElement[_]] = Nil) = {
-      val headers = nsiProviderHeaders(correlationId, sessionSecurityAttrs, any)
+      val headers = nsiProviderHeaders(Aggregator, correlationId, sessionSecurityAttrs, any).copy(requesterNSA = RequesterNsa)
       FromRequester(NsiProviderMessage(headers, operation))
     }
   }
 
-  object upa {
+  implicit class ProviderEndPointOps(provider: ProviderEndPoint) {
     def acknowledge(correlationId: CorrelationId, acknowledgment: NsiAcknowledgement) =
-      AckFromProvider(NsiProviderMessage(nsiProviderHeaders(correlationId), acknowledgment))
+      AckFromProvider(NsiProviderMessage(nsiProviderHeaders(provider, correlationId).forSyncAck, acknowledgment))
     def error(correlationId: CorrelationId, exception: ServiceExceptionType) =
-      AckFromProvider(NsiProviderMessage(nsiProviderHeaders(correlationId), ServiceException(exception)))
+      AckFromProvider(NsiProviderMessage(nsiProviderHeaders(provider, correlationId).forSyncAck, ServiceException(exception)))
     def response(correlationId: CorrelationId, operation: NsiRequesterOperation, any: List[JAXBElement[_]] = Nil) =
-      FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId, Nil, any), operation))
+      FromProvider(NsiRequesterMessage(nsiProviderHeaders(provider, correlationId, Nil, Nil).forAsyncReply.copy(any = XmlAny(any)), operation))
     def notification(correlationId: CorrelationId, operation: NsiRequesterOperation) =
       FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
     def timeout(correlationId: CorrelationId, originalCorrelationId: CorrelationId, timestamp: Instant) =
       MessageDeliveryFailure(correlationId, None, originalCorrelationId, URI.create("http://nsi.local/"), timestamp, "message-delivery-timeout")
   }
+
+  val upa = ProviderEndPointOps(A.provider)
 
   object agg {
     val ProviderReplyToUri = URI.create("http://example.com/nsi/requester")

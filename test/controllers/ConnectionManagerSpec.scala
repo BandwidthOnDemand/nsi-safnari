@@ -255,7 +255,11 @@ class ConnectionManagerSpec extends helpers.Specification {
         await(connection ? command(FromRequester(initialReserveMessage)))
       }
 
-      retransmitted must_== Vector(agg.response(initialReserveMessage.headers.correlationId, ReserveConfirmed(connectionId, ConfirmCriteria)))
+      retransmitted must_== Vector(agg.response(initialReserveMessage.headers.correlationId, ReserveConfirmed(connectionId, ConfirmCriteria), any = pathTrace(
+        AggregatorNsa,
+        connectionId,
+        (A.provider.nsa, "ChildConnection") -> Nil
+      ) :: Nil))
     }
 
     "send PassedEndTime message after reservation end time" in new SingleConnectionActorFixture {

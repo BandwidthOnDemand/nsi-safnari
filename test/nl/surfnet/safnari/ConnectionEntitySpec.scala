@@ -153,13 +153,16 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A))
 
-        when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
-        when(upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps)))
+        when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")))
+        when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteriaWithQualifiedStps)))
 
-        messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps)))
+        messages must contain(agg.response(
+          ReserveCorrelationId,
+          ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps),
+          any = pathTrace(AggregatorNsa, ConnectionId, (A.provider.nsa, "ConnectionIdA") -> Nil) :: Nil))
 
-        childConnectionData(ConnectionId).sourceStp must beEqualTo("networkId:A?vlan=1")
-        childConnectionData(ConnectionId).destinationStp must beEqualTo("networkId:B?vlan=2")
+        childConnectionData("ConnectionIdA").sourceStp must beEqualTo("networkId:A?vlan=1")
+        childConnectionData("ConnectionIdA").destinationStp must beEqualTo("networkId:B?vlan=2")
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
       }
 
@@ -195,18 +198,30 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A, B),
-          upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
-          upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
+          A.provider.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
+          B.provider.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
 
-        when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=12")))))
+        when(A.provider.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=12")))))
         messages must beEmpty
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
         segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
         segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
 
-        when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:B:A?vlan=12").withDestSTP("networkId:B:B?vlan=23")))))
+        when(B.provider.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:B:A?vlan=12").withDestSTP("networkId:B:B?vlan=23")))))
 
-        messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:B:B?vlan=23")))))
+        messages must contain(agg.response(
+          ReserveCorrelationId,
+          ReserveConfirmed(
+            ConnectionId,
+            ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:B:B?vlan=23"))
+          ),
+          any = pathTrace(
+            AggregatorNsa,
+            ConnectionId,
+            (A.provider.nsa, "ConnectionIdA") -> Nil,
+            (B.provider.nsa, "ConnectionIdB") -> Nil
+          ) :: Nil
+        ))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
         segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
@@ -482,15 +497,19 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
 
           given(
             ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
-            pce.confirm(CorrelationId(0, 3), A))
+            pce.confirm(CorrelationId(0, 3), A),
+            upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")))
 
-          when(upa.acknowledge(CorrelationId(0, 4), ReserveResponse(ConnectionId)))
-          when(upa.response(CorrelationId(0, 4), ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps)))
+          when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteriaWithQualifiedStps)))
 
-          messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps)))
+          messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps), any = pathTrace(
+            AggregatorNsa,
+            ConnectionId,
+            (A.provider.nsa, "ConnectionIdA") -> Nil
+          ) :: Nil))
 
-          childConnectionData(ConnectionId).sourceStp must beEqualTo("networkId:A?vlan=1")
-          childConnectionData(ConnectionId).destinationStp must beEqualTo("networkId:B?vlan=2")
+          childConnectionData("ConnectionIdA").sourceStp must beEqualTo("networkId:A?vlan=1")
+          childConnectionData("ConnectionIdA").destinationStp must beEqualTo("networkId:B?vlan=2")
           reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
         }
 
@@ -498,11 +517,11 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           given(
             ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
             pce.confirm(CorrelationId(0, 1), A, B),
-            upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")))
+            A.provider.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")))
 
           segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
 
-          when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=99")))))
+          when(A.provider.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=99")))))
 
           reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
           messages must contain(beLike[Message] {
@@ -510,15 +529,20 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
               reserve.service must beSome.which((x: P2PServiceBaseType) => x.getSourceSTP() must_== "X?vlan=99")
           })
 
-          when(upa.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
+          when(B.provider.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
 
           reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
           segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
           segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
 
-          when(upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:B:A?vlan=99").withDestSTP("networkId:B:B?vlan=23")))))
+          when(B.provider.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:B:A?vlan=99").withDestSTP("networkId:B:B?vlan=23")))))
 
-          messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:B:B?vlan=23")))))
+          messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:B:B?vlan=23"))), any = pathTrace(
+            AggregatorNsa,
+            ConnectionId,
+            (A.provider.nsa, "ConnectionIdA") -> Nil,
+            (B.provider.nsa, "ConnectionIdB") -> Nil
+          ) :: Nil))
 
           reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
           segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })

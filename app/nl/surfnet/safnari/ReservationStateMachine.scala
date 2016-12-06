@@ -192,14 +192,17 @@ case class ReservationStateMachineData(
         new PathTraceType().withId(aggregatorNsa).withConnectionId(connectionId)
       }
 
+      def extractProviderSegment(pathTrace: PathTraceType): Option[Vector[SegmentType]] = {
+        pathTrace.getPath.asScala.headOption.map(_.getSegment.asScala.to[Vector])
+      }
+
       val pathTraceSegments = segments.flatMap {
         case (correlationId, _) =>
           for {
             reply <- childResponses.get(correlationId).to[Vector]
-            pathTrace <- reply.headers.pathTrace.to[Vector]
-            if !pathTrace.getPath().isEmpty()
-            path = pathTrace.getPath().get(0)
-            segment <- path.getSegment.asScala.to[Vector]
+            segment <- reply.headers.pathTrace.flatMap(extractProviderSegment) getOrElse {
+              Vector(new SegmentType().withId(reply.headers.providerNSA).withConnectionId(reply.body.connectionId))
+            }
           } yield segment
       }.zipWithIndex.map {
         case (segment, order) =>
@@ -454,7 +457,7 @@ class ReservationStateMachine(
     case ModifyingReservationState -> (HeldReservationState | TimeoutReservationState) =>
       respond(ReserveConfirmed(id, nextStateData.criteria.confirmed.get))
     case HeldReservationState -> CommittingReservationState =>
-      val completedPathTrace = if (initialReserve.headers.pathTrace.isEmpty) nextStateData.aggregatedPathTrace else nextStateData.command.headers.pathTrace
+      val completedPathTrace = if (nextStateData.criteria.committed.isEmpty && initialReserve.headers.pathTrace.isEmpty) nextStateData.aggregatedPathTrace else nextStateData.command.headers.pathTrace
       children.childConnections.collect {
         case (seg, _, Present(connectionId)) =>
           val headers = newRequestHeaders(nextStateData.command, seg.provider)

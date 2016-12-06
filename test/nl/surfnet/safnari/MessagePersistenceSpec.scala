@@ -25,7 +25,7 @@ class MessagePersistenceSpec extends MessageStoreSpecification {
     Gen.const(AckFromPce(PceMessageSpec.pathComputationFailedAck)),
     Gen.const(AckFromPce(PceMessageSpec.pathComputationAcceptedAck)),
     Gen.const(FromRequester(initialReserveMessage)),
-    Gen.const(FromRequester(NsiProviderMessage(nsiProviderHeaders(InitialReserveCorrelationId, SessionSecurityAttr :: Nil), InitialReserve(InitialReserveType)))),
+    Gen.const(FromRequester(NsiProviderMessage(nsiProviderHeaders(A.provider, InitialReserveCorrelationId, SessionSecurityAttr :: Nil), InitialReserve(InitialReserveType)))),
     Gen.const(FromProvider(NsiRequesterMessage(nsiRequesterHeaders(CorrelationId.random()), ReserveConfirmed(newConnectionId, ConfirmCriteria)))),
     Gen.const(ToProvider(initialReserveMessage, ProviderEndPoint("urn:nsa:surf", URI.create("http://localhost")))))
 }
