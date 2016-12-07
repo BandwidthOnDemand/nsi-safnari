@@ -193,7 +193,7 @@ case class ReservationStateMachineData(
       }
 
       def extractProviderSegment(pathTrace: PathTraceType): Option[Vector[SegmentType]] = {
-        pathTrace.getPath.asScala.headOption.map(_.getSegment.asScala.to[Vector])
+        pathTrace.getPath.asScala.headOption.map(_.getSegment.asScala.to[Vector].sortBy(_.getOrder))
       }
 
       val pathTraceSegments = segments.flatMap {
