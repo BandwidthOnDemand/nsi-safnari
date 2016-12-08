@@ -409,6 +409,7 @@ class ReservationStateMachine(
       val criteria = nextStateData.criteria.requested.get
       Seq(ToPce(PathComputationRequest(
         newCorrelationId(),
+        Some(aggregatorNsa),
         pceReplyUri,
         criteria.schedule.flatMap(_.startTime.toOption(None)),
         criteria.schedule.flatMap(_.endTime.toOption(None)),

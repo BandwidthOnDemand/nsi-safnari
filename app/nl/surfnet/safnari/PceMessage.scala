@@ -47,7 +47,16 @@ sealed trait PceMessage {
   def correlationId: CorrelationId
 }
 sealed trait PceRequest extends PceMessage
-case class PathComputationRequest(correlationId: CorrelationId, replyTo: URI, startTime: Option[Instant], endTime: Option[Instant], serviceType: ServiceType, algorithm: PathComputationAlgorithm, connectionTrace: List[ConnectionType]) extends PceRequest
+case class PathComputationRequest(
+  correlationId: CorrelationId,
+  nsaId: Option[String],
+  replyTo: URI,
+  startTime: Option[Instant],
+  endTime: Option[Instant],
+  serviceType: ServiceType,
+  algorithm: PathComputationAlgorithm,
+  connectionTrace: List[ConnectionType]
+) extends PceRequest
 
 sealed trait PathComputationAlgorithm { def name: String }
 object PathComputationAlgorithm {
@@ -221,6 +230,7 @@ object PceMessage {
 
   implicit val PceRequestFormat: Format[PceRequest] = (
     (__ \ "correlationId").format[CorrelationId] and
+    (__ \ "nsaId").formatNullable[String] and
     (__ \ "replyTo" \ "url").format[URI] and
     (__ \ "replyTo" \ "mediaType").format[String] and
     (__ \ "algorithm").format[PathComputationAlgorithm] and
@@ -229,19 +239,20 @@ object PceMessage {
     (__ \ "constraints").format[Seq[String]] and
     ServiceTypeFormat and
     (__ \ "trace").format[Seq[ConnectionType]])
-    .apply((correlationId, replyTo, mediaType, algorithm, start, end, constraints, serviceType, connectionTrace) => {
-      PathComputationRequest(correlationId, replyTo, start.map(_.toInstant), end.map(_.toInstant), serviceType, algorithm, connectionTrace.toList)
+    .apply((correlationId, nsaId, replyTo, mediaType, algorithm, start, end, constraints, serviceType, connectionTrace) => {
+      PathComputationRequest(correlationId, nsaId, replyTo, start.map(_.toInstant), end.map(_.toInstant), serviceType, algorithm, connectionTrace.toList)
     }, {
-      case PathComputationRequest(correlationId, replyTo, start, end, serviceType, algorithm, connectionTrace) =>
-        (correlationId,
-          replyTo,
+      case request: PathComputationRequest =>
+        ( request.correlationId,
+          request.nsaId,
+          request.replyTo,
           "application/json",
-          algorithm,
-          start.map(_.toXMLGregorianCalendar()),
-          end.map(_.toXMLGregorianCalendar()),
+          request.algorithm,
+          request.startTime.map(_.toXMLGregorianCalendar()),
+          request.endTime.map(_.toXMLGregorianCalendar()),
           Nil,
-          serviceType,
-          connectionTrace)
+          request.serviceType,
+          request.connectionTrace)
     })
 
   implicit val PceAcknowledgementWrites: Writes[PceAcknowledgement] = Writes {

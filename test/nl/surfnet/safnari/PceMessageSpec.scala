@@ -26,7 +26,7 @@ object PceMessageSpec {
 
   val correlationId = helpers.Specification.newCorrelationId
 
-  val pathComputationRequest = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, Nil)
+  val pathComputationRequest = PathComputationRequest(correlationId, Some("NSA-ID"), URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, Nil)
 
   val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"))
   val computedSegment = ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))
@@ -45,11 +45,12 @@ class PceMessageSpec extends helpers.Specification {
     import nl.surfnet.safnari.PceMessage._
 
     "serialize request with p2pServiceBaseType to json" in {
-      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, Nil)
+      val request = PathComputationRequest(correlationId, Some("NSA-ID"), URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, Nil)
 
       val json = Json.toJson(request)
 
       json \ "correlationId" must beEqualTo(JsString(correlationId.toString))
+      json \ "nsaId" must beEqualTo(JsString("NSA-ID"))
       json \ "replyTo" \ "url" must beEqualTo(JsString("http://localhost/pce/reply"))
       json \ "algorithm" must beEqualTo(JsString("CHAIN"))
       (json \ "p.p2ps" apply 0) \ "capacity" must beEqualTo(JsNumber(100))
@@ -61,7 +62,7 @@ class PceMessageSpec extends helpers.Specification {
       val first = new ConnectionType().withIndex(0).withValue("firstnsa")
       val second = new ConnectionType().withIndex(1).withValue("secondnsa")
       val connectionTrace = List(first, second)
-      val request = PathComputationRequest(correlationId, URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, connectionTrace)
+      val request = PathComputationRequest(correlationId, Some("NSA-ID"), URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, connectionTrace)
 
       val json = Json.toJson(request)
       (json \ "trace" apply 0) \ "index" must beEqualTo(JsNumber(first.getIndex))

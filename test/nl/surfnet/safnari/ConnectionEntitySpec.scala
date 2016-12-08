@@ -28,6 +28,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
 
         messages must contain(ToPce(PathComputationRequest(
           correlationId = CorrelationId(0, 3),
+          nsaId = Some(AggregatorNsa),
           replyTo = PceReplyToUri,
           startTime = Schedule.startTime.toOption(None),
           endTime = Schedule.endTime.toOption(None),
