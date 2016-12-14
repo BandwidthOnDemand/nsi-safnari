@@ -22,6 +22,9 @@
  */
 package controllers
 
+import java.net.URI
+import javax.xml.XMLConstants
+import javax.xml.namespace.QName
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.nsiv2.soap.NsiSoapConversions._
@@ -37,7 +40,6 @@ import play.api.libs.ws.{WS, WSRequestHolder}
 import scala.concurrent.Future
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
-import java.net.URI
 
 object NsiWebService {
   implicit class SoapRequestHolder(request: WSRequestHolder) {
@@ -87,7 +89,10 @@ object NsiWebService {
           } match {
             case Failure(error) =>
               Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: $error", error)
-              convertError(defaultAckHeaders, NsiError.GenericInternalError.copy(text = error.toString).toServiceException(nsa))
+              convertError(defaultAckHeaders, NsiError.MessageDeliveryError.withVariables(
+                NsiHeaders.PROVIDER_NSA -> nsa,
+                new QName(XMLConstants.NULL_NS_URI, "error") -> error.toString()
+              ).toServiceException(nsa))
             case Success(ack) =>
               Logger.debug(s"Received ack from ${nsa} at ${request.url}: $ack")
               ack
@@ -97,7 +102,12 @@ object NsiWebService {
           convertError(defaultAckHeaders, NsiError.Unauthorized.toServiceException(nsa))
         case _ =>
           Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
-          convertError(defaultAckHeaders, NsiError.GenericInternalError.copy(text = s"Communication error: ${ack.status} ${ack.statusText}").toServiceException(nsa))
+          convertError(defaultAckHeaders, NsiError.MessageDeliveryError.withVariables(
+            NsiHeaders.PROVIDER_NSA -> nsa,
+            new QName(XMLConstants.NULL_NS_URI, "url") -> url.toASCIIString(),
+            new QName(XMLConstants.NULL_NS_URI, "status") -> ack.status.toString,
+            new QName(XMLConstants.NULL_NS_URI, "statusText") -> ack.statusText
+          ).toServiceException(nsa))
       }
     }
   }

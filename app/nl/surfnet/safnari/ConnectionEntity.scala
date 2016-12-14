@@ -25,6 +25,8 @@ package nl.surfnet.safnari
 import java.net.URI
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import javax.xml.XMLConstants
+import javax.xml.namespace.QName
 
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
@@ -148,7 +150,10 @@ class ConnectionEntity(
         failed.connectionId.foreach { connectionId =>
           val child = children.childrenByConnectionId.get(connectionId)
           val childNsaId = child.map(_.nsa)
-          mostRecentChildExceptions += connectionId -> NsiError.GenericInternalError.toServiceException(childNsaId.getOrElse("")).withText(failed.toShortString)
+          mostRecentChildExceptions += connectionId -> NsiError.MessageDeliveryError.withVariables(
+            NsiHeaders.PROVIDER_NSA -> childNsaId.getOrElse(""),
+            new QName(XMLConstants.NULL_NS_URI, "error") -> failed.toShortString
+          ).toServiceException(childNsaId.getOrElse(""))
         }
       case _ =>
     }

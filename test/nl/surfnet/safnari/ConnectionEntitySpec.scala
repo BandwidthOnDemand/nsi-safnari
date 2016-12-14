@@ -241,7 +241,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
-            failed.getServiceException().getErrorId() must beEqualTo(NsiError.CAPACITY_UNAVAILABLE.id)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildSegmentError.id)
             failed.getServiceException().getNsaId() must beEqualTo(AggregatorNsa)
             failed.getServiceException().getChildException().asScala must haveSize(1)
             failed.getServiceException().getChildException().get(0).getErrorId() must beEqualTo(NsiError.CAPACITY_UNAVAILABLE.id)
@@ -264,7 +264,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
-            failed.getServiceException().getErrorId() must beEqualTo(NsiError.CAPACITY_UNAVAILABLE.id)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildSegmentError.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
@@ -288,7 +288,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
-            failed.getServiceException().getErrorId() must beEqualTo("ErrorId")
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildSegmentError.id)
             failed.getServiceException().getChildException().asScala must haveSize(1)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
@@ -309,7 +309,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
             headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
             failed.getConnectionId() must beEqualTo(ConnectionId)
-            failed.getServiceException().getErrorId() must beEqualTo(NsiError.CAPACITY_UNAVAILABLE.id)
+            failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildSegmentError.id)
             failed.getServiceException().getChildException().asScala must haveSize(2)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
@@ -562,7 +562,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             case ToRequester(NsiRequesterMessage(headers, ReserveFailed(failed))) =>
               headers must beEqualTo(nsiRequesterHeaders(ReserveCorrelationId))
               failed.getConnectionId() must beEqualTo(ConnectionId)
-              failed.getServiceException().getErrorId() must beEqualTo(NsiError.CAPACITY_UNAVAILABLE.id)
+              failed.getServiceException().getErrorId() must beEqualTo(NsiError.ChildSegmentError.id)
               failed.getServiceException().getChildException().asScala must haveSize(1)
           })
           reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
@@ -900,7 +900,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
 
         messages must contain(like[Message] {
           case ToRequester(NsiRequesterMessage(_, ReserveFailed(failed))) =>
-            failed.getServiceException.getErrorId must_== NsiError.CapacityUnavailable(1000).id
+            failed.getServiceException.getErrorId must_== NsiError.ChildSegmentError.id
         })
         reservationState must_== ReservationStateEnumType.RESERVE_FAILED
       }

@@ -9,12 +9,13 @@ libraryDependencies ++= Seq(
   ws,
   jdbc,
   anorm,
-  "nl.surfnet" %% "play-nsi-support" % "2.1.2",
-  "nl.surfnet" %% "play-nsi-support" % "2.1.2" % "test" classifier "tests",
+  "nl.surfnet" %% "play-nsi-support" % "2.1.3-SNAPSHOT",
+  "nl.surfnet" %% "play-nsi-support" % "2.1.3-SNAPSHOT" % "test" classifier "tests",
   "org.scala-stm" %% "scala-stm" % "0.7",
   "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
   "com.mandubian" %% "play-json-zipper" % "1.2",
   "org.specs2" %% "specs2-scalacheck" % "2.3.13" % "test",
+  "org.specs2" %% "specs2-junit" % "2.3.13" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.3.4" % "test"
 )
 
