@@ -82,7 +82,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
 
       val response = message match {
         case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) => connection.queryRecursive(query)
-        case reserve @ FromRequester(NsiProviderMessage(headers, _: InitialReserve)) =>
+        case reserve @ FromRequester(NsiProviderMessage(headers, _: InitialReserve)) if connection == null =>
           initialReserve(reserve)
         case message: FromRequester =>
           val first = processInbound(message)(context).right.toOption
