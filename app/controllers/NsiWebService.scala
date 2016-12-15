@@ -23,7 +23,6 @@
 package controllers
 
 import java.net.URI
-import javax.xml.XMLConstants
 import javax.xml.namespace.QName
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
@@ -91,7 +90,7 @@ object NsiWebService {
               Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: $error", error)
               convertError(defaultAckHeaders, NsiError.MessageDeliveryError.withVariables(
                 NsiHeaders.PROVIDER_NSA -> nsa,
-                new QName(XMLConstants.NULL_NS_URI, "error") -> error.toString()
+                new QName("error") -> error.toString()
               ).toServiceException(nsa))
             case Success(ack) =>
               Logger.debug(s"Received ack from ${nsa} at ${request.url}: $ack")
@@ -104,9 +103,9 @@ object NsiWebService {
           Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
           convertError(defaultAckHeaders, NsiError.MessageDeliveryError.withVariables(
             NsiHeaders.PROVIDER_NSA -> nsa,
-            new QName(XMLConstants.NULL_NS_URI, "url") -> url.toASCIIString(),
-            new QName(XMLConstants.NULL_NS_URI, "status") -> ack.status.toString,
-            new QName(XMLConstants.NULL_NS_URI, "statusText") -> ack.statusText
+            new QName("url") -> url.toASCIIString(),
+            new QName("status") -> ack.status.toString,
+            new QName("statusText") -> ack.statusText
           ).toServiceException(nsa))
       }
     }
