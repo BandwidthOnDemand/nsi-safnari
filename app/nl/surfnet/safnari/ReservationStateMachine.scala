@@ -464,7 +464,7 @@ class ReservationStateMachine(
     case CommittingReservationState -> ReservedReservationState =>
       respond(ReserveCommitConfirmed(id))
     case CommittingReservationState -> CommitFailedReservationState =>
-      respond(ReserveCommitFailed(failed(NsiError.GenericInternalError).tap(_.getServiceException().withChildException(stateData.childExceptions.values.toSeq.asJava))))
+      respond(ReserveCommitFailed(failed(NsiError.GenericNsaError).tap(_.getServiceException().withChildException(stateData.childExceptions.values.toSeq.asJava))))
     case ReservedReservationState -> ModifyingReservationState =>
       val data = nextStateData
       children.childConnections.collect {
