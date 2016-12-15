@@ -7,7 +7,6 @@ import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
 import net.nordu.namespaces._2013._12.gnsbod.{ ConnectionTraceType, ConnectionType, ObjectFactory => ConnectionTraceTypeOF }
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.TypeValueType
 
 import scala.collection.JavaConverters._
@@ -92,7 +91,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
 
       "send reserve request including the connection trace" in new fixture {
         val requesterTrace = new ConnectionTraceTypeOF().createConnectionTrace(new ConnectionTraceType().withConnection(
-            new ConnectionType().withIndex(2).withValue("urn:ogf:network:someone:noId")
+          new ConnectionType().withIndex(2).withValue("urn:ogf:network:someone:noId")
         ))
         given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType), Nil, requesterTrace :: Nil))
 
@@ -630,6 +629,12 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
     }
 
     "that has been committed" should {
+      "be in released state" in new fixture {
+        given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
+
+        provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
+      }
+
       "provide detailed information about committed connections with children" in new ReservedConnection {
         val result = connection.query
 
@@ -808,7 +813,32 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
       }
     }
 
-    "in provisioned state" should {
+    "data plane state machine (DSM)" should {
+      "have a data plane inactive" in new ReservedConnection with Provisioned {
+        dataPlaneStatus.isActive() must beFalse
+      }
+
+      "have a data plane inactive on data plane change" in new ReservedConnection with Provisioned {
+        given(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+          .withConnectionId("ConnectionIdA")
+          .withDataPlaneStatus(dataPlaneStatusType(true, consistent = true))
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
+
+        when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+          .withConnectionId("ConnectionIdA")
+          .withDataPlaneStatus(dataPlaneStatusType(false, consistent = true))
+          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z")))))
+
+        dataPlaneStatus.isActive() must beFalse
+        dataPlaneStatus.isVersionConsistent() must beTrue
+        messages must contain(
+          agg.notification(CorrelationId(0, 12), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
+            .withConnectionId(ConnectionId)
+            .withNotificationId(2)
+            .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z"))
+            .withDataPlaneStatus(dataPlaneStatusType(false, consistent = true)))))
+      }
+
       "have data plane active when data plane state change is received" in new ReservedConnection with Provisioned {
         when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
           .withConnectionId("ConnectionIdA")
@@ -903,26 +933,71 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
 
     }
 
-    "be in released state when initial reserve" in new fixture {
-      given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
+    "lifecycle state machine (LSM)" should {
+      "initialize the provisioning state machine when the path is confirmed" in new fixture {
+        given(
+          ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
-      provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
+        when(pce.confirm(CorrelationId(0, 1), A))
+
+        provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
+      }
     }
 
-    "initialize the provisioning state machine when the path is confirmed" in new fixture {
-      given(
-        ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
+    "in created state" should {
+      "become failed on ForcedEnd error event" in new ReservedConnection {
+        val ProviderErrorEventCorrelationId = newCorrelationId
+        val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
+        val ChildException = new ServiceExceptionType()
+          .withConnectionId("ConnectionIdA")
+          .withNsaId(A.provider.nsa)
+          .withErrorId("FORCED_END")
+          .withText("ERROR_TEXT")
+          .withServiceType("SERVICE_TYPE")
 
-      when(pce.confirm(CorrelationId(0, 1), A))
+        when(upa.notification(ProviderErrorEventCorrelationId, ErrorEvent(new ErrorEventType()
+          .withConnectionId("ConnectionIdA")
+          .withNotificationId(4)
+          .withTimeStamp(TimeStamp)
+          .withEvent(EventEnumType.FORCED_END)
+          .withOriginatingConnectionId("OriginatingConnectionId")
+          .withOriginatingNSA("OriginatingNSA")
+          .withServiceException(ChildException))))
 
-      provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
-    }
+        lifecycleState must beEqualTo(LifecycleStateEnumType.FAILED)
+        connection.lsm.childConnectionState("ConnectionIdA") must beEqualTo(LifecycleStateEnumType.FAILED)
+        messages must contain(agg.notification(CorrelationId(0, 9), ErrorEvent(new ErrorEventType()
+          .withConnectionId("ConnectionId")
+          .withNotificationId(1)
+          .withTimeStamp(TimeStamp)
+          .withEvent(EventEnumType.FORCED_END)
+          .withOriginatingConnectionId("OriginatingConnectionId")
+          .withOriginatingNSA("OriginatingNSA")
+          .withServiceException(new ServiceExceptionType()
+            .withConnectionId("ConnectionId")
+            .withNsaId(AggregatorNsa)
+            .withErrorId("FORCED_END")
+            .withText("ERROR_TEXT")
+            .withServiceType("SERVICE_TYPE")
+            .withChildException(ChildException)))))
+      }
 
-    "in released state" should {
-      "become provisioning on provision request" in new ReservedConnection with Released {
-        when(ura.request(newCorrelationId, Provision(ConnectionId)))
+      "become PassedEndTime on PassedEndTime event" in new ReservedConnection {
+        val endTime = schedule.endTime.fold2(identity, Instant.now, Instant.now)
+        context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault))
 
-        messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 8)), Provision("ConnectionIdA")), A.provider))
+        when(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.PASSED_END_TIME)
+      }
+
+      "ignore PassedEndTime message before scheduled end time" in new ReservedConnection {
+        val endTime = schedule.endTime.fold2(_.minus(5, ChronoUnit.MINUTES), Instant.now, Instant.now)
+        context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault))
+
+        when(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.CREATED)
       }
     }
 
@@ -948,157 +1023,89 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
       }
     }
 
-    "send a provision confirmed to requester" in new ReservedConnection with Released {
-      val ProvisionCorrelationId = newCorrelationId
+    "in released state" should {
+      "become provisioning on provision request" in new ReservedConnection with Released {
+        when(ura.request(newCorrelationId, Provision(ConnectionId)))
 
-      given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
+        messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 8)), Provision("ConnectionIdA")), A.provider))
+      }
 
-      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
+      "send a provision confirmed to requester" in new ReservedConnection with Released {
+        val ProvisionCorrelationId = newCorrelationId
 
-      when(upa.response(CorrelationId(0, 8), ProvisionConfirmed("ConnectionIdA")))
+        given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
 
-      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
-      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ProvisionCorrelationId), ProvisionConfirmed(ConnectionId))))
+        provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
+
+        when(upa.response(CorrelationId(0, 8), ProvisionConfirmed("ConnectionIdA")))
+
+        provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
+        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ProvisionCorrelationId), ProvisionConfirmed(ConnectionId))))
+      }
+
+      "send a provision confirmed with multiple segments" in new ReservedConnectionWithTwoSegments with ReleasedSegments {
+        val ProvisionCorrelationId = newCorrelationId
+
+        given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
+
+        provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
+        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+
+        when(upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")))
+
+        messages must beEmpty
+        provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
+        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+
+        when(upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
+
+        provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
+        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
+        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ProvisionCorrelationId), ProvisionConfirmed(ConnectionId))))
+      }
+
+      "reject release request" in new ReservedConnection with Released {
+        val ack = when(ura.request(newCorrelationId, Release(ConnectionId)))
+
+        ack must beNone
+      }
     }
 
-    "send a provision confirmed with multiple segments" in new ReservedConnectionWithTwoSegments with ReleasedSegments {
-      val ProvisionCorrelationId = newCorrelationId
+    "in provisioned state" should {
+      "become releasing on release request" in new ReservedConnection with Provisioned {
+        val ReleaseCorrelationId = newCorrelationId
 
-      given(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
+        when(ura.request(ReleaseCorrelationId, Release(ConnectionId)))
 
-      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
-      segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_START, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+        provisionState must beEqualTo(ProvisionStateEnumType.RELEASING)
+        messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 10)), Release("ConnectionIdA")), A.provider))
+      }
 
-      when(upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")))
+      "send release confirmed to requester" in new ReservedConnection with Provisioned {
+        val ReleaseCorrelationId = newCorrelationId
 
-      messages must beEmpty
-      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONING)
-      segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
-      segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONING, _, _) => ok })
+        given(
+          ura.request(ReleaseCorrelationId, Release(ConnectionId)),
+          upa.acknowledge(CorrelationId(0, 10), GenericAck()))
 
-      when(upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB")))
+        when(upa.response(CorrelationId(0, 10), ReleaseConfirmed("ConnectionIdA")))
 
-      provisionState must beEqualTo(ProvisionStateEnumType.PROVISIONED)
-      segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
-      segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, _, _, ProvisionStateEnumType.PROVISIONED, _, _) => ok })
-      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ProvisionCorrelationId), ProvisionConfirmed(ConnectionId))))
+        provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
+        messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ReleaseCorrelationId), ReleaseConfirmed(ConnectionId))))
+      }
+
+      "reject provision request when provisioned" in new ReservedConnection with Provisioned {
+        val ack = when(ura.request(newCorrelationId, Provision(ConnectionId)))
+
+        ack must beNone
+      }
     }
+  }
 
-    "become releasing on release request" in new ReservedConnection with Provisioned {
-      val ReleaseCorrelationId = newCorrelationId
-
-      when(ura.request(ReleaseCorrelationId, Release(ConnectionId)))
-
-      provisionState must beEqualTo(ProvisionStateEnumType.RELEASING)
-      messages must contain(ToProvider(NsiProviderMessage(toProviderHeaders(A.provider, CorrelationId(0, 10)), Release("ConnectionIdA")), A.provider))
-    }
-
-    "send release confirmed to requester" in new ReservedConnection with Provisioned {
-      val ReleaseCorrelationId = newCorrelationId
-
-      given(
-        ura.request(ReleaseCorrelationId, Release(ConnectionId)),
-        upa.acknowledge(CorrelationId(0, 10), GenericAck()))
-
-      when(upa.response(CorrelationId(0, 10), ReleaseConfirmed("ConnectionIdA")))
-
-      provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
-      messages must contain(ToRequester(NsiRequesterMessage(nsiRequesterHeaders(ReleaseCorrelationId), ReleaseConfirmed(ConnectionId))))
-    }
-
-    "reject release request when released" in new ReservedConnection with Released {
-      val ack = when(ura.request(newCorrelationId, Release(ConnectionId)))
-
-      ack must beNone
-    }
-
-    "reject provision request when provisioned" in new ReservedConnection with Provisioned {
-      val ack = when(ura.request(newCorrelationId, Provision(ConnectionId)))
-
-      ack must beNone
-    }
-
-    "have a data plane inactive" in new ReservedConnection with Provisioned {
-      dataPlaneStatus.isActive() must beFalse
-    }
-
-    "have a data plane inactive on data plane change" in new ReservedConnection with Provisioned {
-      given(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
-        .withConnectionId("ConnectionIdA")
-        .withDataPlaneStatus(dataPlaneStatusType(true, consistent = true))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:00:00Z")))))
-
-      when(upa.notification(newCorrelationId, DataPlaneStateChange(new DataPlaneStateChangeRequestType()
-        .withConnectionId("ConnectionIdA")
-        .withDataPlaneStatus(dataPlaneStatusType(false, consistent = true))
-        .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z")))))
-
-      dataPlaneStatus.isActive() must beFalse
-      dataPlaneStatus.isVersionConsistent() must beTrue
-      messages must contain(
-        agg.notification(CorrelationId(0, 12), DataPlaneStateChange(new DataPlaneStateChangeRequestType()
-          .withConnectionId(ConnectionId)
-          .withNotificationId(2)
-          .withTimeStamp(DatatypeFactory.newInstance().newXMLGregorianCalendar("2002-10-09T11:15:00Z"))
-          .withDataPlaneStatus(dataPlaneStatusType(false, consistent = true)))))
-    }
-
-    "become failed on ForcedEnd error event" in new ReservedConnection {
-      val ProviderErrorEventCorrelationId = newCorrelationId
-      val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
-      val ChildException = new ServiceExceptionType()
-        .withConnectionId("ConnectionIdA")
-        .withNsaId(A.provider.nsa)
-        .withErrorId("FORCED_END")
-        .withText("ERROR_TEXT")
-        .withServiceType("SERVICE_TYPE")
-
-      when(upa.notification(ProviderErrorEventCorrelationId, ErrorEvent(new ErrorEventType()
-        .withConnectionId("ConnectionIdA")
-        .withNotificationId(4)
-        .withTimeStamp(TimeStamp)
-        .withEvent(EventEnumType.FORCED_END)
-        .withOriginatingConnectionId("OriginatingConnectionId")
-        .withOriginatingNSA("OriginatingNSA")
-        .withServiceException(ChildException))))
-
-      lifecycleState must beEqualTo(LifecycleStateEnumType.FAILED)
-      connection.lsm.childConnectionState("ConnectionIdA") must beEqualTo(LifecycleStateEnumType.FAILED)
-      messages must contain(agg.notification(CorrelationId(0, 9), ErrorEvent(new ErrorEventType()
-        .withConnectionId("ConnectionId")
-        .withNotificationId(1)
-        .withTimeStamp(TimeStamp)
-        .withEvent(EventEnumType.FORCED_END)
-        .withOriginatingConnectionId("OriginatingConnectionId")
-        .withOriginatingNSA("OriginatingNSA")
-        .withServiceException(new ServiceExceptionType()
-          .withConnectionId("ConnectionId")
-          .withNsaId(AggregatorNsa)
-          .withErrorId("FORCED_END")
-          .withText("ERROR_TEXT")
-          .withServiceType("SERVICE_TYPE")
-          .withChildException(ChildException)))))
-    }
-
-    "become PassedEndTime on PassedEndTime event" in new ReservedConnection {
-      val endTime = schedule.endTime.fold2(identity, Instant.now, Instant.now)
-      context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault))
-
-      when(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
-
-      lifecycleState must beEqualTo(LifecycleStateEnumType.PASSED_END_TIME)
-    }
-
-    "ignore PassedEndTime message before scheduled end time" in new ReservedConnection {
-      val endTime = schedule.endTime.fold2(_.minus(5, ChronoUnit.MINUTES), Instant.now, Instant.now)
-      context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault))
-
-      when(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
-
-      lifecycleState must beEqualTo(LifecycleStateEnumType.CREATED)
-    }
-
+  "Connection entity" should {
     "pass MessageDeliveryTimeout notifications to requester" in new ReservedConnection {
       val TimedOutMessageCorrelationId = newCorrelationId.toString
       val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
