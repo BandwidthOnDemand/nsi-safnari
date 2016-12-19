@@ -273,8 +273,8 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
             outbound.foreach(output ! _)
 
             inbound match {
-              case FromRequester(NsiProviderMessage(_, _: InitialReserve)) => ReserveResponse(connection.id)
-              case _                                                       => GenericAck()
+              case FromRequester(NsiProviderMessage(_, _: Reserve)) => ReserveResponse(connection.id)
+              case _                                                => GenericAck()
             }
         }
 
