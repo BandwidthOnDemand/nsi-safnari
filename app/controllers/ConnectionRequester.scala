@@ -27,11 +27,11 @@ import akka.event.LoggingReceive
 import java.net.URI
 import java.time.Instant
 import java.util.concurrent.TimeoutException
-import nl.surfnet.nsiv2._
 import nl.surfnet.nsiv2.messages._
-import soap._
-import soap.ExtraBodyParsers._
+import nl.surfnet.nsiv2.soap._
+import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
+import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 import play.api.Logger
 import play.api.Play.current
 import play.api.libs.concurrent.Execution.Implicits._
@@ -120,21 +120,44 @@ object ConnectionRequester {
   }
 
   class DummyNsiRequesterActor extends Actor {
+    private var connectionCriteria: Map[ConnectionId, ReservationConfirmCriteriaType] = Map.empty
+
     def receive = LoggingReceive {
       case 'healthCheck =>
         sender ! Future.successful("NSI requester (Dummy)" -> true)
       case ToProvider(message @ NsiProviderMessage(headers, reserve: InitialReserve), _) =>
         val connectionId = newConnectionId
-        val confirmCriteria = Conversion.invert(reserve.body.getCriteria()).get
-        confirmCriteria.pointToPointService.foreach { service =>
-          service.setSourceSTP(qualifyStp(service.getSourceSTP))
-          service.setDestSTP(qualifyStp(service.getDestSTP))
+
+        val requestCriteria = reserve.body.getCriteria
+
+        val confirmCriteria = new ReservationConfirmCriteriaType()
+          .withSchedule(requestCriteria.getSchedule)
+          .withServiceType(requestCriteria.getServiceType)
+          .withVersion(if (requestCriteria.getVersion eq null) 1 else requestCriteria.getVersion)
+          .withAny(requestCriteria.getAny)
+
+        requestCriteria.pointToPointService.foreach { p2ps =>
+          val qualified = p2ps.shallowCopy
+          qualified.setSourceSTP(qualifyStp(p2ps.getSourceSTP))
+          qualified.setDestSTP(qualifyStp(p2ps.getDestSTP))
+          confirmCriteria.withPointToPointService(qualified)
         }
+
+        connectionCriteria += connectionId -> confirmCriteria
+
         Connection(sender) ! Connection.Command(Instant.now(), AckFromProvider(message ack ReserveResponse(connectionId)))
         Connection(sender) ! Connection.Command(Instant.now(), FromProvider(message reply ReserveConfirmed(connectionId, confirmCriteria)))
+
       case ToProvider(message @ NsiProviderMessage(headers, reserve: ModifyReserve), _) =>
-        Connection(sender) ! Connection.Command(Instant.now(), AckFromProvider(message ack ReserveResponse(reserve.connectionId)))
-        Connection(sender) ! Connection.Command(Instant.now(), FromProvider(message reply ReserveConfirmed(reserve.connectionId, Conversion.invert(reserve.body.getCriteria()).get)))
+        connectionCriteria.get(reserve.connectionId) map { criteria =>
+          reserve.body.getCriteria.modifiedCapacity.foreach { capacity => criteria.pointToPointService.foreach { p2ps => p2ps.setCapacity(capacity) } }
+
+          Connection(sender) ! Connection.Command(Instant.now(), AckFromProvider(message ack ReserveResponse(reserve.connectionId)))
+          Connection(sender) ! Connection.Command(Instant.now(), FromProvider(message reply ReserveConfirmed(reserve.connectionId, criteria)))
+        } getOrElse {
+          Connection(sender) ! Connection.Command(Instant.now(), AckFromProvider(message ack ServiceException(NsiError.ReservationNonExistent.toServiceException(headers.providerNSA))))
+        }
+
       case ToProvider(message @ NsiProviderMessage(headers, commit: ReserveCommit), _) =>
         Connection(sender) ! Connection.Command(Instant.now(), AckFromProvider(message ack GenericAck()))
         Connection(sender) ! Connection.Command(Instant.now(), FromProvider(message reply ReserveCommitConfirmed(commit.connectionId)))

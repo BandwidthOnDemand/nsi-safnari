@@ -5,7 +5,6 @@ import java.time.Instant
 import java.time.temporal._
 import javax.xml.bind.JAXBElement
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import oasis.names.tc.saml._2_0.assertion.AttributeType
@@ -47,7 +46,7 @@ object NsiMessages {
   val ConfirmedCriteriaVersion = 3
   def Schedule = new ScheduleType().withStartTime(StartTime.toXMLGregorianCalendar()).withEndTime(EndTime.toXMLGregorianCalendar())
   def ConfirmCriteria = new ReservationConfirmCriteriaType().withVersion(ConfirmedCriteriaVersion).withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
-  def RequestCriteria = Conversion.convert(ConfirmCriteria).get
+  def RequestCriteria = new ReservationRequestCriteriaType().withVersion(ConfirmedCriteriaVersion).withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
 
   def InitialReserveType = new ReserveType().withCriteria(RequestCriteria).withDescription("description").withGlobalReservationId("global-reservation-id")
   val InitialReserveCorrelationId = helpers.Specification.newCorrelationId

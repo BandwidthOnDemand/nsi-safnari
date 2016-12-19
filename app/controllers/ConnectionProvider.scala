@@ -22,23 +22,21 @@
  */
 package controllers
 
-import java.net.URI
-
 import akka.actor._
 import controllers.ActorSupport._
-import nl.surfnet.nsiv2._
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.utils._
-import soap.SoapWebService
-import soap.ExtraBodyParsers._
-import nl.surfnet.safnari._
+import java.net.URI
 import java.time.Instant
+import javax.xml.namespace.QName
+import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
+import nl.surfnet.nsiv2.soap.SoapWebService
+import nl.surfnet.nsiv2.utils._
+import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.Play._
 import play.api._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
-
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -51,13 +49,15 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
   override def serviceUrl: String = ConnectionProvider.serviceUrl
 
   def request = NsiProviderEndPoint(Configuration.NsaId) { request =>
-    validateRequesterNsa(request).map(Future.successful) getOrElse (request match {
+    validateRequest(request).map(Future.successful) getOrElse (request match {
       case message @ NsiProviderMessage(headers, query: NsiProviderQuery) => handleQuery(NsiProviderMessage(headers, query))(ConnectionProvider.replyToClient(headers.replyTo)).map(message.ack)
       case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(ConnectionProvider.replyToClient(headers.replyTo)).map(message.ack)
     })
   }
 
-  private def validateRequesterNsa(message: NsiProviderMessage[_]): Option[NsiProviderMessage[NsiAcknowledgement]] = message.headers.replyTo.flatMap { replyTo =>
+  private def validateRequest(message: NsiProviderMessage[_]): Option[NsiProviderMessage[ServiceException]] = validateRequesterNsa(message) orElse validateServiceType(message)
+
+  private def validateRequesterNsa(message: NsiProviderMessage[_]): Option[NsiProviderMessage[ServiceException]] = message.headers.replyTo.flatMap { replyTo =>
     val nsa = message.headers.requesterNSA
     if (Configuration.Use2WayTLS) {
       Configuration.translateToStunnelAddress(nsa, replyTo) match {
@@ -65,10 +65,18 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
           None
         case Failure(e) =>
           Logger.info(s"The requesterNSA '$nsa' does not match a known TLS NSA")
-          val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(nsa, NsiHeaders.REQUESTER_NSA -> nsa))
+          val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(Configuration.NsaId, NsiHeaders.REQUESTER_NSA -> nsa))
           Some(message ack serviceException)
       }
     } else None
+  }
+
+  private def validateServiceType(message: NsiProviderMessage[_]): Option[NsiProviderMessage[ServiceException]] = message match {
+    case NsiProviderMessage(_, reserve: InitialReserve) if reserve.body.getCriteria.getServiceType eq null =>
+      val x = message ack ServiceException(NsiError.MissingParameter.toServiceException(Configuration.NsaId, new QName("serviceType") -> "is required"))
+      Some(x)
+    case _ =>
+      None
   }
 
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderCommand])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] =

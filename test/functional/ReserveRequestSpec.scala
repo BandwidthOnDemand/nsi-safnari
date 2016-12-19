@@ -8,7 +8,6 @@ import controllers.NsiWebService
 import nl.surfnet.nsiv2.soap.NsiSoapConversions._
 import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.soap._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
 import org.ogf.schemas.nsi._2013._12.connection.types._
@@ -44,11 +43,16 @@ class ReserveRequestSpec extends helpers.Specification {
       case "/fake/provider" => Some(NsiProviderEndPoint("fake-provider-nsa") {
         case message @ NsiProviderMessage(headers, reserve: InitialReserve) =>
           val connectionId = newConnectionId
+
+          val requestCriteria = reserve.body.getCriteria
+          val p2ps = requestCriteria.pointToPointService.get
+          val confirmCriteria = requestCriteria.toInitialConfirmCriteria(p2ps.getSourceSTP, p2ps.getDestSTP).get
+
           headers.replyTo.foreach { replyTo =>
             NsiWebService.callRequester(
               headers.requesterNSA,
               replyTo,
-              message reply ReserveConfirmed(connectionId, Conversion.invert(reserve.body.getCriteria()).get))
+              message reply ReserveConfirmed(connectionId, confirmCriteria))
           }
           Future.successful(message.ack(ReserveResponse(connectionId)))
         case wtf =>
