@@ -35,6 +35,7 @@ import scala.collection.JavaConverters._
 
 sealed abstract class ReservationState(val jaxb: ReservationStateEnumType)
 case object InitialReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
+case object ReserveNotAcceptedReservationState extends ReservationState(ReservationStateEnumType.RESERVE_FAILED)
 case object FailedReservationState extends ReservationState(ReservationStateEnumType.RESERVE_FAILED)
 case object ReservedReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
 case object PathComputationState extends ReservationState(ReservationStateEnumType.RESERVE_CHECKING)
@@ -101,7 +102,7 @@ case class ReservationStateMachineData(
     else if (reserveError.isDefined) FailedReservationState
     else if (childConnectionStates.values.exists(_ == CheckingReservationState)) CheckingReservationState
     else if (childConnectionStates.values.exists(_ == ModifyingReservationState)) ModifyingReservationState
-    else if (childConnectionStates.values.exists(_ == FailedReservationState)) FailedReservationState
+    else if (childConnectionStates.values.exists(Set(ReserveNotAcceptedReservationState, FailedReservationState))) FailedReservationState
     else if (childConnectionStates.values.exists(_ == CommittingReservationState)) CommittingReservationState
     else if (childConnectionStates.values.exists(_ == CommitFailedReservationState)) CommitFailedReservationState
     else if (childConnectionStates.values.exists(_ == AbortingReservationState)) AbortingReservationState
@@ -113,12 +114,12 @@ case class ReservationStateMachineData(
 
   def startProcessingNewCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: ReservationState, children: ChildConnectionIds) = {
     // Skip aborted state when we never received a child connection id due to an immediate service exception.
-    val stateForChildConnectionsWithoutConnectionId = if (transitionalState == AbortingReservationState) AbortedReservationState else transitionalState
+    val stateForChildConnectionsThatDidNotAcceptReserveRequest = if (transitionalState == AbortingReservationState) AbortedReservationState else transitionalState
     copy(
       command = command,
       childConnectionStates = childConnectionStates.map {
-        case (correlationId, _) =>
-          correlationId -> (if (children hasConnectionId correlationId) transitionalState else stateForChildConnectionsWithoutConnectionId)
+        case (correlationId, state) =>
+          correlationId -> (if (state != ReserveNotAcceptedReservationState) transitionalState else stateForChildConnectionsThatDidNotAcceptReserveRequest)
       },
       childExceptions = Map.empty,
       childReserveTimeouts = Vector.empty,
@@ -138,6 +139,11 @@ case class ReservationStateMachineData(
     copy(
       childConnectionStates = childConnectionStates.updated(initialCorrelationId, reservationState),
       childExceptions = exception.fold(childExceptions - initialCorrelationId)(exception => childExceptions.updated(initialCorrelationId, exception)))
+  }
+
+  def updateChildByConnectionId(children: ChildConnectionIds, connectionId: ConnectionId, reservationState: ReservationState, exception: Option[ServiceExceptionType]): ReservationStateMachineData = {
+    val correlationId = children.initialCorrelationIdByConnectionId.getOrElse(connectionId, throw new IllegalStateException(s"missing child connection id for ${connectionId}"))
+    updateChild(correlationId, reservationState, exception)
   }
 
   def updateChild(initialCorrelationId: CorrelationId, message: NsiRequesterMessage[NsiRequesterUpdate], reservationState: ReservationState, exception: Option[ServiceExceptionType] = None): ReservationStateMachineData = {
@@ -289,7 +295,7 @@ class ReservationStateMachine(
       goto(newData.aggregatedReservationState) using newData
     case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
       val newData = data
-        .updateChild(headers.correlationId, FailedReservationState, Some(serviceException))
+        .updateChild(headers.correlationId, ReserveNotAcceptedReservationState, Some(serviceException))
         .modifyChildCriteria(headers.correlationId)(_.abort)
         .clearNextSegments
       goto(newData.aggregatedReservationState) using newData
@@ -386,6 +392,12 @@ class ReservationStateMachine(
         .updateChildByConnectionId(children, reply.copy(body = message), FailedReservationState, Some(message.failed.getServiceException()))
         .modifyChildCriteria(children, message.connectionId)(_.abort)
       goto(newData.aggregatedReservationState) using newData
+    case Event(AckFromProvider(NsiProviderMessage(_, ServiceException(exception))), data) if children.childrenByConnectionId.contains(exception.getConnectionId) =>
+      // FIXME child connection id may not be provided, we should really use the correlationId
+      val childConnectionId = exception.getConnectionId
+      val newData = data
+        .updateChildByConnectionId(children, childConnectionId, ReserveNotAcceptedReservationState, Some(exception))
+      goto(newData.aggregatedReservationState) using newData
     case Event(FromProvider(notification @ NsiRequesterMessage(headers, message: ReserveTimeout)), data) =>
       val newData = data
         .copy(childReserveTimeouts = data.childReserveTimeouts :+ notification.copy(body = message))
@@ -458,7 +470,7 @@ class ReservationStateMachine(
       }.toVector
     case (HeldReservationState | FailedReservationState) -> AbortingReservationState =>
       children.childConnections.collect {
-        case (seg, _, Present(connectionId)) =>
+        case (seg, initialCorrelationId, Present(connectionId)) if nextStateData.childHasState(initialCorrelationId, AbortingReservationState) =>
           ToProvider(NsiProviderMessage(newRequestHeaders(nextStateData.command, seg.provider), ReserveAbort(connectionId)), seg.provider)
       }.toVector
     case CommittingReservationState -> ReservedReservationState =>

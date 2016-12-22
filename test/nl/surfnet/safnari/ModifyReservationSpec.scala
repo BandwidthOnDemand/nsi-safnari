@@ -153,6 +153,29 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
         })
         reservationState must_== ReservationStateEnumType.RESERVE_FAILED
       }
+
+      "become failed when modify is not supported by child" in new ReservedConnection with Modified {
+        when(upa.acknowledge(CorrelationId(0, 7), ServiceException(NsiError.NotImplemented.toServiceException(A.provider.nsa).withConnectionId("ConnectionIdA"))))
+
+        messages must contain(like[Message] {
+          case ToRequester(NsiRequesterMessage(_, ReserveFailed(failed))) =>
+            failed.getServiceException.getErrorId must_== NsiError.ChildSegmentError.id
+        })
+        reservationState must_== ReservationStateEnumType.RESERVE_FAILED
+      }
+
+      "not send ReserveAbort to child that does not support modify" in new ReservedConnection with Modified {
+        given(upa.acknowledge(CorrelationId(0, 7), ServiceException(NsiError.NotImplemented.toServiceException(A.provider.nsa).withConnectionId("ConnectionIdA"))))
+
+        val AbortModifyCorrelationId = newCorrelationId
+        when(ura.request(AbortModifyCorrelationId, ReserveAbort(connection.id)))
+
+        messages must contain(like[Message] {
+          case ToRequester(NsiRequesterMessage(_, ReserveAbortConfirmed(_))) =>
+            ok
+        })
+        reservationState must_== ReservationStateEnumType.RESERVE_START
+      }
     }
   }
 }
