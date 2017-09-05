@@ -132,6 +132,7 @@ class QueryRecursiveStateMachine(
         .withSchedule(initialReserve.body.criteria.getSchedule())
         .withServiceType(initialReserve.body.criteria.getServiceType())
         .withVersion(initialReserve.body.criteria.getVersion())
+        .withAny(initialReserve.body.criteria.getAny())
         .withChildren(new ChildRecursiveListType().withChild(childs.asJava)))
   }
 
