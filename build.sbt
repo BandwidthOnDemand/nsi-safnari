@@ -3,7 +3,6 @@ name := "nsi-safnari"
 
 releaseSettings
 
-val surfnetNexusBaseUrl = "https://atlas.dlp.surfnet.nl/nexus/content/repositories"
 
 libraryDependencies ++= Seq(
   ws,
@@ -23,18 +22,8 @@ lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
 scalaVersion := "2.11.8"
 
+
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-value-discard", "-Ywarn-adapted-args")
-
-val surfnetSnapshots = "SURFnet Snapshots" at s"$surfnetNexusBaseUrl/snapshots"
-val surfnetReleases = "SURFnet Releases" at s"$surfnetNexusBaseUrl/releases"
-
-resolvers ++= Seq(
-  surfnetSnapshots, surfnetReleases,
-  "mandubian maven bintray (play-json-zipper)" at "http://dl.bintray.com/mandubian/maven",
-  "SURFnet thirdparty" at s"$surfnetNexusBaseUrl/thirdparty",
-  "SURFnet BoD Snapshots" at s"$surfnetNexusBaseUrl/public-snapshots",
-  "SURFnet BoD Releases" at s"$surfnetNexusBaseUrl/public-releases"
-)
 
 javaOptions in Test += "-Dconfig.file=conf/test.conf"
 
@@ -56,8 +45,6 @@ buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha
 buildInfoPackage := "nl.surfnet.safnari"
 
 PublishDist.publishSettings
-
-publishTo := { if (isSnapshot.value) Some(surfnetSnapshots) else Some(surfnetReleases) }
 
 // Disable ScalaDoc generation
 sources in (Compile, doc) := Seq.empty
