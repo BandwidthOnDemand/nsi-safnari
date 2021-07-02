@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "nsi-safnari.fullname" . }}
+  labels:
+    {{- include "nsi-safnari.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ .Chart.Name }}
+  selector:
+    matchLabels:
+      {{- include "nsi-safnari.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "nsi-safnari.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "nsi-safnari.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:alpine
+        command: ["sh", "-c",
+          "until pg_isready -h nsi-node-postgresql.nsi.svc.cluster.local -p 5432;
+          do echo `date` sleeping 2 seconds ...; sleep 2; done"]
+      - name: wait-for-pce
+        image: curlimages/curl:latest
+        command: ["sh", "-c",
+          "until [ $(curl -sw '%{http_code}' http://nsi-node-nsi-pce.nsi.svc.cluster.local/paths -o /dev/null) -eq 200 ];
+          do echo `date` sleeping 2 seconds ...; sleep 2; done"]
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/nsi-safnari/bin/nsi-safnari"]
+          args:
+            - {{ printf "-Dconfig.file=%s/config-overrides.conf" .Values.config.mountPath | quote }}
+            - "-Dhttp.port=8080"
+            - "-Dhttp.address=0.0.0.0"
+            - "-DapplyEvolutions.default=true"
+            - "-Djavax.net.ssl.trustStoreType=jks"
+            - "-Djavax.net.ssl.keyStoreType=jks"
+            - "-Djavax.net.ssl.trustStorePassword=secret"
+            - "-Djavax.net.ssl.keyStorePassword=secret"
+            - {{ printf "-Djavax.net.ssl.trustStore=%s/nsi-safnari-truststore.jks" .Values.config.mountPath | quote }}
+            - {{ printf "-Djavax.net.ssl.keyStore=%s/nsi-safnari-keystore.jks" .Values.config.mountPath | quote }}
+            - "-J-Xms512m"
+            - "-J-Xmx512m"
+            - "-J-server"
+            - "-J-verbose:gc"
+            - "-J-XX:+PrintGCDetails"
+            - "-J-XX:+PrintGCDateStamps"
+            - "-J-Xloggc:./nsi-safnari/logs/gc.log"
+            - "-J-XX:+UseGCLogFileRotation"
+            - "-J-XX:NumberOfGCLogFiles=10"
+            - "-J-XX:GCLogFileSize=10M"
+            - "-J-XX:+UseParallelGC"
+            - "-J-XX:+UseParallelOldGC"
+          env:
+            - name: SAFNARI_APPLICATION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nsi-safnari
+                  key: safnari-application-secret
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: internal
+              containerPort: {{ .Values.service.containerPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: {{ .Values.config.name }}
+              mountPath: {{ .Values.config.mountPath }}
+              readOnly: true
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              scheme: {{ .Values.livenessProbe.scheme }}
+              path: {{ .Values.livenessProbe.path }}
+              port: {{ .Values.service.containerPort }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              scheme: {{ .Values.startupProbe.scheme }}
+              path: {{ .Values.startupProbe.path }}
+              port: {{ .Values.service.containerPort }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: {{ .Values.config.name }}
+          configMap:
+            name: {{ .Values.config.name }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

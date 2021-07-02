@@ -1,0 +1,111 @@
+# Default values for nsi-safnari.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  registry: docker.io
+  repository: hnstrmprt/nsi-safnari
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+startupProbe:
+  enabled: true
+  scheme: "HTTP"
+  path: "/healthcheck"
+  failureThreshold: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+livenessProbe:
+  enabled: true
+  scheme: "HTTP"
+  path: "/healthcheck"
+  failureThreshold: 5
+  periodSeconds: 6
+  timeoutSeconds: 5
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  name: "nsi-safnari"
+  port: 80
+  containerPort: 8080
+# configure either ClusterIP or LoadBalancer + ipAddress
+  type: ClusterIP
+#  type: LoadBalancer
+#  ipAddress: 1.2.3.4
+#  annotations:
+#    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+
+ingress:
+  enabled: false
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+      - path: /
+        backend:
+          serviceName: chart-example.local
+          servicePort: 80
+  tls:
+    - secretName: chart-example-tls
+      hosts:
+        - chart-example.local
+
+resources:
+  requests:
+    memory: 0.5Gi
+    cpu: 100m
+  limits:
+    memory: 1.5Gi
+    cpu: 1000m
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+postgresql:
+  postgresqlUsername: nsi-safnari-user
+  postgresqlPassword: password
+  postgresqlDatabase: nsi-safnari
+  image:
+    tag: 9.6.21
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      memory: 500Mi
+  volumePermissions:
+    enabled: true
+
+config:
+  name: "nsi-safnari-config"
+  mountPath: "/config"
+  configFilesGlob: "config/*"
