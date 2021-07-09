@@ -71,8 +71,8 @@ spec:
             - name: SAFNARI_APPLICATION_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: nsi-safnari
-                  key: safnari-application-secret
+                  name: {{ .Release.Name }}-secret
+                  key: SAFNARI_APPLICATION_SECRET
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: internal
