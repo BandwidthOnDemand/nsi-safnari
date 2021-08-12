@@ -30,13 +30,13 @@ spec:
       - name: wait-for-postgres
         image: postgres:alpine
         command: ["sh", "-c",
-          "until pg_isready -h nsi-node-postgresql.nsi.svc.cluster.local -p 5432;
-          do echo `date` sleeping 2 seconds ...; sleep 2; done"]
+          {{ printf "until pg_isready -h %s-postgresql.%s.svc.cluster.local -p 5432; do echo `date` sleeping 2 seconds ...; sleep 2; done" .Release.Name .Release.Namespace | quote }}
+        ]
       - name: wait-for-pce
         image: curlimages/curl:latest
         command: ["sh", "-c",
-          "until [ $(curl -sw '%{http_code}' http://nsi-node-nsi-pce.nsi.svc.cluster.local/paths -o /dev/null) -eq 200 ];
-          do echo `date` sleeping 2 seconds ...; sleep 2; done"]
+          {{ printf "until [ $(curl -sw '%%{http_code}' http://%s-nsi-pce.%s.svc.cluster.local:80/dds/portal -o /dev/null) -eq 200 ]; do echo `date` sleeping 2 seconds ...; sleep 2; done" .Release.Name .Release.Namespace | quote }}
+        ]
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
