@@ -73,6 +73,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-secret
                   key: SAFNARI_APPLICATION_SECRET
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secret
+                  key: POSTGRES_PASSWORD
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: internal
