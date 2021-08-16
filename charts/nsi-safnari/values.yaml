@@ -93,7 +93,7 @@ affinity: {}
 
 postgresql:
   postgresqlUsername: nsi-safnari-user
-  postgresqlPassword: password
+  postgresqlPassword:
   postgresqlDatabase: nsi-safnari
   image:
     tag: 9.6.21
