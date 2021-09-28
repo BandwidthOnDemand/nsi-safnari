@@ -91,20 +91,6 @@ tolerations: []
 
 affinity: {}
 
-postgresql:
-  postgresqlUsername: nsi-safnari-user
-  postgresqlPassword:
-  postgresqlDatabase: nsi-safnari
-  image:
-    tag: 9.6.21
-  persistence:
-    size: 1Gi
-  resources:
-    requests:
-      memory: 500Mi
-  volumePermissions:
-    enabled: true
-
 config:
   name: "nsi-safnari-config"
   mountPath: "/config"
