@@ -92,6 +92,7 @@ tolerations: []
 affinity: {}
 
 postgresql:
+  enabled: true
   postgresqlUsername: nsi-safnari-user
   postgresqlPassword:
   postgresqlDatabase: nsi-safnari
