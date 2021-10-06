@@ -19,6 +19,11 @@ libraryDependencies ++= Seq(
 )
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
+    .dependsOn(sub1)
+    .dependsOn(sub2)
+lazy val sub1 = RootProject( uri("git://github.com/BandwidthOnDemand/play-nsi-support.git") )
+lazy val sub2 = RootProject( uri("git://github.com/mandubian/play-json-zipper.git") )
+
 
 scalaVersion := "2.11.8"
 
