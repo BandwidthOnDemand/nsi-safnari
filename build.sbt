@@ -69,3 +69,5 @@ headers := Map(
     }.mkString("/*\n", "\n", "\n */\n")
   )
 )
+
+publishTo := Some(Resolver.file("local-ivy", file("~/.ivy2/releases")))
