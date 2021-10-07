@@ -8,17 +8,18 @@ libraryDependencies ++= Seq(
   ws,
   jdbc,
   anorm,
-  "nl.surfnet" %% "play-nsi-support" % "2.1.5",
-  "nl.surfnet" %% "play-nsi-support" % "2.1.5" % "test" classifier "tests",
   "org.scala-stm" %% "scala-stm" % "0.7",
   "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
-  "com.mandubian" %% "play-json-zipper" % "1.2",
+  "com.github.michaelahlers" % "play-json-zipper_2.11" % "1.2.0.23.1",
   "org.specs2" %% "specs2-scalacheck" % "2.3.13" % "test",
   "org.specs2" %% "specs2-junit" % "2.3.13" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.3.4" % "test"
 )
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
+    .dependsOn(sub1 % "compile->compile;test->test")
+lazy val sub1 = RootProject( uri("git://github.com/BandwidthOnDemand/play-nsi-support.git") )
+
 
 scalaVersion := "2.11.8"
 
@@ -68,3 +69,5 @@ headers := Map(
     }.mkString("/*\n", "\n", "\n */\n")
   )
 )
+
+publishTo := Some(Resolver.file("local-ivy", file("~/.ivy2/releases")))
