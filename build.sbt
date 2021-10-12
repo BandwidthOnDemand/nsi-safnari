@@ -70,4 +70,4 @@ headers := Map(
   )
 )
 
-publishTo := Some(Resolver.file("local-ivy", file("~/.ivy2/releases")))
+publishTo := Some(Resolver.file("local-ivy", file("target")))

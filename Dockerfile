@@ -1,42 +1,26 @@
-#HansT#FROM openjdk:8-jdk-slim AS SBT_BUILD
+# syntax=docker/dockerfile:1
+#
+# first stage uses mozilla sbt image to stage safnari
+#
 FROM mozilla/sbt:8u292_1.5.4 AS SBT_BUILD
 
 RUN apt-get update && apt-get --yes install curl
 
-#ARG MAVEN_VERSION=3.6.3
-#ARG SHA=c35a1803a6e70a126e80b2b3ae33eed961f83ed74d18fcd16909b2d44d7dada3203f1ffe726c17ef8dcca2dcaa9fca676987befeadc9b9f759967a8cb77181c0
-#ARG BASE_URL=https://apache.osuosl.org/maven/maven-3/${MAVEN_VERSION}/binaries
-#ARG SBT_VERSION=1.5.0
-#HansT#ARG SBT_VERSION=0.13.18
-#ARG SBT_SHA=aadf110a48ea77c02ce63a9cc033d9fcd02b634e89e8f22dfe13ed21592042b6
-#HansT#ARG SBT_SHA=afe82322ca8e63e6f1e10fc1eb515eb7dc6c3e5a7f543048814072a03d83b331
-#HansT#ARG SBT_URL=https://github.com/sbt/sbt/releases/download/v${SBT_VERSION}/sbt-${SBT_VERSION}.tgz
-
-#HansT#RUN curl -fsSL -o /tmp/sbt.tar.gz ${SBT_URL} \
-#HansT#  && echo "${SBT_SHA}  /tmp/sbt.tar.gz" | sha256sum -c - \
-#HansT#  && tar -xzf /tmp/sbt.tar.gz -C /opt \
-#HansT#  && rm -f /tmp/sbt.tar.gz
-
 ENV BUILD_HOME /home/nsi-safnari
 COPY . $BUILD_HOME
 WORKDIR $BUILD_HOME
-#HansT#RUN /opt/sbt/bin/sbt stage
 RUN sbt stage
  
-## the second stage of our build will use open jdk 8 on alpine 3.9
+#
+# second stage uses open jdk8 on alpine3.9 with the staged safnari
+#
 FROM openjdk:8-jre-alpine3.9
-
-#ENV DDS_BUILD_HOME /home/safnari/nsi-dds
 
 RUN apk update && apk add bash
 
+ENV BUILD_HOME /home/nsi-safnari
 WORKDIR /nsi-safnari
- 
-## copy only the artifacts we need from the first stage and discard the rest
-#COPY --from=SBT_BUILD $DDS_BUILD_HOME/target/dds.jar .
-#COPY --from=SBT_BUILD $DDS_BUILD_HOME/config ./config
-
-COPY target/universal/stage/. .
+COPY --from=SBT_BUILD $BUILD_HOME/target/universal/stage/. .
 
 ENV USER=safnari
 ENV GROUP=safnari
