@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Values.config.name }}
+  name: {{ include "nsi-safnari.fullname" . }}-{{ .Values.config.name }}
 #  namespace: {{ .Release.Namespace }}
 binaryData:
 {{ range $path, $_ :=  .Files.Glob  .Values.config.configFilesGlob }}
