@@ -112,7 +112,7 @@ spec:
       volumes:
         - name: {{ .Values.config.name }}
           configMap:
-            name: {{ .Values.config.name }}
+            name: name: {{ include "nsi-safnari.fullname" . }}-{{ .Values.config.name }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
