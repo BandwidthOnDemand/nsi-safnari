@@ -87,7 +87,11 @@ object Connection {
   }
 }
 
-class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity), configuration: Configuration)(implicit app: play.api.Application) {
+class ConnectionManager(
+  connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity),
+  configuration: Configuration,
+  val messageStore: MessageStore[Message]
+)(implicit app: play.api.Application) {
   private val connections = TMap.empty[ConnectionId, Connection]
   private val globalReservationIdsMap = TMap.empty[GlobalReservationId, Set[Connection]]
   private val connectionsByRequesterCorrelationId = TMap.empty[(RequesterNsa, CorrelationId), Connection]
@@ -105,7 +109,6 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   }
 
   import MessagePersistence.MessageToMessageData
-  val messageStore = new MessageStore[Message]("default")
 
   def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection): Unit = atomic { implicit txn =>
     connections(connectionId) = connection

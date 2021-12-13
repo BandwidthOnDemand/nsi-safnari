@@ -39,7 +39,7 @@ class Configuration @Inject()(configuration: play.api.Configuration) {
   def AdminContactSurname = getStringOrFail("safnari.adminContact.surname")
   def AdminContact = s"$AdminContactGiven $AdminContactSurname"
   def AdminContactProdid = getStringOrFail("safnari.adminContact.prodid")
-  def Use2WayTLS = current.configuration.getBoolean("nsi.twoway.tls").getOrElse(sys.error("nsi.twoway.tls option is not set"))
+  def Use2WayTLS = configuration.getBoolean("nsi.twoway.tls").getOrElse(sys.error("nsi.twoway.tls option is not set"))
   def VersionString = s"${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})"
   def Longitude = getStringOrFail("safnari.location.longitude")
   def Latitude = getStringOrFail("safnari.location.latitude")

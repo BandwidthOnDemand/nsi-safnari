@@ -6,6 +6,7 @@ import akka.actor.Actor
 import akka.testkit.TestActorRef
 import controllers.Connection.Delete
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.persistence.MessageStore
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import java.time.Instant
@@ -32,6 +33,7 @@ class ConnectionManagerSpec extends helpers.Specification {
   private def command(message: Message, timestamp: Instant = Instant.now()) = Connection.Command(timestamp, message)
 
   abstract class DummyConnectionFixture extends WithApplication() {
+    lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]
     lazy val configuration = app.injector.instanceOf[Configuration]
     implicit lazy val system = Akka.system
 
@@ -50,7 +52,8 @@ class ConnectionManagerSpec extends helpers.Specification {
         URI.create("http://localhost"),
         URI.create("http://localhost")
       )),
-      configuration
+      configuration,
+      messageStore
     )
   }
 
@@ -119,6 +122,7 @@ class ConnectionManagerSpec extends helpers.Specification {
   }
 
   class SingleConnectionActorFixture(additionalConfiguration: Map[String, Any] = Map.empty) extends WithApplication(FakeApplication(additionalConfiguration = additionalConfiguration)) {
+    lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]
     lazy val configuration = app.injector.instanceOf[Configuration]
 
     implicit lazy val system = Akka.system
@@ -137,7 +141,8 @@ class ConnectionManagerSpec extends helpers.Specification {
           URI.create("http://localhost"),
           URI.create("http://localhost")
         )),
-        configuration
+        configuration,
+        messageStore
       )
     }
 

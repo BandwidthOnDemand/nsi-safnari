@@ -39,6 +39,7 @@ import play.api.libs.ws.WS
 import play.api.mvc._
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.concurrent.stm.Ref
 import scala.util.{Failure, Success}
 
@@ -79,7 +80,7 @@ object PathComputationEngine extends Controller {
         sender ! healthy.flatMap(h => lastModified.map(d => s"PCE (Real; $d)" -> h))
 
       case 'reachability =>
-        val reachabilityResponse = WS.url(s"$endPoint/reachability").withRequestTimeout(20000).withHeaders(ACCEPT -> JSON).get()
+        val reachabilityResponse = WS.url(s"$endPoint/reachability").withRequestTimeout(Duration(20000, MILLISECONDS)).withHeaders(ACCEPT -> JSON).get()
         val senderRef = sender
 
         reachabilityResponse.onComplete {

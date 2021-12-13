@@ -25,7 +25,7 @@ package controllers
 import anorm._
 import anorm.SqlParser._
 import play.api.Logger
-import play.api.db.DB
+import play.api.db.Database
 import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
 import scala.concurrent.Await
@@ -37,19 +37,29 @@ import akka.actor.{ActorRef, Props}
 import javax.inject._
 import play.api.inject.ApplicationLifecycle
 import com.google.inject.{ AbstractModule, Provides }
+import nl.surfnet.safnari.SafnariMessageStore
 
 class StartModule extends AbstractModule {
   def configure() = {
     bind(classOf[GlobalSettings]).asEagerSingleton()
   }
+  @Provides def messageStore(database: Database, app: play.api.Application) = new SafnariMessageStore(database, app)
   @Provides def connectionManager(settings: GlobalSettings): ConnectionManager = settings.connectionManager
   @Provides def application(settings: GlobalSettings, configuration: Configuration): Application = new Application(settings.connectionManager, settings.pceRequester, configuration)
+  @Provides def discoveryService(settings: GlobalSettings, configuration: Configuration): DiscoveryService = new DiscoveryService(settings.pceRequester, configuration)
 }
 
 @Singleton
-class GlobalSettings @Inject()(app: play.api.Application, lifecycle: ApplicationLifecycle, configuration: Configuration, pathComputationEngine: PathComputationEngine) {
+class GlobalSettings @Inject()(
+  app: play.api.Application,
+  lifecycle: ApplicationLifecycle,
+  configuration: Configuration,
+  pathComputationEngine: PathComputationEngine,
+  messageStore: SafnariMessageStore,
+  database: Database
+) {
   private val createOutboundActor = ConnectionProvider.outboundActor(configuration, ConnectionRequester.nsiRequester(configuration), pceRequester) _
-  val connectionManager: ConnectionManager = new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor, configuration, pathComputationEngine), configuration)(app)
+  val connectionManager: ConnectionManager = new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor, configuration, pathComputationEngine), configuration, messageStore)(app)
   val pceRequester: ActorRef = createPceRequesterActor(app, pathComputationEngine)
 
   if (app.configuration.getBoolean("clean.db.on.start") getOrElse false) {
@@ -88,7 +98,7 @@ class GlobalSettings @Inject()(app: play.api.Application, lifecycle: Application
     }
   }
 
-  private def cleanDatabase(implicit app: PlayApp): Unit = DB.withTransaction { implicit connection =>
+  private def cleanDatabase(implicit app: PlayApp): Unit = database.withTransaction { implicit connection =>
     val tables = SQL("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'play_evolutions'").as(str("tablename").*).map("public." ++ _)
     val truncate = s"TRUNCATE TABLE ${tables.mkString(",")} CASCADE"
     Logger.debug(s"Cleaning database: $truncate")

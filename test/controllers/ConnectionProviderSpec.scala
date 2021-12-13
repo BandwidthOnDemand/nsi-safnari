@@ -3,6 +3,8 @@ package controllers
 import akka.testkit.TestActorRef
 import controllers.PathComputationEngine.DummyPceRequesterActor
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.persistence.MessageStore
+import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.test._
 import play.libs.Akka
@@ -19,13 +21,14 @@ class ConnectionProviderSpec extends helpers.Specification {
   def Application(extraConfig: (String, String)*) = FakeApplication(additionalConfiguration = DefaultConfiguration ++ extraConfig)
 
   abstract class Fixture(app: FakeApplication) extends WithApplication(app) {
+    lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]
     lazy val configuration = app.injector.instanceOf[Configuration]
     lazy val pathComputationEngine = app.injector.instanceOf[PathComputationEngine]
 
     implicit lazy val actorSystem = Akka.system
     lazy val pceRequester = TestActorRef[DummyPceRequesterActor]
     lazy val createOutboundActor = ConnectionProvider.outboundActor(configuration, ConnectionRequester.nsiRequester(configuration), pceRequester) _
-    lazy val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor, configuration, pathComputationEngine), configuration), configuration)
+    lazy val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor, configuration, pathComputationEngine), configuration, messageStore), configuration)
     lazy val requesterOperation = Promise[NsiRequesterOperation]()
   }
 
