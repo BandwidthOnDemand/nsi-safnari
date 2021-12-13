@@ -23,6 +23,7 @@
 package controllers
 
 import java.net.URI
+import javax.inject._
 
 import akka.actor._
 import controllers.ActorSupport._
@@ -41,27 +42,30 @@ import scala.concurrent.Future
 import scala.concurrent.stm.Ref
 import scala.util.{Failure, Success}
 
-object PathComputationEngine extends Controller {
-  private val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
-
-  def pceReplyUrl: String = s"${Configuration.BaseUrl}${routes.PathComputationEngine.pceReply().url}"
+class PathComputationEngine @Inject()(configuration: Configuration) extends Controller {
+  def pceReplyUrl: String = s"${configuration.BaseUrl}${routes.PathComputationEngine.pceReply().url}"
 
   def pceReply = Action(parse.json) { implicit request =>
     Json.fromJson[PceResponse](request.body) match {
       case JsSuccess(response, _) =>
         Logger.info(s"Pce reply: $response")
-        pceContinuations.replyReceived(response.correlationId, response)
+        PathComputationEngine.pceContinuations.replyReceived(response.correlationId, response)
         Ok
       case JsError(error) =>
         Logger.info(s"Pce error: $error body: ${request.body}")
         BadRequest
     }
   }
+}
 
-  class PceRequesterActor(endPoint: String) extends Actor {
+object PathComputationEngine extends Controller {
+  private val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
+
+  class PceRequesterActor(configuration: Configuration) extends Actor {
     private val uuidGenerator = Uuid.randomUuidGenerator()
     private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
     private val latestReachabilityEntries: LastModifiedCache[Seq[ReachabilityTopologyEntry]] = new LastModifiedCache()
+    private val endPoint = configuration.PceEndpoint
 
     def receive = {
       case 'healthCheck =>
@@ -99,7 +103,7 @@ object PathComputationEngine extends Controller {
         Logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
 
         val connection = Connection(sender)
-        pceContinuations.register(request.correlationId, Configuration.AsyncReplyTimeout).onComplete {
+        pceContinuations.register(request.correlationId, configuration.AsyncReplyTimeout).onComplete {
           case Success(reply) =>
             connection ! Connection.Command(Instant.now, FromPce(reply))
           case Failure(e) =>

@@ -18,9 +18,10 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
   "Discovery service" should {
 
     "serve discovery document with fake reachability" in new WithApplication(Application) {
+      val configuration = app.injector.instanceOf[Configuration]
       implicit val actorSystem = Akka.system
       val pceRequester = TestActorRef[DummyPceRequesterActor]
-      val controller = new DiscoveryService(pceRequester)
+      val controller = new DiscoveryService(pceRequester, configuration)
 
       val result = controller.index().apply(FakeRequest())
 
@@ -31,9 +32,10 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
     }
 
     "return a not modified if if-modified-since header is in the future" in new WithApplication(Application) {
+      val configuration = app.injector.instanceOf[Configuration]
       implicit val actorSystem = Akka.system
       val pceRequester = TestActorRef[DummyPceRequesterActor]
-      val controller = new DiscoveryService(pceRequester)
+      val controller = new DiscoveryService(pceRequester, configuration)
       val dateTimeFormatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of("GMT"))
 
       val dateInTheFuture = dateTimeFormatter.format(ZonedDateTime.now.plus(5, ChronoUnit.HOURS))

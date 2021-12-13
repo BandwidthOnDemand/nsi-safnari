@@ -1,30 +1,29 @@
 organization := "nl.surfnet"
 name := "nsi-safnari"
 
-releaseSettings
+//releaseSettings
 
 
 libraryDependencies ++= Seq(
   ws,
   jdbc,
-  anorm,
+  evolutions,
   "org.scala-stm" %% "scala-stm" % "0.7",
-  "org.postgresql" % "postgresql" % "9.2-1003-jdbc4",
+  "org.postgresql" % "postgresql" % "42.3.1",
   "com.github.michaelahlers" % "play-json-zipper_2.11" % "1.2.0.23.1",
-  "org.specs2" %% "specs2-scalacheck" % "2.3.13" % "test",
-  "org.specs2" %% "specs2-junit" % "2.3.13" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % "2.3.4" % "test"
+  "org.specs2" %% "specs2-scalacheck" % "3.6.6" % "test",
+  "org.specs2" %% "specs2-junit" % "3.6.6" % "test",
+  "org.specs2" %% "specs2-matcher-extra" % "3.6.6" % "test",
+  "com.typesafe.akka" %% "akka-testkit" % "2.3.13" % "test"
 )
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
     .dependsOn(sub1 % "compile->compile;test->test")
 lazy val sub1 = RootProject( uri("git://github.com/BandwidthOnDemand/play-nsi-support.git") )
 
+scalaVersion := "2.11.12"
 
-scalaVersion := "2.11.8"
-
-
-scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-value-discard", "-Ywarn-adapted-args")
+scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-value-discard", "-target:jvm-1.8")
 
 javaOptions in Test += "-Dconfig.file=conf/test.conf"
 
@@ -45,7 +44,7 @@ buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha
 
 buildInfoPackage := "nl.surfnet.safnari"
 
-PublishDist.publishSettings
+//PublishDist.publishSettings
 
 // Disable ScalaDoc generation
 sources in (Compile, doc) := Seq.empty
@@ -54,20 +53,20 @@ publishArtifact in (Compile, packageDoc) := false
 sources in (Test, doc) := Seq.empty
 publishArtifact in (Test, packageDoc) := false
 
-net.virtualvoid.sbt.graph.Plugin.graphSettings
+// net.virtualvoid.sbt.graph.Plugin.graphSettings
 
-lazy val licenseText = settingKey[String]("Project license text.")
+// lazy val licenseText = settingKey[String]("Project license text.")
 
-licenseText := IO.read(baseDirectory.value / "LICENSE")
+// licenseText := IO.read(baseDirectory.value / "LICENSE")
 
-headers := Map(
-  "scala" -> (
-    HeaderPattern.cStyleBlockComment,
-    licenseText.value.split("\n").map {
-      case ""   => " *"
-      case line => " * " ++ line
-    }.mkString("/*\n", "\n", "\n */\n")
-  )
-)
+// headers := Map(
+//   "scala" -> (
+//     HeaderPattern.cStyleBlockComment,
+//     licenseText.value.split("\n").map {
+//       case ""   => " *"
+//       case line => " * " ++ line
+//     }.mkString("/*\n", "\n", "\n */\n")
+//   )
+// )
 
-publishTo := Some(Resolver.file("local-ivy", file("target")))
+// publishTo := Some(Resolver.file("local-ivy", file("target")))

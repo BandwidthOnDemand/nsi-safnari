@@ -29,44 +29,47 @@ import play.api.db.DB
 import play.api.libs.concurrent.Akka
 import play.api.libs.concurrent.Execution.Implicits._
 import scala.concurrent.Await
+import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 import play.api.{ Application => PlayApp }
 import akka.actor.{ActorRef, Props}
-import controllers.PathComputationEngine.DummyPceRequesterActor
-import controllers.PathComputationEngine.PceRequesterActor
+import javax.inject._
+import play.api.inject.ApplicationLifecycle
+import com.google.inject.{ AbstractModule, Provides }
 
-trait GlobalSettings extends play.api.GlobalSettings {
-  private var connectionManager: ConnectionManager = _
-  private var pceRequester: ActorRef = _
+class StartModule extends AbstractModule {
+  def configure() = {
+    bind(classOf[GlobalSettings]).asEagerSingleton()
+  }
+  @Provides def connectionManager(settings: GlobalSettings): ConnectionManager = settings.connectionManager
+  @Provides def application(settings: GlobalSettings, configuration: Configuration): Application = new Application(settings.connectionManager, settings.pceRequester, configuration)
+}
 
-  override def onStart(app: PlayApp): Unit = {
-    pceRequester = createPceRequesterActor(app)
-    val createOutboundActor = ConnectionProvider.outboundActor(ConnectionRequester.nsiRequester, pceRequester) _
-    connectionManager = new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor))(app)
-    if (app.configuration.getBoolean("clean.db.on.start") getOrElse false) {
-      cleanDatabase(app)
-    }
+@Singleton
+class GlobalSettings @Inject()(app: play.api.Application, lifecycle: ApplicationLifecycle, configuration: Configuration, pathComputationEngine: PathComputationEngine) {
+  private val createOutboundActor = ConnectionProvider.outboundActor(configuration, ConnectionRequester.nsiRequester(configuration), pceRequester) _
+  val connectionManager: ConnectionManager = new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor, configuration, pathComputationEngine), configuration)(app)
+  val pceRequester: ActorRef = createPceRequesterActor(app, pathComputationEngine)
 
-    restoreConnectionsFromDatabase(app)
+  if (app.configuration.getBoolean("clean.db.on.start") getOrElse false) {
+    cleanDatabase(app)
   }
 
-  def createPceRequesterActor(implicit app: PlayApp): ActorRef =
+  restoreConnectionsFromDatabase(app)
+
+  def createPceRequesterActor(implicit app: PlayApp, pathComputationEngine: PathComputationEngine): ActorRef =
     app.configuration.getString("pce.actor") match {
-      case None | Some("dummy") => Akka.system.actorOf(Props[DummyPceRequesterActor], "pceRequester")
-      case _                    => Akka.system.actorOf(Props(new PceRequesterActor(Configuration.PceEndpoint)), "pceRequester")
+      case None | Some("dummy") => Akka.system.actorOf(Props[PathComputationEngine.DummyPceRequesterActor], "pceRequester")
+      case _                    => Akka.system.actorOf(Props(new PathComputationEngine.PceRequesterActor(configuration)), "pceRequester")
     }
 
-  override def onStop(app: PlayApp): Unit = {
-    if (app.configuration.getBoolean("clean.db.on.stop") getOrElse false) {
-      cleanDatabase(app)
+  lifecycle.addStopHook { () =>
+    Future.successful {
+      if (app.configuration.getBoolean("clean.db.on.stop") getOrElse false) {
+        cleanDatabase(app)
+      }
     }
-  }
-
-  override def getControllerInstance[A](controllerClass: Class[A]): A = {
-    (if (controllerClass == classOf[DiscoveryService]) new DiscoveryService(pceRequester)
-    else if (controllerClass == classOf[Application]) new Application(connectionManager, pceRequester)
-    else controllerClass.getConstructors().head.newInstance(connectionManager)).asInstanceOf[A]
   }
 
   private def restoreConnectionsFromDatabase(implicit app: PlayApp): Unit = {

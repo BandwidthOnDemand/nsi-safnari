@@ -32,6 +32,7 @@ class ConnectionManagerSpec extends helpers.Specification {
   private def command(message: Message, timestamp: Instant = Instant.now()) = Connection.Command(timestamp, message)
 
   abstract class DummyConnectionFixture extends WithApplication() {
+    lazy val configuration = app.injector.instanceOf[Configuration]
     implicit lazy val system = Akka.system
 
     lazy val mockUuidGenerator = Uuid.mockUuidGenerator(1)
@@ -48,7 +49,8 @@ class ConnectionManagerSpec extends helpers.Specification {
         PathComputationAlgorithm.Chain,
         URI.create("http://localhost"),
         URI.create("http://localhost")
-      ))
+      )),
+      configuration
     )
   }
 
@@ -117,6 +119,8 @@ class ConnectionManagerSpec extends helpers.Specification {
   }
 
   class SingleConnectionActorFixture(additionalConfiguration: Map[String, Any] = Map.empty) extends WithApplication(FakeApplication(additionalConfiguration = additionalConfiguration)) {
+    lazy val configuration = app.injector.instanceOf[Configuration]
+
     implicit lazy val system = Akka.system
     implicit lazy val executionContext = system.dispatcher
 
@@ -132,7 +136,8 @@ class ConnectionManagerSpec extends helpers.Specification {
           PathComputationAlgorithm.Chain,
           URI.create("http://localhost"),
           URI.create("http://localhost")
-        ))
+        )),
+        configuration
       )
     }
 
@@ -282,7 +287,7 @@ class ConnectionManagerSpec extends helpers.Specification {
 
     "be deleted after a grace period" should {
       "when never successfully reserved" in new SingleConnectionActorFixture() {
-        await(connection ? command(ura.request(CorrelationId(0, 0), initialReserveMessage.body), timestamp = Instant.now().minus(Configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)))
+        await(connection ? command(ura.request(CorrelationId(0, 0), initialReserveMessage.body), timestamp = Instant.now().minus(configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)))
 
         eventually(connectionManager.get(connectionId) must beNone)
         connectionManager.messageStore.loadEverything().map(_._1) must not(contain(connectionId))

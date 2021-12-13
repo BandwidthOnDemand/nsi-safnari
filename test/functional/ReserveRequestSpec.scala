@@ -1,5 +1,5 @@
 package functional
-
+import play.api.Logger
 import java.net.{URI, URL}
 import javax.xml.transform.dom.DOMResult
 import javax.xml.ws.Holder
@@ -21,6 +21,7 @@ import play.api.libs.json._
 import play.api.libs.ws.WS
 import play.api.mvc._
 import play.api.test._
+import play.api.inject.guice.GuiceApplicationBuilder
 
 import scala.concurrent._
 
@@ -30,7 +31,7 @@ class ReserveRequestSpec extends helpers.Specification {
 
   val reserveConfirmed = Promise[NsiRequesterMessage[ReserveConfirmed]]
 
-  object Global extends controllers.GlobalSettings {
+  object Global extends play.api.GlobalSettings {
     override def onRouteRequest(request: RequestHeader): Option[Handler] = request.path match {
       case "/fake/requester" => Some(NsiRequesterEndPoint("fake-requester-nsa") {
         case message @ NsiRequesterMessage(headers, confirm: ReserveConfirmed) =>
@@ -52,7 +53,8 @@ class ReserveRequestSpec extends helpers.Specification {
             NsiWebService.callRequester(
               headers.requesterNSA,
               replyTo,
-              message reply ReserveConfirmed(connectionId, confirmCriteria))
+              message reply ReserveConfirmed(connectionId, confirmCriteria),
+            new controllers.Configuration(configuration))
           }
           Future.successful(message.ack(ReserveResponse(connectionId)))
         case wtf =>
@@ -80,12 +82,22 @@ class ReserveRequestSpec extends helpers.Specification {
   val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
   val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"
   val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
-  def Application = FakeApplication(additionalConfiguration = Map(
+  def Application = new GuiceApplicationBuilder(
+    global = Some(Global)
+  ).configure(
     "nsi.actor" -> "real",
     "pce.actor" -> "real",
     "pce.endpoint" -> FakePceUri,
     "nsi.base.url" -> s"http://localhost:$ServerPort",
-    "safnari.nsa.id" -> SafnariNsa), withGlobal = Some(Global))
+    "safnari.nsa.id" -> SafnariNsa,
+    "nsi.twoway.tls" -> "false"
+  ).build()
+  // def Application = FakeApplication(additionalConfiguration = Map(
+  //   "nsi.actor" -> "real",
+  //   "pce.actor" -> "real",
+  //   "pce.endpoint" -> FakePceUri,
+  //   "nsi.base.url" -> s"http://localhost:$ServerPort",
+  //   "safnari.nsa.id" -> SafnariNsa), withGlobal = Some(Global))
 
   def marshal(p2ps: P2PServiceBaseType): Element = {
     val jaxb = new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory().createP2Ps(p2ps)

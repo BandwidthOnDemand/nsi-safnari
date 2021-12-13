@@ -19,10 +19,13 @@ class ConnectionProviderSpec extends helpers.Specification {
   def Application(extraConfig: (String, String)*) = FakeApplication(additionalConfiguration = DefaultConfiguration ++ extraConfig)
 
   abstract class Fixture(app: FakeApplication) extends WithApplication(app) {
+    lazy val configuration = app.injector.instanceOf[Configuration]
+    lazy val pathComputationEngine = app.injector.instanceOf[PathComputationEngine]
+
     implicit lazy val actorSystem = Akka.system
     lazy val pceRequester = TestActorRef[DummyPceRequesterActor]
-    lazy val createOutboundActor = ConnectionProvider.outboundActor(ConnectionRequester.nsiRequester, pceRequester) _
-    lazy val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor)))
+    lazy val createOutboundActor = ConnectionProvider.outboundActor(configuration, ConnectionRequester.nsiRequester(configuration), pceRequester) _
+    lazy val connectionProvider = new ConnectionProvider(new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor, configuration, pathComputationEngine), configuration), configuration)
     lazy val requesterOperation = Promise[NsiRequesterOperation]()
   }
 

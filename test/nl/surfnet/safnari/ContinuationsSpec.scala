@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ContinuationsSpec extends helpers.Specification {
   play.api.Logger("initialize-loggers-to-avoid-warnings")
+  sequential
 
   trait fixture extends org.specs2.mutable.After {
     val actorSystem = ActorSystem("test")

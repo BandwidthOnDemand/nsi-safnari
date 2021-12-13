@@ -22,16 +22,16 @@
  */
 package controllers
 
-import play.api.Play.current
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 import java.net.URI
 import java.time.LocalDateTime
+import javax.inject._
 import com.typesafe.config.ConfigUtil
 import nl.surfnet.safnari._
 import scala.util.Try
 
-object Configuration {
+class Configuration @Inject()(configuration: play.api.Configuration) {
   val StartTime = LocalDateTime.now
   def NsaId = getStringOrFail("safnari.nsa.id")
   def NsaName = getStringOrFail("safnari.nsa.name")
@@ -44,14 +44,14 @@ object Configuration {
   def Longitude = getStringOrFail("safnari.location.longitude")
   def Latitude = getStringOrFail("safnari.location.latitude")
   def AsyncReplyTimeout = readFiniteDuration("safnari.async.reply.timeout")
-  def NetworkId = current.configuration.getString("safnari.network.id")
-  def NetworkUrl = current.configuration.getString("safnari.network.url")
-  def DdsUrl = current.configuration.getString("safnari.dds.url")
-  def PceAlgorithm: PathComputationAlgorithm = current.configuration.getString("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
+  def NetworkId = configuration.getString("safnari.network.id")
+  def NetworkUrl = configuration.getString("safnari.network.url")
+  def DdsUrl = configuration.getString("safnari.dds.url")
+  def PceAlgorithm: PathComputationAlgorithm = configuration.getString("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
   def PceEndpoint = getStringOrFail("pce.endpoint")
 
   def PeersWith: Seq[PeerEntity] = {
-    val configOption = current.configuration.getConfigList("safnari.peersWith")
+    val configOption = configuration.getConfigList("safnari.peersWith")
     configOption.toSeq.flatMap(_.asScala.map( peer => PeerEntity(peer.getString("id"), peer.getString("dn")) ))
   }
 
@@ -62,16 +62,16 @@ object Configuration {
 
   def BaseUrl = getStringOrFail("nsi.base.url")
 
-  private def getStringOrFail(property: String) = current.configuration.getString(property).getOrElse(sys.error(s"$property is not set"))
+  private def getStringOrFail(property: String) = configuration.getString(property).getOrElse(sys.error(s"$property is not set"))
 
-  private def readFiniteDuration(key: String): FiniteDuration = current.configuration.getString(key).map(Duration.apply) match {
+  private def readFiniteDuration(key: String): FiniteDuration = configuration.getString(key).map(Duration.apply) match {
     case Some(fd: FiniteDuration) => fd
     case Some(_)                  => sys.error(s"$key is not finite")
     case None                     => sys.error(s"$key not set")
   }
 
   def translateToStunnelAddress(nsa: String, url: URI): Try[URI] = Try {
-    current.configuration.getString(ConfigUtil.joinPath("nsi", "tlsmap", nsa)) match {
+    configuration.getString(ConfigUtil.joinPath("nsi", "tlsmap", nsa)) match {
       case Some(hostAndPort) =>
         val splitted = hostAndPort.split(":")
         new URI("http", null, splitted(0), Integer.parseInt(splitted(1)), url.getPath, url.getQuery, url.getFragment)

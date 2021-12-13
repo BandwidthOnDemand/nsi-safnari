@@ -87,7 +87,7 @@ object Connection {
   }
 }
 
-class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity))(implicit app: play.api.Application) {
+class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity), configuration: Configuration)(implicit app: play.api.Application) {
   private val connections = TMap.empty[ConnectionId, Connection]
   private val globalReservationIdsMap = TMap.empty[GlobalReservationId, Set[Connection]]
   private val connectionsByRequesterCorrelationId = TMap.empty[(RequesterNsa, CorrelationId), Connection]
@@ -334,7 +334,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     private def scheduleExpiration(lastMessageTimestamp: Instant): Unit = {
       expirationCancellable.foreach(_.cancel())
       expirationCancellable = if (connection.psm.isDefined && connection.lsm.lifecycleState == LifecycleStateEnumType.CREATED) None else {
-        val expirationTime = lastMessageTimestamp.plus(Configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)
+        val expirationTime = lastMessageTimestamp.plus(configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)
         val delay = (expirationTime.toEpochMilli - Instant.now().toEpochMilli).milliseconds
         val message = Connection.Delete
         Logger.debug(s"Scheduling $message for execution after $delay")
