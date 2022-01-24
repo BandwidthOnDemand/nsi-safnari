@@ -7,7 +7,6 @@
 @import org.w3c.dom.Document
 @import scala.xml.PrettyPrinter
 @import play.api.libs.json.{ Json, Writes, JsString }
-@import play.api.libs.json.extensions._
 @import java.time.Instant
 
 @id() = {
@@ -20,10 +19,11 @@
   pp.format(xml)
 }
 @prettyJson[A: Writes](a: A) = @{
-  val json = Json.toJson(a).updateAll {
-    case ((__ \ "path")@@idx \ "credentials" \ "token", value) => JsString("******")
-    case ((__ \ "path")@@idx \ "credentials" \ "password", value) => JsString("******")
-  }
+  val json = Json.toJson(a)
+  //  .updateAll {
+  //    case ((__ \ "path")@@idx \ "credentials" \ "token", value) => JsString("******")
+  //    case ((__ \ "path")@@idx \ "credentials" \ "password", value) => JsString("******")
+  //  }
   Json.prettyPrint(json)
 }
 
