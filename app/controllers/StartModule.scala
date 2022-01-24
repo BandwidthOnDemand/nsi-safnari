@@ -27,6 +27,7 @@ import anorm._
 import anorm.SqlParser._
 import play.api.Logger
 import play.api.db.Database
+import play.api.mvc.ControllerComponents
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
@@ -44,8 +45,16 @@ class StartModule extends AbstractModule {
 
   @Singleton @Provides def messageStore(database: Database, app: Application) = new SafnariMessageStore(database, app)
   @Singleton @Provides def connectionManager(settings: GlobalSettings): ConnectionManager = settings.connectionManager
-  @Singleton @Provides def application(settings: GlobalSettings, configuration: Configuration, connectionRequester: ConnectionRequester)(implicit ec: ExecutionContext): ApplicationController = new ApplicationController(settings.connectionManager, settings.pceRequester, connectionRequester, configuration)
-  @Singleton @Provides def discoveryService(settings: GlobalSettings, configuration: Configuration)(implicit ec: ExecutionContext): DiscoveryService = new DiscoveryService(settings.pceRequester, configuration)
+  @Singleton @Provides def application(settings: GlobalSettings, configuration: Configuration, connectionRequester: ConnectionRequester, controllerComponents: ControllerComponents)(implicit ec: ExecutionContext): ApplicationController = {
+    val applicationController = new ApplicationController(settings.connectionManager, settings.pceRequester, connectionRequester, configuration)
+    applicationController.setControllerComponents(controllerComponents)
+    applicationController
+  }
+  @Singleton @Provides def discoveryService(settings: GlobalSettings, configuration: Configuration, controllerComponents: ControllerComponents)(implicit ec: ExecutionContext): DiscoveryService = {
+    val discoveryService = new DiscoveryService(settings.pceRequester, configuration)
+    discoveryService.setControllerComponents(controllerComponents)
+    discoveryService
+  }
 }
 
 @Singleton
