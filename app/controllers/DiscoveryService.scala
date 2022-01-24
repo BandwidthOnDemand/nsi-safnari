@@ -28,7 +28,6 @@ import controllers.ActorSupport._
 import java.time._
 import java.time.format.DateTimeFormatter
 import java.time.temporal._
-import javax.inject._
 import nl.surfnet.safnari.PathComputationAlgorithm
 import nl.surfnet.safnari.ReachabilityTopologyEntry
 import play.api.http.ContentTypes
@@ -38,8 +37,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
-@Singleton
-class DiscoveryService @Inject()(pceRequester: ActorRef, configuration: Configuration)(implicit ec: ExecutionContext) extends InjectedController {
+class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(implicit ec: ExecutionContext) extends InjectedController {
   private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v1+xml"
   private val rfc1123Formatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of("GMT"))
 

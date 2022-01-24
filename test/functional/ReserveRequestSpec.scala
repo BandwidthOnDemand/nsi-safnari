@@ -1,5 +1,5 @@
 package functional
-import play.api.Logger
+import play.api.{ Application, Logger }
 import java.net.{URI, URL}
 import javax.xml.transform.dom.DOMResult
 import javax.xml.ws.Holder
@@ -46,11 +46,7 @@ class ReserveRequestSpec extends helpers.Specification {
     "nsi.twoway.tls" -> "false"
   )
 
-  lazy val injector = builder.injector
-  lazy val actionBuilder = injector.instanceOf[DefaultActionBuilder]
-  lazy val bodyParsers = injector.instanceOf[PlayBodyParsers]
-
-  def Application = builder.additionalRouter(Router.from({
+  val application: Application = builder.additionalRouter(Router.from({
       case POST(p"/fake/requester") => NsiRequesterEndPoint("fake-requester-nsa") {
         case message @ NsiRequesterMessage(headers, confirm: ReserveConfirmed) =>
           reserveConfirmed.success(NsiRequesterMessage(headers, confirm))
@@ -68,7 +64,7 @@ class ReserveRequestSpec extends helpers.Specification {
           val confirmCriteria = requestCriteria.toInitialConfirmCriteria(p2ps.getSourceSTP, p2ps.getDestSTP).get
 
           headers.replyTo.foreach { replyTo =>
-            injector.instanceOf[NsiWebService].callRequester(
+            application.injector.instanceOf[NsiWebService].callRequester(
               headers.requesterNSA,
               replyTo,
               message reply ReserveConfirmed(connectionId, confirmCriteria),
@@ -80,12 +76,14 @@ class ReserveRequestSpec extends helpers.Specification {
           ???
       }
       case POST(p"/paths/find") =>
+        val actionBuilder = application.injector.instanceOf[DefaultActionBuilder]
+        val bodyParsers = application.injector.instanceOf[PlayBodyParsers]
         actionBuilder(bodyParsers.json) { request =>
           val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
             case JsSuccess(request: PathComputationRequest, _) =>
               val response = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri)), request.serviceType) :: Nil)
-              injector.instanceOf[WSClient].url(request.replyTo.toASCIIString()).post(Json.toJson(response))
+              application.injector.instanceOf[WSClient].url(request.replyTo.toASCIIString()).post(Json.toJson(response))
               Results.Accepted
             case _ =>
               Results.BadRequest
@@ -119,7 +117,7 @@ class ReserveRequestSpec extends helpers.Specification {
         withSourceSTP("networkId:source-localId").
         withDestSTP("networkId:dest-localId")))
 
-    "send a reserve request to the ultimate provider agent" in new WithServer(Application, ServerPort) {
+    "send a reserve request to the ultimate provider agent" in new WithServer(application, ServerPort) {
       val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))
 
       service.getConnectionServiceProviderPort().reserve(ConnectionId, null, "description", Criteria, NsiHeader)

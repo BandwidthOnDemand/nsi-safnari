@@ -27,7 +27,6 @@ import akka.pattern.ask
 import controllers.ActorSupport._
 import java.time.ZonedDateTime
 import java.time.temporal._
-import javax.inject._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
@@ -35,8 +34,7 @@ import play.api.mvc._
 import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
 import scala.concurrent._
 
-@Singleton
-class ApplicationController @Inject()(connectionManager: ConnectionManager, pceRequester: ActorRef, connectionRequester: ConnectionRequester, configuration: Configuration)(implicit ec: ExecutionContext) extends InjectedController {
+class ApplicationController(connectionManager: ConnectionManager, pceRequester: ActorRef, connectionRequester: ConnectionRequester, configuration: Configuration)(implicit ec: ExecutionContext) extends InjectedController {
   def index = Action { implicit request =>
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
     Ok(views.html.index(secure, configuration.NsaId, configuration.WebParams))
