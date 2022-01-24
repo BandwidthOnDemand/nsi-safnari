@@ -12,6 +12,6 @@ resolvers += "Typesafe Server" at "https://repo.typesafe.com/typesafe/releases"
 
 addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.6.25")
 
-addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.3.1")
+addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.10.0")
 
-//addSbtPlugin("com.typesafe.sbt" % "sbt-twirl" % "1.5.1")
+addSbtPlugin("com.typesafe.sbt" % "sbt-twirl" % "1.5.1")

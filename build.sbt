@@ -1,58 +1,64 @@
+import scala.sys.process.Process
+
 organization := "nl.surfnet"
 name := "nsi-safnari"
 
 //releaseSettings
 
+lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run maven")
+lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
 libraryDependencies ++= Seq(
   guice,
   ws,
   jdbc,
   evolutions,
-  "org.scala-stm" %% "scala-stm" % "0.7",
+  "org.scala-stm" %% "scala-stm" % "0.11.0",
   "org.postgresql" % "postgresql" % "42.3.1",
   "com.github.michaelahlers" % "play-json-zipper_2.11" % "1.2.0.23.1",
-  "org.specs2" %% "specs2-scalacheck" % "3.6.6" % "test",
-  "org.specs2" %% "specs2-junit" % "3.6.6" % "test",
-  "org.specs2" %% "specs2-matcher-extra" % "3.6.6" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % "2.3.13" % "test"
+  //"org.specs2" %% "specs2-scalacheck" % "3.6.6" % "test",
+  "org.specs2" %% "specs2-junit" % "3.8.9" % "test",
+  "org.specs2" %% "specs2-matcher-extra" % "3.8.9" % "test",
+  "com.typesafe.akka" %% "akka-testkit" % "2.5.26" % "test"
 )
-
-lazy val root = (project in file(".")).enablePlugins(PlayScala)
-    .dependsOn(sub1 % "compile->compile;test->test")
-lazy val sub1 = RootProject( uri("git://github.com/BandwidthOnDemand/play-nsi-support.git") )
-
-scalaVersion := "2.11.12"
-
-scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-value-discard", "-target:jvm-1.8")
-
-javaOptions in Test += "-Dconfig.file=conf/test.conf"
-
-testFrameworks in Test := Seq(TestFrameworks.Specs2)
-
-// Override Play! defaults to enable parallel test execution
-testOptions in Test := Seq(Tests.Argument(TestFrameworks.Specs2, "junitxml", "console"))
-
-buildInfoSettings
-
-sourceGenerators in Compile <+= buildInfo
 
 val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
 
-gitHeadCommitSha := Process("git rev-parse --short HEAD").lines.head
+gitHeadCommitSha := Process("git rev-parse --short HEAD").lineStream.head
 
-buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha)
+lazy val root = (project in file("."))
+  .enablePlugins(PlayScala)
+  .enablePlugins(BuildInfoPlugin)
+  .settings(
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha),
+    buildInfoPackage := "nl.surfnet.safnari"
+  )
+  .dependsOn(sub1 % "compile->compile;test->test")
 
-buildInfoPackage := "nl.surfnet.safnari"
+//lazy val sub1 = RootProject( uri("git://github.com/BandwidthOnDemand/play-nsi-support.git") )
+lazy val sub1 = RootProject( uri("../play-nsi-support") )
+
+scalaVersion := "2.12.15"
+
+scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-value-discard", "-target:jvm-1.8")
+
+Test / javaOptions += "-Dconfig.file=conf/test.conf"
+
+Test / testFrameworks := Seq(TestFrameworks.Specs2)
+
+// Override Play! defaults to enable parallel test execution
+Test / testOptions := Seq(Tests.Argument(TestFrameworks.Specs2, "junitxml", "console"))
+
+//sourceGenerators in Compile <+= buildInfo
 
 //PublishDist.publishSettings
 
 // Disable ScalaDoc generation
-sources in (Compile, doc) := Seq.empty
-publishArtifact in (Compile, packageDoc) := false
+Compile / doc /sources := Seq.empty
+Compile / packageDoc / publishArtifact := false
 
-sources in (Test, doc) := Seq.empty
-publishArtifact in (Test, packageDoc) := false
+Test / doc / sources := Seq.empty
+Test / packageDoc / publishArtifact := false
 
 // net.virtualvoid.sbt.graph.Plugin.graphSettings
 
