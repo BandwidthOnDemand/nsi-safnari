@@ -52,7 +52,7 @@ class Continuations[T](scheduler: => Scheduler)(implicit ec: ExecutionContext) {
       }
     }
 
-    val promise = Promise[T]
+    val promise = Promise[T]()
     continuations(correlationId) = (timeout :: Nil, promise)
     promise.future
   }
@@ -68,14 +68,14 @@ class Continuations[T](scheduler: => Scheduler)(implicit ec: ExecutionContext) {
     case None =>
       false
     case Some((timeouts, _)) =>
-      timeouts.foreach(_.cancel)
+      timeouts.foreach(_.cancel())
       true
   }
 
   def replyReceived(correlationId: CorrelationId, reply: T): Unit =
     continuations.remove(correlationId).foreach {
       case (timeouts, promise) =>
-        timeouts.foreach(_.cancel)
+        timeouts.foreach(_.cancel())
         promise.trySuccess(reply)
     }
 }

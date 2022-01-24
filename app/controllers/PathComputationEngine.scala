@@ -78,7 +78,10 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
       case 'healthCheck =>
         val topologyHealth = ws.url(s"$endPoint/management/status/topology").addHttpHeaders(ACCEPT -> JSON).get()
 
-        topologyHealth onFailure { case e => Logger.warn(s"Failed to access PCE topology service: $e") }
+        topologyHealth onComplete {
+          case Success(_) => // nothing
+          case Failure(e) => Logger.warn(s"Failed to access PCE topology service: $e")
+        }
 
         val lastModified = topologyHealth map { _.header("Last-Modified").getOrElse("unknown") }
         val healthy = topologyHealth.map(_.status == 200).recover { case t => false }

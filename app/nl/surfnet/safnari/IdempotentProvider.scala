@@ -58,7 +58,7 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Connect
             } else {
               Right(outstandingCommandsOrReply match {
                 case Left(outstandingCommands) =>
-                  outstandingCommands.values.to[Seq]
+                  outstandingCommands.values.toSeq
                 case Right(reply) =>
                   List(reply)
               })

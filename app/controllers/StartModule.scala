@@ -30,7 +30,6 @@ import com.google.inject.{ AbstractModule, Provides }
 import javax.inject._
 import nl.surfnet.nsiv2.soap._
 import nl.surfnet.safnari.SafnariMessageStore
-import play.api.Application
 import play.api.Logger
 import play.api.db.Database
 import play.api.inject.ApplicationLifecycle

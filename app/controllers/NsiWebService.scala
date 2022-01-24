@@ -36,7 +36,6 @@ import play.api.http.Status._
 import play.api.libs.ws.{WSBodyWritables, WSClient, WSRequest}
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
-import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 @Singleton

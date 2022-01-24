@@ -27,7 +27,7 @@ import java.time.Instant
 import javax.xml.XMLConstants
 import javax.xml.namespace.QName
 import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 
@@ -113,7 +113,7 @@ object PceMessage {
     ).apply((tvType, value) => new TypeValueType().withType(tvType).withValue(value), typeValueType => (typeValueType.getType(), typeValueType.getValue()))
 
   implicit val StpListTypeFormat: OFormat[StpListType] =
-    (__ \ "orderedSTP").format[Seq[OrderedStpType]].inmap((orderedSTP) => new StpListType().withOrderedSTP(orderedSTP), stpListType => (stpListType.getOrderedSTP()))
+    (__ \ "orderedSTP").format[Seq[OrderedStpType]].inmap((orderedSTP) => new StpListType().withOrderedSTP(orderedSTP.asJava), stpListType => (stpListType.getOrderedSTP().asScala.toSeq))
 
   implicit val ProviderEndPointFormat: OFormat[ProviderEndPoint] = (
     (__ \ "nsa").format[String] and
@@ -136,11 +136,11 @@ object PceMessage {
         .withSourceSTP(source)
         .withDestSTP(dest)
         .withEro(ero.orNull)
-        .withParameter(parameter)
+        .withParameter(parameter.asJava)
     },
     {
       p2ps => (p2ps.getCapacity(), Option(p2ps.getDirectionality()), Option(p2ps.isSymmetricPath()).map(_.booleanValue()),
-        p2ps.getSourceSTP(), p2ps.getDestSTP(), Option(p2ps.getEro()), p2ps.getParameter())
+        p2ps.getSourceSTP(), p2ps.getDestSTP(), Option(p2ps.getEro()), p2ps.getParameter().asScala.toSeq)
     }
   )
 

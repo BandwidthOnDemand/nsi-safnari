@@ -89,8 +89,9 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
 
   private[controllers] def handleQuery(message: NsiProviderMessage[NsiProviderQuery])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] = message.body match {
     case QuerySummary(ids, ifModifiedSince) =>
-      queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) onSuccess {
-        case (reservations, lastModifiedAt) => sendAsyncReply(message reply QuerySummaryConfirmed(reservations, lastModifiedAt.map(_.toXMLGregorianCalendar())))
+      queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) onComplete {
+        case Success((reservations, lastModifiedAt)) => sendAsyncReply(message reply QuerySummaryConfirmed(reservations, lastModifiedAt.map(_.toXMLGregorianCalendar())))
+        case Failure(_) => // nothing
       }
       Future.successful(GenericAck())
     case QuerySummarySync(ids, ifModifiedSince) =>
@@ -100,8 +101,9 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
     case QueryNotification(connectionId, start, end) =>
       val connection = connectionManager.get(connectionId)
       connection.map { con =>
-        queryNotifications(con, start, end) onSuccess {
-          case n => sendAsyncReply(message reply QueryNotificationConfirmed(n))
+        queryNotifications(con, start, end) onComplete {
+          case Success(n) => sendAsyncReply(message reply QueryNotificationConfirmed(n))
+          case Failure(_) => // nothing
         }
       }
       Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)))(_ => GenericAck()))
@@ -112,8 +114,9 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
     case QueryResult(connectionId, start, end) =>
       val connection = connectionManager.get(connectionId)
       connection.map { con =>
-        queryResults(con, start, end) onSuccess {
-          case n => sendAsyncReply(message reply QueryResultConfirmed(n))
+        queryResults(con, start, end) onComplete {
+          case Success(n) => sendAsyncReply(message reply QueryResultConfirmed(n))
+          case Failure(_) => // nothing
         }
       }
 

@@ -52,7 +52,7 @@ case class LifecycleStateMachineData(
 
     copy(command = Some(command), childConnectionStates = children.segments.map {
       case (correlationId, _) => correlationId -> transitionalState(correlationId)
-    }(collection.breakOut))
+    }.toMap)
   }
 
   def updateChild(correlationId: CorrelationId, state: LifecycleStateEnumType) =

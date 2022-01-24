@@ -27,7 +27,6 @@ import akka.pattern.ask
 import controllers.ActorSupport._
 import java.time.ZonedDateTime
 import java.time.temporal._
-import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import play.api.mvc._
