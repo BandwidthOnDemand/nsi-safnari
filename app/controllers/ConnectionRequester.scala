@@ -29,7 +29,6 @@ import java.util.concurrent.TimeoutException
 import javax.inject._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.soap._
-import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 import play.api.Logger
@@ -41,7 +40,7 @@ import controllers.ActorSupport._
 
 
 @Singleton
-class ConnectionRequesterController @Inject()(connectionManager: ConnectionManager, configuration: Configuration, connectionRequester: ConnectionRequester)(implicit ec: ExecutionContext) extends InjectedController with SoapWebService {
+class ConnectionRequesterController @Inject()(connectionManager: ConnectionManager, configuration: Configuration, connectionRequester: ConnectionRequester, extraBodyParsers: ExtraBodyParsers, val actionBuilder: DefaultActionBuilder)(implicit ec: ExecutionContext) extends InjectedController with SoapWebService {
 
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
@@ -49,7 +48,7 @@ class ConnectionRequesterController @Inject()(connectionManager: ConnectionManag
 
   override def serviceUrl: String = configuration.requesterServiceUrl
 
-  def request = NsiRequesterEndPoint(configuration.NsaId) {
+  def request = extraBodyParsers.NsiRequesterEndPoint(configuration.NsaId) {
     case message @ NsiRequesterMessage(headers, notification: NsiNotification) =>
       val connection = connectionManager.findByChildConnectionId(notification.connectionId)
 

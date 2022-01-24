@@ -22,28 +22,30 @@
  */
 package controllers
 
+import akka.actor.ActorRef
 import akka.actor._
-import anorm._
 import anorm.SqlParser._
+import anorm._
+import com.google.inject.{ AbstractModule, Provides }
+import javax.inject._
+import nl.surfnet.nsiv2.soap._
+import nl.surfnet.safnari.SafnariMessageStore
+import play.api.Application
 import play.api.Logger
 import play.api.db.Database
-import play.api.mvc.ControllerComponents
+import play.api.inject.ApplicationLifecycle
+import play.api.mvc._
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
-import play.api.Application
-import akka.actor.ActorRef
-import javax.inject._
-import play.api.inject.ApplicationLifecycle
-import com.google.inject.{ AbstractModule, Provides }
-import nl.surfnet.safnari.SafnariMessageStore
 
 class StartModule extends AbstractModule {
-  def configure() = {
+  override def configure() = {
     bind(classOf[GlobalSettings]).asEagerSingleton()
   }
 
-  @Singleton @Provides def messageStore(database: Database, app: Application) = new SafnariMessageStore(database, app)
+  @Singleton @Provides def extraBodyParsers(implicit ec: ExecutionContext, bodyParsers: PlayBodyParsers, actionBuilder: DefaultActionBuilder) = new ExtraBodyParsers
+  @Singleton @Provides def messageStore(database: Database) = new SafnariMessageStore(database)
   @Singleton @Provides def connectionManager(settings: GlobalSettings): ConnectionManager = settings.connectionManager
   @Singleton @Provides def application(settings: GlobalSettings, configuration: Configuration, connectionRequester: ConnectionRequester, controllerComponents: ControllerComponents)(implicit ec: ExecutionContext): ApplicationController = {
     val applicationController = new ApplicationController(settings.connectionManager, settings.pceRequester, connectionRequester, configuration)

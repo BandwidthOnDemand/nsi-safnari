@@ -29,8 +29,7 @@ import java.time.Instant
 import javax.inject._
 import javax.xml.namespace.QName
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
-import nl.surfnet.nsiv2.soap.SoapWebService
+import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
@@ -40,14 +39,14 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{Failure, Success}
 
 @Singleton
-class ConnectionProviderController @Inject()(connectionManager: ConnectionManager, connectionProvider: ConnectionProvider, configuration: Configuration)(implicit actorSystem: ActorSystem, ec: ExecutionContext) extends InjectedController with SoapWebService {
+class ConnectionProviderController @Inject()(connectionManager: ConnectionManager, connectionProvider: ConnectionProvider, configuration: Configuration, extraBodyParsers: ExtraBodyParsers, val actionBuilder: DefaultActionBuilder)(implicit actorSystem: ActorSystem, ec: ExecutionContext) extends InjectedController with SoapWebService {
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
   override val WsdlBasename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
   override def serviceUrl: String = configuration.providerServiceUrl
 
-  def request = NsiProviderEndPoint(configuration.NsaId) { request =>
+  def request = extraBodyParsers.NsiProviderEndPoint(configuration.NsaId) { request =>
     validateRequest(request).map(Future.successful) getOrElse (request match {
       case message @ NsiProviderMessage(headers, query: NsiProviderQuery) => handleQuery(NsiProviderMessage(headers, query))(connectionProvider.replyToClient(configuration, headers.replyTo)).map(message.ack)
       case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(connectionProvider.replyToClient(configuration, headers.replyTo)).map(message.ack)

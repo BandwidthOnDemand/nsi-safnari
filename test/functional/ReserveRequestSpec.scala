@@ -6,7 +6,7 @@ import javax.xml.ws.Holder
 
 import controllers.NsiWebService
 import nl.surfnet.nsiv2.soap.NsiSoapConversions._
-import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
+import nl.surfnet.nsiv2.soap.ExtraBodyParsers
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
@@ -46,8 +46,8 @@ class ReserveRequestSpec extends helpers.Specification {
     "nsi.twoway.tls" -> "false"
   )
 
-  val application: Application = builder.additionalRouter(Router.from({
-      case POST(p"/fake/requester") => NsiRequesterEndPoint("fake-requester-nsa") {
+  val application: Application = builder.appRoutes(app => {
+      case ("POST", p"/fake/requester") => app.injector.instanceOf[ExtraBodyParsers].NsiRequesterEndPoint("fake-requester-nsa") {
         case message @ NsiRequesterMessage(headers, confirm: ReserveConfirmed) =>
           reserveConfirmed.success(NsiRequesterMessage(headers, confirm))
           Future.successful(message.ack())
@@ -55,7 +55,7 @@ class ReserveRequestSpec extends helpers.Specification {
           reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
           Future.successful(response.ack(ServiceException(new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response"))))
       }
-      case POST(p"/fake/provider") => NsiProviderEndPoint("fake-provider-nsa") {
+      case ("POST", p"/fake/provider") => app.injector.instanceOf[ExtraBodyParsers].NsiProviderEndPoint("fake-provider-nsa") {
         case message @ NsiProviderMessage(headers, reserve: InitialReserve) =>
           val connectionId = newConnectionId
 
@@ -64,7 +64,7 @@ class ReserveRequestSpec extends helpers.Specification {
           val confirmCriteria = requestCriteria.toInitialConfirmCriteria(p2ps.getSourceSTP, p2ps.getDestSTP).get
 
           headers.replyTo.foreach { replyTo =>
-            application.injector.instanceOf[NsiWebService].callRequester(
+            app.injector.instanceOf[NsiWebService].callRequester(
               headers.requesterNSA,
               replyTo,
               message reply ReserveConfirmed(connectionId, confirmCriteria),
@@ -75,22 +75,22 @@ class ReserveRequestSpec extends helpers.Specification {
           wtf.pp
           ???
       }
-      case POST(p"/paths/find") =>
-        val actionBuilder = application.injector.instanceOf[DefaultActionBuilder]
-        val bodyParsers = application.injector.instanceOf[PlayBodyParsers]
+      case ("POST", p"/paths/find") =>
+        val actionBuilder = app.injector.instanceOf[DefaultActionBuilder]
+        val bodyParsers = app.injector.instanceOf[PlayBodyParsers]
         actionBuilder(bodyParsers.json) { request =>
           val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
             case JsSuccess(request: PathComputationRequest, _) =>
               val response = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri)), request.serviceType) :: Nil)
-              application.injector.instanceOf[WSClient].url(request.replyTo.toASCIIString()).post(Json.toJson(response))
+              app.injector.instanceOf[WSClient].url(request.replyTo.toASCIIString()).post(Json.toJson(response))
               Results.Accepted
             case _ =>
               Results.BadRequest
           }
         }
     }
-  )).build()
+  ).build()
 
   def marshal(p2ps: P2PServiceBaseType): Element = {
     val jaxb = new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory().createP2Ps(p2ps)

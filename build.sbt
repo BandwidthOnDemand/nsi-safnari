@@ -17,8 +17,8 @@ libraryDependencies ++= Seq(
   "org.postgresql" % "postgresql" % "42.3.1",
   "com.github.michaelahlers" % "play-json-zipper_2.11" % "1.2.0.23.1",
   //"org.specs2" %% "specs2-scalacheck" % "3.6.6" % "test",
-  "org.specs2" %% "specs2-junit" % "3.8.9" % "test",
-  "org.specs2" %% "specs2-matcher-extra" % "3.8.9" % "test",
+  "org.specs2" %% "specs2-junit" % "4.3.5" % "test",
+  "org.specs2" %% "specs2-matcher-extra" % "4.3.5" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.5.26" % "test"
 )
 
