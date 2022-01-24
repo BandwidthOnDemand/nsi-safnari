@@ -91,7 +91,7 @@ class ConnectionManager(
   connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity),
   configuration: Configuration,
   val messageStore: MessageStore[Message]
-)(implicit app: play.api.Application) {
+) {
   private val connections = TMap.empty[ConnectionId, Connection]
   private val globalReservationIdsMap = TMap.empty[GlobalReservationId, Set[Connection]]
   private val connectionsByRequesterCorrelationId = TMap.empty[(RequesterNsa, CorrelationId), Connection]
@@ -107,8 +107,6 @@ class ConnectionManager(
   private def runDeleteHook(connectionId: ConnectionId): Unit = atomic { implicit txn =>
     deleteHooks.remove(connectionId).foreach { hook => hook(txn) }
   }
-
-  import MessagePersistence.MessageToMessageData
 
   def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection): Unit = atomic { implicit txn =>
     connections(connectionId) = connection
@@ -190,7 +188,7 @@ class ConnectionManager(
   def findOrCreateConnection(request: NsiProviderMessage[NsiProviderCommand])(implicit actorSystem: ActorSystem): Option[Connection] = atomic { implicit txn =>
     findByRequesterCorrelationId(request.headers.requesterNSA, request.headers.correlationId).orElse {
       val result = request match {
-        case NsiProviderMessage(headers, update: NsiProviderUpdateCommand) =>
+        case NsiProviderMessage(headers@_, update: NsiProviderUpdateCommand) =>
           get(update.connectionId).map(update.connectionId -> _)
         case NsiProviderMessage(headers, initialReserve: InitialReserve) =>
           val connectionId = newConnectionId

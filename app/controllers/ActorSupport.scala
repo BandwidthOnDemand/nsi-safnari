@@ -23,7 +23,6 @@
 package controllers
 
 import akka.util.Timeout
-import play.api.libs.concurrent.Akka
 import scala.concurrent.duration._
 
 private[controllers] object ActorSupport {

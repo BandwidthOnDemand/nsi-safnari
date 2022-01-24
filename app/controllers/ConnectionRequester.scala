@@ -24,7 +24,6 @@ package controllers
 
 import akka.actor._
 import akka.event.LoggingReceive
-import java.net.URI
 import java.time.Instant
 import java.util.concurrent.TimeoutException
 import javax.inject._
@@ -34,7 +33,6 @@ import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 import play.api.Logger
-import play.api.Play.current
 import play.api.mvc._
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success }

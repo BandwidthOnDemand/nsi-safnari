@@ -34,7 +34,6 @@ import nl.surfnet.nsiv2.soap.SoapWebService
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import play.api.Play._
 import play.api.Logger
 import play.api.mvc._
 import scala.concurrent.{ ExecutionContext, Future }
@@ -63,7 +62,7 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
       configuration.translateToStunnelAddress(nsa, replyTo) match {
         case Success(_) =>
           None
-        case Failure(e) =>
+        case Failure(_) =>
           Logger.info(s"The requesterNSA '$nsa' does not match a known TLS NSA")
           val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(configuration.NsaId, NsiHeaders.REQUESTER_NSA -> nsa))
           Some(message ack serviceException)
@@ -138,7 +137,7 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
       case Success(list) =>
         val resultTypes = list.flatMap {
           case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultType
-          case ToRequester(NsiRequesterMessage(_, ErrorReply(e)))                       => Seq.empty
+          case ToRequester(NsiRequesterMessage(_, ErrorReply(_)))                       => Seq.empty
         }
 
         sendAsyncReply(message reply QueryRecursiveConfirmed(resultTypes))
@@ -201,9 +200,9 @@ class ConnectionProvider @Inject()(nsiWebService: NsiWebService)(implicit actorS
     val ackFuture = nsiWebService.callRequester(response.headers.requesterNSA, replyTo, response, configuration)
 
     ackFuture onComplete {
-      case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
-      case Success(NsiRequesterMessage(headers, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
-      case Success(acknowledgement)                                       => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
+      case Failure(error)                                           => Logger.info(s"Replying $response to $replyTo: $error", error)
+      case Success(NsiRequesterMessage(_, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
+      case Success(acknowledgement)                                 => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
     }
   }
 

@@ -27,12 +27,11 @@ import anorm._
 import anorm.SqlParser._
 import play.api.Logger
 import play.api.db.Database
-import play.api.libs.concurrent.Akka
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 import play.api.Application
-import akka.actor.{ActorRef, Props}
+import akka.actor.ActorRef
 import javax.inject._
 import play.api.inject.ApplicationLifecycle
 import com.google.inject.{ AbstractModule, Provides }
@@ -51,7 +50,6 @@ class StartModule extends AbstractModule {
 
 @Singleton
 class GlobalSettings @Inject()(
-  app: Application,
   lifecycle: ApplicationLifecycle,
   configuration: Configuration,
   actorSystem: ActorSystem,
@@ -63,7 +61,7 @@ class GlobalSettings @Inject()(
 )(implicit ec: ExecutionContext) {
   val pceRequester: ActorRef = pathComputationEngine.createPceRequesterActor(configuration)
   private val createOutboundActor = connectionProvider.outboundActor(configuration, connectionRequester.nsiRequester, pceRequester) _
-  val connectionManager: ConnectionManager = new ConnectionManager(connectionProvider.connectionFactory(createOutboundActor, configuration), configuration, messageStore)(app)
+  val connectionManager: ConnectionManager = new ConnectionManager(connectionProvider.connectionFactory(createOutboundActor, configuration), configuration, messageStore)
 
   if (configuration.CleanDbOnStart) {
     cleanDatabase()

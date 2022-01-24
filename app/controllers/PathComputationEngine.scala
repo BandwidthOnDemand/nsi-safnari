@@ -26,7 +26,6 @@ import java.net.URI
 import javax.inject._
 
 import akka.actor._
-import controllers.ActorSupport._
 import nl.surfnet.nsiv2.messages.CorrelationId
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
