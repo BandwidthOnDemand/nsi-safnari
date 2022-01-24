@@ -2,7 +2,7 @@ package nl.surfnet.safnari
 
 import akka.actor.ActorSystem
 import java.util.concurrent.TimeoutException
-import scala.concurrent.Await
+import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 import scala.util.Failure
 import java.util.concurrent.CountDownLatch
@@ -17,7 +17,7 @@ class ContinuationsSpec extends helpers.Specification {
     val actorSystem = ActorSystem("test")
 
     val CorrelationId = newCorrelationId
-    val continuations = new Continuations[String](actorSystem.scheduler)
+    val continuations = new Continuations[String](actorSystem.scheduler)(ExecutionContext.global)
 
     override def after = Await.result(actorSystem.terminate, 10.seconds)
   }

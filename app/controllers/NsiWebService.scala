@@ -35,17 +35,16 @@ import org.w3c.dom.Document
 import play.api.Logger
 import play.api.Play.current
 import play.api.http.Status._
-import play.api.libs.concurrent.Execution.Implicits._
-import play.api.libs.ws.{WSClient, WSRequest}
-import scala.concurrent.Future
+import play.api.libs.ws.{WSBodyWritables, WSClient, WSRequest}
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 @Singleton
-class NsiWebService @Inject()(ws: WSClient) {
-  implicit class SoapRequestHolder(request: WSRequest) {
-    def withSoapActionHeader(action: String) = request.withHeaders("SOAPAction" -> ('"' + action +'"'))
+class NsiWebService @Inject()(ws: WSClient)(implicit ec: ExecutionContext) extends WSBodyWritables {
+  implicit class SoapRequestHolder(val request: WSRequest) {
+    def withSoapActionHeader(action: String) = request.addHttpHeaders("SOAPAction" -> ('"' + action +'"'))
   }
 
   def callProvider(provider: ProviderEndPoint, message: NsiProviderMessage[NsiProviderOperation], configuration: Configuration): Future[NsiProviderMessage[NsiAcknowledgement]] =
@@ -81,8 +80,9 @@ class NsiWebService @Inject()(ws: WSClient) {
     for {
       providerUrl <- if (configuration.Use2WayTLS) Future.fromTry(configuration.translateToStunnelAddress(nsa, url)) else Future.successful(url)
       request = ws.url(providerUrl.toASCIIString()).withRequestTimeout(Duration(20000, MILLISECONDS)).withSoapActionHeader(soapAction)
-      _ = Logger.debug(s"Sending NSA ${nsa} at ${request.url} the SOAP message: ${Conversion[M[T], Document].andThen(Conversion[Document, String]).apply(message)}")
-      ack <- request.post(message)
+      messageBody <- Future.fromTry(Conversion[M[T], Document].apply(message))
+      _ = Logger.debug(s"Sending NSA ${nsa} at ${request.url} the SOAP message: ${Conversion[Document, String].apply(messageBody)}")
+      ack <- request.post(messageBody)
     } yield {
       val defaultAckHeaders = message.headers.forSyncAck
 

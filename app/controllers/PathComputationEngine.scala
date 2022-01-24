@@ -32,18 +32,20 @@ import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import java.time.Instant
 import play.api.Logger
-import play.api.libs.concurrent.Execution.Implicits._
+import play.api.http.ContentTypes._
+import play.api.http.HeaderNames._
+import play.api.http.Status._
 import play.api.libs.json._
 import play.api.libs.ws.WSClient
 import play.api.mvc._
 
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 import scala.concurrent.stm.Ref
 import scala.util.{Failure, Success}
 
 @Singleton
-class PathComputationEngineController @Inject()(configuration: Configuration, pce: PathComputationEngine) extends Controller {
+class PathComputationEngineController @Inject()(configuration: Configuration, pce: PathComputationEngine)(implicit ec: ExecutionContext) extends InjectedController {
   def pceReply = Action(parse.json) { implicit request =>
     Json.fromJson[PceResponse](request.body) match {
       case JsSuccess(response, _) =>
@@ -58,7 +60,7 @@ class PathComputationEngineController @Inject()(configuration: Configuration, pc
 }
 
 @Singleton
-class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient) extends Controller {
+class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(implicit ec: ExecutionContext) {
   private[controllers] val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
 
   def createPceRequesterActor(configuration: Configuration): ActorRef =
@@ -75,7 +77,7 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient) ex
 
     def receive = {
       case 'healthCheck =>
-        val topologyHealth = ws.url(s"$endPoint/management/status/topology").withHeaders(ACCEPT -> JSON).get()
+        val topologyHealth = ws.url(s"$endPoint/management/status/topology").addHttpHeaders(ACCEPT -> JSON).get()
 
         topologyHealth onFailure { case e => Logger.warn(s"Failed to access PCE topology service: $e") }
 
@@ -85,7 +87,7 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient) ex
         sender ! healthy.flatMap(h => lastModified.map(d => s"PCE (Real; $d)" -> h))
 
       case 'reachability =>
-        val reachabilityResponse = ws.url(s"$endPoint/reachability").withRequestTimeout(Duration(20000, MILLISECONDS)).withHeaders(ACCEPT -> JSON).get()
+        val reachabilityResponse = ws.url(s"$endPoint/reachability").withRequestTimeout(Duration(20000, MILLISECONDS)).addHttpHeaders(ACCEPT -> JSON).get()
         val senderRef = sender
 
         reachabilityResponse.onComplete {

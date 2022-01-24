@@ -13,6 +13,7 @@ import java.time.Instant
 import java.time.temporal._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.libs.concurrent.Akka
+import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test._
 import helpers.NsiMessages._
 
@@ -20,6 +21,7 @@ import helpers.NsiMessages._
 class ConnectionManagerSpec extends helpers.Specification {
   sequential
 
+  private def FakeApplication(additionalConfiguration: Map[String, Any]) = new GuiceApplicationBuilder().configure(additionalConfiguration).build
 
   class RecordingActor extends Actor {
     @volatile var messages = Vector.empty[Any]

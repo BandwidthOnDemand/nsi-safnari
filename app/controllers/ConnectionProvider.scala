@@ -36,15 +36,12 @@ import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.Play._
 import play.api.Logger
-import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{Failure, Success}
 
 @Singleton
-class ConnectionProviderController @Inject()(connectionManager: ConnectionManager, connectionProvider: ConnectionProvider, configuration: Configuration, actorSystem: ActorSystem) extends Controller with SoapWebService {
-  private implicit def as: ActorSystem = actorSystem
-
+class ConnectionProviderController @Inject()(connectionManager: ConnectionManager, connectionProvider: ConnectionProvider, configuration: Configuration)(implicit actorSystem: ActorSystem, ec: ExecutionContext) extends InjectedController with SoapWebService {
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
   override val WsdlBasename = "ogf_nsi_connection_provider_v2_0.wsdl"
@@ -178,7 +175,7 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
 }
 
 @Singleton
-class ConnectionProvider @Inject()(nsiWebService: NsiWebService, actorSystem: ActorSystem) {
+class ConnectionProvider @Inject()(nsiWebService: NsiWebService)(implicit actorSystem: ActorSystem, ec: ExecutionContext) {
   val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
   def connectionFactory(createOutboundActor: NsiProviderMessage[InitialReserve] => ActorRef, configuration: Configuration)(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {

@@ -28,9 +28,7 @@ import anorm.SqlParser._
 import play.api.Logger
 import play.api.db.Database
 import play.api.libs.concurrent.Akka
-import play.api.libs.concurrent.Execution.Implicits._
-import scala.concurrent.Await
-import scala.concurrent.Future
+import scala.concurrent._
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 import play.api.Application
@@ -47,8 +45,8 @@ class StartModule extends AbstractModule {
 
   @Singleton @Provides def messageStore(database: Database, app: Application) = new SafnariMessageStore(database, app)
   @Singleton @Provides def connectionManager(settings: GlobalSettings): ConnectionManager = settings.connectionManager
-  @Singleton @Provides def application(settings: GlobalSettings, configuration: Configuration, connectionRequester: ConnectionRequester): ApplicationController = new ApplicationController(settings.connectionManager, settings.pceRequester, connectionRequester, configuration)
-  @Singleton @Provides def discoveryService(settings: GlobalSettings, configuration: Configuration): DiscoveryService = new DiscoveryService(settings.pceRequester, configuration)
+  @Singleton @Provides def application(settings: GlobalSettings, configuration: Configuration, connectionRequester: ConnectionRequester)(implicit ec: ExecutionContext): ApplicationController = new ApplicationController(settings.connectionManager, settings.pceRequester, connectionRequester, configuration)
+  @Singleton @Provides def discoveryService(settings: GlobalSettings, configuration: Configuration)(implicit ec: ExecutionContext): DiscoveryService = new DiscoveryService(settings.pceRequester, configuration)
 }
 
 @Singleton
@@ -62,7 +60,7 @@ class GlobalSettings @Inject()(
   connectionProvider: ConnectionProvider,
   connectionRequester: ConnectionRequester,
   database: Database
-) {
+)(implicit ec: ExecutionContext) {
   val pceRequester: ActorRef = pathComputationEngine.createPceRequesterActor(configuration)
   private val createOutboundActor = connectionProvider.outboundActor(configuration, connectionRequester.nsiRequester, pceRequester) _
   val connectionManager: ConnectionManager = new ConnectionManager(connectionProvider.connectionFactory(createOutboundActor, configuration), configuration, messageStore)(app)

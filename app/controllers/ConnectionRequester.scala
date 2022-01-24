@@ -35,16 +35,15 @@ import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 import play.api.Logger
 import play.api.Play.current
-import play.api.libs.concurrent.Execution.Implicits._
-import play.api.mvc.Controller
-import scala.concurrent.Future
+import play.api.mvc._
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success }
 
 import controllers.ActorSupport._
 
 
 @Singleton
-class ConnectionRequesterController @Inject()(connectionManager: ConnectionManager, configuration: Configuration, connectionRequester: ConnectionRequester) extends Controller with SoapWebService {
+class ConnectionRequesterController @Inject()(connectionManager: ConnectionManager, configuration: Configuration, connectionRequester: ConnectionRequester)(implicit ec: ExecutionContext) extends InjectedController with SoapWebService {
 
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
@@ -70,7 +69,7 @@ class ConnectionRequesterController @Inject()(connectionManager: ConnectionManag
 }
 
 @Singleton
-class ConnectionRequester @Inject()(configuration: Configuration, nsiWebService: NsiWebService, actorSystem: ActorSystem) {
+class ConnectionRequester @Inject()(configuration: Configuration, nsiWebService: NsiWebService)(implicit actorSystem: ActorSystem, ec: ExecutionContext) {
   private val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
   private[controllers] def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =

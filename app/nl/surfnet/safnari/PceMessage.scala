@@ -34,7 +34,6 @@ import nl.surfnet.nsiv2.utils._
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types._
-import play.api.data.validation.ValidationError
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -88,8 +87,8 @@ object ReachabilityTopologyEntry {
 
 object PceMessage {
   implicit val CorrelationIdReads: Reads[CorrelationId] = Reads[CorrelationId] {
-    case JsString(s) => CorrelationId.fromString(s).map { x => JsSuccess(x) }.getOrElse { JsError(ValidationError("bad.correlation.id", s)) }
-    case json        => JsError(ValidationError("bad.correlation.id", json))
+    case JsString(s) => CorrelationId.fromString(s).map { x => JsSuccess(x) }.getOrElse { JsError(JsonValidationError("bad.correlation.id", s)) }
+    case json        => JsError(JsonValidationError("bad.correlation.id", json))
   }
   implicit val CorrelationIdWrites: Writes[CorrelationId] = Writes { x => JsString(x.toString) }
 
@@ -159,7 +158,7 @@ object PceMessage {
     (__ \ "status").read[String].reads(json) match {
       case JsSuccess("SUCCESS", _) => Json.fromJson[PathComputationConfirmed](json)
       case JsSuccess("FAILED", _)  => Json.fromJson[PathComputationFailed](json)
-      case JsSuccess(status, path) => JsError(path -> ValidationError("bad.response.status", status))
+      case JsSuccess(status, path) => JsError(path -> JsonValidationError("bad.response.status", status))
       case errors: JsError         => errors
     }
   }
@@ -219,8 +218,8 @@ object PceMessage {
   }
 
   implicit val XMLGregorianCalendarReads: Reads[XMLGregorianCalendar] = Reads {
-    case JsString(s) => Try { DatatypeFactory.newInstance().newXMLGregorianCalendar(s) }.map { x => JsSuccess(x) }.getOrElse { JsError(ValidationError("bad.timestamp", s)) }
-    case json        => JsError(ValidationError("bad.timestamp", json))
+    case JsString(s) => Try { DatatypeFactory.newInstance().newXMLGregorianCalendar(s) }.map { x => JsSuccess(x) }.getOrElse { JsError(JsonValidationError("bad.timestamp", s)) }
+    case json        => JsError(JsonValidationError("bad.timestamp", json))
   }
   implicit val XMLGregorianCalendarWrites: Writes[XMLGregorianCalendar] = Writes { x => JsString(x.toString) }
 

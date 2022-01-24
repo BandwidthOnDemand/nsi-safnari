@@ -46,7 +46,9 @@ class ReserveRequestSpec extends helpers.Specification {
     "nsi.twoway.tls" -> "false"
   )
 
-  val injector = builder.injector
+  lazy val injector = builder.injector
+  lazy val actionBuilder = injector.instanceOf[DefaultActionBuilder]
+  lazy val bodyParsers = injector.instanceOf[PlayBodyParsers]
 
   def Application = builder.additionalRouter(Router.from({
       case POST(p"/fake/requester") => NsiRequesterEndPoint("fake-requester-nsa") {
@@ -78,7 +80,7 @@ class ReserveRequestSpec extends helpers.Specification {
           ???
       }
       case POST(p"/paths/find") =>
-        Action(BodyParsers.parse.json) { request =>
+        actionBuilder(bodyParsers.json) { request =>
           val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
             case JsSuccess(request: PathComputationRequest, _) =>

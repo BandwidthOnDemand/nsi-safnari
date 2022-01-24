@@ -5,6 +5,7 @@ name := "nsi-safnari"
 
 
 libraryDependencies ++= Seq(
+  guice,
   ws,
   jdbc,
   evolutions,
