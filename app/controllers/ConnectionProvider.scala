@@ -41,18 +41,20 @@ import play.api.mvc._
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class ConnectionProvider @Inject()(connectionManager: ConnectionManager, configuration: Configuration) extends Controller with SoapWebService {
+@Singleton
+class ConnectionProviderController @Inject()(connectionManager: ConnectionManager, connectionProvider: ConnectionProvider, configuration: Configuration, actorSystem: ActorSystem) extends Controller with SoapWebService {
+  private implicit def as: ActorSystem = actorSystem
 
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
   override val WsdlBasename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
-  override def serviceUrl: String = ConnectionProvider.serviceUrl(configuration)
+  override def serviceUrl: String = configuration.providerServiceUrl
 
   def request = NsiProviderEndPoint(configuration.NsaId) { request =>
     validateRequest(request).map(Future.successful) getOrElse (request match {
-      case message @ NsiProviderMessage(headers, query: NsiProviderQuery) => handleQuery(NsiProviderMessage(headers, query))(ConnectionProvider.replyToClient(configuration, headers.replyTo)).map(message.ack)
-      case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(ConnectionProvider.replyToClient(configuration, headers.replyTo)).map(message.ack)
+      case message @ NsiProviderMessage(headers, query: NsiProviderQuery) => handleQuery(NsiProviderMessage(headers, query))(connectionProvider.replyToClient(configuration, headers.replyTo)).map(message.ack)
+      case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(connectionProvider.replyToClient(configuration, headers.replyTo)).map(message.ack)
     })
   }
 
@@ -85,7 +87,7 @@ class ConnectionProvider @Inject()(connectionManager: ConnectionManager, configu
       case None =>
         Future.successful(ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)))
       case Some(connection) =>
-        ConnectionProvider.requesterContinuations.register(request.headers.correlationId, configuration.AsyncReplyTimeout).foreach(sendAsyncReply)
+        connectionProvider.requesterContinuations.register(request.headers.correlationId, configuration.AsyncReplyTimeout).foreach(sendAsyncReply)
 
         connection ? Connection.Command(Instant.now, FromRequester(request))
     }
@@ -175,16 +177,15 @@ class ConnectionProvider @Inject()(connectionManager: ConnectionManager, configu
 
 }
 
-object ConnectionProvider {
-  private val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
+@Singleton
+class ConnectionProvider @Inject()(nsiWebService: NsiWebService, actorSystem: ActorSystem) {
+  val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
-  def serviceUrl(configuration: Configuration): String = s"${configuration.BaseUrl}${routes.ConnectionProvider.request().url}"
-
-  def connectionFactory(createOutboundActor: NsiProviderMessage[InitialReserve] => ActorRef, configuration: Configuration, pce: PathComputationEngine)(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
+  def connectionFactory(createOutboundActor: NsiProviderMessage[InitialReserve] => ActorRef, configuration: Configuration)(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
     val outbound = createOutboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
-    (outbound, new ConnectionEntity(configuration.NsaId, connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), configuration.PceAlgorithm, URI.create(ConnectionRequester.serviceUrl(configuration)), URI.create(pce.pceReplyUrl)))
+    (outbound, new ConnectionEntity(configuration.NsaId, connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), configuration.PceAlgorithm, URI.create(configuration.requesterServiceUrl), URI.create(configuration.pceReplyUrl)))
   }
 
   def outboundActor(configuration: Configuration, nsiRequester: => ActorRef, pceRequester: ActorRef)(initialReserve: NsiProviderMessage[InitialReserve]) =
@@ -199,8 +200,8 @@ object ConnectionProvider {
     }
   }
 
-  private def replyToClient(configuration: Configuration, replyTo: Option[URI])(response: NsiRequesterMessage[NsiRequesterOperation]): Unit = replyTo.foreach { replyTo =>
-    val ackFuture = NsiWebService.callRequester(response.headers.requesterNSA, replyTo, response, configuration)
+  def replyToClient(configuration: Configuration, replyTo: Option[URI])(response: NsiRequesterMessage[NsiRequesterOperation]): Unit = replyTo.foreach { replyTo =>
+    val ackFuture = nsiWebService.callRequester(response.headers.requesterNSA, replyTo, response, configuration)
 
     ackFuture onComplete {
       case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
@@ -209,7 +210,7 @@ object ConnectionProvider {
     }
   }
 
-  private[controllers] def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
+  def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
     requesterContinuations.replyReceived(message.headers.correlationId, message)
 
 }

@@ -43,13 +43,14 @@ import scala.util.{ Failure, Success }
 import controllers.ActorSupport._
 
 
-class ConnectionRequester @Inject()(connectionManager: ConnectionManager, configuration: Configuration) extends Controller with SoapWebService {
+@Singleton
+class ConnectionRequesterController @Inject()(connectionManager: ConnectionManager, configuration: Configuration, connectionRequester: ConnectionRequester) extends Controller with SoapWebService {
 
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
   override val WsdlBasename = "ogf_nsi_connection_requester_v2_0.wsdl"
 
-  override def serviceUrl: String = ConnectionRequester.serviceUrl(configuration)
+  override def serviceUrl: String = configuration.requesterServiceUrl
 
   def request = NsiRequesterEndPoint(configuration.NsaId) {
     case message @ NsiRequesterMessage(headers, notification: NsiNotification) =>
@@ -61,24 +62,27 @@ class ConnectionRequester @Inject()(connectionManager: ConnectionManager, config
 
       ack.map(message.ack)
     case response =>
-      ConnectionRequester.continuations.replyReceived(response.headers.correlationId, response)
+      connectionRequester.handleResponse(response)
       // FIXME return error when message cannot be handled?
       Future.successful(response.ack(GenericAck()))
   }
 
 }
 
-object ConnectionRequester {
-  def serviceUrl(configuration: Configuration): String = s"${configuration.BaseUrl}${routes.ConnectionRequester.request().url}"
-  val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
+@Singleton
+class ConnectionRequester @Inject()(configuration: Configuration, nsiWebService: NsiWebService, actorSystem: ActorSystem) {
+  private val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
-  def nsiRequester(configuration: Configuration): ActorRef =
-    current.configuration.getString("nsi.actor") match {
-      case None | Some("dummy") => actorSystem.actorOf(Props[DummyNsiRequesterActor])
-      case _                    => actorSystem.actorOf(Props(new NsiRequesterActor(configuration.NsaId, URI.create(serviceUrl(configuration)), configuration)))
+  private[controllers] def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
+    continuations.replyReceived(message.headers.correlationId, message)
+
+  def nsiRequester: ActorRef =
+    configuration.NsiActor match {
+      case None | Some("dummy") => actorSystem.actorOf(Props(new DummyNsiRequesterActor))
+      case _                    => actorSystem.actorOf(Props(new NsiRequesterActor(configuration)))
     }
 
-  class NsiRequesterActor(requesterNsa: String, requesterUrl: URI, configuration: Configuration) extends Actor {
+  class NsiRequesterActor(configuration: Configuration) extends Actor {
     private val uuidGenerator = Uuid.randomUuidGenerator()
     private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
 
@@ -103,7 +107,7 @@ object ConnectionRequester {
               MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, Instant.now(), s"No reply received within: ${configuration.AsyncReplyTimeout}"))
         }
 
-        val response = NsiWebService.callProvider(provider, message, configuration)
+        val response = nsiWebService.callProvider(provider, message, configuration)
         response.onComplete {
           case Failure(timeout: TimeoutException) =>
             // Let the requester timeout as well (or receive an actual reply). No need to send an ack timeout!

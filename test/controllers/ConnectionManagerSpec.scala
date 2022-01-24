@@ -2,7 +2,7 @@ package controllers
 
 import java.net.URI
 
-import akka.actor.Actor
+import akka.actor.{ Actor, ActorSystem }
 import akka.testkit.TestActorRef
 import controllers.Connection.Delete
 import nl.surfnet.nsiv2.messages._
@@ -35,7 +35,7 @@ class ConnectionManagerSpec extends helpers.Specification {
   abstract class DummyConnectionFixture extends WithApplication() {
     lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]
     lazy val configuration = app.injector.instanceOf[Configuration]
-    implicit lazy val system = Akka.system
+    implicit lazy val system = app.injector.instanceOf[ActorSystem]
 
     lazy val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
@@ -125,7 +125,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]
     lazy val configuration = app.injector.instanceOf[Configuration]
 
-    implicit lazy val system = Akka.system
+    implicit lazy val system = app.injector.instanceOf[ActorSystem]
     implicit lazy val executionContext = system.dispatcher
 
     def createConnectionManager = {

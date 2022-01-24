@@ -3,21 +3,21 @@
 # ~~~~
 
 # Home page
-GET    /                                    @controllers.Application.index
-GET    /connections                         @controllers.Application.connections
-GET    /connections/:id                     @controllers.Application.connection(id: String)
-GET    /healthcheck                         @controllers.Application.healthcheck
+GET    /                                    @controllers.ApplicationController.index
+GET    /connections                         @controllers.ApplicationController.connections
+GET    /connections/:id                     @controllers.ApplicationController.connection(id: String)
+GET    /healthcheck                         @controllers.ApplicationController.healthcheck
 
-POST   /nsi-v2/ConnectionServiceProvider    @controllers.ConnectionProvider.request
-GET    /nsi-v2/ConnectionServiceProvider    @controllers.ConnectionProvider.wsdl
-POST   /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequester.request
-GET    /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequester.wsdl
+POST   /nsi-v2/ConnectionServiceProvider    @controllers.ConnectionProviderController.request
+GET    /nsi-v2/ConnectionServiceProvider    @controllers.ConnectionProviderController.wsdl
+POST   /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequesterController.request
+GET    /nsi-v2/ConnectionServiceRequester   @controllers.ConnectionRequesterController.wsdl
 
-GET    /nsi-v2/:wsdlOrXsd                   @controllers.ConnectionRequester.wsdlOrXsd(wsdlOrXsd: String)
+GET    /nsi-v2/:wsdlOrXsd                   @controllers.ConnectionRequesterController.wsdlOrXsd(wsdlOrXsd: String)
 
 GET    /nsa-discovery                       @controllers.DiscoveryService.index
 
-POST   /pce/reply                           @controllers.PathComputationEngine.pceReply
+POST   /pce/reply                           @controllers.PathComputationEngineController.pceReply
 
 # Map static resources from the /public folder to the /assets URL path
 GET    /assets/*file                        controllers.Assets.at(path="/public", file)

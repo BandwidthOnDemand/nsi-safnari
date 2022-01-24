@@ -31,6 +31,7 @@ import com.typesafe.config.ConfigUtil
 import nl.surfnet.safnari._
 import scala.util.Try
 
+@Singleton
 class Configuration @Inject()(configuration: play.api.Configuration) {
   val StartTime = LocalDateTime.now
   def NsaId = getStringOrFail("safnari.nsa.id")
@@ -50,6 +51,12 @@ class Configuration @Inject()(configuration: play.api.Configuration) {
   def PceAlgorithm: PathComputationAlgorithm = configuration.getString("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
   def PceEndpoint = getStringOrFail("pce.endpoint")
 
+  def NsiActor = configuration.getString("nsi.actor")
+  def PceActor = configuration.getString("pce.actor")
+
+  def CleanDbOnStart = configuration.getBoolean("clean.db.on.start") getOrElse false
+  def CleanDbOnStop = configuration.getBoolean("clean.db.on.stop") getOrElse false
+
   def PeersWith: Seq[PeerEntity] = {
     val configOption = configuration.getConfigList("safnari.peersWith")
     configOption.toSeq.flatMap(_.asScala.map( peer => PeerEntity(peer.getString("id"), peer.getString("dn")) ))
@@ -61,6 +68,12 @@ class Configuration @Inject()(configuration: play.api.Configuration) {
   def ConnectionExpirationTime = readFiniteDuration("safnari.connection.expiration.time")
 
   def BaseUrl = getStringOrFail("nsi.base.url")
+
+  lazy val providerServiceUrl: String = s"${BaseUrl}${routes.ConnectionProviderController.request().url}"
+
+  lazy val requesterServiceUrl: String = s"${BaseUrl}${routes.ConnectionRequesterController.request().url}"
+
+  lazy val pceReplyUrl: String = s"${BaseUrl}${routes.PathComputationEngineController.pceReply().url}"
 
   private def getStringOrFail(property: String) = configuration.getString(property).getOrElse(sys.error(s"$property is not set"))
 

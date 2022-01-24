@@ -38,6 +38,7 @@ import play.api.mvc._
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
+@Singleton
 class DiscoveryService @Inject()(pceRequester: ActorRef, configuration: Configuration) extends Controller {
   private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v1+xml"
   private val rfc1123Formatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of("GMT"))
@@ -65,8 +66,8 @@ class DiscoveryService @Inject()(pceRequester: ActorRef, configuration: Configur
 
   def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry], lastModified: Instant)(implicit request: RequestHeader): xml.Elem = {
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
-    val providerUrl = routes.ConnectionProvider.request.absoluteURL(secure)
-    val requesterUrl = routes.ConnectionRequester.request.absoluteURL(secure)
+    val providerUrl = routes.ConnectionProviderController.request.absoluteURL(secure)
+    val requesterUrl = routes.ConnectionRequesterController.request.absoluteURL(secure)
 
     <nsa:nsa
         xmlns:vcard="urn:ietf:params:xml:ns:vcard-4.0"

@@ -22,6 +22,7 @@
  */
 package controllers
 
+import akka.actor._
 import anorm._
 import anorm.SqlParser._
 import play.api.Logger
@@ -32,7 +33,7 @@ import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
-import play.api.{ Application => PlayApp }
+import play.api.Application
 import akka.actor.{ActorRef, Props}
 import javax.inject._
 import play.api.inject.ApplicationLifecycle
@@ -43,47 +44,45 @@ class StartModule extends AbstractModule {
   def configure() = {
     bind(classOf[GlobalSettings]).asEagerSingleton()
   }
-  @Provides def messageStore(database: Database, app: play.api.Application) = new SafnariMessageStore(database, app)
-  @Provides def connectionManager(settings: GlobalSettings): ConnectionManager = settings.connectionManager
-  @Provides def application(settings: GlobalSettings, configuration: Configuration): Application = new Application(settings.connectionManager, settings.pceRequester, configuration)
-  @Provides def discoveryService(settings: GlobalSettings, configuration: Configuration): DiscoveryService = new DiscoveryService(settings.pceRequester, configuration)
+
+  @Singleton @Provides def messageStore(database: Database, app: Application) = new SafnariMessageStore(database, app)
+  @Singleton @Provides def connectionManager(settings: GlobalSettings): ConnectionManager = settings.connectionManager
+  @Singleton @Provides def application(settings: GlobalSettings, configuration: Configuration, connectionRequester: ConnectionRequester): ApplicationController = new ApplicationController(settings.connectionManager, settings.pceRequester, connectionRequester, configuration)
+  @Singleton @Provides def discoveryService(settings: GlobalSettings, configuration: Configuration): DiscoveryService = new DiscoveryService(settings.pceRequester, configuration)
 }
 
 @Singleton
 class GlobalSettings @Inject()(
-  app: play.api.Application,
+  app: Application,
   lifecycle: ApplicationLifecycle,
   configuration: Configuration,
+  actorSystem: ActorSystem,
   pathComputationEngine: PathComputationEngine,
   messageStore: SafnariMessageStore,
+  connectionProvider: ConnectionProvider,
+  connectionRequester: ConnectionRequester,
   database: Database
 ) {
-  private val createOutboundActor = ConnectionProvider.outboundActor(configuration, ConnectionRequester.nsiRequester(configuration), pceRequester) _
-  val connectionManager: ConnectionManager = new ConnectionManager(ConnectionProvider.connectionFactory(createOutboundActor, configuration, pathComputationEngine), configuration, messageStore)(app)
-  val pceRequester: ActorRef = createPceRequesterActor(app, pathComputationEngine)
+  val pceRequester: ActorRef = pathComputationEngine.createPceRequesterActor(configuration)
+  private val createOutboundActor = connectionProvider.outboundActor(configuration, connectionRequester.nsiRequester, pceRequester) _
+  val connectionManager: ConnectionManager = new ConnectionManager(connectionProvider.connectionFactory(createOutboundActor, configuration), configuration, messageStore)(app)
 
-  if (app.configuration.getBoolean("clean.db.on.start") getOrElse false) {
-    cleanDatabase(app)
+  if (configuration.CleanDbOnStart) {
+    cleanDatabase()
   }
 
-  restoreConnectionsFromDatabase(app)
-
-  def createPceRequesterActor(implicit app: PlayApp, pathComputationEngine: PathComputationEngine): ActorRef =
-    app.configuration.getString("pce.actor") match {
-      case None | Some("dummy") => Akka.system.actorOf(Props[PathComputationEngine.DummyPceRequesterActor], "pceRequester")
-      case _                    => Akka.system.actorOf(Props(new PathComputationEngine.PceRequesterActor(configuration)), "pceRequester")
-    }
+  restoreConnectionsFromDatabase()
 
   lifecycle.addStopHook { () =>
     Future.successful {
-      if (app.configuration.getBoolean("clean.db.on.stop") getOrElse false) {
-        cleanDatabase(app)
+      if (configuration.CleanDbOnStop) {
+        cleanDatabase()
       }
     }
   }
 
-  private def restoreConnectionsFromDatabase(implicit app: PlayApp): Unit = {
-    implicit val actorSystem = Akka.system
+  private def restoreConnectionsFromDatabase(): Unit = {
+    implicit val implicitActorSystem = actorSystem
     try {
       Logger.info("Start replaying of connection messages")
       Await.result(connectionManager.restore, Duration.Inf)
@@ -98,7 +97,7 @@ class GlobalSettings @Inject()(
     }
   }
 
-  private def cleanDatabase(implicit app: PlayApp): Unit = database.withTransaction { implicit connection =>
+  private def cleanDatabase(): Unit = database.withTransaction { implicit connection =>
     val tables = SQL("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'play_evolutions'").as(str("tablename").*).map("public." ++ _)
     val truncate = s"TRUNCATE TABLE ${tables.mkString(",")} CASCADE"
     Logger.debug(s"Cleaning database: $truncate")

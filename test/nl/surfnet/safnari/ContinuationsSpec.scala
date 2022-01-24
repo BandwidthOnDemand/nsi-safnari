@@ -19,10 +19,7 @@ class ContinuationsSpec extends helpers.Specification {
     val CorrelationId = newCorrelationId
     val continuations = new Continuations[String](actorSystem.scheduler)
 
-    override def after = {
-      actorSystem.shutdown
-      actorSystem.awaitTermination
-    }
+    override def after = Await.result(actorSystem.terminate, 10.seconds)
   }
 
   "Continuations" should {

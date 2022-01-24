@@ -36,7 +36,8 @@ import play.api.mvc._
 import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
 import scala.concurrent.Future
 
-class Application @Inject()(connectionManager: ConnectionManager, pceRequester: ActorRef, configuration: Configuration) extends Controller {
+@Singleton
+class ApplicationController @Inject()(connectionManager: ConnectionManager, pceRequester: ActorRef, connectionRequester: ConnectionRequester, configuration: Configuration) extends Controller {
   def index = Action { implicit request =>
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
     Ok(views.html.index(secure, configuration.NsaId, configuration.WebParams))
@@ -44,7 +45,7 @@ class Application @Inject()(connectionManager: ConnectionManager, pceRequester: 
 
   def healthcheck = Action.async {
     val pceHealth = (pceRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
-    val nsiHealth = (ConnectionRequester.nsiRequester(configuration) ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
+    val nsiHealth = (connectionRequester.nsiRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
 
     Future.sequence(List(nsiHealth, pceHealth)) map { healthStates =>
       val view = views.html.healthcheck(healthStates.toMap, configuration.VersionString, configuration.WebParams)

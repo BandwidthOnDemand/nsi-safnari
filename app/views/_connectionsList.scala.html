@@ -22,7 +22,7 @@
                     @_connectionDetails(connection, segments)
                     </div>
                 </td>
-                <td><a href="@routes.Application.connection(connection.connectionId)">@connection.connectionId</a></td>
+                <td><a href="@routes.ApplicationController.connection(connection.connectionId)">@connection.connectionId</a></td>
                 <td>@connection.description.getOrElse("-")</td>
                 <td>@connection.status</td>
             </tr>

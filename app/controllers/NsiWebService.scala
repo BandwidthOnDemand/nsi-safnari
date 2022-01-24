@@ -23,6 +23,7 @@
 package controllers
 
 import java.net.URI
+import javax.inject._
 import javax.xml.namespace.QName
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
@@ -35,13 +36,14 @@ import play.api.Logger
 import play.api.Play.current
 import play.api.http.Status._
 import play.api.libs.concurrent.Execution.Implicits._
-import play.api.libs.ws.{WS, WSRequest}
+import play.api.libs.ws.{WSClient, WSRequest}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
-object NsiWebService {
+@Singleton
+class NsiWebService @Inject()(ws: WSClient) {
   implicit class SoapRequestHolder(request: WSRequest) {
     def withSoapActionHeader(action: String) = request.withHeaders("SOAPAction" -> ('"' + action +'"'))
   }
@@ -78,7 +80,7 @@ object NsiWebService {
 
     for {
       providerUrl <- if (configuration.Use2WayTLS) Future.fromTry(configuration.translateToStunnelAddress(nsa, url)) else Future.successful(url)
-      request = WS.url(providerUrl.toASCIIString()).withRequestTimeout(Duration(20000, MILLISECONDS)).withSoapActionHeader(soapAction)
+      request = ws.url(providerUrl.toASCIIString()).withRequestTimeout(Duration(20000, MILLISECONDS)).withSoapActionHeader(soapAction)
       _ = Logger.debug(s"Sending NSA ${nsa} at ${request.url} the SOAP message: ${Conversion[M[T], Document].andThen(Conversion[Document, String]).apply(message)}")
       ack <- request.post(message)
     } yield {
