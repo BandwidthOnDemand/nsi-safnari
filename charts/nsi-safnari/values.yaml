@@ -96,6 +96,8 @@ postgresql:
   postgresqlUsername: nsi-safnari-user
   postgresqlPassword:
   postgresqlDatabase: nsi-safnari
+  postgresqlConfiguration:
+    listenAddresses: '*'
   image:
     tag: 9.6.21
   persistence:
