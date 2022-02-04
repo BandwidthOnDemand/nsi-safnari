@@ -51,6 +51,9 @@ githubOwner := "BandwidthOnDemand"
 githubRepository := "play-nsi-support"
 resolvers += Resolver.githubPackages("BandwidthOnDemand")
 
+// sbt-native-packager configuration
+enablePlugins(JavaAppPackaging)
+
 //PublishDist.publishSettings
 
 // Disable ScalaDoc generation
