@@ -17,7 +17,8 @@ libraryDependencies ++= Seq(
   "org.postgresql" % "postgresql" % "42.3.1",
   "org.specs2" %% "specs2-junit" % "4.13.0" % "test",
   "org.specs2" %% "specs2-matcher-extra" % "4.13.0" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % "2.5.26" % "test"
+  "com.typesafe.akka" %% "akka-testkit" % "2.5.26" % "test",
+  "nl.surfnet" % "play-nsi-support_2.13" % "2.1.6",
 )
 
 val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
@@ -31,10 +32,6 @@ lazy val root = (project in file("."))
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha),
     buildInfoPackage := "nl.surfnet.safnari"
   )
-  .dependsOn(sub1 % "compile->compile;test->test")
-
-//lazy val sub1 = RootProject( uri("git://github.com/BandwidthOnDemand/play-nsi-support.git") )
-lazy val sub1 = RootProject( uri("../play-nsi-support") )
 
 scalaVersion := "2.13.7"
 
@@ -48,6 +45,11 @@ Test / testFrameworks := Seq(TestFrameworks.Specs2)
 Test / testOptions := Seq(Tests.Argument(TestFrameworks.Specs2, "junitxml", "console"))
 
 //sourceGenerators in Compile <+= buildInfo
+
+// sbt-github-packages configuration
+githubOwner := "BandwidthOnDemand"
+githubRepository := "play-nsi-support"
+resolvers += Resolver.githubPackages("BandwidthOnDemand")
 
 //PublishDist.publishSettings
 
