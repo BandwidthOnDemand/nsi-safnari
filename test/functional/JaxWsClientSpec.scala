@@ -1,6 +1,7 @@
 package functional
 
 import org.junit.runner.RunWith
+import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test._
 import java.net.URL
 import java.util.Collections
@@ -15,7 +16,7 @@ class JaxWsClientSpec extends helpers.Specification {
 
   val ServerPort = Helpers.testServerPort
   val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
-  def Application = FakeApplication(additionalConfiguration = Map("nsi.base.url" -> s"http://localhost:$ServerPort", "safnari.nsa.id" -> SafnariNsa))
+  def Application = new GuiceApplicationBuilder().configure(Map("nsi.base.url" -> s"http://localhost:$ServerPort", "safnari.nsa.id" -> SafnariNsa)).build
 
   "A JAX WS client" should {
 

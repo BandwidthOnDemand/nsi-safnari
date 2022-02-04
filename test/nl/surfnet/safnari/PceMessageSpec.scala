@@ -49,11 +49,11 @@ class PceMessageSpec extends helpers.Specification {
 
       val json = Json.toJson(request)
 
-      json \ "correlationId" must beEqualTo(JsString(correlationId.toString))
-      json \ "nsaId" must beEqualTo(JsString("NSA-ID"))
-      json \ "replyTo" \ "url" must beEqualTo(JsString("http://localhost/pce/reply"))
-      json \ "algorithm" must beEqualTo(JsString("CHAIN"))
-      (json \ "p.p2ps" apply 0) \ "capacity" must beEqualTo(JsNumber(100))
+      json \ "correlationId" must beEqualTo(JsDefined(JsString(correlationId.toString)))
+      json \ "nsaId" must beEqualTo(JsDefined(JsString("NSA-ID")))
+      json \ "replyTo" \ "url" must beEqualTo(JsDefined(JsString("http://localhost/pce/reply")))
+      json \ "algorithm" must beEqualTo(JsDefined(JsString("CHAIN")))
+      (json \ "p.p2ps" apply 0) \ "capacity" must beEqualTo(JsDefined(JsNumber(100)))
 
       Json.fromJson[PceRequest](json) must beEqualTo(JsSuccess(request))
     }
@@ -65,10 +65,10 @@ class PceMessageSpec extends helpers.Specification {
       val request = PathComputationRequest(correlationId, Some("NSA-ID"), URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, connectionTrace)
 
       val json = Json.toJson(request)
-      (json \ "trace" apply 0) \ "index" must beEqualTo(JsNumber(first.getIndex))
-      (json \ "trace" apply 1) \ "index" must beEqualTo(JsNumber(second.getIndex))
-      (json \ "trace" apply 0) \ "value" must beEqualTo(JsString(first.getValue))
-      (json \ "trace" apply 1) \ "value" must beEqualTo(JsString(second.getValue))
+      (json \ "trace" apply 0) \ "index" must beEqualTo(JsDefined(JsNumber(first.getIndex)))
+      (json \ "trace" apply 1) \ "index" must beEqualTo(JsDefined(JsNumber(second.getIndex)))
+      (json \ "trace" apply 0) \ "value" must beEqualTo(JsDefined(JsString(first.getValue)))
+      (json \ "trace" apply 1) \ "value" must beEqualTo(JsDefined(JsString(second.getValue)))
 
       Json.fromJson[PceRequest](json) must beEqualTo(JsSuccess(request))
     }
@@ -78,7 +78,7 @@ class PceMessageSpec extends helpers.Specification {
 
       val json = Json.toJson[PceResponse](response)
 
-      json \ "correlationId" must beEqualTo(JsString(correlationId.toString))
+      json \ "correlationId" must beEqualTo(JsDefined(JsString(correlationId.toString)))
 
       Json.fromJson[PceResponse](json) must beEqualTo(JsSuccess(response))
     }
@@ -88,7 +88,7 @@ class PceMessageSpec extends helpers.Specification {
 
       val json = Json.toJson[PceResponse](response)
 
-      json \ "correlationId" must beEqualTo(JsString(correlationId.toString))
+      json \ "correlationId" must beEqualTo(JsDefined(JsString(correlationId.toString)))
       Json.fromJson[PceResponse](json) must beEqualTo(JsSuccess(response))
     }
 

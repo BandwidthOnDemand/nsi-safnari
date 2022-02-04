@@ -27,26 +27,24 @@ import akka.pattern.ask
 import controllers.ActorSupport._
 import java.time.ZonedDateTime
 import java.time.temporal._
-import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
-import play.api.libs.concurrent.Execution.Implicits._
 import play.api.mvc._
 import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
-import scala.concurrent.Future
+import scala.concurrent._
 
-class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) extends Controller {
+class ApplicationController(connectionManager: ConnectionManager, pceRequester: ActorRef, connectionRequester: ConnectionRequester, configuration: Configuration)(implicit ec: ExecutionContext) extends InjectedController {
   def index = Action { implicit request =>
     val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
-    Ok(views.html.index(secure, Configuration.NsaId, Configuration.WebParams))
+    Ok(views.html.index(secure, configuration.NsaId, configuration.WebParams))
   }
 
   def healthcheck = Action.async {
     val pceHealth = (pceRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
-    val nsiHealth = (ConnectionRequester.nsiRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
+    val nsiHealth = (connectionRequester.nsiRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
 
     Future.sequence(List(nsiHealth, pceHealth)) map { healthStates =>
-      val view = views.html.healthcheck(healthStates.toMap, Configuration.VersionString, Configuration.WebParams)
+      val view = views.html.healthcheck(healthStates.toMap, configuration.VersionString, configuration.WebParams)
 
       if (healthStates forall { case (_, healthy) => healthy })
         Ok(view)
@@ -74,7 +72,7 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
           case (connection, _) => connection.qualifier(now.toInstant)
         }
 
-      Ok(views.html.connections(connections.withDefaultValue(Nil), Configuration.WebParams))
+      Ok(views.html.connections(connections.withDefaultValue(Nil), configuration.WebParams))
     }
   }
 
@@ -83,7 +81,7 @@ class Application(connectionManager: ConnectionManager, pceRequester: ActorRef) 
     connectionManager.get(id).map { c =>
       connectionDetails(c) map { case (summary, pendingCriteria, segments) =>
         val messages = connectionManager.messageStore.findByConnectionId(id)
-        Ok(views.html.connection(ConnectionPresenter(summary, pendingCriteria), segments.map{ ConnectionPathSegmentPresenter }, messages, Configuration.WebParams))
+        Ok(views.html.connection(ConnectionPresenter(summary, pendingCriteria), segments.map{ ConnectionPathSegmentPresenter }, messages, configuration.WebParams))
       }
     }.getOrElse {
       Future.successful(NotFound(s"Connection ($id) was not found"))

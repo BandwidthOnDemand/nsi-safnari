@@ -22,16 +22,17 @@
  */
 package controllers
 
-import play.api.Play.current
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 import java.net.URI
 import java.time.LocalDateTime
+import javax.inject._
 import com.typesafe.config.ConfigUtil
 import nl.surfnet.safnari._
 import scala.util.Try
 
-object Configuration {
+@Singleton
+class Configuration @Inject()(configuration: play.api.Configuration) {
   val StartTime = LocalDateTime.now
   def NsaId = getStringOrFail("safnari.nsa.id")
   def NsaName = getStringOrFail("safnari.nsa.name")
@@ -39,20 +40,26 @@ object Configuration {
   def AdminContactSurname = getStringOrFail("safnari.adminContact.surname")
   def AdminContact = s"$AdminContactGiven $AdminContactSurname"
   def AdminContactProdid = getStringOrFail("safnari.adminContact.prodid")
-  def Use2WayTLS = current.configuration.getBoolean("nsi.twoway.tls").getOrElse(sys.error("nsi.twoway.tls option is not set"))
+  def Use2WayTLS = configuration.getOptional[Boolean]("nsi.twoway.tls").getOrElse(sys.error("nsi.twoway.tls option is not set"))
   def VersionString = s"${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})"
   def Longitude = getStringOrFail("safnari.location.longitude")
   def Latitude = getStringOrFail("safnari.location.latitude")
   def AsyncReplyTimeout = readFiniteDuration("safnari.async.reply.timeout")
-  def NetworkId = current.configuration.getString("safnari.network.id")
-  def NetworkUrl = current.configuration.getString("safnari.network.url")
-  def DdsUrl = current.configuration.getString("safnari.dds.url")
-  def PceAlgorithm: PathComputationAlgorithm = current.configuration.getString("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
+  def NetworkId = configuration.getOptional[String]("safnari.network.id")
+  def NetworkUrl = configuration.getOptional[String]("safnari.network.url")
+  def DdsUrl = configuration.getOptional[String]("safnari.dds.url")
+  def PceAlgorithm: PathComputationAlgorithm = configuration.getOptional[String]("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
   def PceEndpoint = getStringOrFail("pce.endpoint")
 
+  def NsiActor = configuration.getOptional[String]("nsi.actor")
+  def PceActor = configuration.getOptional[String]("pce.actor")
+
+  def CleanDbOnStart = configuration.getOptional[Boolean]("clean.db.on.start") getOrElse false
+  def CleanDbOnStop = configuration.getOptional[Boolean]("clean.db.on.stop") getOrElse false
+
   def PeersWith: Seq[PeerEntity] = {
-    val configOption = current.configuration.getConfigList("safnari.peersWith")
-    configOption.toSeq.flatMap(_.asScala.map( peer => PeerEntity(peer.getString("id"), peer.getString("dn")) ))
+    val configOption = Try(configuration.underlying.getConfigList("safnari.peersWith").asInstanceOf[java.util.List[com.typesafe.config.Config]].asScala).toOption
+    configOption.toSeq.flatMap(_.map(cfg => play.api.Configuration(cfg)).map(peer => PeerEntity(peer.getOptional[String]("id"), peer.getOptional[String]("dn")) ))
   }
 
   // Web page footer information for main.scala.html.
@@ -62,16 +69,22 @@ object Configuration {
 
   def BaseUrl = getStringOrFail("nsi.base.url")
 
-  private def getStringOrFail(property: String) = current.configuration.getString(property).getOrElse(sys.error(s"$property is not set"))
+  lazy val providerServiceUrl: String = s"${BaseUrl}${routes.ConnectionProviderController.request().url}"
 
-  private def readFiniteDuration(key: String): FiniteDuration = current.configuration.getString(key).map(Duration.apply) match {
+  lazy val requesterServiceUrl: String = s"${BaseUrl}${routes.ConnectionRequesterController.request().url}"
+
+  lazy val pceReplyUrl: String = s"${BaseUrl}${routes.PathComputationEngineController.pceReply().url}"
+
+  private def getStringOrFail(property: String) = configuration.getOptional[String](property).getOrElse(sys.error(s"$property is not set"))
+
+  private def readFiniteDuration(key: String): FiniteDuration = configuration.getOptional[String](key).map(Duration.apply) match {
     case Some(fd: FiniteDuration) => fd
     case Some(_)                  => sys.error(s"$key is not finite")
     case None                     => sys.error(s"$key not set")
   }
 
   def translateToStunnelAddress(nsa: String, url: URI): Try[URI] = Try {
-    current.configuration.getString(ConfigUtil.joinPath("nsi", "tlsmap", nsa)) match {
+    configuration.getOptional[String](ConfigUtil.joinPath("nsi", "tlsmap", nsa)) match {
       case Some(hostAndPort) =>
         val splitted = hostAndPort.split(":")
         new URI("http", null, splitted(0), Integer.parseInt(splitted(1)), url.getPath, url.getQuery, url.getFragment)

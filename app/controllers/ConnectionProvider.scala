@@ -26,32 +26,30 @@ import akka.actor._
 import controllers.ActorSupport._
 import java.net.URI
 import java.time.Instant
+import javax.inject._
 import javax.xml.namespace.QName
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
-import nl.surfnet.nsiv2.soap.SoapWebService
+import nl.surfnet.nsiv2.soap._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import play.api.Play._
-import play.api._
-import play.api.libs.concurrent.Execution.Implicits._
+import play.api.Logger
 import play.api.mvc._
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{Failure, Success}
 
-class ConnectionProvider(connectionManager: ConnectionManager) extends Controller with SoapWebService {
-
+@Singleton
+class ConnectionProviderController @Inject()(connectionManager: ConnectionManager, connectionProvider: ConnectionProvider, configuration: Configuration, extraBodyParsers: ExtraBodyParsers, val actionBuilder: DefaultActionBuilder)(implicit actorSystem: ActorSystem, ec: ExecutionContext) extends InjectedController with SoapWebService {
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
   override val WsdlBasename = "ogf_nsi_connection_provider_v2_0.wsdl"
 
-  override def serviceUrl: String = ConnectionProvider.serviceUrl
+  override def serviceUrl: String = configuration.providerServiceUrl
 
-  def request = NsiProviderEndPoint(Configuration.NsaId) { request =>
+  def request = extraBodyParsers.NsiProviderEndPoint(configuration.NsaId) { request =>
     validateRequest(request).map(Future.successful) getOrElse (request match {
-      case message @ NsiProviderMessage(headers, query: NsiProviderQuery) => handleQuery(NsiProviderMessage(headers, query))(ConnectionProvider.replyToClient(headers.replyTo)).map(message.ack)
-      case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(ConnectionProvider.replyToClient(headers.replyTo)).map(message.ack)
+      case message @ NsiProviderMessage(headers, query: NsiProviderQuery) => handleQuery(NsiProviderMessage(headers, query))(connectionProvider.replyToClient(configuration, headers.replyTo)).map(message.ack)
+      case message @ NsiProviderMessage(headers, command: NsiProviderCommand) => handleCommand(NsiProviderMessage(headers, command))(connectionProvider.replyToClient(configuration, headers.replyTo)).map(message.ack)
     })
   }
 
@@ -59,13 +57,13 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
 
   private def validateRequesterNsa(message: NsiProviderMessage[_]): Option[NsiProviderMessage[ServiceException]] = message.headers.replyTo.flatMap { replyTo =>
     val nsa = message.headers.requesterNSA
-    if (Configuration.Use2WayTLS) {
-      Configuration.translateToStunnelAddress(nsa, replyTo) match {
+    if (configuration.Use2WayTLS) {
+      configuration.translateToStunnelAddress(nsa, replyTo) match {
         case Success(_) =>
           None
-        case Failure(e) =>
+        case Failure(_) =>
           Logger.info(s"The requesterNSA '$nsa' does not match a known TLS NSA")
-          val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(Configuration.NsaId, NsiHeaders.REQUESTER_NSA -> nsa))
+          val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(configuration.NsaId, NsiHeaders.REQUESTER_NSA -> nsa))
           Some(message ack serviceException)
       }
     } else None
@@ -73,7 +71,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
 
   private def validateServiceType(message: NsiProviderMessage[_]): Option[NsiProviderMessage[ServiceException]] = message match {
     case NsiProviderMessage(_, reserve: InitialReserve) if reserve.body.getCriteria.getServiceType eq null =>
-      val x = message ack ServiceException(NsiError.MissingParameter.toServiceException(Configuration.NsaId, new QName("serviceType") -> "is required"))
+      val x = message ack ServiceException(NsiError.MissingParameter.toServiceException(configuration.NsaId, new QName("serviceType") -> "is required"))
       Some(x)
     case _ =>
       None
@@ -82,17 +80,18 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderCommand])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] =
     connectionManager.findOrCreateConnection(request) match {
       case None =>
-        Future.successful(ServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))
+        Future.successful(ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)))
       case Some(connection) =>
-        ConnectionProvider.requesterContinuations.register(request.headers.correlationId, Configuration.AsyncReplyTimeout).foreach(sendAsyncReply)
+        connectionProvider.requesterContinuations.register(request.headers.correlationId, configuration.AsyncReplyTimeout).foreach(sendAsyncReply)
 
         connection ? Connection.Command(Instant.now, FromRequester(request))
     }
 
   private[controllers] def handleQuery(message: NsiProviderMessage[NsiProviderQuery])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] = message.body match {
     case QuerySummary(ids, ifModifiedSince) =>
-      queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) onSuccess {
-        case (reservations, lastModifiedAt) => sendAsyncReply(message reply QuerySummaryConfirmed(reservations, lastModifiedAt.map(_.toXMLGregorianCalendar())))
+      queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) onComplete {
+        case Success((reservations, lastModifiedAt)) => sendAsyncReply(message reply QuerySummaryConfirmed(reservations, lastModifiedAt.map(_.toXMLGregorianCalendar())))
+        case Failure(_) => // nothing
       }
       Future.successful(GenericAck())
     case QuerySummarySync(ids, ifModifiedSince) =>
@@ -102,28 +101,30 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
     case QueryNotification(connectionId, start, end) =>
       val connection = connectionManager.get(connectionId)
       connection.map { con =>
-        queryNotifications(con, start, end) onSuccess {
-          case n => sendAsyncReply(message reply QueryNotificationConfirmed(n))
+        queryNotifications(con, start, end) onComplete {
+          case Success(n) => sendAsyncReply(message reply QueryNotificationConfirmed(n))
+          case Failure(_) => // nothing
         }
       }
-      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))(_ => GenericAck()))
+      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)))(_ => GenericAck()))
     case QueryNotificationSync(connectionId, start, end) =>
       val ack = connectionManager.get(connectionId).map(queryNotifications(_, start, end).map(QueryNotificationSyncConfirmed))
 
-      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))))
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)))))
     case QueryResult(connectionId, start, end) =>
       val connection = connectionManager.get(connectionId)
       connection.map { con =>
-        queryResults(con, start, end) onSuccess {
-          case n => sendAsyncReply(message reply QueryResultConfirmed(n))
+        queryResults(con, start, end) onComplete {
+          case Success(n) => sendAsyncReply(message reply QueryResultConfirmed(n))
+          case Failure(_) => // nothing
         }
       }
 
-      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))(_ => GenericAck()))
+      Future.successful(connection.fold[NsiAcknowledgement](ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)))(_ => GenericAck()))
     case QueryResultSync(connectionId, start, end) =>
       val ack = connectionManager.get(connectionId).map(queryResults(_, start, end).map(QueryResultSyncConfirmed))
 
-      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ReservationNonExistent.toServiceException(Configuration.NsaId)))))
+      ack.getOrElse(Future.successful(ErrorAck(new GenericErrorType().withServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)))))
     case q @ QueryRecursive(_, _) =>
       handleQueryRecursive(message.copy(body = q))(sendAsyncReply)
   }
@@ -138,7 +139,7 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
       case Success(list) =>
         val resultTypes = list.flatMap {
           case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) => resultType
-          case ToRequester(NsiRequesterMessage(_, ErrorReply(e)))                       => Seq.empty
+          case ToRequester(NsiRequesterMessage(_, ErrorReply(_)))                       => Seq.empty
         }
 
         sendAsyncReply(message reply QueryRecursiveConfirmed(resultTypes))
@@ -174,20 +175,19 @@ class ConnectionProvider(connectionManager: ConnectionManager) extends Controlle
 
 }
 
-object ConnectionProvider {
-  private val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
+@Singleton
+class ConnectionProvider @Inject()(nsiWebService: NsiWebService)(implicit actorSystem: ActorSystem, ec: ExecutionContext) {
+  val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
-  def serviceUrl: String = s"${Configuration.BaseUrl}${routes.ConnectionProvider.request().url}"
-
-  def connectionFactory(createOutboundActor: NsiProviderMessage[InitialReserve] => ActorRef)(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
+  def connectionFactory(createOutboundActor: NsiProviderMessage[InitialReserve] => ActorRef, configuration: Configuration)(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
     val outbound = createOutboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
-    (outbound, new ConnectionEntity(Configuration.NsaId, connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), Configuration.PceAlgorithm, URI.create(ConnectionRequester.serviceUrl), URI.create(PathComputationEngine.pceReplyUrl)))
+    (outbound, new ConnectionEntity(configuration.NsaId, connectionId, initialReserve, () => CorrelationId.fromUuid(correlationIdGenerator()), configuration.PceAlgorithm, URI.create(configuration.requesterServiceUrl), URI.create(configuration.pceReplyUrl)))
   }
 
-  def outboundActor(nsiRequester: => ActorRef, pceRequester: ActorRef)(initialReserve: NsiProviderMessage[InitialReserve]) =
-    actorSystem.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester, replyToClient(initialReserve.headers.replyTo))))
+  def outboundActor(configuration: Configuration, nsiRequester: => ActorRef, pceRequester: ActorRef)(initialReserve: NsiProviderMessage[InitialReserve]) =
+    actorSystem.actorOf(Props(new OutboundRoutingActor(nsiRequester, pceRequester, replyToClient(configuration, initialReserve.headers.replyTo))))
 
   class OutboundRoutingActor(nsiRequester: ActorRef, pceRequester: ActorRef, notify: NsiRequesterMessage[NsiRequesterOperation] => Unit) extends Actor {
     def receive = {
@@ -198,17 +198,17 @@ object ConnectionProvider {
     }
   }
 
-  private def replyToClient(replyTo: Option[URI])(response: NsiRequesterMessage[NsiRequesterOperation]): Unit = replyTo.foreach { replyTo =>
-    val ackFuture = NsiWebService.callRequester(response.headers.requesterNSA, replyTo, response)
+  def replyToClient(configuration: Configuration, replyTo: Option[URI])(response: NsiRequesterMessage[NsiRequesterOperation]): Unit = replyTo.foreach { replyTo =>
+    val ackFuture = nsiWebService.callRequester(response.headers.requesterNSA, replyTo, response, configuration)
 
     ackFuture onComplete {
-      case Failure(error)                                                 => Logger.info(s"Replying $response to $replyTo: $error", error)
-      case Success(NsiRequesterMessage(headers, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
-      case Success(acknowledgement)                                       => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
+      case Failure(error)                                           => Logger.info(s"Replying $response to $replyTo: $error", error)
+      case Success(NsiRequesterMessage(_, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
+      case Success(acknowledgement)                                 => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
     }
   }
 
-  private[controllers] def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
+  def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
     requesterContinuations.replyReceived(message.headers.correlationId, message)
 
 }

@@ -2,7 +2,7 @@ package nl.surfnet.safnari
 
 import akka.actor.ActorSystem
 import java.util.concurrent.TimeoutException
-import scala.concurrent.Await
+import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 import scala.util.Failure
 import java.util.concurrent.CountDownLatch
@@ -11,17 +11,15 @@ import java.util.concurrent.TimeUnit
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ContinuationsSpec extends helpers.Specification {
   play.api.Logger("initialize-loggers-to-avoid-warnings")
+  sequential
 
   trait fixture extends org.specs2.mutable.After {
     val actorSystem = ActorSystem("test")
 
     val CorrelationId = newCorrelationId
-    val continuations = new Continuations[String](actorSystem.scheduler)
+    val continuations = new Continuations[String](actorSystem.scheduler)(ExecutionContext.global)
 
-    override def after = {
-      actorSystem.shutdown
-      actorSystem.awaitTermination
-    }
+    override def after = Await.result(actorSystem.terminate, 10.seconds)
   }
 
   "Continuations" should {

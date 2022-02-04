@@ -7,9 +7,7 @@ import nl.surfnet.safnari.Uuid
 abstract class Specification
     extends org.specs2.mutable.Specification
     with org.specs2.matcher.XmlMatchers
-    with org.specs2.mutable.Tags
     with org.specs2.execute.PendingUntilFixed
-    with org.specs2.time.NoTimeConversions
     with org.specs2.ScalaCheck
     with play.api.http.HeaderNames
     with play.api.http.Status

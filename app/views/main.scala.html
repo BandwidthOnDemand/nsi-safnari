@@ -2,8 +2,8 @@
 
 @menus = @{
   List(
-    ("usage", routes.Application.index),
-    ("connections", routes.Application.connections())
+    ("usage", routes.ApplicationController.index),
+    ("connections", routes.ApplicationController.connections())
   )
 }
 
@@ -19,7 +19,7 @@
     <body>
         <div class="wrapper">
             <header>
-                <a href="@routes.Application.index">Home</a>
+                <a href="@routes.ApplicationController.index">Home</a>
                 <h1>NSI Safnari</h1>
             </header>
             <nav class="navbar">
@@ -47,4 +47,3 @@
         <script src="@routes.Assets.at("js/prettify.min.js")"></script>
     </body>
 </html>
-

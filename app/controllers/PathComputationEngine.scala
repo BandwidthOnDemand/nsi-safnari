@@ -23,51 +23,65 @@
 package controllers
 
 import java.net.URI
+import javax.inject._
 
 import akka.actor._
-import controllers.ActorSupport._
 import nl.surfnet.nsiv2.messages.CorrelationId
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import java.time.Instant
 import play.api.Logger
-import play.api.Play.current
-import play.api.libs.concurrent.Execution.Implicits._
+import play.api.http.ContentTypes._
+import play.api.http.HeaderNames._
+import play.api.http.Status._
 import play.api.libs.json._
-import play.api.libs.ws.WS
+import play.api.libs.ws.WSClient
 import play.api.mvc._
 
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration._
 import scala.concurrent.stm.Ref
 import scala.util.{Failure, Success}
 
-object PathComputationEngine extends Controller {
-  private val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
-
-  def pceReplyUrl: String = s"${Configuration.BaseUrl}${routes.PathComputationEngine.pceReply().url}"
-
+@Singleton
+class PathComputationEngineController @Inject()(configuration: Configuration, pce: PathComputationEngine)(implicit ec: ExecutionContext) extends InjectedController {
   def pceReply = Action(parse.json) { implicit request =>
     Json.fromJson[PceResponse](request.body) match {
       case JsSuccess(response, _) =>
         Logger.info(s"Pce reply: $response")
-        pceContinuations.replyReceived(response.correlationId, response)
+        pce.pceContinuations.replyReceived(response.correlationId, response)
         Ok
       case JsError(error) =>
         Logger.info(s"Pce error: $error body: ${request.body}")
         BadRequest
     }
   }
+}
 
-  class PceRequesterActor(endPoint: String) extends Actor {
+@Singleton
+class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(implicit ec: ExecutionContext) {
+  private[controllers] val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
+
+  def createPceRequesterActor(configuration: Configuration): ActorRef =
+    configuration.PceActor match {
+      case None | Some("dummy") => actorSystem.actorOf(Props(new DummyPceRequesterActor), "pceRequester")
+      case _                    => actorSystem.actorOf(Props(new PceRequesterActor(configuration)), "pceRequester")
+    }
+
+  class PceRequesterActor(configuration: Configuration) extends Actor {
     private val uuidGenerator = Uuid.randomUuidGenerator()
     private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
     private val latestReachabilityEntries: LastModifiedCache[Seq[ReachabilityTopologyEntry]] = new LastModifiedCache()
+    private val endPoint = configuration.PceEndpoint
 
     def receive = {
       case 'healthCheck =>
-        val topologyHealth = WS.url(s"$endPoint/management/status/topology").withHeaders(ACCEPT -> JSON).get()
+        val topologyHealth = ws.url(s"$endPoint/management/status/topology").addHttpHeaders(ACCEPT -> JSON).get()
 
-        topologyHealth onFailure { case e => Logger.warn(s"Failed to access PCE topology service: $e") }
+        topologyHealth onComplete {
+          case Success(_) => // nothing
+          case Failure(e) => Logger.warn(s"Failed to access PCE topology service: $e")
+        }
 
         val lastModified = topologyHealth map { _.header("Last-Modified").getOrElse("unknown") }
         val healthy = topologyHealth.map(_.status == 200).recover { case t => false }
@@ -75,7 +89,7 @@ object PathComputationEngine extends Controller {
         sender ! healthy.flatMap(h => lastModified.map(d => s"PCE (Real; $d)" -> h))
 
       case 'reachability =>
-        val reachabilityResponse = WS.url(s"$endPoint/reachability").withRequestTimeout(20000).withHeaders(ACCEPT -> JSON).get()
+        val reachabilityResponse = ws.url(s"$endPoint/reachability").withRequestTimeout(Duration(20000, MILLISECONDS)).addHttpHeaders(ACCEPT -> JSON).get()
         val senderRef = sender
 
         reachabilityResponse.onComplete {
@@ -99,14 +113,14 @@ object PathComputationEngine extends Controller {
         Logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
 
         val connection = Connection(sender)
-        pceContinuations.register(request.correlationId, Configuration.AsyncReplyTimeout).onComplete {
+        pceContinuations.register(request.correlationId, configuration.AsyncReplyTimeout).onComplete {
           case Success(reply) =>
             connection ! Connection.Command(Instant.now, FromPce(reply))
           case Failure(e) =>
             connection ! Connection.Command(Instant.now, MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), Instant.now(), e.toString))
         }
 
-        val response = WS.url(findPathEndPoint).post(Json.toJson(request))
+        val response = ws.url(findPathEndPoint).post(Json.toJson(request))
         response onComplete {
           case Failure(e) =>
             Logger.error(s"Could not reach the pce ($endPoint): $e")

@@ -87,7 +87,11 @@ object Connection {
   }
 }
 
-class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity))(implicit app: play.api.Application) {
+class ConnectionManager(
+  connectionFactory: (ConnectionId, NsiProviderMessage[InitialReserve]) => (ActorRef, ConnectionEntity),
+  configuration: Configuration,
+  val messageStore: MessageStore[Message]
+) {
   private val connections = TMap.empty[ConnectionId, Connection]
   private val globalReservationIdsMap = TMap.empty[GlobalReservationId, Set[Connection]]
   private val connectionsByRequesterCorrelationId = TMap.empty[(RequesterNsa, CorrelationId), Connection]
@@ -103,9 +107,6 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   private def runDeleteHook(connectionId: ConnectionId): Unit = atomic { implicit txn =>
     deleteHooks.remove(connectionId).foreach { hook => hook(txn) }
   }
-
-  import MessagePersistence.MessageToMessageData
-  val messageStore = new MessageStore[Message]("default")
 
   def add(connectionId: ConnectionId, globalReservationId: Option[GlobalReservationId], connection: Connection): Unit = atomic { implicit txn =>
     connections(connectionId) = connection
@@ -187,7 +188,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
   def findOrCreateConnection(request: NsiProviderMessage[NsiProviderCommand])(implicit actorSystem: ActorSystem): Option[Connection] = atomic { implicit txn =>
     findByRequesterCorrelationId(request.headers.requesterNSA, request.headers.correlationId).orElse {
       val result = request match {
-        case NsiProviderMessage(headers, update: NsiProviderUpdateCommand) =>
+        case NsiProviderMessage(headers@_, update: NsiProviderUpdateCommand) =>
           get(update.connectionId).map(update.connectionId -> _)
         case NsiProviderMessage(headers, initialReserve: InitialReserve) =>
           val connectionId = newConnectionId
@@ -334,7 +335,7 @@ class ConnectionManager(connectionFactory: (ConnectionId, NsiProviderMessage[Ini
     private def scheduleExpiration(lastMessageTimestamp: Instant): Unit = {
       expirationCancellable.foreach(_.cancel())
       expirationCancellable = if (connection.psm.isDefined && connection.lsm.lifecycleState == LifecycleStateEnumType.CREATED) None else {
-        val expirationTime = lastMessageTimestamp.plus(Configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)
+        val expirationTime = lastMessageTimestamp.plus(configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)
         val delay = (expirationTime.toEpochMilli - Instant.now().toEpochMilli).milliseconds
         val message = Connection.Delete
         Logger.debug(s"Scheduling $message for execution after $delay")

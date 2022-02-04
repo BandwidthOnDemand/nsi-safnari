@@ -2,16 +2,18 @@ package controllers
 
 import java.net.URI
 
-import akka.actor.Actor
+import akka.actor.{ Actor, ActorSystem }
 import akka.testkit.TestActorRef
 import controllers.Connection.Delete
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.persistence.MessageStore
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import java.time.Instant
 import java.time.temporal._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.libs.concurrent.Akka
+import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test._
 import helpers.NsiMessages._
 
@@ -19,6 +21,7 @@ import helpers.NsiMessages._
 class ConnectionManagerSpec extends helpers.Specification {
   sequential
 
+  private def FakeApplication(additionalConfiguration: Map[String, Any]) = new GuiceApplicationBuilder().configure(additionalConfiguration).build
 
   class RecordingActor extends Actor {
     @volatile var messages = Vector.empty[Any]
@@ -32,7 +35,9 @@ class ConnectionManagerSpec extends helpers.Specification {
   private def command(message: Message, timestamp: Instant = Instant.now()) = Connection.Command(timestamp, message)
 
   abstract class DummyConnectionFixture extends WithApplication() {
-    implicit lazy val system = Akka.system
+    lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]
+    lazy val configuration = app.injector.instanceOf[Configuration]
+    implicit lazy val system = app.injector.instanceOf[ActorSystem]
 
     lazy val mockUuidGenerator = Uuid.mockUuidGenerator(1)
     def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
@@ -48,7 +53,9 @@ class ConnectionManagerSpec extends helpers.Specification {
         PathComputationAlgorithm.Chain,
         URI.create("http://localhost"),
         URI.create("http://localhost")
-      ))
+      )),
+      configuration,
+      messageStore
     )
   }
 
@@ -117,7 +124,10 @@ class ConnectionManagerSpec extends helpers.Specification {
   }
 
   class SingleConnectionActorFixture(additionalConfiguration: Map[String, Any] = Map.empty) extends WithApplication(FakeApplication(additionalConfiguration = additionalConfiguration)) {
-    implicit lazy val system = Akka.system
+    lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]
+    lazy val configuration = app.injector.instanceOf[Configuration]
+
+    implicit lazy val system = app.injector.instanceOf[ActorSystem]
     implicit lazy val executionContext = system.dispatcher
 
     def createConnectionManager = {
@@ -132,7 +142,9 @@ class ConnectionManagerSpec extends helpers.Specification {
           PathComputationAlgorithm.Chain,
           URI.create("http://localhost"),
           URI.create("http://localhost")
-        ))
+        )),
+        configuration,
+        messageStore
       )
     }
 
@@ -282,7 +294,7 @@ class ConnectionManagerSpec extends helpers.Specification {
 
     "be deleted after a grace period" should {
       "when never successfully reserved" in new SingleConnectionActorFixture() {
-        await(connection ? command(ura.request(CorrelationId(0, 0), initialReserveMessage.body), timestamp = Instant.now().minus(Configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)))
+        await(connection ? command(ura.request(CorrelationId(0, 0), initialReserveMessage.body), timestamp = Instant.now().minus(configuration.ConnectionExpirationTime.toMillis, ChronoUnit.MILLIS)))
 
         eventually(connectionManager.get(connectionId) must beNone)
         connectionManager.messageStore.loadEverything().map(_._1) must not(contain(connectionId))

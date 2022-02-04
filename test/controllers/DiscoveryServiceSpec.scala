@@ -1,26 +1,25 @@
 package controllers
 
-import akka.testkit.TestActorRef
-import controllers.PathComputationEngine.DummyPceRequesterActor
 import java.time.{ ZoneId, ZonedDateTime }
 import java.time.format.DateTimeFormatter
 import java.time.temporal._
 import play.api.http.HeaderNames
 import play.api.mvc.Results
-import play.api.test.{FakeApplication, FakeRequest, PlaySpecification, WithApplication}
+import play.api.test.{FakeRequest, PlaySpecification, WithApplication}
+import play.api.inject.guice.GuiceApplicationBuilder
 import play.libs.Akka
+import play.api.mvc._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class DiscoveryServiceSpec extends PlaySpecification with Results {
 
-  def Application = FakeApplication(additionalConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
+  def Application = new GuiceApplicationBuilder().configure(Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy")).build
 
   "Discovery service" should {
 
     "serve discovery document with fake reachability" in new WithApplication(Application) {
-      implicit val actorSystem = Akka.system
-      val pceRequester = TestActorRef[DummyPceRequesterActor]
-      val controller = new DiscoveryService(pceRequester)
+      val controller = app.injector.instanceOf[DiscoveryService]
+      controller.setControllerComponents(app.injector.instanceOf[ControllerComponents])
 
       val result = controller.index().apply(FakeRequest())
 
@@ -31,10 +30,9 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
     }
 
     "return a not modified if if-modified-since header is in the future" in new WithApplication(Application) {
-      implicit val actorSystem = Akka.system
-      val pceRequester = TestActorRef[DummyPceRequesterActor]
-      val controller = new DiscoveryService(pceRequester)
       val dateTimeFormatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of("GMT"))
+      val controller = app.injector.instanceOf[DiscoveryService]
+      controller.setControllerComponents(app.injector.instanceOf[ControllerComponents])
 
       val dateInTheFuture = dateTimeFormatter.format(ZonedDateTime.now.plus(5, ChronoUnit.HOURS))
 

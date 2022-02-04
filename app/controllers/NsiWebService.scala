@@ -23,45 +23,46 @@
 package controllers
 
 import java.net.URI
+import javax.inject._
 import javax.xml.namespace.QName
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.soap.ExtraBodyParsers._
 import nl.surfnet.nsiv2.soap.NsiSoapConversions._
 import nl.surfnet.nsiv2.soap._
 import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.w3c.dom.Document
 import play.api.Logger
-import play.api.Play.current
 import play.api.http.Status._
-import play.api.libs.concurrent.Execution.Implicits._
-import play.api.libs.ws.{WS, WSRequestHolder}
-import scala.concurrent.Future
-import scala.language.higherKinds
+import play.api.libs.ws.{WSBodyWritables, WSClient, WSRequest}
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-object NsiWebService {
-  implicit class SoapRequestHolder(request: WSRequestHolder) {
-    def withSoapActionHeader(action: String) = request.withHeaders("SOAPAction" -> ('"' + action +'"'))
+@Singleton
+class NsiWebService @Inject()(ws: WSClient)(implicit ec: ExecutionContext) extends WSBodyWritables {
+  implicit class SoapRequestHolder(val request: WSRequest) {
+    def withSoapActionHeader(action: String) = request.addHttpHeaders("SOAPAction" -> ('"' + action +'"'))
   }
 
-  def callProvider(provider: ProviderEndPoint, message: NsiProviderMessage[NsiProviderOperation]): Future[NsiProviderMessage[NsiAcknowledgement]] =
+  def callProvider(provider: ProviderEndPoint, message: NsiProviderMessage[NsiProviderOperation], configuration: Configuration): Future[NsiProviderMessage[NsiAcknowledgement]] =
     call[NsiProviderOperation, NsiProviderMessage](
       provider.nsa,
       provider.url,
       message.body.soapActionUrl,
       message,
       (defaultHeaders, document) => NsiProviderMessageToDocument[NsiAcknowledgement](Some(defaultHeaders)).invert(document),
-      (headers, exception) => NsiProviderMessage(headers, ServiceException(exception)))(NsiProviderMessageToDocument(defaultHeaders = None))
+      (headers, exception) => NsiProviderMessage(headers, ServiceException(exception)),
+      configuration)(NsiProviderMessageToDocument(defaultHeaders = None))
 
-  def callRequester(requesterNsa: String, requesterUri: URI, message: NsiRequesterMessage[NsiRequesterOperation]): Future[NsiRequesterMessage[NsiAcknowledgement]] =
+  def callRequester(requesterNsa: String, requesterUri: URI, message: NsiRequesterMessage[NsiRequesterOperation], configuration: Configuration): Future[NsiRequesterMessage[NsiAcknowledgement]] =
     call[NsiRequesterOperation, NsiRequesterMessage](
       requesterNsa,
       requesterUri,
       message.body.soapActionUrl,
       message,
       (defaultHeaders, document) => NsiRequesterMessageToDocument[NsiAcknowledgement](Some(defaultHeaders)).invert(document),
-      (headers, exception) => NsiRequesterMessage(headers, ServiceException(exception)))(NsiRequesterMessageToDocument(defaultHeaders = None))
+      (headers, exception) => NsiRequesterMessage(headers, ServiceException(exception)),
+      configuration)(NsiRequesterMessageToDocument(defaultHeaders = None))
 
   private def call[T <: NsiOperation, M[_ <: NsiOperation] <: NsiMessage[_]](
     nsa: String,
@@ -69,13 +70,16 @@ object NsiWebService {
     soapAction: String,
     message: M[T],
     convertAck: (NsiHeaders, Document) => Try[M[NsiAcknowledgement]],
-    convertError: (NsiHeaders, ServiceExceptionType) => M[NsiAcknowledgement])(implicit messageConversion: Conversion[M[T], Document]): Future[M[NsiAcknowledgement]] = {
+    convertError: (NsiHeaders, ServiceExceptionType) => M[NsiAcknowledgement],
+    configuration: Configuration
+  )(implicit messageConversion: Conversion[M[T], Document]): Future[M[NsiAcknowledgement]] = {
 
     for {
-      providerUrl <- if (Configuration.Use2WayTLS) Future.fromTry(Configuration.translateToStunnelAddress(nsa, url)) else Future.successful(url)
-      request = WS.url(providerUrl.toASCIIString()).withRequestTimeout(20000).withSoapActionHeader(soapAction)
-      _ = Logger.debug(s"Sending NSA ${nsa} at ${request.url} the SOAP message: ${Conversion[M[T], Document].andThen(Conversion[Document, String]).apply(message)}")
-      ack <- request.post(message)
+      providerUrl <- if (configuration.Use2WayTLS) Future.fromTry(configuration.translateToStunnelAddress(nsa, url)) else Future.successful(url)
+      request = ws.url(providerUrl.toASCIIString()).withRequestTimeout(Duration(20000, MILLISECONDS)).withSoapActionHeader(soapAction)
+      messageBody <- Future.fromTry(Conversion[M[T], Document].apply(message))
+      _ = Logger.debug(s"Sending NSA ${nsa} at ${request.url} the SOAP message: ${Conversion[Document, String].apply(messageBody)}")
+      ack <- request.post(messageBody)
     } yield {
       val defaultAckHeaders = message.headers.forSyncAck
 

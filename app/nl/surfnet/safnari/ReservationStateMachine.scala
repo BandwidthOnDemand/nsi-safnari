@@ -86,7 +86,7 @@ case class ReservationStateMachineData(
           .withServiceType(requestedCriteria.getServiceType())
           .withVersion(pendingVersion)
         correlationId -> ConnectionCriteria.Initial.withRequested(criteria)
-    }(collection.breakOut)
+    }
 
     val nextChildConnectionStates = initialReserveAlgorithm.nextSegments.map {
       case (correlationId, _) => correlationId -> CheckingReservationState
@@ -199,13 +199,13 @@ case class ReservationStateMachineData(
       }
 
       def extractProviderSegment(pathTrace: PathTraceType): Option[Vector[SegmentType]] = {
-        pathTrace.getPath.asScala.headOption.map(_.getSegment.asScala.to[Vector].sortBy(_.getOrder))
+        pathTrace.getPath.asScala.headOption.map(_.getSegment.asScala.toVector.sortBy(_.getOrder))
       }
 
       val pathTraceSegments = segments.flatMap {
         case (correlationId, _) =>
           for {
-            reply <- childResponses.get(correlationId).to[Vector]
+            reply <- childResponses.get(correlationId).toVector
             segment <- reply.headers.pathTrace.flatMap(extractProviderSegment) getOrElse {
               Vector(new SegmentType().withId(reply.headers.providerNSA).withConnectionId(reply.body.connectionId))
             }
@@ -374,7 +374,7 @@ class ReservationStateMachine(
               criteria.getOtherAttributes().putAll(pendingCriteria.getOtherAttributes())
 
               initialCorrelationId -> childCriteria.withRequested(criteria)
-          }(collection.breakOut))
+          }.toMap)
       }
 
       goto(newData.aggregatedReservationState) using newData
@@ -444,7 +444,7 @@ class ReservationStateMachine(
           val headers = newInitialReserveNsiHeaders(segment.provider).copy(correlationId = correlationId)
 
           ToProvider(NsiProviderMessage(headers, InitialReserve(reserveType)), segment.provider)
-      }(collection.breakOut)
+      }.toSeq
 
       nextSegments
     case PathComputationState -> FailedReservationState =>
@@ -452,7 +452,7 @@ class ReservationStateMachine(
     case (CheckingReservationState | ModifyingReservationState) -> FailedReservationState =>
       val baseError = failed(NsiError.ChildSegmentError)
 
-      val childExceptions = nextStateData.childExceptions.values.to[Vector]
+      val childExceptions = nextStateData.childExceptions.values.toVector
       baseError.getServiceException.withChildException(childExceptions.asJava)
 
       respond(ReserveFailed(baseError))

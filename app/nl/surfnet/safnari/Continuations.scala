@@ -24,11 +24,9 @@ package nl.surfnet.safnari
 
 import akka.actor.Scheduler
 import nl.surfnet.nsiv2.messages.CorrelationId
-import play.api.libs.concurrent.Execution.Implicits._
-import scala.concurrent.stm.TMap
-import scala.concurrent.Future
-import scala.concurrent.Promise
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration._
+import scala.concurrent.stm.TMap
 import akka.actor.Cancellable
 import java.util.concurrent.TimeoutException
 
@@ -38,7 +36,7 @@ import java.util.concurrent.TimeoutException
  * @param scheduler The scheduler used for timeout management. Passed by-name to ensure the
  *   currently active scheduler is used, even from unit tests.
  */
-class Continuations[T](scheduler: => Scheduler) {
+class Continuations[T](scheduler: => Scheduler)(implicit ec: ExecutionContext) {
   private val continuations = TMap.empty[CorrelationId, (Seq[Cancellable], Promise[T])].single
 
   /**
@@ -54,7 +52,7 @@ class Continuations[T](scheduler: => Scheduler) {
       }
     }
 
-    val promise = Promise[T]
+    val promise = Promise[T]()
     continuations(correlationId) = (timeout :: Nil, promise)
     promise.future
   }
@@ -70,14 +68,14 @@ class Continuations[T](scheduler: => Scheduler) {
     case None =>
       false
     case Some((timeouts, _)) =>
-      timeouts.foreach(_.cancel)
+      timeouts.foreach(_.cancel())
       true
   }
 
   def replyReceived(correlationId: CorrelationId, reply: T): Unit =
     continuations.remove(correlationId).foreach {
       case (timeouts, promise) =>
-        timeouts.foreach(_.cancel)
+        timeouts.foreach(_.cancel())
         promise.trySuccess(reply)
     }
 }
