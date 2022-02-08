@@ -32,6 +32,8 @@ lazy val root = (project in file("."))
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha),
     buildInfoPackage := "nl.surfnet.safnari"
   )
+//  .enablePlugins(PlayScala, PlayNettyServer)
+//  .disablePlugins(PlayAkkaHttpServer)
 
 scalaVersion := "2.13.7"
 

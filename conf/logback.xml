@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<configuration>
+    <conversionRule conversionWord="coloredLevel" converterClass="play.api.libs.logback.ColoredLevel"/>
+    <!--
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${application.home}/logs/application.log</file>
+        <encoder>
+            <pattern>%date{ISO8601} %-5level %logger{36} %thread %X{sourceThread} %X{akkaSource} - %msg - %xException%n</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${application.home}/logs/application.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+    </appender>
+    -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date{ISO8601} %coloredLevel %logger{36} %thread %X{sourceThread} %X{akkaSource} - %msg - %xException{10}%n</pattern>
+        </encoder>
+    </appender>
+    <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
+        <!-- increases the default queue size -->
+        <queueSize>512</queueSize>
+        <!-- don't discard messages -->
+        <discardingThreshold>0</discardingThreshold>
+        <!-- block when queue is full -->
+        <neverBlock>false</neverBlock>
+        <appender-ref ref="STDOUT"/>
+    </appender>
+    <logger name="play" level="INFO"/>
+    <logger name="application" level="DEBUG"/>
+    <logger name="controllers" level="INFO"/>
+    <logger name="support" level="INFO"/>
+    <logger name="nl.surfnet.safnari" level="DEBUG"/>
+    <!-- Database connection pool -->
+    <logger name="com.jolbox.bonecp" level="INFO"/>
+    <logger name="com.gargoylesoftware.htmlunit.javascript" level="OFF"/>
+    <root level="INFO">
+        <appender-ref ref="ASYNCSTDOUT"/>
+        <!--
+        <appender-ref ref="FILE"/>
+        -->
+    </root>
+    <shutdownHook class="ch.qos.logback.core.hook.DelayingShutdownHook"/>
+</configuration>
