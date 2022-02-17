@@ -8,6 +8,8 @@ name := "nsi-safnari"
 lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run maven")
 lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
+val playVersion = "2.7.9"
+
 libraryDependencies ++= Seq(
   guice,
   ws,
@@ -17,8 +19,12 @@ libraryDependencies ++= Seq(
   "org.postgresql" % "postgresql" % "42.3.1",
   "org.specs2" %% "specs2-junit" % "4.13.0" % "test",
   "org.specs2" %% "specs2-matcher-extra" % "4.13.0" % "test",
+  "org.specs2" %% "specs2-scalacheck" % "4.13.0" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.5.26" % "test",
+  "com.typesafe.play" %% "play-test" % playVersion % "test",
+  "com.typesafe.play" %% "play-specs2" % playVersion % "test",
   "nl.surfnet" % "play-nsi-support_2.13" % "2.1.6",
+  "nl.surfnet" % "play-nsi-support_2.13" % "2.1.6" % "test" classifier "tests",
 )
 
 val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
@@ -30,7 +36,8 @@ lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
   .settings(
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha),
-    buildInfoPackage := "nl.surfnet.safnari"
+    buildInfoPackage := "nl.surfnet.safnari",
+    exportJars := true,
   )
 //  .enablePlugins(PlayScala, PlayNettyServer)
 //  .disablePlugins(PlayAkkaHttpServer)
