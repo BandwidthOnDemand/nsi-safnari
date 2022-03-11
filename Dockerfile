@@ -8,6 +8,8 @@ ENV PORT=9000
 ENV ADDRESS="0.0.0.0"
 ENV CONFIG=/config/config-overrides.conf
 ENV EXTRA="-J-Xms512m -J-Xmx512m -J-server -J-verbose:gc -J-XX:+PrintGCDetails -J-XX:+PrintGCDateStamps -J-XX:+UseGCLogFileRotation -J-XX:NumberOfGCLogFiles=10 -J-XX:GCLogFileSize=10M -J-XX:+UseParallelGC -J-XX:+UseParallelOldGC"
+# default trust store in configured here, the key store is configured in the config file
+ENV TRUSTSTORE="-Djavax.net.ssl.trustStoreType=jks -Djavax.net.ssl.trustStorePassword=secret -Djavax.net.ssl.trustStore=target/universal/stage/conf/nsi-safnari-truststore.jks"
 
 RUN apt update && apt -y install zip
 RUN adduser --disabled-password --uid 12345 --gecos 'Safnari user' safnari
@@ -19,4 +21,4 @@ RUN mv nsi-safnari-$VERSION/* .
 RUN rmdir nsi-safnari-$VERSION
 
 EXPOSE 9000/tcp
-CMD /nsi-safnari/bin/nsi-safnari -Dconfig.file=$CONFIG -Dhttp.port=$PORT -Dhttp.address=$ADDRESS -DapplyEvolutions.default=true $EXTRA
+CMD /nsi-safnari/bin/nsi-safnari -Dconfig.file=$CONFIG -DapplyEvolutions.default=true $TRUSTSTORE $EXTRA
