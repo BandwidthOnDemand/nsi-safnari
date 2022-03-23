@@ -63,9 +63,8 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
   }
 
   def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry], lastModified: Instant)(implicit request: RequestHeader): xml.Elem = {
-    val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
-    val providerUrl = routes.ConnectionProviderController.request.absoluteURL(secure)
-    val requesterUrl = routes.ConnectionRequesterController.request.absoluteURL(secure)
+    val providerUrl = configuration.providerServiceUrl
+    val requesterUrl = configuration.requesterServiceUrl
 
     <nsa:nsa
         xmlns:vcard="urn:ietf:params:xml:ns:vcard-4.0"
