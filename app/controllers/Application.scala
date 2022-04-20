@@ -35,8 +35,7 @@ import scala.concurrent._
 
 class ApplicationController(connectionManager: ConnectionManager, pceRequester: ActorRef, connectionRequester: ConnectionRequester, configuration: Configuration)(implicit ec: ExecutionContext) extends InjectedController {
   def index = Action { implicit request =>
-    val secure = request.headers.get(X_FORWARDED_PROTO) == Some("https")
-    Ok(views.html.index(secure, configuration.NsaId, configuration.WebParams))
+    Ok(views.html.index(configuration))
   }
 
   def healthcheck = Action.async {

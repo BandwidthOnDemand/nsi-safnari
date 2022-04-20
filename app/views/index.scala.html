@@ -1,15 +1,15 @@
-@(secure: Boolean, nsaId: String, webParams: Map[String,String])(implicit request: play.api.mvc.RequestHeader)
+@(configuration: Configuration)(implicit request: play.api.mvc.RequestHeader)
 
-@providerWsdl = { @routes.ConnectionProviderController.wsdl.absoluteURL(secure) }
-@requesterWsdl = { @routes.ConnectionRequesterController.wsdl.absoluteURL(secure) }
+@providerWsdl = { @configuration.providerServiceUrl }
+@requesterWsdl = { @configuration.requesterServiceUrl }
 
-@main("Welcome to the NSI Safnari", "usage", webParams) {
+@main("Welcome to the NSI Safnari", "usage", configuration.WebParams) {
     <section>
         <h1>Welcome</h1>
         <div class="content">
             <h3>Using NSI Safnari</h3>
 
-            <p>Safnari (@nsaId) is a NSI Aggregator supporting the NSI v2 specification.</p>
+            <p>Safnari (@configuration.NsaId) is a NSI Aggregator supporting the NSI v2 specification.</p>
 
             <p>The following service end points are implemented:</p>
             <ul>
