@@ -3,6 +3,8 @@ import scala.sys.process.Process
 organization := "nl.surfnet"
 name := "nsi-safnari"
 
+githubTokenSource := TokenSource.GitConfig("github.token") || TokenSource.Environment("GITHUB_USERTOKEN") || TokenSource.Environment("GITHUB_TOKEN")
+
 //releaseSettings
 
 lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run maven")
