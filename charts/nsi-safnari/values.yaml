@@ -112,3 +112,23 @@ config:
   name: "nsi-safnari-config"
   mountPath: "/config"
   configFilesGlob: "config/*"
+
+secretProviderClass:
+  enabled: false
+  name:
+  keyVaultName:
+  tenantId:
+  nodePublishSecretRefNname:
+  env:
+    - name: "PGHOST"
+      value: "host.domain"
+    - name: "PGPORT"
+      value: 5432
+  objects:
+    - key: "PGDATABASE"
+      objectName: "ns-safnari-db-name"
+    - key: "PGPASSWORD"
+      objectName: "ns-safnari-db-password"
+    - key: "PGUSER"
+      objectName: "ns-safnari-db-username"
+

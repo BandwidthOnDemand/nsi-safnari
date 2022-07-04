@@ -27,16 +27,38 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
-      - name: wait-for-postgres
-        image: postgres:alpine
-        command: ["sh", "-c",
-          {{ printf "until pg_isready -h %s-postgresql.%s.svc.cluster.local -p 5432; do echo `date` sleeping 2 seconds ...; sleep 2; done" .Release.Name .Release.Namespace | quote }}
-        ]
-      - name: wait-for-pce
-        image: curlimages/curl:latest
-        command: ["sh", "-c",
-          {{ printf "until [ $(curl -sw '%%{http_code}' http://%s-nsi-pce.%s.svc.cluster.local:80/paths -o /dev/null) -eq 200 ]; do echo `date` sleeping 2 seconds ...; sleep 2; done" .Release.Name .Release.Namespace | quote }}
-        ]
+        - name: wait-for-postgres
+          image: postgres:alpine
+          {{- if .Values.secretProviderClass.enabled }}
+          command:
+            - "sh"
+          args:
+            - "-c"
+            - 'until pg_isready; do echo `date` sleeping 2 seconds ...; sleep 2; done'
+          env:
+            {{- range .Values.secretProviderClass.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Chart.Name }}-{{ .Release.Namespace }}
+          volumeMounts:
+            - name: secret-volume
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+          {{- else }}
+          command:
+            - "sh"
+          args:
+            - "-c"
+            - {{ printf "until pg_isready -h %s-postgresql.%s.svc.cluster.local -p 5432; do echo `date` sleeping 2 seconds ...; sleep 2; done" .Release.Name .Release.Namespace | quote }}
+          {{- end }}
+        - name: wait-for-pce
+          image: curlimages/curl:latest
+          command: ["sh", "-c",
+            {{ printf "until [ $(curl -sw '%%{http_code}' http://%s-nsi-pce.%s.svc.cluster.local:80/paths -o /dev/null) -eq 200 ]; do echo `date` sleeping 2 seconds ...; sleep 2; done" .Release.Name .Release.Namespace | quote }}
+          ]
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -73,11 +95,21 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-secret
                   key: SAFNARI_APPLICATION_SECRET
+          {{- if .Values.secretProviderClass.enabled }}
+            {{- range .Values.secretProviderClass.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Chart.Name }}-{{ .Release.Namespace }}
+          {{- else }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-secret
                   key: POSTGRES_PASSWORD
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: internal
@@ -87,6 +119,11 @@ spec:
             - name: {{ .Values.config.name }}
               mountPath: {{ .Values.config.mountPath }}
               readOnly: true
+          {{- if .Values.secretProviderClass.enabled }}
+            - name: secret-volume
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+          {{- end }}
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
@@ -113,6 +150,16 @@ spec:
         - name: {{ .Values.config.name }}
           configMap:
             name: {{ include "nsi-safnari.fullname" . }}-{{ .Values.config.name }}
+        {{- if .Values.secretProviderClass.enabled }}
+        - name: secret-volume
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ .Release.Name }}-secretproviderclass
+            nodePublishSecretRef:
+              name: {{ .Values.secretProviderClass.nodePublishSecretRefNname }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
