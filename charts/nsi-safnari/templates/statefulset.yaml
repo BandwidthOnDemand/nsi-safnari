@@ -42,7 +42,7 @@ spec:
             {{- end }}
           envFrom:
             - secretRef:
-                name: {{ .Chart.Name }}-{{ .Release.Namespace }}
+                name: {{ include "nsi-safnari.fullname" . }}-secret
           volumeMounts:
             - name: secret-volume
               mountPath: "/mnt/secrets-store"
@@ -102,7 +102,7 @@ spec:
             {{- end }}
           envFrom:
             - secretRef:
-                name: {{ .Chart.Name }}-{{ .Release.Namespace }}
+                name: {{ include "nsi-safnari.fullname" . }}-secret
           {{- else }}
             - name: POSTGRES_PASSWORD
               valueFrom:
