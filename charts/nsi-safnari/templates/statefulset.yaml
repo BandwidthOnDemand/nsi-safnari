@@ -156,7 +156,7 @@ spec:
             driver: secrets-store.csi.k8s.io
             readOnly: true
             volumeAttributes:
-              secretProviderClass: {{ .Release.Name }}-secretproviderclass
+              secretProviderClass: {{ include "nsi-safnari.fullname" . }}-secretproviderclass
             nodePublishSecretRef:
               name: {{ .Values.secretProviderClass.nodePublishSecretRefNname }}
         {{- end }}
