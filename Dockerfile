@@ -2,7 +2,7 @@
 #
 FROM openjdk:8
 
-ENV VERSION 2.2.1
+ENV VERSION 2.2.3
 ENV REPOSITORY  https://github.com/BandwidthOnDemand/nsi-safnari
 ENV PORT=9000
 ENV ADDRESS="0.0.0.0"
