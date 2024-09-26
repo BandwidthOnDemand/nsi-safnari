@@ -32,7 +32,6 @@ class ReserveRequestSpec extends helpers.Specification {
 
   val reserveConfirmed = Promise[NsiRequesterMessage[ReserveConfirmed]]
 
-  val ServerPort = Helpers.testServerPort + 2
   val FakePceUri = s"http://localhost:$ServerPort"
   val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
   val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"

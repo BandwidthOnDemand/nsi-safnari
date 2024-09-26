@@ -14,7 +14,6 @@ import jakarta.xml.ws.Holder
 class JaxWsClientSpec extends helpers.Specification {
   sequential
 
-  val ServerPort = Helpers.testServerPort + 1
   val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
   def Application = new GuiceApplicationBuilder().configure(Map("nsi.base.url" -> s"http://localhost:$ServerPort", "safnari.nsa.id" -> SafnariNsa)).build
 
