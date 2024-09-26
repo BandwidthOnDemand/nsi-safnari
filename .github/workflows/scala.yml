@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Start PostgreSQL
+      run: sudo systemctl start postgresql.service
     - uses: actions/checkout@v4
     - name: Set up JDK 21
       uses: actions/setup-java@v4
@@ -30,5 +32,11 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         cache: 'sbt'
+    - name: Initialize PostgreSQL database
+      run: |
+        sudo -u postgres -i createuser -D -R -S nsi-safnari-user
+        sudo -u postgres -i psql -c "ALTER USER \"nsi-safnari-user\" WITH PASSWORD 'password'"
+        sudo -u postgres -i createdb -O nsi-safnari-user nsi-safnari-dev
+        sudo -u postgres -i createdb -O nsi-safnari-user nsi-safnari-test
     - name: Run tests
       run: sbt test
