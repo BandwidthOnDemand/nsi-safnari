@@ -5,12 +5,17 @@ name := "nsi-safnari"
 
 githubTokenSource := TokenSource.GitConfig("github.token") || TokenSource.Environment("GITHUB_USERTOKEN") || TokenSource.Environment("GITHUB_TOKEN")
 
+scalaVersion := "2.13.14"
+
+scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-value-discard", "-target:jvm-1.8")
+
 //releaseSettings
 
 lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run maven")
 lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
-val playVersion = "2.7.9"
+val playVersion = "2.9.4"
+val playNsiSupportVersion = "3.0.0-SNAPSHOT"
 
 libraryDependencies ++= Seq(
   guice,
@@ -22,11 +27,13 @@ libraryDependencies ++= Seq(
   "org.specs2" %% "specs2-junit" % "4.13.0" % "test",
   "org.specs2" %% "specs2-matcher-extra" % "4.13.0" % "test",
   "org.specs2" %% "specs2-scalacheck" % "4.13.0" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % "2.5.26" % "test",
+  "com.typesafe.akka" %% "akka-testkit" % "2.6.21" % "test",
   "com.typesafe.play" %% "play-test" % playVersion % "test",
   "com.typesafe.play" %% "play-specs2" % playVersion % "test",
-  "nl.surfnet" % "play-nsi-support_2.13" % "2.1.6",
-  "nl.surfnet" % "play-nsi-support_2.13" % "2.1.6" % "test" classifier "tests",
+  "org.glassfish.hk2" % "osgi-resource-locator" % "2.4.0" % "test",
+  "com.sun.xml.ws" % "jaxws-rt" % "4.0.3" % "test",
+  "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion,
+  "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion % "test" classifier "tests",
 )
 
 val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
@@ -36,6 +43,7 @@ gitHeadCommitSha := Process("git rev-parse --short HEAD").lineStream.head
 lazy val root = (project in file("."))
   .enablePlugins(PlayScala)
   .enablePlugins(BuildInfoPlugin)
+  .enablePlugins(SbtTwirl)
   .settings(
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha),
     buildInfoPackage := "nl.surfnet.safnari",
@@ -43,10 +51,6 @@ lazy val root = (project in file("."))
   )
 //  .enablePlugins(PlayScala, PlayNettyServer)
 //  .disablePlugins(PlayAkkaHttpServer)
-
-scalaVersion := "2.13.7"
-
-scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-value-discard", "-target:jvm-1.8")
 
 Test / javaOptions += "-Dconfig.file=conf/test.conf"
 

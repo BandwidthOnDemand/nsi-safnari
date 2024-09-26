@@ -67,6 +67,8 @@ class ConnectionRequesterController @Inject()(connectionManager: ConnectionManag
 
 @Singleton
 class ConnectionRequester @Inject()(configuration: Configuration, nsiWebService: NsiWebService)(implicit actorSystem: ActorSystem, ec: ExecutionContext) {
+  private val logger = Logger(classOf[ConnectionRequester])
+
   private val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
   private[controllers] def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
@@ -108,7 +110,7 @@ class ConnectionRequester @Inject()(configuration: Configuration, nsiWebService:
           case Failure(timeout: TimeoutException) =>
             // Let the requester timeout as well (or receive an actual reply). No need to send an ack timeout!
           case Failure(exception) =>
-            Logger.warn(s"communication failure calling $provider", exception)
+            logger.warn(s"communication failure calling $provider", exception)
             continuations.unregister(headers.correlationId)
             connection ! Connection.Command(Instant.now(), MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, Instant.now(), exception.toString))
           case Success(ack @ NsiProviderMessage(_, ServiceException(_))) =>

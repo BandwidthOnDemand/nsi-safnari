@@ -69,11 +69,11 @@ class Configuration @Inject()(configuration: play.api.Configuration) {
 
   def BaseUrl = getStringOrFail("nsi.base.url")
 
-  lazy val providerServiceUrl: String = s"${BaseUrl}${routes.ConnectionProviderController.request().url}"
+  lazy val providerServiceUrl: String = s"${BaseUrl}${routes.ConnectionProviderController.request.url}"
 
-  lazy val requesterServiceUrl: String = s"${BaseUrl}${routes.ConnectionRequesterController.request().url}"
+  lazy val requesterServiceUrl: String = s"${BaseUrl}${routes.ConnectionRequesterController.request.url}"
 
-  lazy val pceReplyUrl: String = s"${BaseUrl}${routes.PathComputationEngineController.pceReply().url}"
+  lazy val pceReplyUrl: String = s"${BaseUrl}${routes.PathComputationEngineController.pceReply.url}"
 
   private def getStringOrFail(property: String) = configuration.getOptional[String](property).getOrElse(sys.error(s"$property is not set"))
 

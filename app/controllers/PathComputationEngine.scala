@@ -45,14 +45,16 @@ import scala.util.{Failure, Success}
 
 @Singleton
 class PathComputationEngineController @Inject()(configuration: Configuration, pce: PathComputationEngine)(implicit ec: ExecutionContext) extends InjectedController {
+  private val logger = Logger(classOf[PathComputationEngineController])
+
   def pceReply = Action(parse.json) { implicit request =>
     Json.fromJson[PceResponse](request.body) match {
       case JsSuccess(response, _) =>
-        Logger.info(s"Pce reply: $response")
+        logger.info(s"Pce reply: $response")
         pce.pceContinuations.replyReceived(response.correlationId, response)
         Ok
       case JsError(error) =>
-        Logger.info(s"Pce error: $error body: ${request.body}")
+        logger.info(s"Pce error: $error body: ${request.body}")
         BadRequest
     }
   }
@@ -60,6 +62,8 @@ class PathComputationEngineController @Inject()(configuration: Configuration, pc
 
 @Singleton
 class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(implicit ec: ExecutionContext) {
+  private val logger = Logger(classOf[PathComputationEngine])
+
   private[controllers] val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
 
   def createPceRequesterActor(configuration: Configuration): ActorRef =
@@ -80,7 +84,7 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
 
         topologyHealth onComplete {
           case Success(_) => // nothing
-          case Failure(e) => Logger.warn(s"Failed to access PCE topology service: $e")
+          case Failure(e) => logger.warn(s"Failed to access PCE topology service: $e")
         }
 
         val lastModified = topologyHealth map { _.header("Last-Modified").getOrElse("unknown") }
@@ -98,19 +102,19 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
               case JsSuccess(reachability, _) =>
                 Success(latestReachabilityEntries.updateAndGet(reachability))
               case JsError(e) =>
-                Logger.error(s"Failed to parse reachability from the pce: $e")
+                logger.error(s"Failed to parse reachability from the pce: $e")
                 latestReachabilityEntries.get.toTry(new RuntimeException("Could not parse reachability"))
             }
 
             senderRef ! result
           case Failure(e) =>
-            Logger.error("Failed to retrieve reachability from the pce", e)
+            logger.error("Failed to retrieve reachability from the pce", e)
             senderRef ! latestReachabilityEntries.get.toTry(e)
         }
 
       case ToPce(request) =>
         val findPathEndPoint = s"$endPoint/paths/find"
-        Logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
+        logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
 
         val connection = Connection(sender)
         pceContinuations.register(request.correlationId, configuration.AsyncReplyTimeout).onComplete {
@@ -123,13 +127,13 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
         val response = ws.url(findPathEndPoint).post(Json.toJson(request))
         response onComplete {
           case Failure(e) =>
-            Logger.error(s"Could not reach the pce ($endPoint): $e")
+            logger.error(s"Could not reach the pce ($endPoint): $e")
             pceContinuations.unregister(request.correlationId)
             connection ! Connection.Command(Instant.now, MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), Instant.now(), e.toString))
           case Success(response) if response.status == ACCEPTED =>
             connection ! Connection.Command(Instant.now, AckFromPce(PceAccepted(request.correlationId)))
           case Success(response) =>
-            Logger.error(s"Got back a ${response.status} response from the PCE: ${response.body}")
+            logger.error(s"Got back a ${response.status} response from the PCE: ${response.body}")
             pceContinuations.unregister(request.correlationId)
             connection ! Connection.Command(Instant.now, AckFromPce(PceFailed(request.correlationId, response.status, response.statusText, response.body)))
         }

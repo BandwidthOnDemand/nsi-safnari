@@ -52,6 +52,7 @@ class ConnectionEntity(
     pceReplyUri: URI
 ) {
   private final val PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE = "pathComputationAlgorithm"
+  private val logger = Logger(classOf[ConnectionEntity])
 
   private def requesterNSA = initialReserve.headers.requesterNSA
   private def newRequestHeaders(requesterMessage: NsiProviderMessage[NsiProviderOperation], provider: ProviderEndPoint) = requesterMessage.headers.copy(
@@ -221,7 +222,7 @@ class ConnectionEntity(
       providerConversations -= headers.correlationId
       stateMachine match {
         case None =>
-          Logger.debug(s"No active conversation for reply ${message.toShortString}, one of [${providerConversations.keySet.mkString(", ")}] expected")
+          logger.debug(s"No active conversation for reply ${message.toShortString}, one of [${providerConversations.keySet.mkString(", ")}] expected")
           Nil
         case Some(sm) =>
           List(sm) ++ (body match {
@@ -232,10 +233,10 @@ class ConnectionEntity(
 
     case AckFromProvider(NsiProviderMessage(headers, body)) =>
       val stateMachine = providerConversations.get(headers.correlationId)
-      if (stateMachine.isEmpty) Logger.debug(s"No active conversation for ack ${message.toShortString}")
+      if (stateMachine.isEmpty) logger.debug(s"No active conversation for ack ${message.toShortString}")
       stateMachine match {
         case None =>
-          Logger.debug(s"No active conversation for ack ${message.toShortString}, one of [${providerConversations.keySet.mkString(", ")}] expected")
+          logger.debug(s"No active conversation for ack ${message.toShortString}, one of [${providerConversations.keySet.mkString(", ")}] expected")
           Nil
         case Some(sm) =>
           List(sm) ++ (body match {
@@ -282,7 +283,7 @@ class ConnectionEntity(
   private def registerProviderConversations(messages: Seq[OutboundMessage], stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage]): Unit = {
     providerConversations ++= messages.collect {
       case message: ToProvider =>
-        Logger.trace(s"Registering conversation for ${message.toShortString}")
+        logger.trace(s"Registering conversation for ${message.toShortString}")
         message.correlationId -> stateMachine
     }
   }

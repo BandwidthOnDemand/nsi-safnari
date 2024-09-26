@@ -39,6 +39,8 @@ import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 
 class StartModule extends AbstractModule {
+  private val logger = Logger(classOf[StartModule])
+
   override def configure() = {
     bind(classOf[GlobalSettings]).asEagerSingleton()
   }
@@ -69,6 +71,8 @@ class GlobalSettings @Inject()(
   connectionRequester: ConnectionRequester,
   database: Database
 )(implicit ec: ExecutionContext) {
+  private val logger = Logger(classOf[GlobalSettings])
+
   val pceRequester: ActorRef = pathComputationEngine.createPceRequesterActor(configuration)
   private val createOutboundActor = connectionProvider.outboundActor(configuration, connectionRequester.nsiRequester, pceRequester) _
   val connectionManager: ConnectionManager = new ConnectionManager(connectionProvider.connectionFactory(createOutboundActor, configuration), configuration, messageStore)
@@ -90,14 +94,14 @@ class GlobalSettings @Inject()(
   private def restoreConnectionsFromDatabase(): Unit = {
     implicit val implicitActorSystem = actorSystem
     try {
-      Logger.info("Start replaying of connection messages")
+      logger.info("Start replaying of connection messages")
       Await.result(connectionManager.restore, Duration.Inf)
-      Logger.info("Completed replaying of connection messages")
+      logger.info("Completed replaying of connection messages")
     } catch {
       case NonFatal(e) =>
         val suppressed = e.getSuppressed()
         suppressed.foreach { e =>
-          Logger.error(s"Connection replay failed with suppressed exception", e)
+          logger.error(s"Connection replay failed with suppressed exception", e)
         }
         throw e
     }
@@ -106,7 +110,7 @@ class GlobalSettings @Inject()(
   private def cleanDatabase(): Unit = database.withTransaction { implicit connection =>
     val tables = SQL("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'play_evolutions'").as(str("tablename").*).map("public." ++ _)
     val truncate = s"TRUNCATE TABLE ${tables.mkString(",")} CASCADE"
-    Logger.debug(s"Cleaning database: $truncate")
+    logger.debug(s"Cleaning database: $truncate")
     SQL(truncate).executeUpdate()
     ()
   }

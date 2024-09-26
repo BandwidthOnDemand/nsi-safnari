@@ -70,7 +70,7 @@ spec:
             - {{ printf "-Dconfig.file=%s/config-overrides.conf" .Values.config.mountPath | quote }}
             - "-Dhttp.port=8080"
             - "-Dhttp.address=0.0.0.0"
-            - "-DapplyEvolutions.default=true"
+            - "-Dplay.evolutions.db.default.autoApply=true"
             - "-Djavax.net.ssl.trustStoreType=jks"
             - "-Djavax.net.ssl.keyStoreType=jks"
             - "-Djavax.net.ssl.trustStorePassword=secret"

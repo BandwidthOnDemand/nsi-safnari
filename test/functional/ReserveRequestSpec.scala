@@ -1,8 +1,8 @@
 package functional
-import play.api.{ Application, Logger }
+import play.api.Application
 import java.net.{URI, URL}
 import javax.xml.transform.dom.DOMResult
-import javax.xml.ws.Holder
+import jakarta.xml.ws.Holder
 
 import controllers.NsiWebService
 import nl.surfnet.nsiv2.soap.NsiSoapConversions._
@@ -32,7 +32,7 @@ class ReserveRequestSpec extends helpers.Specification {
 
   val reserveConfirmed = Promise[NsiRequesterMessage[ReserveConfirmed]]
 
-  val ServerPort = Helpers.testServerPort
+  val ServerPort = Helpers.testServerPort + 2
   val FakePceUri = s"http://localhost:$ServerPort"
   val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
   val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"
@@ -82,7 +82,7 @@ class ReserveRequestSpec extends helpers.Specification {
           val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
             case JsSuccess(request: PathComputationRequest, _) =>
-              val response = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri)), request.serviceType) :: Nil)
+              val response: PceResponse = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri)), request.serviceType) :: Nil)
               app.injector.instanceOf[WSClient].url(request.replyTo.toASCIIString()).post(Json.toJson(response))
               Results.Accepted
             case _ =>

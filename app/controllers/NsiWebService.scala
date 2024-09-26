@@ -40,6 +40,8 @@ import scala.util.{Failure, Success, Try}
 
 @Singleton
 class NsiWebService @Inject()(ws: WSClient)(implicit ec: ExecutionContext) extends WSBodyWritables {
+  private val logger = Logger(classOf[NsiWebService])
+
   implicit class SoapRequestHolder(val request: WSRequest) {
     def withSoapActionHeader(action: String) = request.addHttpHeaders("SOAPAction" -> ('"' + action +'"'))
   }
@@ -78,33 +80,33 @@ class NsiWebService @Inject()(ws: WSClient)(implicit ec: ExecutionContext) exten
       providerUrl <- if (configuration.Use2WayTLS) Future.fromTry(configuration.translateToStunnelAddress(nsa, url)) else Future.successful(url)
       request = ws.url(providerUrl.toASCIIString()).withRequestTimeout(Duration(20000, MILLISECONDS)).withSoapActionHeader(soapAction)
       messageBody <- Future.fromTry(Conversion[M[T], Document].apply(message))
-      _ = Logger.debug(s"Sending NSA ${nsa} at ${request.url} the SOAP message: ${Conversion[Document, String].apply(messageBody)}")
+      _ = logger.debug(s"Sending NSA ${nsa} at ${request.url} the SOAP message: ${Conversion[Document, String].apply(messageBody)}")
       ack <- request.post(messageBody)
     } yield {
       val defaultAckHeaders = message.headers.forSyncAck
 
       ack.status match {
         case OK | CREATED | ACCEPTED | INTERNAL_SERVER_ERROR =>
-          Logger.debug(s"Parsing SOAP ack (${ack.status}) from ${nsa} at ${request.url}: ${ack.body}")
+          logger.debug(s"Parsing SOAP ack (${ack.status}) from ${nsa} at ${request.url}: ${ack.body}")
 
           DocumentToString.invert(ack.body).flatMap { document =>
             convertAck(defaultAckHeaders, document)
           } match {
             case Failure(error) =>
-              Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: $error", error)
+              logger.warn(s"Communication error with provider ${nsa} at ${request.url}: $error", error)
               convertError(defaultAckHeaders, NsiError.MessageDeliveryError.withVariables(
                 NsiHeaders.PROVIDER_NSA -> nsa,
                 new QName("error") -> error.toString()
               ).toServiceException(nsa))
             case Success(ack) =>
-              Logger.debug(s"Received ack from ${nsa} at ${request.url}: $ack")
+              logger.debug(s"Received ack from ${nsa} at ${request.url}: $ack")
               ack
           }
         case FORBIDDEN =>
-          Logger.warn(s"Authentication failed (${ack.status}) from ${nsa} at ${request.url}: ${ack.body}")
+          logger.warn(s"Authentication failed (${ack.status}) from ${nsa} at ${request.url}: ${ack.body}")
           convertError(defaultAckHeaders, NsiError.Unauthorized.toServiceException(nsa))
         case _ =>
-          Logger.warn(s"Communication error with provider ${nsa} at ${request.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
+          logger.warn(s"Communication error with provider ${nsa} at ${request.url}: ${ack.status} ${ack.statusText} ${ack.header("content-type")}\n\t${ack.body}")
           convertError(defaultAckHeaders, NsiError.MessageDeliveryError.withVariables(
             NsiHeaders.PROVIDER_NSA -> nsa,
             new QName("url") -> url.toASCIIString(),

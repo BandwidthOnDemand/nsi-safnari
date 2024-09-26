@@ -40,6 +40,8 @@ import scala.util.{Failure, Success}
 
 @Singleton
 class ConnectionProviderController @Inject()(connectionManager: ConnectionManager, connectionProvider: ConnectionProvider, configuration: Configuration, extraBodyParsers: ExtraBodyParsers, val actionBuilder: DefaultActionBuilder)(implicit actorSystem: ActorSystem, ec: ExecutionContext) extends InjectedController with SoapWebService {
+  private val logger = Logger(classOf[ConnectionProviderController])
+
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
   override val WsdlBasename = "ogf_nsi_connection_provider_v2_0.wsdl"
@@ -62,7 +64,7 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
         case Success(_) =>
           None
         case Failure(_) =>
-          Logger.info(s"The requesterNSA '$nsa' does not match a known TLS NSA")
+          logger.info(s"The requesterNSA '$nsa' does not match a known TLS NSA")
           val serviceException = ServiceException(NsiError.UnsupportedParameter.toServiceException(configuration.NsaId, NsiHeaders.REQUESTER_NSA -> nsa))
           Some(message ack serviceException)
       }
@@ -177,6 +179,8 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
 
 @Singleton
 class ConnectionProvider @Inject()(nsiWebService: NsiWebService)(implicit actorSystem: ActorSystem, ec: ExecutionContext) {
+  private val logger = Logger(classOf[ConnectionProvider])
+
   val requesterContinuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
   def connectionFactory(createOutboundActor: NsiProviderMessage[InitialReserve] => ActorRef, configuration: Configuration)(connectionId: ConnectionId, initialReserve: NsiProviderMessage[InitialReserve]): (ActorRef, ConnectionEntity) = {
@@ -202,9 +206,9 @@ class ConnectionProvider @Inject()(nsiWebService: NsiWebService)(implicit actorS
     val ackFuture = nsiWebService.callRequester(response.headers.requesterNSA, replyTo, response, configuration)
 
     ackFuture onComplete {
-      case Failure(error)                                           => Logger.info(s"Replying $response to $replyTo: $error", error)
-      case Success(NsiRequesterMessage(_, ServiceException(error))) => Logger.info(s"Replying $response to $replyTo: $error")
-      case Success(acknowledgement)                                 => Logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
+      case Failure(error)                                           => logger.info(s"Replying $response to $replyTo: $error", error)
+      case Success(NsiRequesterMessage(_, ServiceException(error))) => logger.info(s"Replying $response to $replyTo: $error")
+      case Success(acknowledgement)                                 => logger.debug(s"Replying $response to $replyTo succeeded with $acknowledgement")
     }
   }
 

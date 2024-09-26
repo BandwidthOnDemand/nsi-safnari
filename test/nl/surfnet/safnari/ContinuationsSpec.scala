@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ContinuationsSpec extends helpers.Specification {
-  play.api.Logger("initialize-loggers-to-avoid-warnings")
+  private val logger = play.api.Logger(classOf[ContinuationsSpec])
   sequential
 
   trait fixture extends org.specs2.mutable.After {

@@ -3,7 +3,7 @@ package helpers
 import java.net.URI
 import java.time.Instant
 import java.time.temporal._
-import javax.xml.bind.JAXBElement
+import jakarta.xml.bind.JAXBElement
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._

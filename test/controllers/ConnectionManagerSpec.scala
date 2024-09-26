@@ -32,7 +32,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
   }
 
-  private def command(message: Message, timestamp: Instant = Instant.now()) = Connection.Command(timestamp, message)
+  private def command(message: Message, timestamp: Instant = Instant.ofEpochMilli(System.currentTimeMillis)) = Connection.Command(timestamp, message)
 
   abstract class DummyConnectionFixture extends WithApplication() {
     lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]

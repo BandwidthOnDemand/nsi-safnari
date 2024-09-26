@@ -8,13 +8,13 @@ import java.util.Collections
 import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
 import org.ogf.schemas.nsi._2013._12.framework.headers.CommonHeaderType
 import org.ogf.schemas.nsi._2013._12.connection.requester.ConnectionServiceRequester
-import javax.xml.ws.Holder
+import jakarta.xml.ws.Holder
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
 class JaxWsClientSpec extends helpers.Specification {
   sequential
 
-  val ServerPort = Helpers.testServerPort
+  val ServerPort = Helpers.testServerPort + 1
   val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
   def Application = new GuiceApplicationBuilder().configure(Map("nsi.base.url" -> s"http://localhost:$ServerPort", "safnari.nsa.id" -> SafnariNsa)).build
 

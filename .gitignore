@@ -18,3 +18,7 @@
 /.cache-tests
 .java-version
 charts/nsi-safnari/Chart.lock
+/project/.bloop/
+/project/metals.sbt
+/.metals/
+/.bsp/
