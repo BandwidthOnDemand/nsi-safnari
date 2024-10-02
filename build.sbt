@@ -3,11 +3,23 @@ import scala.sys.process.Process
 organization := "nl.surfnet"
 name := "nsi-safnari"
 
-githubTokenSource := TokenSource.GitConfig("github.token") || TokenSource.Environment("GITHUB_USERTOKEN") || TokenSource.Environment("GITHUB_TOKEN")
+githubTokenSource := (
+  TokenSource.GitConfig("github.token")
+    || TokenSource.Environment("GITHUB_USERTOKEN")
+    || TokenSource.Environment("GITHUB_TOKEN")
+)
 
 scalaVersion := "2.13.14"
 
-scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-value-discard", "-release:21")
+scalacOptions ++= Seq(
+  "-deprecation",
+  "-feature",
+  "-unchecked",
+  "-Xlint",
+  "-Ywarn-unused",
+  "-Ywarn-value-discard",
+  "-release:21"
+)
 
 //releaseSettings
 
@@ -72,7 +84,7 @@ enablePlugins(JavaAppPackaging)
 //PublishDist.publishSettings
 
 // Disable ScalaDoc generation
-Compile / doc /sources := Seq.empty
+Compile / doc / sources := Seq.empty
 Compile / packageDoc / publishArtifact := false
 
 Test / doc / sources := Seq.empty

@@ -33,17 +33,29 @@ import play.api.mvc._
 import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
 import scala.concurrent._
 
-class ApplicationController(connectionManager: ConnectionManager, pceRequester: ActorRef, connectionRequester: ConnectionRequester, configuration: Configuration)(implicit ec: ExecutionContext) extends InjectedController {
+class ApplicationController(
+    connectionManager: ConnectionManager,
+    pceRequester: ActorRef,
+    connectionRequester: ConnectionRequester,
+    configuration: Configuration
+)(implicit ec: ExecutionContext)
+    extends InjectedController {
   def index = Action { implicit request =>
     Ok(views.html.index(configuration))
   }
 
   def healthcheck = Action.async {
     val pceHealth = (pceRequester ? HealthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
-    val nsiHealth = (connectionRequester.nsiRequester ? HealthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
+    val nsiHealth = (connectionRequester.nsiRequester ? HealthCheck)
+      .mapTo[Future[(String, Boolean)]]
+      .flatMap(identity)
 
     Future.sequence(List(nsiHealth, pceHealth)) map { healthStates =>
-      val view = views.html.healthcheck(healthStates.toMap, configuration.VersionString, configuration.WebParams)
+      val view = views.html.healthcheck(
+        healthStates.toMap,
+        configuration.VersionString,
+        configuration.WebParams
+      )
 
       if (healthStates forall { case (_, healthy) => healthy })
         Ok(view)
@@ -61,15 +73,19 @@ class ApplicationController(connectionManager: ConnectionManager, pceRequester: 
 
     queryResult map { cs =>
       val connections =
-        cs.map {
-          case (summary, pendingCriteria, segments) => (ConnectionPresenter(summary, pendingCriteria), segments.map{ ConnectionPathSegmentPresenter })
-        }.filter {
-          case (connection, _) => connection.endTime.fold2(_.compareTo(timeBound.toInstant) > 0, true, true)
-        }.sortBy {
-          case (connection, _) => connection.startTime.toOption(None)
-        }.reverse.groupBy {
-          case (connection, _) => connection.qualifier(now.toInstant)
-        }
+        cs.map { case (summary, pendingCriteria, segments) =>
+          (
+            ConnectionPresenter(summary, pendingCriteria),
+            segments.map { ConnectionPathSegmentPresenter }
+          )
+        }.filter { case (connection, _) =>
+          connection.endTime.fold2(_.compareTo(timeBound.toInstant) > 0, true, true)
+        }.sortBy { case (connection, _) =>
+          connection.startTime.toOption(None)
+        }.reverse
+          .groupBy { case (connection, _) =>
+            connection.qualifier(now.toInstant)
+          }
 
       Ok(views.html.connections(connections.withDefaultValue(Nil), configuration.WebParams))
     }
@@ -77,14 +93,24 @@ class ApplicationController(connectionManager: ConnectionManager, pceRequester: 
 
   def connection(id: ConnectionId) = Action.async {
     // FIXME data consistency (db query + two messages may be interleaved with other messages)
-    connectionManager.get(id).map { c =>
-      connectionDetails(c) map { case (summary, pendingCriteria, segments) =>
-        val messages = connectionManager.messageStore.findByConnectionId(id)
-        Ok(views.html.connection(ConnectionPresenter(summary, pendingCriteria), segments.map{ ConnectionPathSegmentPresenter }, messages, configuration.WebParams))
+    connectionManager
+      .get(id)
+      .map { c =>
+        connectionDetails(c) map { case (summary, pendingCriteria, segments) =>
+          val messages = connectionManager.messageStore.findByConnectionId(id)
+          Ok(
+            views.html.connection(
+              ConnectionPresenter(summary, pendingCriteria),
+              segments.map { ConnectionPathSegmentPresenter },
+              messages,
+              configuration.WebParams
+            )
+          )
+        }
       }
-    }.getOrElse {
-      Future.successful(NotFound(s"Connection ($id) was not found"))
-    }
+      .getOrElse {
+        Future.successful(NotFound(s"Connection ($id) was not found"))
+      }
   }
 
   private def connectionDetails(connection: Connection) = for {

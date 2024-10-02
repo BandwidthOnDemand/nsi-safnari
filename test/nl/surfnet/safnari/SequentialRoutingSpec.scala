@@ -9,7 +9,6 @@ import scala.jdk.CollectionConverters._
 import nl.surfnet.nsiv2.messages._
 import helpers.NsiMessages._
 
-
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
   "Connection Entity" >> {
@@ -19,20 +18,34 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
       }
 
       "confirm the reservation with a single path segment with sequential routing" in new SequentialRoutingFixture {
-        val ConfirmCriteriaWithQualifiedStps = ConfirmCriteria.withPointToPointService(Service.withSourceSTP("networkId:A?vlan=1").withDestSTP("networkId:B?vlan=2"))
+        val ConfirmCriteriaWithQualifiedStps = ConfirmCriteria.withPointToPointService(
+          Service.withSourceSTP("networkId:A?vlan=1").withDestSTP("networkId:B?vlan=2")
+        )
 
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A),
-          upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")))
+          upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA"))
+        )
 
-        when(upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteriaWithQualifiedStps)))
+        when(
+          upa.response(
+            CorrelationId(0, 4),
+            ReserveConfirmed("ConnectionIdA", ConfirmCriteriaWithQualifiedStps)
+          )
+        )
 
-        messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps), any = pathTrace(
-          AggregatorNsa,
-          ConnectionId,
-          (A.provider.nsa, "ConnectionIdA") -> Nil
-        ) :: Nil))
+        messages must contain(
+          agg.response(
+            ReserveCorrelationId,
+            ReserveConfirmed(ConnectionId, ConfirmCriteriaWithQualifiedStps),
+            any = pathTrace(
+              AggregatorNsa,
+              ConnectionId,
+              (A.provider.nsa, "ConnectionIdA") -> Nil
+            ) :: Nil
+          )
+        )
 
         childConnectionData("ConnectionIdA").sourceStp must beEqualTo("networkId:A?vlan=1")
         childConnectionData("ConnectionIdA").destinationStp must beEqualTo("networkId:B?vlan=2")
@@ -43,44 +56,167 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A, B),
-          A.provider.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")))
+          A.provider.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA"))
+        )
 
-        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
+        segments must contain(like[ConnectionData] {
+          case ConnectionData(
+                Present("ConnectionIdA"),
+                _,
+                _,
+                _,
+                _,
+                ReservationStateEnumType.RESERVE_CHECKING,
+                _,
+                _,
+                _,
+                _
+              ) =>
+            ok
+        })
 
-        when(A.provider.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=99")))))
+        when(
+          A.provider.response(
+            CorrelationId(0, 4),
+            ReserveConfirmed(
+              "ConnectionIdA",
+              ConfirmCriteria.withPointToPointService(
+                A.serviceType.service
+                  .withSourceSTP("networkId:A:A?vlan=3")
+                  .withDestSTP("networkId:A:B?vlan=99")
+              )
+            )
+          )
+        )
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
         messages must contain(beLike[Message] {
-          case ToProvider(NsiProviderMessage(_, reserve @ InitialReserve(_)), provider) if provider == B.provider =>
-            reserve.service must beSome.which((x: P2PServiceBaseType) => x.getSourceSTP() must_== "X?vlan=99")
+          case ToProvider(NsiProviderMessage(_, reserve @ InitialReserve(_)), provider)
+              if provider == B.provider =>
+            reserve.service must beSome.which((x: P2PServiceBaseType) =>
+              x.getSourceSTP() must_== "X?vlan=99"
+            )
         })
 
         when(B.provider.acknowledge(CorrelationId(0, 5), ReserveResponse("ConnectionIdB")))
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
-        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_CHECKING, _, _, _, _) => ok })
+        segments must contain(like[ConnectionData] {
+          case ConnectionData(
+                Present("ConnectionIdA"),
+                _,
+                _,
+                _,
+                _,
+                ReservationStateEnumType.RESERVE_HELD,
+                _,
+                _,
+                _,
+                _
+              ) =>
+            ok
+        })
+        segments must contain(like[ConnectionData] {
+          case ConnectionData(
+                Present("ConnectionIdB"),
+                _,
+                _,
+                _,
+                _,
+                ReservationStateEnumType.RESERVE_CHECKING,
+                _,
+                _,
+                _,
+                _
+              ) =>
+            ok
+        })
 
-        when(B.provider.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:B:A?vlan=99").withDestSTP("networkId:B:B?vlan=23")))))
+        when(
+          B.provider.response(
+            CorrelationId(0, 5),
+            ReserveConfirmed(
+              "ConnectionIdB",
+              ConfirmCriteria.withPointToPointService(
+                A.serviceType.service
+                  .withSourceSTP("networkId:B:A?vlan=99")
+                  .withDestSTP("networkId:B:B?vlan=23")
+              )
+            )
+          )
+        )
 
-        messages must contain(agg.response(ReserveCorrelationId, ReserveConfirmed(ConnectionId, ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:B:B?vlan=23"))), any = pathTrace(
-          AggregatorNsa,
-          ConnectionId,
-          (A.provider.nsa, "ConnectionIdA") -> Nil,
-          (B.provider.nsa, "ConnectionIdB") -> Nil
-        ) :: Nil))
+        messages must contain(
+          agg.response(
+            ReserveCorrelationId,
+            ReserveConfirmed(
+              ConnectionId,
+              ConfirmCriteria.withPointToPointService(
+                A.serviceType.service
+                  .withSourceSTP("networkId:A:A?vlan=3")
+                  .withDestSTP("networkId:B:B?vlan=23")
+              )
+            ),
+            any = pathTrace(
+              AggregatorNsa,
+              ConnectionId,
+              (A.provider.nsa, "ConnectionIdA") -> Nil,
+              (B.provider.nsa, "ConnectionIdB") -> Nil
+            ) :: Nil
+          )
+        )
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdA"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
-        segments must contain(like[ConnectionData] { case ConnectionData(Present("ConnectionIdB"), _, _, _, _, ReservationStateEnumType.RESERVE_HELD, _, _, _, _) => ok })
+        segments must contain(like[ConnectionData] {
+          case ConnectionData(
+                Present("ConnectionIdA"),
+                _,
+                _,
+                _,
+                _,
+                ReservationStateEnumType.RESERVE_HELD,
+                _,
+                _,
+                _,
+                _
+              ) =>
+            ok
+        })
+        segments must contain(like[ConnectionData] {
+          case ConnectionData(
+                Present("ConnectionIdB"),
+                _,
+                _,
+                _,
+                _,
+                ReservationStateEnumType.RESERVE_HELD,
+                _,
+                _,
+                _,
+                _
+              ) =>
+            ok
+        })
       }
 
       "immediately fail the reservation with two segments when the first one fails" in new SequentialRoutingFixture {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
-          pce.confirm(CorrelationId(0, 3), A, B))
+          pce.confirm(CorrelationId(0, 3), A, B)
+        )
 
-        when(upa.response(CorrelationId(0, 4), ReserveFailed(new GenericFailedType().withConnectionId("ConnectionIdA").withServiceException(NsiError.CapacityUnavailable(1000).toServiceException(A.provider.nsa)))))
+        when(
+          upa.response(
+            CorrelationId(0, 4),
+            ReserveFailed(
+              new GenericFailedType()
+                .withConnectionId("ConnectionIdA")
+                .withServiceException(
+                  NsiError.CapacityUnavailable(1000).toServiceException(A.provider.nsa)
+                )
+            )
+          )
+        )
 
         messages must haveSize(1)
         messages must contain(like[Message] {
@@ -96,9 +232,22 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
       "duplicate initial reserve request should resend reserve request for current segment" in new SequentialRoutingFixture {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
-          pce.confirm(CorrelationId(0, 3), A, B))
+          pce.confirm(CorrelationId(0, 3), A, B)
+        )
 
-        when(A.provider.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=99")))))
+        when(
+          A.provider.response(
+            CorrelationId(0, 4),
+            ReserveConfirmed(
+              "ConnectionIdA",
+              ConfirmCriteria.withPointToPointService(
+                A.serviceType.service
+                  .withSourceSTP("networkId:A:A?vlan=3")
+                  .withDestSTP("networkId:A:B?vlan=99")
+              )
+            )
+          )
+        )
 
         messages must haveSize(1)
         messages must contain(like[Message] {
@@ -116,9 +265,32 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
-          A.provider.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:A:A?vlan=3").withDestSTP("networkId:A:B?vlan=99")))))
+          A.provider.response(
+            CorrelationId(0, 4),
+            ReserveConfirmed(
+              "ConnectionIdA",
+              ConfirmCriteria.withPointToPointService(
+                A.serviceType.service
+                  .withSourceSTP("networkId:A:A?vlan=3")
+                  .withDestSTP("networkId:A:B?vlan=99")
+              )
+            )
+          )
+        )
 
-        when(B.provider.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria.withPointToPointService(A.serviceType.service.withSourceSTP("networkId:B:A?vlan=99").withDestSTP("networkId:B:B?vlan=23")))))
+        when(
+          B.provider.response(
+            CorrelationId(0, 5),
+            ReserveConfirmed(
+              "ConnectionIdB",
+              ConfirmCriteria.withPointToPointService(
+                A.serviceType.service
+                  .withSourceSTP("networkId:B:A?vlan=99")
+                  .withDestSTP("networkId:B:B?vlan=23")
+              )
+            )
+          )
+        )
 
         messages must haveSize(1)
         messages must contain(like[Message] {
@@ -135,12 +307,18 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
       "terminate the reservation when downstream initial reserve communication fails" in new SequentialRoutingFixture {
         given(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
-          pce.confirm(CorrelationId(0, 3), A, B))
+          pce.confirm(CorrelationId(0, 3), A, B)
+        )
 
-        when(upa.error(CorrelationId(0, 4), new ServiceExceptionType()
-          .withNsaId("ConnectionIdA")
-          .withErrorId("ErrorId")
-          .withText("communication error")))
+        when(
+          upa.error(
+            CorrelationId(0, 4),
+            new ServiceExceptionType()
+              .withNsaId("ConnectionIdA")
+              .withErrorId("ErrorId")
+              .withText("communication error")
+          )
+        )
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
 

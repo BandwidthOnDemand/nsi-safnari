@@ -38,13 +38,14 @@ import play.api.libs.json._
 import play.api.libs.ws.WSClient
 import play.api.mvc._
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.concurrent.stm.Ref
 import scala.util.{Failure, Success}
 
 @Singleton
-class PathComputationEngineController @Inject()(pce: PathComputationEngine) extends InjectedController {
+class PathComputationEngineController @Inject() (pce: PathComputationEngine)
+    extends InjectedController {
   private val logger = Logger(classOf[PathComputationEngineController])
 
   def pceReply = Action(parse.json) { implicit request =>
@@ -61,26 +62,31 @@ class PathComputationEngineController @Inject()(pce: PathComputationEngine) exte
 }
 
 @Singleton
-class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(implicit ec: ExecutionContext) {
+class PathComputationEngine @Inject() (actorSystem: ActorSystem, ws: WSClient)(implicit
+    ec: ExecutionContext
+) {
   private val logger = Logger(classOf[PathComputationEngine])
 
   private[controllers] val pceContinuations = new Continuations[PceResponse](actorSystem.scheduler)
 
   def createPceRequesterActor(configuration: Configuration): ActorRef =
     configuration.PceActor match {
-      case None | Some("dummy") => actorSystem.actorOf(Props(new DummyPceRequesterActor), "pceRequester")
-      case _                    => actorSystem.actorOf(Props(new PceRequesterActor(configuration)), "pceRequester")
+      case None | Some("dummy") =>
+        actorSystem.actorOf(Props(new DummyPceRequesterActor), "pceRequester")
+      case _ => actorSystem.actorOf(Props(new PceRequesterActor(configuration)), "pceRequester")
     }
 
   class PceRequesterActor(configuration: Configuration) extends Actor {
     private val uuidGenerator = Uuid.randomUuidGenerator()
     private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
-    private val latestReachabilityEntries: LastModifiedCache[Seq[ReachabilityTopologyEntry]] = new LastModifiedCache()
+    private val latestReachabilityEntries: LastModifiedCache[Seq[ReachabilityTopologyEntry]] =
+      new LastModifiedCache()
     private val endPoint = configuration.PceEndpoint
 
     def receive = {
       case HealthCheck =>
-        val topologyHealth = ws.url(s"$endPoint/management/status/topology").addHttpHeaders(ACCEPT -> JSON).get()
+        val topologyHealth =
+          ws.url(s"$endPoint/management/status/topology").addHttpHeaders(ACCEPT -> JSON).get()
 
         topologyHealth onComplete {
           case Success(_) => // nothing
@@ -93,18 +99,25 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
         sender() ! healthy.flatMap(h => lastModified.map(d => s"PCE (Real; $d)" -> h))
 
       case ReachabilityCheck =>
-        val reachabilityResponse = ws.url(s"$endPoint/reachability").withRequestTimeout(Duration(20000, MILLISECONDS)).addHttpHeaders(ACCEPT -> JSON).get()
+        val reachabilityResponse = ws
+          .url(s"$endPoint/reachability")
+          .withRequestTimeout(Duration(20000, MILLISECONDS))
+          .addHttpHeaders(ACCEPT -> JSON)
+          .get()
         val senderRef = sender()
 
         reachabilityResponse.onComplete {
           case Success(response) =>
-            val result = (response.json \ "reachability").validate[Seq[ReachabilityTopologyEntry]] match {
-              case JsSuccess(reachability, _) =>
-                Success(latestReachabilityEntries.updateAndGet(reachability))
-              case JsError(e) =>
-                logger.error(s"Failed to parse reachability from the pce: $e")
-                latestReachabilityEntries.get.toTry(new RuntimeException("Could not parse reachability"))
-            }
+            val result =
+              (response.json \ "reachability").validate[Seq[ReachabilityTopologyEntry]] match {
+                case JsSuccess(reachability, _) =>
+                  Success(latestReachabilityEntries.updateAndGet(reachability))
+                case JsError(e) =>
+                  logger.error(s"Failed to parse reachability from the pce: $e")
+                  latestReachabilityEntries.get.toTry(
+                    new RuntimeException("Could not parse reachability")
+                  )
+              }
 
             senderRef ! result
           case Failure(e) =>
@@ -117,25 +130,60 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
         logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
 
         val connection = Connection(sender())
-        pceContinuations.register(request.correlationId, configuration.AsyncReplyTimeout).onComplete {
-          case Success(reply) =>
-            connection ! Connection.Command(Instant.now, FromPce(reply))
-          case Failure(e) =>
-            connection ! Connection.Command(Instant.now, MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), Instant.now(), e.toString))
-        }
+        pceContinuations
+          .register(request.correlationId, configuration.AsyncReplyTimeout)
+          .onComplete {
+            case Success(reply) =>
+              connection ! Connection.Command(Instant.now, FromPce(reply))
+            case Failure(e) =>
+              connection ! Connection.Command(
+                Instant.now,
+                MessageDeliveryFailure(
+                  newCorrelationId(),
+                  None,
+                  request.correlationId,
+                  URI.create(findPathEndPoint),
+                  Instant.now(),
+                  e.toString
+                )
+              )
+          }
 
         val response = ws.url(findPathEndPoint).post(Json.toJson(request))
         response onComplete {
           case Failure(e) =>
             logger.error(s"Could not reach the pce ($endPoint): $e")
             pceContinuations.unregister(request.correlationId)
-            connection ! Connection.Command(Instant.now, MessageDeliveryFailure(newCorrelationId(), None, request.correlationId, URI.create(findPathEndPoint), Instant.now(), e.toString))
+            connection ! Connection.Command(
+              Instant.now,
+              MessageDeliveryFailure(
+                newCorrelationId(),
+                None,
+                request.correlationId,
+                URI.create(findPathEndPoint),
+                Instant.now(),
+                e.toString
+              )
+            )
           case Success(response) if response.status == ACCEPTED =>
-            connection ! Connection.Command(Instant.now, AckFromPce(PceAccepted(request.correlationId)))
+            connection ! Connection.Command(
+              Instant.now,
+              AckFromPce(PceAccepted(request.correlationId))
+            )
           case Success(response) =>
             logger.error(s"Got back a ${response.status} response from the PCE: ${response.body}")
             pceContinuations.unregister(request.correlationId)
-            connection ! Connection.Command(Instant.now, AckFromPce(PceFailed(request.correlationId, response.status, response.statusText, response.body)))
+            connection ! Connection.Command(
+              Instant.now,
+              AckFromPce(
+                PceFailed(
+                  request.correlationId,
+                  response.status,
+                  response.statusText,
+                  response.body
+                )
+              )
+            )
         }
     }
 
@@ -146,8 +194,8 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
 
       def updateAndGet(newSubject: T): (T, Instant) =
         value.single.transformAndGet {
-          case Some(unchanged@(old, _)) if old == newSubject => Some(unchanged)
-          case _ => Some(newSubject -> Instant.now)
+          case Some(unchanged @ (old, _)) if old == newSubject => Some(unchanged)
+          case _                                               => Some(newSubject -> Instant.now)
         }.get
     }
   }
@@ -156,8 +204,10 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
     private val Reachability = (
       List(
         ReachabilityTopologyEntry("urn:ogf:network:surfnet.nl:1990:nsa:bod-dev", 0),
-        ReachabilityTopologyEntry("urn:ogf:network:es.net:2013:nsa:oscars", 3)),
-      Instant.now())
+        ReachabilityTopologyEntry("urn:ogf:network:es.net:2013:nsa:oscars", 3)
+      ),
+      Instant.now()
+    )
 
     def receive = {
       case HealthCheck =>
@@ -167,14 +217,29 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
         sender() ! Success(Reachability)
 
       case ToPce(pce: PathComputationRequest) =>
-        val serviceType = Json.fromJson[ServiceType](Json.toJson(pce.serviceType)(PceMessage.ServiceTypeFormat))(PceMessage.ServiceTypeFormat).get
+        val serviceType = Json
+          .fromJson[ServiceType](Json.toJson(pce.serviceType)(PceMessage.ServiceTypeFormat))(
+            PceMessage.ServiceTypeFormat
+          )
+          .get
 
-        Connection(sender()) ! Connection.Command(Instant.now,
-          FromPce(PathComputationConfirmed(
-            pce.correlationId,
-            Seq(ComputedSegment(
-              ProviderEndPoint("urn:ogf:network:surfnet.nl:1990:nsa:bod-dev", URI.create("http://localhost:8082/bod/nsi/v2/provider")),
-              serviceType)))))
+        Connection(sender()) ! Connection.Command(
+          Instant.now,
+          FromPce(
+            PathComputationConfirmed(
+              pce.correlationId,
+              Seq(
+                ComputedSegment(
+                  ProviderEndPoint(
+                    "urn:ogf:network:surfnet.nl:1990:nsa:bod-dev",
+                    URI.create("http://localhost:8082/bod/nsi/v2/provider")
+                  ),
+                  serviceType
+                )
+              )
+            )
+          )
+        )
     }
   }
 }

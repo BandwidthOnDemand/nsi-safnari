@@ -1,6 +1,6 @@
 package controllers
 
-import java.time.{ ZoneId, ZonedDateTime }
+import java.time.{ZoneId, ZonedDateTime}
 import java.time.format.DateTimeFormatter
 import java.time.temporal._
 import play.api.http.HeaderNames
@@ -12,7 +12,9 @@ import play.api.mvc._
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class DiscoveryServiceSpec extends PlaySpecification with Results {
 
-  def Application = new GuiceApplicationBuilder().configure(Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy")).build()
+  def Application = new GuiceApplicationBuilder()
+    .configure(Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
+    .build()
 
   "Discovery service" should {
 
@@ -28,14 +30,20 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
       body must contain("""<Topology id="urn:ogf:network:surfnet.nl:1990:nsa:bod-dev" cost="0"/>""")
     }
 
-    "return a not modified if if-modified-since header is in the future" in new WithApplication(Application) {
-      val dateTimeFormatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of("GMT"))
+    "return a not modified if if-modified-since header is in the future" in new WithApplication(
+      Application
+    ) {
+      val dateTimeFormatter = DateTimeFormatter.RFC_1123_DATE_TIME
+        .withLocale(java.util.Locale.ENGLISH)
+        .withZone(ZoneId.of("GMT"))
       val controller = app.injector.instanceOf[DiscoveryService]
       controller.setControllerComponents(app.injector.instanceOf[ControllerComponents])
 
       val dateInTheFuture = dateTimeFormatter.format(ZonedDateTime.now.plus(5, ChronoUnit.HOURS))
 
-      val result = controller.index().apply(FakeRequest().withHeaders(HeaderNames.IF_MODIFIED_SINCE -> dateInTheFuture))
+      val result = controller
+        .index()
+        .apply(FakeRequest().withHeaders(HeaderNames.IF_MODIFIED_SINCE -> dateInTheFuture))
 
       status(result) must beEqualTo(NOT_MODIFIED)
     }

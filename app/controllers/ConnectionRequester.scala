@@ -33,13 +33,21 @@ import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 import play.api.Logger
 import play.api.mvc._
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.{ Failure, Success }
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 import controllers.ActorSupport._
 
 @Singleton
-class ConnectionRequesterController @Inject()(connectionManager: ConnectionManager, configuration: Configuration, connectionRequester: ConnectionRequester, extraBodyParsers: ExtraBodyParsers, val actionBuilder: DefaultActionBuilder)(implicit ec: ExecutionContext) extends InjectedController with SoapWebService {
+class ConnectionRequesterController @Inject() (
+    connectionManager: ConnectionManager,
+    configuration: Configuration,
+    connectionRequester: ConnectionRequester,
+    extraBodyParsers: ExtraBodyParsers,
+    val actionBuilder: DefaultActionBuilder
+)(implicit ec: ExecutionContext)
+    extends InjectedController
+    with SoapWebService {
 
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
@@ -52,8 +60,13 @@ class ConnectionRequesterController @Inject()(connectionManager: ConnectionManag
       val connection = connectionManager.findByChildConnectionId(notification.connectionId)
 
       val ack = connection.map { c =>
-        (c ? Connection.Command(Instant.now(), FromProvider(NsiRequesterMessage(headers, notification))))
-      } getOrElse Future.successful(ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)))
+        (c ? Connection.Command(
+          Instant.now(),
+          FromProvider(NsiRequesterMessage(headers, notification))
+        ))
+      } getOrElse Future.successful(
+        ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId))
+      )
 
       ack.map(message.ack)
     case response =>
@@ -65,12 +78,19 @@ class ConnectionRequesterController @Inject()(connectionManager: ConnectionManag
 }
 
 @Singleton
-class ConnectionRequester @Inject()(configuration: Configuration, nsiWebService: NsiWebService)(implicit actorSystem: ActorSystem, ec: ExecutionContext) {
+class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService: NsiWebService)(
+    implicit
+    actorSystem: ActorSystem,
+    ec: ExecutionContext
+) {
   private val logger = Logger(classOf[ConnectionRequester])
 
-  private val continuations = new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
+  private val continuations =
+    new Continuations[NsiRequesterMessage[NsiRequesterOperation]](actorSystem.scheduler)
 
-  private[controllers] def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
+  private[controllers] def handleResponse(
+      message: NsiRequesterMessage[NsiRequesterOperation]
+  ): Unit =
     continuations.replyReceived(message.headers.correlationId, message)
 
   def nsiRequester: ActorRef =
@@ -87,31 +107,54 @@ class ConnectionRequester @Inject()(configuration: Configuration, nsiWebService:
       case HealthCheck =>
         sender() ! Future.successful("NSI requester (Real)" -> true)
 
-      case ToProvider(message @ NsiProviderMessage(headers, operation: NsiProviderOperation), provider) =>
+      case ToProvider(
+            message @ NsiProviderMessage(headers, operation: NsiProviderOperation),
+            provider
+          ) =>
         val connectionId = operation match {
           case command: NsiProviderCommand => command.optionalConnectionId
-          case _ => None
+          case _                           => None
         }
 
         val connection = Connection(sender())
 
-        continuations.register(headers.correlationId, configuration.ConnectionExpirationTime).foreach { reply =>
-          connection ! Connection.Command(Instant.now(), FromProvider(reply))
-        }
+        continuations
+          .register(headers.correlationId, configuration.ConnectionExpirationTime)
+          .foreach { reply =>
+            connection ! Connection.Command(Instant.now(), FromProvider(reply))
+          }
         continuations.addTimeout(headers.correlationId, configuration.AsyncReplyTimeout) {
           connection ! Connection.Command(
+            Instant.now(),
+            MessageDeliveryFailure(
+              newCorrelationId(),
+              connectionId,
+              headers.correlationId,
+              provider.url,
               Instant.now(),
-              MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, Instant.now(), s"No reply received within: ${configuration.AsyncReplyTimeout}"))
+              s"No reply received within: ${configuration.AsyncReplyTimeout}"
+            )
+          )
         }
 
         val response = nsiWebService.callProvider(provider, message, configuration)
         response.onComplete {
           case Failure(_: TimeoutException) =>
-            // Let the requester timeout as well (or receive an actual reply). No need to send an ack timeout!
+          // Let the requester timeout as well (or receive an actual reply). No need to send an ack timeout!
           case Failure(exception) =>
             logger.warn(s"communication failure calling $provider", exception)
             continuations.unregister(headers.correlationId)
-            connection ! Connection.Command(Instant.now(), MessageDeliveryFailure(newCorrelationId(), connectionId, headers.correlationId, provider.url, Instant.now(), exception.toString))
+            connection ! Connection.Command(
+              Instant.now(),
+              MessageDeliveryFailure(
+                newCorrelationId(),
+                connectionId,
+                headers.correlationId,
+                provider.url,
+                Instant.now(),
+                exception.toString
+              )
+            )
           case Success(ack @ NsiProviderMessage(_, ServiceException(_))) =>
             continuations.unregister(headers.correlationId)
             connection ! Connection.Command(Instant.now(), AckFromProvider(ack))
@@ -147,42 +190,106 @@ class ConnectionRequester @Inject()(configuration: Configuration, nsiWebService:
 
         connectionCriteria += connectionId -> confirmCriteria
 
-        Connection(sender()) ! Connection.Command(Instant.now(), AckFromProvider(message ack ReserveResponse(connectionId)))
-        Connection(sender()) ! Connection.Command(Instant.now(), FromProvider(message reply ReserveConfirmed(connectionId, confirmCriteria)))
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          AckFromProvider(message ack ReserveResponse(connectionId))
+        )
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          FromProvider(message reply ReserveConfirmed(connectionId, confirmCriteria))
+        )
 
       case ToProvider(message @ NsiProviderMessage(headers, reserve: ModifyReserve), _) =>
         connectionCriteria.get(reserve.connectionId) map { criteria =>
-          reserve.body.getCriteria.modifiedCapacity.foreach { capacity => criteria.pointToPointService.foreach { p2ps => p2ps.setCapacity(capacity) } }
+          reserve.body.getCriteria.modifiedCapacity.foreach { capacity =>
+            criteria.pointToPointService.foreach { p2ps => p2ps.setCapacity(capacity) }
+          }
 
-          Connection(sender()) ! Connection.Command(Instant.now(), AckFromProvider(message ack ReserveResponse(reserve.connectionId)))
-          Connection(sender()) ! Connection.Command(Instant.now(), FromProvider(message reply ReserveConfirmed(reserve.connectionId, criteria)))
+          Connection(sender()) ! Connection.Command(
+            Instant.now(),
+            AckFromProvider(message ack ReserveResponse(reserve.connectionId))
+          )
+          Connection(sender()) ! Connection.Command(
+            Instant.now(),
+            FromProvider(message reply ReserveConfirmed(reserve.connectionId, criteria))
+          )
         } getOrElse {
-          Connection(sender()) ! Connection.Command(Instant.now(), AckFromProvider(message ack ServiceException(NsiError.ReservationNonExistent.toServiceException(headers.providerNSA))))
+          Connection(sender()) ! Connection.Command(
+            Instant.now(),
+            AckFromProvider(
+              message ack ServiceException(
+                NsiError.ReservationNonExistent.toServiceException(headers.providerNSA)
+              )
+            )
+          )
         }
 
       case ToProvider(message @ NsiProviderMessage(_, commit: ReserveCommit), _) =>
-        Connection(sender()) ! Connection.Command(Instant.now(), AckFromProvider(message ack GenericAck()))
-        Connection(sender()) ! Connection.Command(Instant.now(), FromProvider(message reply ReserveCommitConfirmed(commit.connectionId)))
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          AckFromProvider(message ack GenericAck())
+        )
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          FromProvider(message reply ReserveCommitConfirmed(commit.connectionId))
+        )
       case ToProvider(message @ NsiProviderMessage(_, provision: Provision), _) =>
-        Connection(sender()) ! Connection.Command(Instant.now(), AckFromProvider(message ack GenericAck()))
-        Connection(sender()) ! Connection.Command(Instant.now(), FromProvider(message reply ProvisionConfirmed(provision.connectionId)))
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          AckFromProvider(message ack GenericAck())
+        )
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          FromProvider(message reply ProvisionConfirmed(provision.connectionId))
+        )
       case ToProvider(message @ NsiProviderMessage(_, terminate: Terminate), _) =>
-        Connection(sender()) ! Connection.Command(Instant.now(), AckFromProvider(message ack GenericAck()))
-        Connection(sender()) ! Connection.Command(Instant.now(), FromProvider(message reply TerminateConfirmed(terminate.connectionId)))
-      case ToProvider(message @ NsiProviderMessage(_, update: NsiProviderUpdateCommand), provider) =>
-        Connection(sender()) ! Connection.Command(Instant.now(), AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa).withConnectionId(update.connectionId))))
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          AckFromProvider(message ack GenericAck())
+        )
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          FromProvider(message reply TerminateConfirmed(terminate.connectionId))
+        )
+      case ToProvider(
+            message @ NsiProviderMessage(_, update: NsiProviderUpdateCommand),
+            provider
+          ) =>
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          AckFromProvider(
+            message ack ServiceException(
+              NsiError.NotImplemented
+                .toServiceException(provider.nsa)
+                .withConnectionId(update.connectionId)
+            )
+          )
+        )
       case ToProvider(message @ NsiProviderMessage(_, _: QueryRecursive), provider) =>
-        Connection(sender()) ! Connection.Command(Instant.now(), AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa))))
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          AckFromProvider(
+            message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa))
+          )
+        )
       case ToProvider(message @ NsiProviderMessage(_, _: NsiProviderQuery), provider) =>
-        Connection(sender()) ! Connection.Command(Instant.now(), AckFromProvider(message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa))))
+        Connection(sender()) ! Connection.Command(
+          Instant.now(),
+          AckFromProvider(
+            message ack ServiceException(NsiError.NotImplemented.toServiceException(provider.nsa))
+          )
+        )
     }
 
-    private def qualifyStp(s: String): String = Stp.fromString(s).map { stp =>
-      stp.vlan match {
-        case None => stp.toString
-        case Some(vlanRange) => stp.withLabel("vlan", vlanRange.lowerBound.toString).toString
+    private def qualifyStp(s: String): String = Stp
+      .fromString(s)
+      .map { stp =>
+        stp.vlan match {
+          case None            => stp.toString
+          case Some(vlanRange) => stp.withLabel("vlan", vlanRange.lowerBound.toString).toString
+        }
       }
-    }.getOrElse(s)
+      .getOrElse(s)
   }
 
 }

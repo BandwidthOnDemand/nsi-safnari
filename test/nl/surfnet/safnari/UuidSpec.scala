@@ -15,7 +15,10 @@ class UuidSpec extends helpers.Specification {
       uuid.variant must beEqualTo(2)
     }
 
-    "generate a deterministic sequence from the same seed" in forAll(arbitrary[Long], Gen.chooseNum(10, 100)) { (seed: Long, count: Int) =>
+    "generate a deterministic sequence from the same seed" in forAll(
+      arbitrary[Long],
+      Gen.chooseNum(10, 100)
+    ) { (seed: Long, count: Int) =>
       val a = Uuid.deterministicUuidGenerator(seed)
       val b = Uuid.deterministicUuidGenerator(seed)
 
@@ -27,7 +30,9 @@ class UuidSpec extends helpers.Specification {
     "generate a simple sequence of UUIDs" in forAll(Gen.chooseNum(1, 1000)) { (count: Int) =>
       val generator = Uuid.mockUuidGenerator(start = 1)
 
-      Vector.fill(count)(generator()).map(_.getLeastSignificantBits()) must beEqualTo((1L to count).toVector)
+      Vector.fill(count)(generator()).map(_.getLeastSignificantBits()) must beEqualTo(
+        (1L to count).toVector
+      )
     }
   }
 }

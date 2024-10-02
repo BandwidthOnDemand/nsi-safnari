@@ -32,7 +32,10 @@ trait InitialReserveAlgorithm {
   def nextSegments: Map[CorrelationId, ComputedSegment]
   def clearNextSegments: InitialReserveAlgorithm
 
-  def reserveConfirmed(correlationId: CorrelationId, criteria: ReservationConfirmCriteriaType): InitialReserveAlgorithm
+  def reserveConfirmed(
+      correlationId: CorrelationId,
+      criteria: ReservationConfirmCriteriaType
+  ): InitialReserveAlgorithm
 }
 object InitialReserveAlgorithm {
   def forAlgorithm(algorithm: PathComputationAlgorithm): InitialReserveAlgorithm = algorithm match {
@@ -42,16 +45,21 @@ object InitialReserveAlgorithm {
       SequentialInitialReserveAlgorithm(Map.empty, None, Seq.empty)
   }
 
-  private case class SimultaneousInitialReserveAlgorithm(nextSegments: Map[CorrelationId, ComputedSegment]) extends InitialReserveAlgorithm {
+  private case class SimultaneousInitialReserveAlgorithm(
+      nextSegments: Map[CorrelationId, ComputedSegment]
+  ) extends InitialReserveAlgorithm {
     def forSegments(segments: ComputedPathSegments) = copy(nextSegments = segments.toMap)
     def clearNextSegments: InitialReserveAlgorithm = copy(nextSegments = Map.empty)
-    def reserveConfirmed(correlationId: CorrelationId, criteria: ReservationConfirmCriteriaType): InitialReserveAlgorithm = clearNextSegments
+    def reserveConfirmed(
+        correlationId: CorrelationId,
+        criteria: ReservationConfirmCriteriaType
+    ): InitialReserveAlgorithm = clearNextSegments
   }
 
   private case class SequentialInitialReserveAlgorithm(
-    nextSegments: Map[CorrelationId, ComputedSegment],
-    outstandingSegment: Option[(CorrelationId, ComputedSegment)],
-    remainingSegments: ComputedPathSegments
+      nextSegments: Map[CorrelationId, ComputedSegment],
+      outstandingSegment: Option[(CorrelationId, ComputedSegment)],
+      remainingSegments: ComputedPathSegments
   ) extends InitialReserveAlgorithm {
 
     def forSegments(segments: ComputedPathSegments) = copy(
@@ -60,8 +68,14 @@ object InitialReserveAlgorithm {
       remainingSegments = segments.drop(1)
     )
 
-    def reserveConfirmed(correlationId: CorrelationId, criteria: ReservationConfirmCriteriaType): InitialReserveAlgorithm = {
-      assert(outstandingSegment.exists(_._1 == correlationId), s"reservation confirm $correlationId does not match any outstanding request: $outstandingSegment")
+    def reserveConfirmed(
+        correlationId: CorrelationId,
+        criteria: ReservationConfirmCriteriaType
+    ): InitialReserveAlgorithm = {
+      assert(
+        outstandingSegment.exists(_._1 == correlationId),
+        s"reservation confirm $correlationId does not match any outstanding request: $outstandingSegment"
+      )
       remainingSegments match {
         case Seq() =>
           SequentialInitialReserveAlgorithm(Map.empty, None, Seq.empty)
@@ -70,12 +84,16 @@ object InitialReserveAlgorithm {
             throw new RuntimeException("P2PService is missing")
           }
 
-          val nextSegment = service.destStp.vlan.map { vlan =>
-            next.copy(_2 = next._2.copy(serviceType = next._2.serviceType.copy(service = {
-              val nextService = next._2.serviceType.service.shallowCopy
-              nextService.withSourceSTP(nextService.sourceStp.withLabel("vlan", vlan.toString()).toString())
-            })))
-          }.getOrElse(next)
+          val nextSegment = service.destStp.vlan
+            .map { vlan =>
+              next.copy(_2 = next._2.copy(serviceType = next._2.serviceType.copy(service = {
+                val nextService = next._2.serviceType.service.shallowCopy
+                nextService.withSourceSTP(
+                  nextService.sourceStp.withLabel("vlan", vlan.toString()).toString()
+                )
+              })))
+            }
+            .getOrElse(next)
 
           SequentialInitialReserveAlgorithm(Map(nextSegment), Some(nextSegment), remaining)
       }

@@ -44,35 +44,52 @@ class ReserveRequestSpec extends helpers.Specification {
     "nsi.twoway.tls" -> "false"
   )
 
-  val application: Application = builder.appRoutes(app => {
-      case ("POST", p"/fake/requester") => app.injector.instanceOf[ExtraBodyParsers].NsiRequesterEndPoint("fake-requester-nsa") {
-        case message @ NsiRequesterMessage(headers, confirm: ReserveConfirmed) =>
-          reserveConfirmed.success(NsiRequesterMessage(headers, confirm))
-          Future.successful(message.ack())
-        case response =>
-          reserveConfirmed.failure(new RuntimeException(s"bad async response received: $response"))
-          Future.successful(response.ack(ServiceException(new ServiceExceptionType().withNsaId("FAKE").withErrorId("FAKE").withText(s"$response"))))
-      }
-      case ("POST", p"/fake/provider") => app.injector.instanceOf[ExtraBodyParsers].NsiProviderEndPoint("fake-provider-nsa") {
-        case message @ NsiProviderMessage(headers, reserve: InitialReserve) =>
-          val connectionId = newConnectionId()
+  val application: Application = builder
+    .appRoutes(app => {
+      case ("POST", p"/fake/requester") =>
+        app.injector.instanceOf[ExtraBodyParsers].NsiRequesterEndPoint("fake-requester-nsa") {
+          case message @ NsiRequesterMessage(headers, confirm: ReserveConfirmed) =>
+            reserveConfirmed.success(NsiRequesterMessage(headers, confirm))
+            Future.successful(message.ack())
+          case response =>
+            reserveConfirmed
+              .failure(new RuntimeException(s"bad async response received: $response"))
+            Future.successful(
+              response.ack(
+                ServiceException(
+                  new ServiceExceptionType()
+                    .withNsaId("FAKE")
+                    .withErrorId("FAKE")
+                    .withText(s"$response")
+                )
+              )
+            )
+        }
+      case ("POST", p"/fake/provider") =>
+        app.injector.instanceOf[ExtraBodyParsers].NsiProviderEndPoint("fake-provider-nsa") {
+          case message @ NsiProviderMessage(headers, reserve: InitialReserve) =>
+            val connectionId = newConnectionId()
 
-          val requestCriteria = reserve.body.getCriteria
-          val p2ps = requestCriteria.pointToPointService.get
-          val confirmCriteria = requestCriteria.toInitialConfirmCriteria(p2ps.getSourceSTP, p2ps.getDestSTP).get
+            val requestCriteria = reserve.body.getCriteria
+            val p2ps = requestCriteria.pointToPointService.get
+            val confirmCriteria =
+              requestCriteria.toInitialConfirmCriteria(p2ps.getSourceSTP, p2ps.getDestSTP).get
 
-          headers.replyTo.foreach { replyTo =>
-            app.injector.instanceOf[NsiWebService].callRequester(
-              headers.requesterNSA,
-              replyTo,
-              message reply ReserveConfirmed(connectionId, confirmCriteria),
-            new controllers.Configuration(builder.configuration))
-          }
-          Future.successful(message.ack(ReserveResponse(connectionId)))
-        case wtf =>
-          wtf.pp
-          ???
-      }
+            headers.replyTo.foreach { replyTo =>
+              app.injector
+                .instanceOf[NsiWebService]
+                .callRequester(
+                  headers.requesterNSA,
+                  replyTo,
+                  message reply ReserveConfirmed(connectionId, confirmCriteria),
+                  new controllers.Configuration(builder.configuration)
+                )
+            }
+            Future.successful(message.ack(ReserveResponse(connectionId)))
+          case wtf =>
+            wtf.pp
+            ???
+        }
       case ("POST", p"/paths/find") =>
         val actionBuilder = app.injector.instanceOf[DefaultActionBuilder]
         val bodyParsers = app.injector.instanceOf[PlayBodyParsers]
@@ -80,18 +97,28 @@ class ReserveRequestSpec extends helpers.Specification {
           val pceRequest = Json.fromJson[PceRequest](request.body)
           pceRequest match {
             case JsSuccess(request: PathComputationRequest, _) =>
-              val response: PceResponse = PathComputationConfirmed(request.correlationId, ComputedSegment(ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri)), request.serviceType) :: Nil)
-              app.injector.instanceOf[WSClient].url(request.replyTo.toASCIIString()).post(Json.toJson(response))
+              val response: PceResponse = PathComputationConfirmed(
+                request.correlationId,
+                ComputedSegment(
+                  ProviderEndPoint("fake-provider-nsa", URI.create(FakeProviderUri)),
+                  request.serviceType
+                ) :: Nil
+              )
+              app.injector
+                .instanceOf[WSClient]
+                .url(request.replyTo.toASCIIString())
+                .post(Json.toJson(response))
               Results.Accepted
             case _ =>
               Results.BadRequest
           }
         }
-    }
-  ).build()
+    })
+    .build()
 
   def marshal(p2ps: P2PServiceBaseType): Element = {
-    val jaxb = new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory().createP2Ps(p2ps)
+    val jaxb =
+      new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory().createP2Ps(p2ps)
     val result = new DOMResult()
     jaxbContext.createMarshaller().marshal(jaxb, result)
     result.getNode().asInstanceOf[Document].getDocumentElement();
@@ -99,28 +126,43 @@ class ReserveRequestSpec extends helpers.Specification {
 
   "A reserve request" should {
 
-    val NsiHeader = new Holder(new CommonHeaderType()
-      .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
-      .withProtocolVersion("2")
-      .withRequesterNSA("fake-requester-nsa")
-      .withProviderNSA(SafnariNsa)
-      .withReplyTo(FakeRequesterUri))
+    val NsiHeader = new Holder(
+      new CommonHeaderType()
+        .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
+        .withProtocolVersion("2")
+        .withRequesterNSA("fake-requester-nsa")
+        .withProviderNSA(SafnariNsa)
+        .withReplyTo(FakeRequesterUri)
+    )
     val ConnectionId = new Holder[String]()
-    val Criteria = new ReservationRequestCriteriaType().
-      withSchedule(new ScheduleType()).
-      withServiceType("ServiceType").
-      withAny(marshal(new P2PServiceBaseType().
-        withCapacity(100).
-        withDirectionality(DirectionalityType.BIDIRECTIONAL).
-        withSourceSTP("networkId:source-localId").
-        withDestSTP("networkId:dest-localId")))
+    val Criteria = new ReservationRequestCriteriaType()
+      .withSchedule(new ScheduleType())
+      .withServiceType("ServiceType")
+      .withAny(
+        marshal(
+          new P2PServiceBaseType()
+            .withCapacity(100)
+            .withDirectionality(DirectionalityType.BIDIRECTIONAL)
+            .withSourceSTP("networkId:source-localId")
+            .withDestSTP("networkId:dest-localId")
+        )
+      )
 
-    "send a reserve request to the ultimate provider agent" in new WithServer(application, ServerPort) {
-      val service = new ConnectionServiceProvider(URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider").toURL())
+    "send a reserve request to the ultimate provider agent" in new WithServer(
+      application,
+      ServerPort
+    ) {
+      val service = new ConnectionServiceProvider(
+        URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider").toURL()
+      )
 
-      service.getConnectionServiceProviderPort().reserve(ConnectionId, null, "description", Criteria, NsiHeader)
+      service
+        .getConnectionServiceProviderPort()
+        .reserve(ConnectionId, null, "description", Criteria, NsiHeader)
 
-      await(reserveConfirmed.future).correlationId must beEqualTo(CorrelationId.fromString("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def").get)
+      await(reserveConfirmed.future).correlationId must beEqualTo(
+        CorrelationId.fromString("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def").get
+      )
     }
 
   }

@@ -24,31 +24,29 @@ package nl.surfnet.safnari
 
 import akka.actor.Scheduler
 import nl.surfnet.nsiv2.messages.CorrelationId
-import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
 import scala.concurrent.stm.TMap
 import akka.actor.Cancellable
 import java.util.concurrent.TimeoutException
 
-/**
- * Track all messages that await an asynchronous reply. Thread safe.
- *
- * @param scheduler The scheduler used for timeout management. Passed by-name to ensure the
- *   currently active scheduler is used, even from unit tests.
- */
+/** Track all messages that await an asynchronous reply. Thread safe.
+  *
+  * @param scheduler
+  *   The scheduler used for timeout management. Passed by-name to ensure the currently active
+  *   scheduler is used, even from unit tests.
+  */
 class Continuations[T](scheduler: => Scheduler)(implicit ec: ExecutionContext) {
   private val continuations = TMap.empty[CorrelationId, (Seq[Cancellable], Promise[T])].single
 
-  /**
-   * Register a continuation. When the continuation is completed the future will be successful.
-   * If the continuation is not completed within the specified timeout the returned future will
-   * fail with a [[java.concurrent.TimeoutException]].
-   */
+  /** Register a continuation. When the continuation is completed the future will be successful. If
+    * the continuation is not completed within the specified timeout the returned future will fail
+    * with a [[java.concurrent.TimeoutException]].
+    */
   def register(correlationId: CorrelationId, within: FiniteDuration): Future[T] = {
     val timeout = scheduler.scheduleOnce(within) {
-      continuations.remove(correlationId).foreach {
-        case (_, promise) =>
-          promise.tryFailure(new TimeoutException(s"continuation not completed within $within"))
+      continuations.remove(correlationId).foreach { case (_, promise) =>
+        promise.tryFailure(new TimeoutException(s"continuation not completed within $within"))
       }
     }
 
@@ -57,25 +55,27 @@ class Continuations[T](scheduler: => Scheduler)(implicit ec: ExecutionContext) {
     promise.future
   }
 
-  def addTimeout(correlationId: CorrelationId, within: FiniteDuration)(timeoutCallback: => Unit): Unit = {
+  def addTimeout(correlationId: CorrelationId, within: FiniteDuration)(
+      timeoutCallback: => Unit
+  ): Unit = {
     continuations.get(correlationId).foreach { case (timeouts, promise) =>
       val timeout = scheduler.scheduleOnce(within)(timeoutCallback)
       continuations.update(correlationId, ((timeout +: timeouts), promise))
     }
   }
 
-  def unregister(correlationId: CorrelationId): Boolean = continuations.remove(correlationId) match {
-    case None =>
-      false
-    case Some((timeouts, _)) =>
-      timeouts.foreach(_.cancel())
-      true
-  }
+  def unregister(correlationId: CorrelationId): Boolean =
+    continuations.remove(correlationId) match {
+      case None =>
+        false
+      case Some((timeouts, _)) =>
+        timeouts.foreach(_.cancel())
+        true
+    }
 
   def replyReceived(correlationId: CorrelationId, reply: T): Unit =
-    continuations.remove(correlationId).foreach {
-      case (timeouts, promise) =>
-        timeouts.foreach(_.cancel())
-        promise.trySuccess(reply)
+    continuations.remove(correlationId).foreach { case (timeouts, promise) =>
+      timeouts.foreach(_.cancel())
+      promise.trySuccess(reply)
     }
 }

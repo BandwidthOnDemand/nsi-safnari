@@ -25,19 +25,19 @@ package nl.surfnet.safnari
 sealed trait FutureVal[+A] {
   def flatMap[B](f: (A) => FutureVal[B]): FutureVal[B] = this match {
     case Present(x) => f(x)
-    case Pending => Pending
-    case Never => Never
+    case Pending    => Pending
+    case Never      => Never
   }
 
   def map[B](f: (A) => B): FutureVal[B] = this match {
     case Present(x) => Present(f(x))
-    case Pending => Pending
-    case Never => Never
+    case Pending    => Pending
+    case Never      => Never
   }
 
   def present: Option[A] = this match {
     case Present(x) => Some(x)
-    case _ => None
+    case _          => None
   }
 }
 

@@ -3,7 +3,7 @@ package nl.surfnet.safnari
 import nl.surfnet.nsiv2.utils._
 
 import javax.xml.datatype.XMLGregorianCalendar
-import java.time.{ Instant, ZoneOffset }
+import java.time.{Instant, ZoneOffset}
 import java.time.temporal._
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
@@ -23,9 +23,15 @@ class PackageSpec extends helpers.Specification {
     } yield {
       val dt = Instant.ofEpochMilli(timeInMillis).atOffset(ZoneOffset.ofHours(timezoneOffset))
       XmlGregorianCalendar.factory.newXMLGregorianCalendar(
-        dt.getYear(), dt.getMonthValue() - 1, dt.getDayOfMonth(),
-        dt.getHour(), dt.getMinute(), dt.getSecond(), dt.get(ChronoField.MILLI_OF_SECOND),
-        dt.getOffset().getTotalSeconds() / 60)
+        dt.getYear(),
+        dt.getMonthValue() - 1,
+        dt.getDayOfMonth(),
+        dt.getHour(),
+        dt.getMinute(),
+        dt.getSecond(),
+        dt.get(ChronoField.MILLI_OF_SECOND),
+        dt.getOffset().getTotalSeconds() / 60
+      )
     })
   }
 
@@ -43,7 +49,10 @@ class PackageSpec extends helpers.Specification {
     }
 
     "find max in" in {
-      val dates = List(XmlGregorianCalendar("2002-10-09T11:00:00"), XmlGregorianCalendar("2001-10-09T11:00:00"))
+      val dates = List(
+        XmlGregorianCalendar("2002-10-09T11:00:00"),
+        XmlGregorianCalendar("2001-10-09T11:00:00")
+      )
 
       dates.max must beEqualTo(XmlGregorianCalendar("2002-10-09T11:00:00"))
     }

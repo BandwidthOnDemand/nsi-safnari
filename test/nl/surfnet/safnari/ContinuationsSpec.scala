@@ -2,7 +2,7 @@ package nl.surfnet.safnari
 
 import akka.actor.ActorSystem
 import java.util.concurrent.TimeoutException
-import scala.concurrent.{ Await, ExecutionContext }
+import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration._
 import scala.util.Failure
 import java.util.concurrent.CountDownLatch
@@ -56,8 +56,8 @@ class ContinuationsSpec extends helpers.Specification {
     "remove callback after timeout has been exceeded" in new fixture {
       val reply = continuations.register(CorrelationId, within = 10.milliseconds)
 
-      Await.ready(reply, 100.milliseconds).value must beSome.like {
-        case Failure(e) => e must beAnInstanceOf[TimeoutException]
+      Await.ready(reply, 100.milliseconds).value must beSome.like { case Failure(e) =>
+        e must beAnInstanceOf[TimeoutException]
       }
 
       continuations.unregister(CorrelationId) aka "registered" must beFalse

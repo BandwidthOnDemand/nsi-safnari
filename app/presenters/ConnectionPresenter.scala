@@ -26,23 +26,38 @@ import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import java.time.Instant
-import org.ogf.schemas.nsi._2013._12.connection.types.{ QuerySummaryResultType, ReservationRequestCriteriaType, ScheduleType }
+import org.ogf.schemas.nsi._2013._12.connection.types.{
+  QuerySummaryResultType,
+  ReservationRequestCriteriaType,
+  ScheduleType
+}
 import scala.jdk.CollectionConverters._
 
-case class ConnectionPresenter(private val data: QuerySummaryResultType, val pendingCriteria: Option[ReservationRequestCriteriaType]) {
+case class ConnectionPresenter(
+    private val data: QuerySummaryResultType,
+    val pendingCriteria: Option[ReservationRequestCriteriaType]
+) {
   private val statusPresenter = Nsi2StatusPresenter(data.getConnectionStates)
 
   def connectionId: ConnectionId = data.getConnectionId
-  def globalReservationId: Option[String] = Option(data.getGlobalReservationId).map(_.trim).filter(_.nonEmpty)
+  def globalReservationId: Option[String] =
+    Option(data.getGlobalReservationId).map(_.trim).filter(_.nonEmpty)
   def description: Option[String] = Option(data.getDescription).map(_.trim).filter(_.nonEmpty)
   def requesterNsa = data.getRequesterNSA
   def status = statusPresenter.status
-  def dataPlaneStatus = if (data.getConnectionStates.getDataPlaneStatus.isActive) "active" else "inactive"
+  def dataPlaneStatus =
+    if (data.getConnectionStates.getDataPlaneStatus.isActive) "active" else "inactive"
 
-  def committedCriteria = if (data.getCriteria.isEmpty) None else Some(data.getCriteria.asScala.maxBy(_.getVersion))
+  def committedCriteria =
+    if (data.getCriteria.isEmpty) None else Some(data.getCriteria.asScala.maxBy(_.getVersion))
 
-  private val schedule = committedCriteria.map(_.getSchedule).orElse(pendingCriteria.map(_.getSchedule)).getOrElse(new ScheduleType())
-  private val pointToPointService = committedCriteria.flatMap(_.pointToPointService).orElse(pendingCriteria.flatMap(_.pointToPointService))
+  private val schedule = committedCriteria
+    .map(_.getSchedule)
+    .orElse(pendingCriteria.map(_.getSchedule))
+    .getOrElse(new ScheduleType())
+  private val pointToPointService = committedCriteria
+    .flatMap(_.pointToPointService)
+    .orElse(pendingCriteria.flatMap(_.pointToPointService))
 
   def startTime = schedule.startTime
   def endTime = schedule.endTime
@@ -51,7 +66,8 @@ case class ConnectionPresenter(private val data: QuerySummaryResultType, val pen
   def destinationStp = pointToPointService.map(_.getDestSTP)
 
   def committedVersion: Option[Int] = committedCriteria.map(_.getVersion)
-  def pendingVersion: Option[Int] = pendingCriteria.map(_.version orElse (committedVersion.map(_ + 1)) getOrElse 1)
+  def pendingVersion: Option[Int] =
+    pendingCriteria.map(_.version orElse (committedVersion.map(_ + 1)) getOrElse 1)
 
   def qualifier(now: Instant) = {
     def inFuture(dt: Instant) = dt.isAfter(now)

@@ -39,22 +39,31 @@ case class QueryRecursiveStateMachineData(
     providers: Map[ConnectionId, ProviderEndPoint],
     childStates: Map[ConnectionId, QueryRecursiveState],
     answers: Map[ConnectionId, NsiRequesterOperation] = Map.empty,
-    segments: Map[CorrelationId, ConnectionId] = Map.empty) {
+    segments: Map[CorrelationId, ConnectionId] = Map.empty
+) {
 
   def aggregatedState: QueryRecursiveState =
     if (childStates.isEmpty) Collected
     else if (childStates.values.exists(_ == Collecting)) Collecting
     else if (childStates.values.forall(s => s == Failed || s == Collected))
       if (childStates.values.exists(_ == Failed)) Failed else Collected
-    else throw new IllegalStateException(s"cannot determine aggregated status from ${childStates.values}")
+    else
+      throw new IllegalStateException(
+        s"cannot determine aggregated status from ${childStates.values}"
+      )
 
   def start(segs: Map[CorrelationId, ConnectionId]): QueryRecursiveStateMachineData =
     this.copy(childStates = childStates.map(_._1 -> Collecting), segments = segs)
 
-  def updateChild(correlationId: CorrelationId, state: QueryRecursiveState, answer: NsiRequesterOperation): QueryRecursiveStateMachineData =
+  def updateChild(
+      correlationId: CorrelationId,
+      state: QueryRecursiveState,
+      answer: NsiRequesterOperation
+  ): QueryRecursiveStateMachineData =
     this.copy(
       childStates = childStates.updated(segments(correlationId), state),
-      answers = answers.updated(segments(correlationId), answer))
+      answers = answers.updated(segments(correlationId), answer)
+    )
 }
 
 class QueryRecursiveStateMachine(
@@ -65,22 +74,31 @@ class QueryRecursiveStateMachine(
     children: Map[ProviderEndPoint, FutureVal[ConnectionId]],
     newCorrelationId: () => CorrelationId,
     newNsiHeaders: ProviderEndPoint => NsiHeaders,
-    ifModifiedSince: Option[XMLGregorianCalendar])
-  extends FiniteStateMachine[QueryRecursiveState, QueryRecursiveStateMachineData, InboundMessage, OutboundMessage](
-    Initial,
-    QueryRecursiveStateMachineData(
-      children.collect(QueryRecursiveStateMachine.toConnectionIdProviderMap),
-      children.collect(QueryRecursiveStateMachine.toConnectionIdStateMap))) {
+    ifModifiedSince: Option[XMLGregorianCalendar]
+) extends FiniteStateMachine[
+      QueryRecursiveState,
+      QueryRecursiveStateMachineData,
+      InboundMessage,
+      OutboundMessage
+    ](
+      Initial,
+      QueryRecursiveStateMachineData(
+        children.collect(QueryRecursiveStateMachine.toConnectionIdProviderMap),
+        children.collect(QueryRecursiveStateMachine.toConnectionIdStateMap)
+      )
+    ) {
 
-  when(Initial) {
-    case Event(FromRequester(NsiProviderMessage(_, _: QueryRecursive)), data) =>
-      val segments = data.providers.map(newCorrelationId() -> _._1)
-      val newData = data.start(segments)
-      goto(newData.aggregatedState) using newData
+  when(Initial) { case Event(FromRequester(NsiProviderMessage(_, _: QueryRecursive)), data) =>
+    val segments = data.providers.map(newCorrelationId() -> _._1)
+    val newData = data.start(segments)
+    goto(newData.aggregatedState) using newData
   }
 
   when(Collecting) {
-    case Event(FromProvider(NsiRequesterMessage(headers, queryResult: QueryRecursiveConfirmed)), data) =>
+    case Event(
+          FromProvider(NsiRequesterMessage(headers, queryResult: QueryRecursiveConfirmed)),
+          data
+        ) =>
       val newData = data.updateChild(headers.correlationId, Collected, queryResult)
       goto(newData.aggregatedState) using newData
     case Event(FromProvider(NsiRequesterMessage(headers, error @ ErrorReply(_))), data) =>
@@ -93,13 +111,15 @@ class QueryRecursiveStateMachine(
 
   onTransition {
     case Initial -> Collecting =>
-      nextStateData.segments.map {
-        case (correlationId, connectionId) =>
-          val provider = nextStateData.providers(connectionId)
-          ToProvider(NsiProviderMessage(
+      nextStateData.segments.map { case (correlationId, connectionId) =>
+        val provider = nextStateData.providers(connectionId)
+        ToProvider(
+          NsiProviderMessage(
             newNsiHeaders(provider).copy(correlationId = correlationId),
-            QueryRecursive(Some(Left(connectionId :: Nil)), ifModifiedSince)),
-            provider)
+            QueryRecursive(Some(Left(connectionId :: Nil)), ifModifiedSince)
+          ),
+          provider
+        )
       }.toSeq
 
     case Initial -> Collected =>
@@ -114,36 +134,50 @@ class QueryRecursiveStateMachine(
             .withCriteria(result.getCriteria())
       }.toList
 
-      Seq(ToRequester(query reply QueryRecursiveConfirmed(queryRecursiveResultType(childRecursiveTypes) :: Nil)))
+      Seq(
+        ToRequester(
+          query reply QueryRecursiveConfirmed(queryRecursiveResultType(childRecursiveTypes) :: Nil)
+        )
+      )
     case Collecting -> Failed =>
-      val queryFailed = nextStateData.answers.collectFirst {
-        case (_, failed @ ErrorReply(_)) => failed
+      val queryFailed = nextStateData.answers.collectFirst { case (_, failed @ ErrorReply(_)) =>
+        failed
       }
 
       Seq(ToRequester(query reply queryFailed.get))
   }
 
-  private def queryRecursiveResultType(childs: List[ChildRecursiveType]): QueryRecursiveResultType = {
+  private def queryRecursiveResultType(
+      childs: List[ChildRecursiveType]
+  ): QueryRecursiveResultType = {
     new QueryRecursiveResultType()
       .withRequesterNSA(initialReserve.headers.requesterNSA)
       .withConnectionId(id)
       .withConnectionStates(connectionStates)
-      .withCriteria(new QueryRecursiveResultCriteriaType()
-        .withSchedule(initialReserve.body.criteria.getSchedule())
-        .withServiceType(initialReserve.body.criteria.getServiceType())
-        .withVersion(initialReserve.body.criteria.getVersion())
-        .withAny(initialReserve.body.criteria.getAny())
-        .withChildren(new ChildRecursiveListType().withChild(childs.asJava)))
+      .withCriteria(
+        new QueryRecursiveResultCriteriaType()
+          .withSchedule(initialReserve.body.criteria.getSchedule())
+          .withServiceType(initialReserve.body.criteria.getServiceType())
+          .withVersion(initialReserve.body.criteria.getVersion())
+          .withAny(initialReserve.body.criteria.getAny())
+          .withChildren(new ChildRecursiveListType().withChild(childs.asJava))
+      )
   }
 
 }
 
 object QueryRecursiveStateMachine {
-  val toConnectionIdProviderMap: PartialFunction[(ProviderEndPoint, FutureVal[ConnectionId]), (ConnectionId, ProviderEndPoint)] = {
-    case (provider, Present(connectionId)) => connectionId -> provider
+  val toConnectionIdProviderMap: PartialFunction[
+    (ProviderEndPoint, FutureVal[ConnectionId]),
+    (ConnectionId, ProviderEndPoint)
+  ] = { case (provider, Present(connectionId)) =>
+    connectionId -> provider
   }
 
-  val toConnectionIdStateMap: PartialFunction[(ProviderEndPoint, FutureVal[ConnectionId]), (ConnectionId, QueryRecursiveState)] = {
-    case (_, Present(connectionId)) => connectionId -> Initial
+  val toConnectionIdStateMap: PartialFunction[
+    (ProviderEndPoint, FutureVal[ConnectionId]),
+    (ConnectionId, QueryRecursiveState)
+  ] = { case (_, Present(connectionId)) =>
+    connectionId -> Initial
   }
 }

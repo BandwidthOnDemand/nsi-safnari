@@ -36,4 +36,5 @@ case class ConnectionData(
     lifecycleState: LifecycleStateEnumType,
     provisionState: ProvisionStateEnumType,
     dataPlaneStatus: DataPlaneStatusType,
-    lastServiceException: Option[ServiceExceptionType])
+    lastServiceException: Option[ServiceExceptionType]
+)

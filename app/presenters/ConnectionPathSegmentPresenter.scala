@@ -25,7 +25,12 @@ package presenters
 import nl.surfnet.safnari.ConnectionData
 
 case class ConnectionPathSegmentPresenter(private val data: ConnectionData) {
-  private val statusPresenter = Nsi2StatusPresenter(data.lifecycleState, data.reservationState, data.provisionState, data.dataPlaneStatus.isActive)
+  private val statusPresenter = Nsi2StatusPresenter(
+    data.lifecycleState,
+    data.reservationState,
+    data.provisionState,
+    data.dataPlaneStatus.isActive
+  )
 
   def connectionId = data.connectionId
   def providerNsa = data.providerNsa

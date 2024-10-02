@@ -12,8 +12,12 @@ class ConnectionPresenterTest extends helpers.Specification {
       .withProvisionState(ProvisionStateEnumType.PROVISIONED)
       .withLifecycleState(LifecycleStateEnumType.CREATED)
       .withDataPlaneStatus(new DataPlaneStatusType().withActive(false))
-    def data = new QuerySummaryResultType().withConnectionId("ID").withGlobalReservationId("GLOBAL").withDescription("description")
-      .withRequesterNSA("requester").withConnectionStates(states)
+    def data = new QuerySummaryResultType()
+      .withConnectionId("ID")
+      .withGlobalReservationId("GLOBAL")
+      .withDescription("description")
+      .withRequesterNSA("requester")
+      .withConnectionStates(states)
     def criteria = new ReservationRequestCriteriaType().withSchedule(new ScheduleType)
 
     val now = Instant.now
@@ -46,8 +50,12 @@ class ConnectionPresenterTest extends helpers.Specification {
       val schedule = criteria.getSchedule
         .withStartTime(now.minus(1, ChronoUnit.DAYS).toXMLGregorianCalendar())
         .withEndTime(now.plus(1, ChronoUnit.DAYS).toXMLGregorianCalendar())
-      val subject = ConnectionPresenter(data.withConnectionStates(states.withDataPlaneStatus( new DataPlaneStatusType().withActive(true) )),
-                                        Some(criteria.withSchedule(schedule)))
+      val subject = ConnectionPresenter(
+        data.withConnectionStates(
+          states.withDataPlaneStatus(new DataPlaneStatusType().withActive(true))
+        ),
+        Some(criteria.withSchedule(schedule))
+      )
 
       "have an active data plane" in {
         subject.dataPlaneStatus must beEqualTo("active")
@@ -62,8 +70,12 @@ class ConnectionPresenterTest extends helpers.Specification {
       val schedule = criteria.getSchedule
         .withStartTime(now.plus(1, ChronoUnit.DAYS).toXMLGregorianCalendar())
         .withEndTime(now.plus(5, ChronoUnit.DAYS).toXMLGregorianCalendar())
-      val subject = ConnectionPresenter(data.withConnectionStates(states.withDataPlaneStatus( new DataPlaneStatusType().withActive(false) )),
-                                        Some(criteria.withSchedule(schedule)))
+      val subject = ConnectionPresenter(
+        data.withConnectionStates(
+          states.withDataPlaneStatus(new DataPlaneStatusType().withActive(false))
+        ),
+        Some(criteria.withSchedule(schedule))
+      )
 
       "have an inactive data plane" in {
         subject.dataPlaneStatus must beEqualTo("inactive")
@@ -78,8 +90,12 @@ class ConnectionPresenterTest extends helpers.Specification {
       val schedule = criteria.getSchedule
         .withStartTime(now.minus(5, ChronoUnit.DAYS).toXMLGregorianCalendar())
         .withEndTime(now.minus(1, ChronoUnit.DAYS).toXMLGregorianCalendar())
-      val subject = ConnectionPresenter(data.withConnectionStates(states.withDataPlaneStatus( new DataPlaneStatusType().withActive(false) )),
-                                        Some(criteria.withSchedule(schedule)))
+      val subject = ConnectionPresenter(
+        data.withConnectionStates(
+          states.withDataPlaneStatus(new DataPlaneStatusType().withActive(false))
+        ),
+        Some(criteria.withSchedule(schedule))
+      )
 
       "have an inactive data plane" in {
         subject.dataPlaneStatus must beEqualTo("inactive")

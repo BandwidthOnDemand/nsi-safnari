@@ -15,7 +15,8 @@ class ConnectionProviderSpec extends helpers.Specification {
 
   val DefaultConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy")
 
-  def Application(extraConfig: (String, String)*) = new GuiceApplicationBuilder().configure(DefaultConfiguration ++ extraConfig).build()
+  def Application(extraConfig: (String, String)*) =
+    new GuiceApplicationBuilder().configure(DefaultConfiguration ++ extraConfig).build()
 
   abstract class Fixture(application: Application) extends WithApplication(application) {
     lazy val configuration = app.injector.instanceOf[Configuration]
@@ -29,35 +30,45 @@ class ConnectionProviderSpec extends helpers.Specification {
   "Reserve operation" should {
 
     "return the connection id and confirm the reservation" in new Fixture(Application()) {
-      val response = await(connectionProvider.handleCommand(initialReserveMessage) { reply => requesterOperation.success(reply.body); () })
+      val response = await(connectionProvider.handleCommand(initialReserveMessage) { reply =>
+        requesterOperation.success(reply.body); ()
+      })
 
-      response must beLike {
-        case ReserveResponse(connectionId) => connectionId must not(beEmpty)
+      response must beLike { case ReserveResponse(connectionId) =>
+        connectionId must not(beEmpty)
       }
 
-      await(requesterOperation.future) must beLike {
-        case op: ReserveConfirmed =>
-          val queryResult = Promise[NsiRequesterOperation]()
+      await(requesterOperation.future) must beLike { case op: ReserveConfirmed =>
+        val queryResult = Promise[NsiRequesterOperation]()
 
-          await(connectionProvider.handleQuery(NsiProviderMessage(nsiRequesterHeaders(CorrelationId(0, 3)), QuerySummary(Some(Left(Seq(op.connectionId))), None))) { reply => queryResult.success(reply.body); () })
+        await(
+          connectionProvider.handleQuery(
+            NsiProviderMessage(
+              nsiRequesterHeaders(CorrelationId(0, 3)),
+              QuerySummary(Some(Left(Seq(op.connectionId))), None)
+            )
+          ) { reply => queryResult.success(reply.body); () }
+        )
 
-          await(queryResult.future) must beLike {
-            case QuerySummaryConfirmed(Seq(reservation: QuerySummaryResultType), _) =>
-              reservation.getConnectionId() must beEqualTo(op.connectionId)
-          }
+        await(queryResult.future) must beLike {
+          case QuerySummaryConfirmed(Seq(reservation: QuerySummaryResultType), _) =>
+            reservation.getConnectionId() must beEqualTo(op.connectionId)
+        }
       }
     }
 
   }
 
   "Any operation" should {
-    "check requester NSA against TLS configuration" in new Fixture(Application("nsi.twoway.tls" -> "yes")) {
+    "check requester NSA against TLS configuration" in new Fixture(
+      Application("nsi.twoway.tls" -> "yes")
+    ) {
       val response = connectionProvider.request.apply(FakeRequest().withBody(initialReserveMessage))
 
       val body = scala.xml.XML.loadString(contentAsString(response))
       body must \\("text") \> NsiError.UnsupportedParameter.text
       body must \\("variable", "type" -> "requesterNSA")
-      body must \\("variable") \("value") \> RequesterNsa
+      body must \\("variable") \ ("value") \> RequesterNsa
     }
   }
 }

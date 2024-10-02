@@ -15,30 +15,50 @@ class JaxWsClientSpec extends helpers.Specification {
   sequential
 
   val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
-  def Application = new GuiceApplicationBuilder().configure(Map("nsi.base.url" -> s"http://localhost:$ServerPort", "safnari.nsa.id" -> SafnariNsa)).build()
+  def Application = new GuiceApplicationBuilder()
+    .configure(
+      Map("nsi.base.url" -> s"http://localhost:$ServerPort", "safnari.nsa.id" -> SafnariNsa)
+    )
+    .build()
 
   "A JAX WS client" should {
 
-    "be able to talk to the connection provider endpoint" in new WithServer(Application, ServerPort) {
-      val service = new ConnectionServiceProvider(URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider").toURL())
+    "be able to talk to the connection provider endpoint" in new WithServer(
+      Application,
+      ServerPort
+    ) {
+      val service = new ConnectionServiceProvider(
+        URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider").toURL()
+      )
 
-      val header = new Holder(new CommonHeaderType()
-        .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
-        .withProtocolVersion("2")
-        .withRequesterNSA("urn:ogf:network:surfnet-fake-requester")
-        .withProviderNSA(SafnariNsa))
+      val header = new Holder(
+        new CommonHeaderType()
+          .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
+          .withProtocolVersion("2")
+          .withRequesterNSA("urn:ogf:network:surfnet-fake-requester")
+          .withProviderNSA(SafnariNsa)
+      )
 
-      service.getConnectionServiceProviderPort().querySummary(Collections.emptyList[String], Collections.emptyList[String], null, header)
+      service
+        .getConnectionServiceProviderPort()
+        .querySummary(Collections.emptyList[String], Collections.emptyList[String], null, header)
     }
 
-    "be able to talk to the connection requester endpoint" in new WithServer(Application, ServerPort) {
-      val service = new ConnectionServiceRequester(URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceRequester").toURL())
+    "be able to talk to the connection requester endpoint" in new WithServer(
+      Application,
+      ServerPort
+    ) {
+      val service = new ConnectionServiceRequester(
+        URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceRequester").toURL()
+      )
 
-      val header = new Holder(new CommonHeaderType()
-        .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
-        .withProtocolVersion("2")
-        .withRequesterNSA(SafnariNsa)
-        .withProviderNSA("urn:ogf:network:surfnet-fake-provider"))
+      val header = new Holder(
+        new CommonHeaderType()
+          .withCorrelationId("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def")
+          .withProtocolVersion("2")
+          .withRequesterNSA(SafnariNsa)
+          .withProviderNSA("urn:ogf:network:surfnet-fake-provider")
+      )
 
       service.getConnectionServiceRequesterPort().reserveCommitConfirmed("123-abc", header)
     }

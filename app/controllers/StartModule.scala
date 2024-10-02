@@ -26,7 +26,7 @@ import akka.actor.ActorRef
 import akka.actor._
 import anorm.SqlParser._
 import anorm._
-import com.google.inject.{ AbstractModule, Provides }
+import com.google.inject.{AbstractModule, Provides}
 import javax.inject._
 import nl.surfnet.nsiv2.soap._
 import nl.surfnet.safnari.SafnariMessageStore
@@ -43,15 +43,34 @@ class StartModule extends AbstractModule {
     bind(classOf[GlobalSettings]).asEagerSingleton()
   }
 
-  @Singleton @Provides def extraBodyParsers(implicit ec: ExecutionContext, bodyParsers: PlayBodyParsers, actionBuilder: DefaultActionBuilder) = new ExtraBodyParsers
+  @Singleton @Provides def extraBodyParsers(implicit
+      ec: ExecutionContext,
+      bodyParsers: PlayBodyParsers,
+      actionBuilder: DefaultActionBuilder
+  ) = new ExtraBodyParsers
   @Singleton @Provides def messageStore(database: Database) = new SafnariMessageStore(database)
-  @Singleton @Provides def connectionManager(settings: GlobalSettings): ConnectionManager = settings.connectionManager
-  @Singleton @Provides def application(settings: GlobalSettings, configuration: Configuration, connectionRequester: ConnectionRequester, controllerComponents: ControllerComponents)(implicit ec: ExecutionContext): ApplicationController = {
-    val applicationController = new ApplicationController(settings.connectionManager, settings.pceRequester, connectionRequester, configuration)
+  @Singleton @Provides def connectionManager(settings: GlobalSettings): ConnectionManager =
+    settings.connectionManager
+  @Singleton @Provides def application(
+      settings: GlobalSettings,
+      configuration: Configuration,
+      connectionRequester: ConnectionRequester,
+      controllerComponents: ControllerComponents
+  )(implicit ec: ExecutionContext): ApplicationController = {
+    val applicationController = new ApplicationController(
+      settings.connectionManager,
+      settings.pceRequester,
+      connectionRequester,
+      configuration
+    )
     applicationController.setControllerComponents(controllerComponents)
     applicationController
   }
-  @Singleton @Provides def discoveryService(settings: GlobalSettings, configuration: Configuration, controllerComponents: ControllerComponents)(implicit ec: ExecutionContext): DiscoveryService = {
+  @Singleton @Provides def discoveryService(
+      settings: GlobalSettings,
+      configuration: Configuration,
+      controllerComponents: ControllerComponents
+  )(implicit ec: ExecutionContext): DiscoveryService = {
     val discoveryService = new DiscoveryService(settings.pceRequester, configuration)
     discoveryService.setControllerComponents(controllerComponents)
     discoveryService
@@ -59,21 +78,29 @@ class StartModule extends AbstractModule {
 }
 
 @Singleton
-class GlobalSettings @Inject()(
-  lifecycle: ApplicationLifecycle,
-  configuration: Configuration,
-  actorSystem: ActorSystem,
-  pathComputationEngine: PathComputationEngine,
-  messageStore: SafnariMessageStore,
-  connectionProvider: ConnectionProvider,
-  connectionRequester: ConnectionRequester,
-  database: Database
+class GlobalSettings @Inject() (
+    lifecycle: ApplicationLifecycle,
+    configuration: Configuration,
+    actorSystem: ActorSystem,
+    pathComputationEngine: PathComputationEngine,
+    messageStore: SafnariMessageStore,
+    connectionProvider: ConnectionProvider,
+    connectionRequester: ConnectionRequester,
+    database: Database
 )(implicit ec: ExecutionContext) {
   private val logger = Logger(classOf[GlobalSettings])
 
   val pceRequester: ActorRef = pathComputationEngine.createPceRequesterActor(configuration)
-  private val createOutboundActor = connectionProvider.outboundActor(configuration, connectionRequester.nsiRequester, pceRequester) _
-  val connectionManager: ConnectionManager = new ConnectionManager(connectionProvider.connectionFactory(createOutboundActor, configuration), configuration, messageStore)
+  private val createOutboundActor = connectionProvider.outboundActor(
+    configuration,
+    connectionRequester.nsiRequester,
+    pceRequester
+  ) _
+  val connectionManager: ConnectionManager = new ConnectionManager(
+    connectionProvider.connectionFactory(createOutboundActor, configuration),
+    configuration,
+    messageStore
+  )
 
   if (configuration.CleanDbOnStart) {
     cleanDatabase()
@@ -106,7 +133,9 @@ class GlobalSettings @Inject()(
   }
 
   private def cleanDatabase(): Unit = database.withTransaction { implicit connection =>
-    val tables = SQL("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'play_evolutions'").as(str("tablename").*).map("public." ++ _)
+    val tables = SQL(
+      "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'play_evolutions'"
+    ).as(str("tablename").*).map("public." ++ _)
     val truncate = s"TRUNCATE TABLE ${tables.mkString(",")} CASCADE"
     logger.debug(s"Cleaning database: $truncate")
     SQL(truncate).executeUpdate()

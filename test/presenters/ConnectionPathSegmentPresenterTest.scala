@@ -1,7 +1,12 @@
 package presenters
 
 import nl.surfnet.safnari._
-import org.ogf.schemas.nsi._2013._12.connection.types.{DataPlaneStatusType, ProvisionStateEnumType, LifecycleStateEnumType, ReservationStateEnumType}
+import org.ogf.schemas.nsi._2013._12.connection.types.{
+  DataPlaneStatusType,
+  ProvisionStateEnumType,
+  LifecycleStateEnumType,
+  ReservationStateEnumType
+}
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
@@ -21,7 +26,11 @@ class ConnectionPathSegmentPresenterTest extends helpers.Specification {
     )
 
     "given an active connection" should {
-      val subject = ConnectionPathSegmentPresenter(data.copy(dataPlaneStatus = new DataPlaneStatusType().withVersion(1).withActive(true).withVersionConsistent(true)))
+      val subject = ConnectionPathSegmentPresenter(
+        data.copy(dataPlaneStatus =
+          new DataPlaneStatusType().withVersion(1).withActive(true).withVersionConsistent(true)
+        )
+      )
 
       "have a connectionId" in {
         subject.connectionId must beEqualTo(data.connectionId)
@@ -53,7 +62,11 @@ class ConnectionPathSegmentPresenterTest extends helpers.Specification {
     }
 
     "given an inactive connection" should {
-      val subject = ConnectionPathSegmentPresenter(data.copy(dataPlaneStatus = new DataPlaneStatusType().withVersion(1).withActive(false).withVersionConsistent(true)))
+      val subject = ConnectionPathSegmentPresenter(
+        data.copy(dataPlaneStatus =
+          new DataPlaneStatusType().withVersion(1).withActive(false).withVersionConsistent(true)
+        )
+      )
 
       "have an inactive data plane status" in {
         subject.dataPlaneStatus must beEqualTo("Inactive")
