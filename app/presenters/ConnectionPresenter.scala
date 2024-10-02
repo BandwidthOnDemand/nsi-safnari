@@ -27,7 +27,7 @@ import nl.surfnet.nsiv2.utils._
 import nl.surfnet.safnari._
 import java.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types.{ QuerySummaryResultType, ReservationRequestCriteriaType, ScheduleType }
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 case class ConnectionPresenter(private val data: QuerySummaryResultType, val pendingCriteria: Option[ReservationRequestCriteriaType]) {
   private val statusPresenter = Nsi2StatusPresenter(data.getConnectionStates)
@@ -56,8 +56,8 @@ case class ConnectionPresenter(private val data: QuerySummaryResultType, val pen
   def qualifier(now: Instant) = {
     def inFuture(dt: Instant) = dt.isAfter(now)
 
-    if (startTime.fold2(inFuture, false, false)) 'future
-    else if (endTime.fold2(inFuture, true, true)) 'current
-    else 'past
+    if (startTime.fold2(inFuture, false, false)) "future"
+    else if (endTime.fold2(inFuture, true, true)) "current"
+    else "past"
   }
 }

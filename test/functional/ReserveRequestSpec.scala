@@ -1,6 +1,6 @@
 package functional
 import play.api.Application
-import java.net.{URI, URL}
+import java.net.URI
 import javax.xml.transform.dom.DOMResult
 import jakarta.xml.ws.Holder
 
@@ -20,7 +20,6 @@ import play.api.libs.json._
 import play.api.libs.ws.WSClient
 import play.api.mvc._
 import play.api.test._
-import play.api.routing.Router
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.routing.sird._
 
@@ -30,7 +29,7 @@ import scala.concurrent._
 class ReserveRequestSpec extends helpers.Specification {
   sequential
 
-  val reserveConfirmed = Promise[NsiRequesterMessage[ReserveConfirmed]]
+  val reserveConfirmed = Promise[NsiRequesterMessage[ReserveConfirmed]]()
 
   val FakePceUri = s"http://localhost:$ServerPort"
   val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
@@ -56,7 +55,7 @@ class ReserveRequestSpec extends helpers.Specification {
       }
       case ("POST", p"/fake/provider") => app.injector.instanceOf[ExtraBodyParsers].NsiProviderEndPoint("fake-provider-nsa") {
         case message @ NsiProviderMessage(headers, reserve: InitialReserve) =>
-          val connectionId = newConnectionId
+          val connectionId = newConnectionId()
 
           val requestCriteria = reserve.body.getCriteria
           val p2ps = requestCriteria.pointToPointService.get
@@ -117,7 +116,7 @@ class ReserveRequestSpec extends helpers.Specification {
         withDestSTP("networkId:dest-localId")))
 
     "send a reserve request to the ultimate provider agent" in new WithServer(application, ServerPort) {
-      val service = new ConnectionServiceProvider(new URL(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider"))
+      val service = new ConnectionServiceProvider(URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider").toURL())
 
       service.getConnectionServiceProviderPort().reserve(ConnectionId, null, "description", Criteria, NsiHeader)
 

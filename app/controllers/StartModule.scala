@@ -39,8 +39,6 @@ import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 
 class StartModule extends AbstractModule {
-  private val logger = Logger(classOf[StartModule])
-
   override def configure() = {
     bind(classOf[GlobalSettings]).asEagerSingleton()
   }

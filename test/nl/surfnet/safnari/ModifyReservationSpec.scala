@@ -99,7 +99,7 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
 
         connection.rsm.pendingCriteria must beNone
         connection.rsm.committedCriteria must beSome
-        connection.query.getCriteria.get(0).pointToPointService.map(_.getCapacity) must beSome(500)
+        connection.query.getCriteria.get(0).pointToPointService.map(_.getCapacity) must beSome(500L)
       }
 
       "allow aborting modified reservation before commit" in new ReservedConnection with Modified {

@@ -57,7 +57,7 @@ class DataPlaneStateMachine(connectionId: ConnectionId, newNotificationHeaders: 
       None)) {
 
   when(()) {
-    case Event(FromProvider(NsiRequesterMessage(headers, DataPlaneStateChange(notification))), data) =>
+    case Event(FromProvider(NsiRequesterMessage(_, DataPlaneStateChange(notification))), data) =>
       val newData = data.updateState(notification.getConnectionId, notification.getDataPlaneStatus(), notification.getTimeStamp())
       stay using newData
   }

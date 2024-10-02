@@ -39,8 +39,8 @@ class ApplicationController(connectionManager: ConnectionManager, pceRequester: 
   }
 
   def healthcheck = Action.async {
-    val pceHealth = (pceRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
-    val nsiHealth = (connectionRequester.nsiRequester ? 'healthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
+    val pceHealth = (pceRequester ? HealthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
+    val nsiHealth = (connectionRequester.nsiRequester ? HealthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
 
     Future.sequence(List(nsiHealth, pceHealth)) map { healthStates =>
       val view = views.html.healthcheck(healthStates.toMap, configuration.VersionString, configuration.WebParams)

@@ -10,16 +10,15 @@ import java.util.concurrent.TimeUnit
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ContinuationsSpec extends helpers.Specification {
-  private val logger = play.api.Logger(classOf[ContinuationsSpec])
   sequential
 
   trait fixture extends org.specs2.mutable.After {
     val actorSystem = ActorSystem("test")
 
-    val CorrelationId = newCorrelationId
+    val CorrelationId = newCorrelationId()
     val continuations = new Continuations[String](actorSystem.scheduler)(ExecutionContext.global)
 
-    override def after = Await.result(actorSystem.terminate, 10.seconds)
+    override def after = Await.result(actorSystem.terminate(), 10.seconds)
   }
 
   "Continuations" should {

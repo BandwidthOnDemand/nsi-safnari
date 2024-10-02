@@ -13,7 +13,7 @@ class PathTraceSpec extends helpers.ConnectionEntitySpecification {
       when(pce.confirm(CorrelationId(0, 1), A))
 
       messages must contain(like[Message] {
-        case ToProvider(NsiProviderMessage(headers, _), provider) =>
+        case ToProvider(NsiProviderMessage(headers, _), _) =>
           headers.pathTrace must beSome(emptyPathTrace(AggregatorNsa, ConnectionId).getValue())
       })
     }
@@ -99,7 +99,7 @@ class PathTraceSpec extends helpers.ConnectionEntitySpecification {
       when(pce.confirm(CorrelationId(0, 1), A))
 
       messages must contain(like[Message] {
-        case ToProvider(NsiProviderMessage(headers, _), provider) =>
+        case ToProvider(NsiProviderMessage(headers, _), _) =>
           headers.pathTrace must beSome(pathTraceHeader.getValue())
       })
     }

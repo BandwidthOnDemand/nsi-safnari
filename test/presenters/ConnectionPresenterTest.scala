@@ -54,7 +54,7 @@ class ConnectionPresenterTest extends helpers.Specification {
       }
 
       "qualify as 'current" in {
-        subject.qualifier(now) must beEqualTo('current)
+        subject.qualifier(now) must beEqualTo("current")
       }
     }
 
@@ -70,7 +70,7 @@ class ConnectionPresenterTest extends helpers.Specification {
       }
 
       "qualify as 'future" in {
-        subject.qualifier(now) must beEqualTo('future)
+        subject.qualifier(now) must beEqualTo("future")
       }
     }
 
@@ -86,7 +86,7 @@ class ConnectionPresenterTest extends helpers.Specification {
       }
 
       "qualify as 'past" in {
-        subject.qualifier(now) must beEqualTo('past)
+        subject.qualifier(now) must beEqualTo("past")
       }
     }
   }

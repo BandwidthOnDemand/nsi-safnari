@@ -16,7 +16,7 @@ class PackageSpec extends helpers.Specification {
     def apply(date: String): XMLGregorianCalendar = factory.newXMLGregorianCalendar(date)
   }
 
-  implicit val arbitraryXmlGregorianCalendar = {
+  implicit val arbitraryXmlGregorianCalendar: Arbitrary[XMLGregorianCalendar] = {
     Arbitrary(for {
       timeInMillis <- Gen.choose(0, System.currentTimeMillis() * 3)
       timezoneOffset <- Gen.choose(-14 * 60, 14 * 60)

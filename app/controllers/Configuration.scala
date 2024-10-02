@@ -22,13 +22,13 @@
  */
 package controllers
 
-import scala.concurrent.duration._
-import scala.collection.JavaConverters._
+import com.typesafe.config.ConfigUtil
 import java.net.URI
 import java.time.LocalDateTime
 import javax.inject._
-import com.typesafe.config.ConfigUtil
 import nl.surfnet.safnari._
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 @Singleton

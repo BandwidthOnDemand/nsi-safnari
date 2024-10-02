@@ -2,16 +2,14 @@ package nl.surfnet.safnari
 
 import java.time.{ Clock, Instant, ZoneId }
 import java.time.temporal._
-import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
+import javax.xml.datatype.DatatypeFactory
 
 import net.nordu.namespaces._2013._12.gnsbod.{ ConnectionTraceType, ConnectionType, ObjectFactory => ConnectionTraceTypeOF }
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
-import org.ogf.schemas.nsi._2013._12.services.types.TypeValueType
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
-import nl.surfnet.bod.nsi.Nillable
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import helpers.NsiMessages._

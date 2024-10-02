@@ -4,7 +4,7 @@ import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 import nl.surfnet.nsiv2.messages._
 import helpers.NsiMessages._

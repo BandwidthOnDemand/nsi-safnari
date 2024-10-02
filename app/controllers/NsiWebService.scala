@@ -43,7 +43,7 @@ class NsiWebService @Inject()(ws: WSClient)(implicit ec: ExecutionContext) exten
   private val logger = Logger(classOf[NsiWebService])
 
   implicit class SoapRequestHolder(val request: WSRequest) {
-    def withSoapActionHeader(action: String) = request.addHttpHeaders("SOAPAction" -> ('"' + action +'"'))
+    def withSoapActionHeader(action: String) = request.addHttpHeaders("SOAPAction" -> (s"\"$action\""))
   }
 
   def callProvider(provider: ProviderEndPoint, message: NsiProviderMessage[NsiProviderOperation], configuration: Configuration): Future[NsiProviderMessage[NsiAcknowledgement]] =

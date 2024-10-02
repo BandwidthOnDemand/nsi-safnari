@@ -26,7 +26,7 @@ import javax.xml.datatype.XMLGregorianCalendar
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object QueryRecursiveState extends Enumeration {
   type QueryRecursiveState = Value
@@ -117,7 +117,7 @@ class QueryRecursiveStateMachine(
       Seq(ToRequester(query reply QueryRecursiveConfirmed(queryRecursiveResultType(childRecursiveTypes) :: Nil)))
     case Collecting -> Failed =>
       val queryFailed = nextStateData.answers.collectFirst {
-        case (connectionId, failed @ ErrorReply(_)) => failed
+        case (_, failed @ ErrorReply(_)) => failed
       }
 
       Seq(ToRequester(query reply queryFailed.get))
@@ -144,6 +144,6 @@ object QueryRecursiveStateMachine {
   }
 
   val toConnectionIdStateMap: PartialFunction[(ProviderEndPoint, FutureVal[ConnectionId]), (ConnectionId, QueryRecursiveState)] = {
-    case (provider, Present(connectionId)) => connectionId -> Initial
+    case (_, Present(connectionId)) => connectionId -> Initial
   }
 }

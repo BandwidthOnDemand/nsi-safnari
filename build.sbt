@@ -7,7 +7,7 @@ githubTokenSource := TokenSource.GitConfig("github.token") || TokenSource.Enviro
 
 scalaVersion := "2.13.14"
 
-scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-value-discard", "-target:jvm-1.8")
+scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Xlint", "-Ywarn-unused", "-Ywarn-value-discard", "-release:21")
 
 //releaseSettings
 
@@ -33,7 +33,7 @@ libraryDependencies ++= Seq(
   "org.glassfish.hk2" % "osgi-resource-locator" % "2.4.0" % "test",
   "com.sun.xml.ws" % "jaxws-rt" % "4.0.3" % "test",
   "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion,
-  "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion % "test" classifier "tests",
+  "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion % "test" classifier "tests"
 )
 
 val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
@@ -47,7 +47,7 @@ lazy val root = (project in file("."))
   .settings(
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, gitHeadCommitSha),
     buildInfoPackage := "nl.surfnet.safnari",
-    exportJars := true,
+    exportJars := true
   )
 //  .enablePlugins(PlayScala, PlayNettyServer)
 //  .disablePlugins(PlayAkkaHttpServer)

@@ -62,7 +62,7 @@ class ProvisionStateMachine(
   }
 
   when(PROVISIONING) {
-    case Event(FromProvider(NsiRequesterMessage(headers, message: ProvisionConfirmed)), data) if data.childHasState(message.connectionId, PROVISIONING) =>
+    case Event(FromProvider(NsiRequesterMessage(_, message: ProvisionConfirmed)), data) if data.childHasState(message.connectionId, PROVISIONING) =>
       val newData = data.updateChild(message.connectionId, PROVISIONED)
       goto(newData.aggregatedProvisionStatus) using newData
   }
@@ -73,7 +73,7 @@ class ProvisionStateMachine(
   }
 
   when(RELEASING) {
-    case Event(FromProvider(NsiRequesterMessage(headers, message: ReleaseConfirmed)), data) if data.childHasState(message.connectionId, RELEASING) =>
+    case Event(FromProvider(NsiRequesterMessage(_, message: ReleaseConfirmed)), data) if data.childHasState(message.connectionId, RELEASING) =>
       val newData = data.updateChild(message.connectionId, RELEASED)
       goto(newData.aggregatedProvisionStatus) using newData
   }

@@ -28,7 +28,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
     val CommitCorrelationId = newCorrelationId
     val AbortCorrelationId = CommitCorrelationId
 
-    val ModifyCorrelationId = helpers.Specification.newCorrelationId
+    val ModifyCorrelationId = helpers.Specification.newCorrelationId()
     def ModifyReserveType = new ReserveType().withConnectionId(connection.id)
       .withCriteria(new ReservationRequestCriteriaType()
         .withVersion(InitialReserveType.getCriteria.getVersion + 1)
@@ -47,12 +47,12 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
 
     def schedule = connection.rsm.committedCriteria.map(_.getSchedule) getOrElse connection.rsm.pendingCriteria.get.getSchedule()
 
-    def given(messages: Message*): Unit = messages.foreach {
+    def `given`(messages: Message*): Unit = messages.foreach {
       case inbound @ FromProvider(NsiRequesterMessage(_, _: QueryRecursiveConfirmed)) =>
         connection.queryRecursiveResult(inbound)
       case inbound @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) =>
         connection.queryRecursive(inbound)
-      case inbound @ FromRequester(NsiProviderMessage(headers, _: InitialReserve)) =>
+      case inbound @ FromRequester(NsiProviderMessage(_, _: InitialReserve)) =>
         initialReserve(inbound)
       case inbound: InboundMessage =>
         processInbound(inbound)(context) aka s"given message $inbound must be processed" must beRight
@@ -73,7 +73,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
 
       processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
 
-      processInbound(reserve)(context).right.toOption
+      processInbound(reserve)(context).toOption
     }
 
     var messages: Seq[Message] = Nil
@@ -82,15 +82,15 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
 
       val response = message match {
         case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) => connection.queryRecursive(query)
-        case reserve @ FromRequester(NsiProviderMessage(headers, _: InitialReserve)) if connection == null =>
+        case reserve @ FromRequester(NsiProviderMessage(_, _: InitialReserve)) if connection == null =>
           initialReserve(reserve)
         case message: FromRequester =>
-          val first = processInbound(message)(context).right.toOption
-          val second = processInbound(message)(context).right.toOption
+          val first = processInbound(message)(context).toOption
+          val second = processInbound(message)(context).toOption
           second aka "idempotent retransmit" must beEqualTo(first)
           first
-        case other: InboundMessage =>
-          processInbound(message)(context).right.toOption
+        case _: InboundMessage =>
+          processInbound(message)(context).toOption
       }
       response.tap(_.foreach { outbound =>
         // Validate outbound messages against XML schema.
@@ -103,7 +103,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
             import nl.surfnet.nsiv2.soap.NsiSoapConversions._
             val conversion = NsiProviderMessageToDocument(None)(NsiProviderOperationToElement) andThen NsiXmlDocumentConversion
             conversion.apply(msg).get
-          case ToPce(msg) =>
+          case ToPce(_) =>
           // No schema to validate against.
         }
         messages = outbound

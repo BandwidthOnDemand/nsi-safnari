@@ -7,13 +7,12 @@ import play.api.http.HeaderNames
 import play.api.mvc.Results
 import play.api.test.{FakeRequest, PlaySpecification, WithApplication}
 import play.api.inject.guice.GuiceApplicationBuilder
-import play.libs.Akka
 import play.api.mvc._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class DiscoveryServiceSpec extends PlaySpecification with Results {
 
-  def Application = new GuiceApplicationBuilder().configure(Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy")).build
+  def Application = new GuiceApplicationBuilder().configure(Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy")).build()
 
   "Discovery service" should {
 

@@ -31,7 +31,7 @@ import org.ogf.schemas.nsi._2013._12.connection.types._
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2015._04.connection.pathtrace.{ PathTraceType, PathType, SegmentType }
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 sealed abstract class ReservationState(val jaxb: ReservationStateEnumType)
 case object InitialReservationState extends ReservationState(ReservationStateEnumType.RESERVE_START)
@@ -112,7 +112,7 @@ case class ReservationStateMachineData(
     else if (childConnectionStates.values.forall(_ == AbortedReservationState)) AbortedReservationState
     else throw new IllegalStateException(s"cannot determine aggregated state from child states ${childConnectionStates.values.mkString(",")}")
 
-  def startProcessingNewCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: ReservationState, children: ChildConnectionIds) = {
+  def startProcessingNewCommand(command: NsiProviderMessage[NsiProviderOperation], transitionalState: ReservationState) = {
     // Skip aborted state when we never received a child connection id due to an immediate service exception.
     val stateForChildConnectionsThatDidNotAcceptReserveRequest = if (transitionalState == AbortingReservationState) AbortedReservationState else transitionalState
     copy(
@@ -261,7 +261,7 @@ class ReservationStateMachine(
   }
 
   when(PathComputationState) {
-    case Event(FromPce(message: PathComputationConfirmed), data) =>
+    case Event(FromPce(_: PathComputationConfirmed), data) =>
       goto(CheckingReservationState) using data.receivedSegments(pathComputationAlgorithm, children.segments).reserveNextSegments
     case Event(FromPce(message: PathComputationFailed), data) =>
       goto(FailedReservationState) using data.copy(pceError = Some(message.error))
@@ -290,7 +290,7 @@ class ReservationStateMachine(
         .modifyChildCriteria(children, message.connectionId)(_.abort)
         .clearNextSegments
       goto(newData.aggregatedReservationState) using newData
-    case Event(FromProvider(message @ NsiRequesterMessage(headers, timeout: ReserveTimeout)), data) =>
+    case Event(FromProvider(message @ NsiRequesterMessage(_, timeout: ReserveTimeout)), data) =>
       val newData = data.copy(childReserveTimeouts = data.childReserveTimeouts :+ message.copy(body = timeout))
       goto(newData.aggregatedReservationState) using newData
     case Event(AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))), data) if data.childHasState(headers.correlationId, CheckingReservationState) =>
@@ -305,12 +305,12 @@ class ReservationStateMachine(
 
   when(HeldReservationState, TimeoutReservationState) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: ReserveCommit)), data) =>
-      val newData = data.startProcessingNewCommand(message, CommittingReservationState, children)
+      val newData = data.startProcessingNewCommand(message, CommittingReservationState)
       goto(CommittingReservationState) using newData
     case Event(FromRequester(message @ NsiProviderMessage(_, _: ReserveAbort)), data) =>
-      val newData = data.startProcessingNewCommand(message, AbortingReservationState, children).copy(criteria = data.criteria.abort)
+      val newData = data.startProcessingNewCommand(message, AbortingReservationState).copy(criteria = data.criteria.abort)
       goto(newData.aggregatedReservationState) using newData
-    case Event(FromProvider(message @ NsiRequesterMessage(headers, timeout: ReserveTimeout)), data) =>
+    case Event(FromProvider(message @ NsiRequesterMessage(_, timeout: ReserveTimeout)), data) =>
       val newData = data
         .copy(childReserveTimeouts = data.childReserveTimeouts :+ message.copy(body = timeout))
         .processReserveTimeouts(children)
@@ -318,13 +318,13 @@ class ReservationStateMachine(
   }
 
   when(CommittingReservationState) {
-    case Event(FromProvider(reply @ NsiRequesterMessage(headers, message: ReserveCommitConfirmed)), data) if data.childHasState(children, message.connectionId, CommittingReservationState) =>
+    case Event(FromProvider(reply @ NsiRequesterMessage(_, message: ReserveCommitConfirmed)), data) if data.childHasState(children, message.connectionId, CommittingReservationState) =>
       val newData = data
         .updateChildByConnectionId(children, reply.copy(body = message), ReservedReservationState)
         .modifyChildCriteria(children, message.connectionId)(_.commit)
       val newData2 = if (newData.aggregatedReservationState == ReservedReservationState) newData.commitPendingCriteria else newData
       goto(newData2.aggregatedReservationState) using newData2
-    case Event(FromProvider(reply @ NsiRequesterMessage(headers, message: ReserveCommitFailed)), data) if data.childHasState(children, message.connectionId, CommittingReservationState) =>
+    case Event(FromProvider(reply @ NsiRequesterMessage(_, message: ReserveCommitFailed)), data) if data.childHasState(children, message.connectionId, CommittingReservationState) =>
       val newData = data
         .updateChildByConnectionId(children, reply.copy(body = message), CommitFailedReservationState, Some(message.failed.getServiceException()))
         .modifyChildCriteria(children, message.connectionId)(_.abort)
@@ -332,7 +332,7 @@ class ReservationStateMachine(
   }
 
   when(AbortingReservationState) {
-    case Event(FromProvider(reply @ NsiRequesterMessage(headers, message: ReserveAbortConfirmed)), data) if data.childHasState(children, message.connectionId, AbortingReservationState) =>
+    case Event(FromProvider(reply @ NsiRequesterMessage(_, message: ReserveAbortConfirmed)), data) if data.childHasState(children, message.connectionId, AbortingReservationState) =>
       val newData = data
         .updateChildByConnectionId(children, reply.copy(body = message), if (data.criteria.committed.isDefined) ReservedReservationState else AbortedReservationState)
         .modifyChildCriteria(children, message.connectionId)(_.abort)
@@ -345,26 +345,26 @@ class ReservationStateMachine(
         if (data.reserveError.isDefined)
           data.copy(command = command, reserveError = None, criteria = data.criteria.abort)
         else
-          data.startProcessingNewCommand(command, AbortingReservationState, children).copy(criteria = data.criteria.abort)
+          data.startProcessingNewCommand(command, AbortingReservationState).copy(criteria = data.criteria.abort)
       goto(newData.aggregatedReservationState) using newData
   }
 
   when(ReservedReservationState) {
-    case Event(FromRequester(command @ NsiProviderMessage(headers, ModifyReserve(reserve))), data) =>
+    case Event(FromRequester(command @ NsiProviderMessage(_, ModifyReserve(reserve))), data) =>
       val pendingCriteria = reserve.getCriteria
 
-      val error = validateModify(pendingCriteria, data.criteria.committed.get)
+      val error = validateModify(pendingCriteria)
 
       val newData = error.map { error =>
         data.copy(command = command, childExceptions = Map.empty, reserveError = Some(error))
       }.getOrElse {
         val data2 = data
-          .startProcessingNewCommand(command, ModifyingReservationState, children)
+          .startProcessingNewCommand(command, ModifyingReservationState)
           .copy(criteria = data.criteria.withRequested(pendingCriteria))
 
         data2.copy(
           childConnectionCriteria = data.segments.map {
-            case (initialCorrelationId, segment) =>
+            case (initialCorrelationId, segment@_) =>
               val childCriteria = data.childConnectionCriteria(initialCorrelationId)
 
               val criteria = new ReservationRequestCriteriaType()
@@ -381,13 +381,13 @@ class ReservationStateMachine(
   }
 
   when(ModifyingReservationState) {
-    case Event(FromProvider(reply @ NsiRequesterMessage(headers, message @ ReserveConfirmed(connectionId, _))), data) if data.childHasState(children, connectionId, ModifyingReservationState) =>
+    case Event(FromProvider(reply @ NsiRequesterMessage(_, message @ ReserveConfirmed(connectionId, _))), data) if data.childHasState(children, connectionId, ModifyingReservationState) =>
       val newData = data
         .updateChildByConnectionId(children, reply.copy(body = message), HeldReservationState)
         .modifyChildCriteria(children, message.connectionId)(_.withHeld(message.criteria))
       val newData2 = if (newData.aggregatedReservationState == HeldReservationState) newData.requestedCriteriaToHeld else newData
       goto(newData2.aggregatedReservationState) using newData2
-    case Event(FromProvider(reply @ NsiRequesterMessage(headers, message: ReserveFailed)), data) if data.childHasState(children, message.connectionId, ModifyingReservationState) =>
+    case Event(FromProvider(reply @ NsiRequesterMessage(_, message: ReserveFailed)), data) if data.childHasState(children, message.connectionId, ModifyingReservationState) =>
       val newData = data
         .updateChildByConnectionId(children, reply.copy(body = message), FailedReservationState, Some(message.failed.getServiceException()))
         .modifyChildCriteria(children, message.connectionId)(_.abort)
@@ -398,7 +398,7 @@ class ReservationStateMachine(
       val newData = data
         .updateChildByConnectionId(children, childConnectionId, ReserveNotAcceptedReservationState, Some(exception))
       goto(newData.aggregatedReservationState) using newData
-    case Event(FromProvider(notification @ NsiRequesterMessage(headers, message: ReserveTimeout)), data) =>
+    case Event(FromProvider(notification @ NsiRequesterMessage(_, message: ReserveTimeout)), data) =>
       val newData = data
         .copy(childReserveTimeouts = data.childReserveTimeouts :+ notification.copy(body = message))
         .processReserveTimeouts(children)
@@ -534,7 +534,7 @@ class ReservationStateMachine(
     )
   )
 
-  private def validateModify(requestedCriteria: ReservationRequestCriteriaType, committedCriteria: ReservationConfirmCriteriaType) = {
+  private def validateModify(requestedCriteria: ReservationRequestCriteriaType) = {
     val requestedVersion: Int = if (requestedCriteria.getVersion ne null) requestedCriteria.getVersion else 0
     if (committedVersion >= requestedVersion)
       Some(NsiError.GenericMessagePayloadError.copy(text = s"requested version ${requestedVersion} must be greater than committed version ${committedVersion}"))

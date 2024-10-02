@@ -85,8 +85,8 @@ class ConnectionEntity(
     children,
     newCorrelationId,
     newRequestHeaders,
-    newNotificationId,
-    newNotifyHeaders,
+    newNotificationId _,
+    newNotifyHeaders _,
     pathComputationAlgorithm,
     { error =>
       new GenericFailedType().
@@ -95,7 +95,7 @@ class ConnectionEntity(
         withServiceException(error.toServiceException(aggregatorNsa))
     }
   )
-  val lsm = new LifecycleStateMachine(id, newRequestHeaders, newNotifyHeaders, newNotificationId, children)
+  val lsm = new LifecycleStateMachine(id, newRequestHeaders, newNotifyHeaders _, newNotificationId _, children)
 
   private val globalReservationId: Option[GlobalReservationId] = Try(URI.create(initialReserve.body.body.getGlobalReservationId())).toOption
 
@@ -159,14 +159,14 @@ class ConnectionEntity(
     }
 
     if (lsm.lifecycleState == LifecycleStateEnumType.TERMINATED) {
-      Left(messageNotApplicable(message))
+      Left(messageNotApplicable)
     } else {
       val outputs = stateMachines(message, context).flatMap { stateMachine =>
         applyMessageToStateMachine(stateMachine, message)
       }
 
       if (outputs.isEmpty) {
-        handleUnhandledProviderNotifications(message).toRight(messageNotApplicable(message))
+        handleUnhandledProviderNotifications(message).toRight(messageNotApplicable)
       } else {
         lastUpdatedAt = context.clock.instant
 
@@ -178,7 +178,7 @@ class ConnectionEntity(
   def process(message: OutboundMessage)(context: ConnectionContext): Unit = message match {
     case ToPce(request: PathComputationRequest) =>
       pathComputationAlgorithm = request.algorithm
-    case ToRequester(NsiRequesterMessage(headers, notification: NsiNotification)) =>
+    case ToRequester(NsiRequesterMessage(_, notification: NsiNotification)) =>
       nsiNotifications = notification :: nsiNotifications
     case ToRequester(NsiRequesterMessage(headers, result: NsiCommandReply)) =>
       def genericConfirmed(connectionId: ConnectionId) = new GenericConfirmedType().withConnectionId(connectionId)
@@ -248,7 +248,7 @@ class ConnectionEntity(
     case _: MessageDeliveryFailure =>
       Nil
 
-    case message: PassedEndTime =>
+    case _: PassedEndTime =>
       /*
          * Only accept PassedEndTime messages that are at or after the scheduled end time.
          * In some (rare) cases it may be possible to receive a scheduled PassedEndTime message
@@ -271,14 +271,14 @@ class ConnectionEntity(
           }.toMap
 
           (new ProvisionStateMachine(id, newRequestHeaders, children),
-            new DataPlaneStateMachine(id, newNotifyHeaders, newNotificationId, children))
+            new DataPlaneStateMachine(id, newNotifyHeaders _, newNotificationId _, children))
       }
     }
 
     output
   }
 
-  private def messageNotApplicable(message: InboundMessage): ServiceExceptionType = NsiError.InvalidTransition.toServiceException(aggregatorNsa)
+  private lazy val messageNotApplicable: ServiceExceptionType = NsiError.InvalidTransition.toServiceException(aggregatorNsa)
 
   private def registerProviderConversations(messages: Seq[OutboundMessage], stateMachine: FiniteStateMachine[_, _, InboundMessage, OutboundMessage]): Unit = {
     providerConversations ++= messages.collect {
@@ -348,10 +348,10 @@ class ConnectionEntity(
 
     rsm.committedCriteria.foreach { criteria =>
       val children = this.children.childConnections.zipWithIndex.collect {
-        case ((segment, correlationId, Present(id)), order) =>
+        case ((segment, correlationId, Present(childConnectionId)), order) =>
           val p2ps = childP2PServiceType(correlationId, segment)
           new ChildSummaryType()
-            .withConnectionId(id)
+            .withConnectionId(childConnectionId)
             .withProviderNSA(segment.provider.nsa)
             .withServiceType(segment.serviceType.serviceType)
             .withPointToPointService(p2ps)

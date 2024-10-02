@@ -32,7 +32,7 @@ package object safnari {
 
   type ComputedPathSegments = Seq[(CorrelationId, ComputedSegment)]
 
-  private val UuidGenerator = Uuid.randomUuidGenerator
+  private val UuidGenerator = Uuid.randomUuidGenerator()
 
-  def newConnectionId: ConnectionId = UuidGenerator().toString
+  def newConnectionId(): ConnectionId = UuidGenerator().toString
 }

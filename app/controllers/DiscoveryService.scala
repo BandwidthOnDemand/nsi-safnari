@@ -49,7 +49,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
       case NonFatal(_) => None
     }
 
-    (pceRequester ? 'reachability).mapTo[Try[(Seq[ReachabilityTopologyEntry], Instant)]] map {
+    (pceRequester ? ReachabilityCheck).mapTo[Try[(Seq[ReachabilityTopologyEntry], Instant)]] map {
       case Success((reachability, lastModified)) =>
         val haveLatest = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).exists(ifModifiedSince => !ifModifiedSince.isBefore(lastModified.`with`(ChronoField.MILLI_OF_SECOND, 0)))
 
@@ -62,7 +62,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
     }
   }
 
-  def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry], lastModified: Instant)(implicit request: RequestHeader): xml.Elem = {
+  def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry], lastModified: Instant): xml.Elem = {
     val providerUrl = configuration.providerServiceUrl
     val requesterUrl = configuration.requesterServiceUrl
 

@@ -33,18 +33,18 @@ object MessagePersistence {
   import PceMessage.ProviderEndPointFormat
 
   // Json.format doesn't work, so use manual conversion instead.
-  implicit val FromRequesterFormat = unaryCaseClassFormat("message")(FromRequester.apply, FromRequester.unapply)
-  implicit val ToRequesterFormat = unaryCaseClassFormat("message")(ToRequester.apply, ToRequester.unapply)
-  implicit val FromProviderFormat = unaryCaseClassFormat("message")(FromProvider.apply, FromProvider.unapply)
-  implicit val AckFromProviderFormat = unaryCaseClassFormat("message")(AckFromProvider.apply, AckFromProvider.unapply)
-  implicit val ToProviderFormat = Json.format[ToProvider]
-  implicit val FromPceFormat = Json.format[FromPce]
-  implicit val AckFromPceFormat = Json.format[AckFromPce]
-  implicit val ToPceFormat = Json.format[ToPce]
-  implicit val MessageDeliveryFailureFormat = Json.format[MessageDeliveryFailure]
-  implicit val PassedEndTimeFormat = Json.format[PassedEndTime]
+  implicit val FromRequesterFormat: OFormat[FromRequester] = unaryCaseClassFormat("message")(FromRequester.apply, FromRequester.unapply)
+  implicit val ToRequesterFormat: OFormat[ToRequester] = unaryCaseClassFormat("message")(ToRequester.apply, ToRequester.unapply)
+  implicit val FromProviderFormat: OFormat[FromProvider] = unaryCaseClassFormat("message")(FromProvider.apply, FromProvider.unapply)
+  implicit val AckFromProviderFormat: OFormat[AckFromProvider] = unaryCaseClassFormat("message")(AckFromProvider.apply, AckFromProvider.unapply)
+  implicit val ToProviderFormat: OFormat[ToProvider] = Json.format[ToProvider]
+  implicit val FromPceFormat: OFormat[FromPce] = Json.format[FromPce]
+  implicit val AckFromPceFormat: OFormat[AckFromPce] = Json.format[AckFromPce]
+  implicit val ToPceFormat: OFormat[ToPce] = Json.format[ToPce]
+  implicit val MessageDeliveryFailureFormat: OFormat[MessageDeliveryFailure] = Json.format[MessageDeliveryFailure]
+  implicit val PassedEndTimeFormat: OFormat[PassedEndTime] = Json.format[PassedEndTime]
 
-  implicit val MessageToMessageData = Conversion.build[Message, MessageData] {
+  implicit val MessageToMessageData: Conversion[Message, MessageData] = Conversion.build[Message, MessageData] {
     case message @ FromRequester(nsi)    => Success(MessageData(Some(nsi.headers.correlationId), "FromRequester", formatJson(message)))
     case message @ ToRequester(nsi)      => Success(MessageData(Some(nsi.headers.correlationId), "ToRequester", formatJson(message)))
     case message @ FromProvider(nsi)     => Success(MessageData(Some(nsi.headers.correlationId), "FromProvider", formatJson(message)))

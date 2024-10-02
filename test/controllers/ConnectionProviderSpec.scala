@@ -1,12 +1,10 @@
 package controllers
 
 import nl.surfnet.nsiv2.messages._
-import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
 import play.api.Application
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test._
-import play.libs.Akka
 
 import scala.concurrent.Promise
 import helpers.NsiMessages._
@@ -17,7 +15,7 @@ class ConnectionProviderSpec extends helpers.Specification {
 
   val DefaultConfiguration = Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy")
 
-  def Application(extraConfig: (String, String)*) = new GuiceApplicationBuilder().configure(DefaultConfiguration ++ extraConfig).build
+  def Application(extraConfig: (String, String)*) = new GuiceApplicationBuilder().configure(DefaultConfiguration ++ extraConfig).build()
 
   abstract class Fixture(application: Application) extends WithApplication(application) {
     lazy val configuration = app.injector.instanceOf[Configuration]
@@ -39,7 +37,7 @@ class ConnectionProviderSpec extends helpers.Specification {
 
       await(requesterOperation.future) must beLike {
         case op: ReserveConfirmed =>
-          val queryResult = Promise[NsiRequesterOperation]
+          val queryResult = Promise[NsiRequesterOperation]()
 
           await(connectionProvider.handleQuery(NsiProviderMessage(nsiRequesterHeaders(CorrelationId(0, 3)), QuerySummary(Some(Left(Seq(op.connectionId))), None))) { reply => queryResult.success(reply.body); () })
 

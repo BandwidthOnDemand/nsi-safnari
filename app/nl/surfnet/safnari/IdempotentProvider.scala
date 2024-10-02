@@ -50,7 +50,7 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Connect
         requesterCommands.get(inbound.correlationId) match {
           case None =>
             val result = wrapped(inbound)(context)
-            result.right.foreach(recordOutput(inbound, _))
+            result.foreach(recordOutput(inbound, _))
             result
           case Some(RequesterCommandStatus(original, outstandingCommandsOrReply)) =>
             if (!sameMessage(inbound.message, original.message)) {
@@ -71,7 +71,7 @@ class IdempotentProvider(providerNsa: String, wrapped: InboundMessage => Connect
         for {
           requesterCommandCorrelationId <- outgoingToRequesterCommands.get(message.correlationId)
           RequesterCommandStatus(originalRequest, _) <- requesterCommands.get(requesterCommandCorrelationId)
-          messages <- output.right.toOption
+          messages <- output.toOption
         } {
           recordOutput(originalRequest, messages)
           message match {

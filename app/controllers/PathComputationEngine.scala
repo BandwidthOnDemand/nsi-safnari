@@ -44,7 +44,7 @@ import scala.concurrent.stm.Ref
 import scala.util.{Failure, Success}
 
 @Singleton
-class PathComputationEngineController @Inject()(configuration: Configuration, pce: PathComputationEngine)(implicit ec: ExecutionContext) extends InjectedController {
+class PathComputationEngineController @Inject()(pce: PathComputationEngine) extends InjectedController {
   private val logger = Logger(classOf[PathComputationEngineController])
 
   def pceReply = Action(parse.json) { implicit request =>
@@ -79,7 +79,7 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
     private val endPoint = configuration.PceEndpoint
 
     def receive = {
-      case 'healthCheck =>
+      case HealthCheck =>
         val topologyHealth = ws.url(s"$endPoint/management/status/topology").addHttpHeaders(ACCEPT -> JSON).get()
 
         topologyHealth onComplete {
@@ -88,13 +88,13 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
         }
 
         val lastModified = topologyHealth map { _.header("Last-Modified").getOrElse("unknown") }
-        val healthy = topologyHealth.map(_.status == 200).recover { case t => false }
+        val healthy = topologyHealth.map(_.status == 200).recover { case _ => false }
 
-        sender ! healthy.flatMap(h => lastModified.map(d => s"PCE (Real; $d)" -> h))
+        sender() ! healthy.flatMap(h => lastModified.map(d => s"PCE (Real; $d)" -> h))
 
-      case 'reachability =>
+      case ReachabilityCheck =>
         val reachabilityResponse = ws.url(s"$endPoint/reachability").withRequestTimeout(Duration(20000, MILLISECONDS)).addHttpHeaders(ACCEPT -> JSON).get()
-        val senderRef = sender
+        val senderRef = sender()
 
         reachabilityResponse.onComplete {
           case Success(response) =>
@@ -116,7 +116,7 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
         val findPathEndPoint = s"$endPoint/paths/find"
         logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
 
-        val connection = Connection(sender)
+        val connection = Connection(sender())
         pceContinuations.register(request.correlationId, configuration.AsyncReplyTimeout).onComplete {
           case Success(reply) =>
             connection ! Connection.Command(Instant.now, FromPce(reply))
@@ -160,16 +160,16 @@ class PathComputationEngine @Inject()(actorSystem: ActorSystem, ws: WSClient)(im
       Instant.now())
 
     def receive = {
-      case 'healthCheck =>
-        sender ! Future.successful("PCE (Dummy)" -> true)
+      case HealthCheck =>
+        sender() ! Future.successful("PCE (Dummy)" -> true)
 
-      case 'reachability =>
-        sender ! Success(Reachability)
+      case ReachabilityCheck =>
+        sender() ! Success(Reachability)
 
       case ToPce(pce: PathComputationRequest) =>
         val serviceType = Json.fromJson[ServiceType](Json.toJson(pce.serviceType)(PceMessage.ServiceTypeFormat))(PceMessage.ServiceTypeFormat).get
 
-        Connection(sender) ! Connection.Command(Instant.now,
+        Connection(sender()) ! Connection.Command(Instant.now,
           FromPce(PathComputationConfirmed(
             pce.correlationId,
             Seq(ComputedSegment(

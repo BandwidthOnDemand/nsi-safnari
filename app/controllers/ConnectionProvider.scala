@@ -91,13 +91,13 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
 
   private[controllers] def handleQuery(message: NsiProviderMessage[NsiProviderQuery])(sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit): Future[NsiAcknowledgement] = message.body match {
     case QuerySummary(ids, ifModifiedSince) =>
-      queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) onComplete {
+      queryConnections(ids, ifModifiedSince.map(_.toInstant)) onComplete {
         case Success((reservations, lastModifiedAt)) => sendAsyncReply(message reply QuerySummaryConfirmed(reservations, lastModifiedAt.map(_.toXMLGregorianCalendar())))
         case Failure(_) => // nothing
       }
       Future.successful(GenericAck())
     case QuerySummarySync(ids, ifModifiedSince) =>
-      queryConnections(ids, message.headers.requesterNSA, ifModifiedSince.map(_.toInstant)) map {
+      queryConnections(ids, ifModifiedSince.map(_.toInstant)) map {
         case (states, lastModifiedAt) => QuerySummarySyncConfirmed(states, lastModifiedAt.map(_.toXMLGregorianCalendar()))
       }
     case QueryNotification(connectionId, start, end) =>
@@ -150,19 +150,19 @@ class ConnectionProviderController @Inject()(connectionManager: ConnectionManage
     Future.successful(GenericAck())
   }
 
-  private def queryNotifications(connection: Connection, start: Option[Int], end: Option[Int]): Future[Seq[NotificationBaseType]] = {
-    val range = start.getOrElse(1) to end.getOrElse(Int.MaxValue)
+  private def queryNotifications(connection: Connection, start: Option[Long], end: Option[Long]): Future[Seq[NotificationBaseType]] = {
+    val range = start.getOrElse(1L) to end.getOrElse(Long.MaxValue)
     val notifications = (connection ? Connection.QueryNotifications)
     notifications.map(ns => ns.filter(n => range.contains(n.getNotificationId())))
   }
 
-  private def queryResults(connection: Connection, start: Option[Int], end: Option[Int]): Future[Seq[QueryResultResponseType]] = {
-    val range = start.getOrElse(1) to end.getOrElse(Int.MaxValue)
+  private def queryResults(connection: Connection, start: Option[Long], end: Option[Long]): Future[Seq[QueryResultResponseType]] = {
+    val range = start.getOrElse(1L) to end.getOrElse(Long.MaxValue)
     val results = (connection ? Connection.QueryResults)
     results.map(rs => rs.filter(r => range.contains(r.getResultId())))
   }
 
-  private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], requesterNsa: String, ifModifiedSince: Option[Instant]): Future[(Seq[QuerySummaryResultType], Option[Instant])] = {
+  private def queryConnections(ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]], ifModifiedSince: Option[Instant]): Future[(Seq[QuerySummaryResultType], Option[Instant])] = {
     val maxInstant = (a: Instant, b: Instant) => if (a.isBefore(b)) b else a
     val connections = connectionIdsToConnections(ids)
     Future.traverse(connections)(c => (c ? Connection.Query).filter(c => ifModifiedSince.fold(true)(_.isBefore(c.lastModifiedAt))))

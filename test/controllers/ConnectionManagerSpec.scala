@@ -2,26 +2,26 @@ package controllers
 
 import java.net.URI
 
+import akka.actor.ActorRef
 import akka.actor.{ Actor, ActorSystem }
 import akka.testkit.TestActorRef
 import controllers.Connection.Delete
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.persistence.MessageStore
-import nl.surfnet.nsiv2.utils._
-import nl.surfnet.safnari._
+import helpers.NsiMessages._
 import java.time.Instant
 import java.time.temporal._
+import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.utils._
+import nl.surfnet.safnari._
 import org.ogf.schemas.nsi._2013._12.connection.types._
-import play.api.libs.concurrent.Akka
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test._
-import helpers.NsiMessages._
+import scala.concurrent.ExecutionContext
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionManagerSpec extends helpers.Specification {
   sequential
 
-  private def FakeApplication(additionalConfiguration: Map[String, Any]) = new GuiceApplicationBuilder().configure(additionalConfiguration).build
+  private def FakeApplication(additionalConfiguration: Map[String, Any]) = new GuiceApplicationBuilder().configure(additionalConfiguration).build()
 
   class RecordingActor extends Actor {
     @volatile var messages = Vector.empty[Any]
@@ -37,10 +37,10 @@ class ConnectionManagerSpec extends helpers.Specification {
   abstract class DummyConnectionFixture extends WithApplication() {
     lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]
     lazy val configuration = app.injector.instanceOf[Configuration]
-    implicit lazy val system = app.injector.instanceOf[ActorSystem]
+    implicit lazy val system: ActorSystem = app.injector.instanceOf[ActorSystem]
 
     lazy val mockUuidGenerator = Uuid.mockUuidGenerator(1)
-    def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
+    def newCorrelationId() = CorrelationId.fromUuid(mockUuidGenerator())
 
     lazy val outbound = TestActorRef(new RecordingActor)
 
@@ -49,7 +49,7 @@ class ConnectionManagerSpec extends helpers.Specification {
         AggregatorNsa,
         id,
         reserve,
-        () => newCorrelationId,
+        () => newCorrelationId(),
         PathComputationAlgorithm.Chain,
         URI.create("http://localhost"),
         URI.create("http://localhost")
@@ -61,16 +61,16 @@ class ConnectionManagerSpec extends helpers.Specification {
 
   "Connection manager" should {
     "find a created connection" in new DummyConnectionFixture {
-      val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
+      val actor = connectionManager.createConnection(newConnectionId(), initialReserveMessage)
       val data = await(actor ? Connection.Query).summary
 
       connectionManager.get(data.getConnectionId) must beSome(actor)
     }
 
     "add child connection id" in new DummyConnectionFixture {
-      implicit val sender = Actor.noSender
+      implicit val sender: ActorRef = Actor.noSender
       val initialReserve = ura.request(CorrelationId(0, 0), initialReserveMessage.body)
-      val Some(connection) = connectionManager.findOrCreateConnection(initialReserve.message.asInstanceOf[NsiProviderMessage[NsiProviderCommand]])
+      val connection = connectionManager.createConnection(newConnectionId(), initialReserve.message.asInstanceOf[NsiProviderMessage[InitialReserve]])
       connection ! command(initialReserve)
       connection ! command(pce.confirm(CorrelationId(0, 1), A))
       await(connection ? command(upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnectionId", ConfirmCriteria))))
@@ -79,7 +79,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     "add child connection id during replay" in new DummyConnectionFixture {
-      val Some(actor) = connectionManager.findOrCreateConnection(initialReserveMessage)
+      val actor = connectionManager.createConnection(newConnectionId(), initialReserveMessage)
 
       await(actor ? Connection.Replay(Seq(
         command(FromRequester(initialReserveMessage)),
@@ -90,32 +90,33 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     "find connection by requester correlationId for idempotent command handling" in new DummyConnectionFixture {
-      val Some(actor1) = connectionManager.findOrCreateConnection(initialReserveMessage)
-      val Some(actor2) = connectionManager.findOrCreateConnection(initialReserveMessage)
+      val actor1 = connectionManager.findOrCreateConnection(initialReserveMessage)
+      val actor2 = connectionManager.findOrCreateConnection(initialReserveMessage)
 
+      actor1 must beSome
       actor1 must_== actor2
     }
 
     "accept duplicate globalReservationId" in new DummyConnectionFixture {
       def newReserveWithGlobalReservationId(globalReservationId: String) = {
-        val message = initialReserveMessage.tap(_.body.body.setGlobalReservationId("urn:A"))
-        message.copy(message.headers.copy(correlationId = helpers.Specification.newCorrelationId))
+        val message = initialReserveMessage.tap(_.body.body.setGlobalReservationId(globalReservationId))
+        message.copy(message.headers.copy(correlationId = helpers.Specification.newCorrelationId()))
       }
-      val Some(connection1) = connectionManager.findOrCreateConnection(newReserveWithGlobalReservationId("urn:A"))
-      val Some(connection2) = connectionManager.findOrCreateConnection(newReserveWithGlobalReservationId("urn:A"))
+      val connection1 = connectionManager.createConnection(newConnectionId(), newReserveWithGlobalReservationId("urn:A"))
+      val connection2 = connectionManager.createConnection(newConnectionId(), newReserveWithGlobalReservationId("urn:A"))
 
       connectionManager.findByGlobalReservationIds(Seq(URI.create("urn:A"))) must beEqualTo(Seq(connection1, connection2))
     }
 
     "delete single connection from globalReservationIdMap" in new DummyConnectionFixture {
-      implicit val sender = Actor.noSender
+      implicit val sender: ActorRef = Actor.noSender
 
       def newReserveWithGlobalReservationId(globalReservationId: String) = {
-        val message = initialReserveMessage.tap(_.body.body.setGlobalReservationId("urn:A"))
-        message.copy(message.headers.copy(correlationId = helpers.Specification.newCorrelationId))
+        val message = initialReserveMessage.tap(_.body.body.setGlobalReservationId(globalReservationId))
+        message.copy(message.headers.copy(correlationId = helpers.Specification.newCorrelationId()))
       }
-      val Some(connection1) = connectionManager.findOrCreateConnection(newReserveWithGlobalReservationId("urn:A"))
-      val Some(connection2) = connectionManager.findOrCreateConnection(newReserveWithGlobalReservationId("urn:A"))
+      val connection1 = connectionManager.createConnection(newConnectionId(), newReserveWithGlobalReservationId("urn:A"))
+      val connection2 = connectionManager.createConnection(newConnectionId(), newReserveWithGlobalReservationId("urn:A"))
 
       connection1 ! Delete
 
@@ -127,18 +128,18 @@ class ConnectionManagerSpec extends helpers.Specification {
     lazy val messageStore = app.injector.instanceOf[SafnariMessageStore]
     lazy val configuration = app.injector.instanceOf[Configuration]
 
-    implicit lazy val system = app.injector.instanceOf[ActorSystem]
-    implicit lazy val executionContext = system.dispatcher
+    implicit lazy val system: ActorSystem = app.injector.instanceOf[ActorSystem]
+    implicit lazy val executionContext: ExecutionContext = system.dispatcher
 
-    def createConnectionManager = {
+    def createConnectionManager() = {
       val mockUuidGenerator = Uuid.mockUuidGenerator(1)
-      def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
+      def newCorrelationId() = CorrelationId.fromUuid(mockUuidGenerator())
       new ConnectionManager((id, reserve) =>
         (outbound, new ConnectionEntity(
           AggregatorNsa,
           id,
           reserve,
-          () => newCorrelationId,
+          () => newCorrelationId(),
           PathComputationAlgorithm.Chain,
           URI.create("http://localhost"),
           URI.create("http://localhost")
@@ -149,14 +150,11 @@ class ConnectionManagerSpec extends helpers.Specification {
     }
 
     lazy val outbound = TestActorRef(new RecordingActor)
-    lazy val connectionManager = createConnectionManager
-    lazy val Some((connectionId, connection)) = {
-      connectionManager.findOrCreateConnection(initialReserveMessage).map { c =>
-        (await(c ? Connection.Query).summary.getConnectionId(), c)
-      }
-    }
+    lazy val connectionManager = createConnectionManager()
+    lazy val connectionId = newConnectionId()
+    lazy val connection = connectionManager.createConnection(connectionId, initialReserveMessage)
 
-    def query = await(connection ? Connection.Query).summary
+    def query() = await(connection ? Connection.Query).summary
 
     def reserveWithEndTime(endTime: Instant): Unit = {
       val reserve = initialReserveMessage.tap(_.body.body.getCriteria().getSchedule().withEndTime(endTime.toXMLGregorianCalendar()))
@@ -187,7 +185,7 @@ class ConnectionManagerSpec extends helpers.Specification {
       val originalQueryResult = await(connection ? Connection.Query)
       system.stop(connection.actor)
 
-      val restoredConnectionManager = createConnectionManager
+      val restoredConnectionManager = createConnectionManager()
       await(restoredConnectionManager.restore)
 
       val restoredConnection = restoredConnectionManager.get(connectionId)
@@ -277,7 +275,7 @@ class ConnectionManagerSpec extends helpers.Specification {
     "send PassedEndTime message after reservation end time" in new SingleConnectionActorFixture {
       reserveWithEndTime(Instant.now())
 
-      eventually(query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.PASSED_END_TIME)
+      eventually(query().getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.PASSED_END_TIME)
     }
 
     "support PassedEndTime more than 248 days into the future" in new SingleConnectionActorFixture {
@@ -287,9 +285,9 @@ class ConnectionManagerSpec extends helpers.Specification {
     "ignore PassedEndTime message received before end time" in new SingleConnectionActorFixture {
       reserveWithEndTime(Instant.now().plus(1, ChronoUnit.DAYS))
 
-      await(connection ? command(PassedEndTime(newCorrelationId, connectionId, Instant.now())))
+      await(connection ? command(PassedEndTime(newCorrelationId(), connectionId, Instant.now())))
 
-      query.getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.CREATED
+      query().getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.CREATED
     }
 
     "be deleted after a grace period" should {

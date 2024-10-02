@@ -27,7 +27,7 @@ import java.time.Instant
 import javax.xml.XMLConstants
 import javax.xml.namespace.QName
 import javax.xml.datatype.{ DatatypeFactory, XMLGregorianCalendar }
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import nl.surfnet.nsiv2.messages._
 import nl.surfnet.nsiv2.utils._
 
@@ -261,13 +261,13 @@ object PceMessage {
 
   implicit val PceAcknowledgementReads: Reads[PceAcknowledgement] = Reads { json =>
     (__ \ "status").read[Int].reads(json) match {
-      case JsSuccess(202, _)    => Json.fromJson[PceAccepted](json)
-      case JsSuccess(status, _) => Json.fromJson[PceFailed](json)
-      case errors: JsError      => errors
+      case JsSuccess(202, _) => Json.fromJson[PceAccepted](json)
+      case JsSuccess(_, _)   => Json.fromJson[PceFailed](json)
+      case errors: JsError   => errors
     }
   }
   private implicit val PceAcceptedReads: Reads[PceAccepted] = (
     (__ \ "correlationId").read[CorrelationId] and
-    (__ \ "status").read[Int]) { (correlationId, status) => PceAccepted(correlationId) }
+    (__ \ "status").read[Int]) { (correlationId, _) => PceAccepted(correlationId) }
   private implicit val PceFailedReads: Reads[PceFailed] = Json.reads[PceFailed]
 }

@@ -91,19 +91,19 @@ class LifecycleStateMachine(
       goto(newData.aggregatedLifecycleStatus) using newData
     case Event(FromProvider(NsiRequesterMessage(_, errorEvent: ErrorEvent)), data) if errorEvent.notification.getEvent() == EventEnumType.FORCED_END =>
       goto(FAILED) using data.updateChild(children, errorEvent.connectionId, FAILED).copy(errorEvent = Some(errorEvent))
-    case Event(PassedEndTime(_, _, _), data) =>
+    case Event(PassedEndTime(_, _, _), _) =>
       goto(PASSED_END_TIME)
   }
 
   when(TERMINATING) {
-    case Event(FromProvider(NsiRequesterMessage(headers, message: TerminateConfirmed)), data) if data.childHasState(children, message.connectionId, TERMINATING) =>
+    case Event(FromProvider(NsiRequesterMessage(_, message: TerminateConfirmed)), data) if data.childHasState(children, message.connectionId, TERMINATING) =>
       val newData = data.updateChild(children, message.connectionId, TERMINATED).copy(sendTerminateRequest = Map.empty)
       goto(newData.aggregatedLifecycleStatus) using newData
-    case Event(AckFromProvider(NsiProviderMessage(headers, body: ReserveResponse)), data) =>
+    case Event(AckFromProvider(NsiProviderMessage(_, body: ReserveResponse)), data) =>
       stay using data.updateChild(children, body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(connectionId)))
-    case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveConfirmed)), data) =>
+    case Event(FromProvider(NsiRequesterMessage(_, body: ReserveConfirmed)), data) =>
       stay using data.updateChild(children, body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(body.connectionId)))
-    case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveFailed)), data) =>
+    case Event(FromProvider(NsiRequesterMessage(_, body: ReserveFailed)), data) =>
       stay using data.updateChild(children, body.connectionId, TERMINATING).copy(sendTerminateRequest = Map(body.connectionId -> children.childrenByConnectionId(body.connectionId)))
   }
 
@@ -122,11 +122,11 @@ class LifecycleStateMachine(
   whenUnhandled {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) if children.childConnections.isEmpty =>
       goto(TERMINATED) using data.copy(command = Some(message))
-    case Event(AckFromProvider(NsiProviderMessage(headers, ReserveResponse(connectionId))), data) =>
+    case Event(AckFromProvider(NsiProviderMessage(_, ReserveResponse(connectionId))), data) =>
       stay using data.updateChild(children, connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
-    case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveConfirmed)), data) =>
+    case Event(FromProvider(NsiRequesterMessage(_, body: ReserveConfirmed)), data) =>
       stay using data.updateChild(children, body.connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
-    case Event(FromProvider(NsiRequesterMessage(headers, body: ReserveFailed)), data) =>
+    case Event(FromProvider(NsiRequesterMessage(_, body: ReserveFailed)), data) =>
       stay using data.updateChild(children, body.connectionId, CREATED).copy(sendTerminateRequest = Map.empty)
     case Event(AckFromProvider(_), data) =>
       stay using data.copy(sendTerminateRequest = Map.empty)

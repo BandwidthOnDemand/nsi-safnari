@@ -14,7 +14,7 @@ import org.ogf.schemas.nsi._2013._12.framework.types._
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import org.ogf.schemas.nsi._2015._04.connection.pathtrace.{ PathTraceType, PathType, ObjectFactory => PathTraceTypeOF, SegmentType, StpType }
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object NsiMessages {
   val AggregatorNsa = "urn:ogf:network:aggregator.tld:2015:nsa:aggregator-nsa"
@@ -49,7 +49,7 @@ object NsiMessages {
   def RequestCriteria = new ReservationRequestCriteriaType().withVersion(ConfirmedCriteriaVersion).withSchedule(Schedule).withServiceType("ServiceType").withPointToPointService(Service)
 
   def InitialReserveType = new ReserveType().withCriteria(RequestCriteria).withDescription("description").withGlobalReservationId("global-reservation-id")
-  val InitialReserveCorrelationId = helpers.Specification.newCorrelationId
+  val InitialReserveCorrelationId = helpers.Specification.newCorrelationId()
 
   def initialReserveMessage = NsiProviderMessage(nsiProviderHeaders(Aggregator, InitialReserveCorrelationId).copy(requesterNSA = RequesterNsa), InitialReserve(InitialReserveType))
   def reserveConfirmed = NsiRequesterMessage(nsiRequesterHeaders(InitialReserveCorrelationId), ReserveConfirmed("ConnectionIdA", ConfirmCriteria))

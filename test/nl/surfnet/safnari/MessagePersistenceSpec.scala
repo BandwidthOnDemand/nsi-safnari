@@ -2,7 +2,9 @@ package nl.surfnet.safnari
 
 import java.net.URI
 import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.persistence.MessageData
 import nl.surfnet.nsiv2.persistence.MessageStoreSpecification
+import nl.surfnet.nsiv2.soap.Conversion
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
@@ -18,14 +20,14 @@ class MessagePersistenceSpec extends MessageStoreSpecification {
   private implicit val ArbitraryPceRequest: Arbitrary[PceRequest] = Arbitrary(arbitrary[PathComputationRequest])
 
   override type Message = nl.surfnet.safnari.Message
-  override implicit def MessageConversion = MessagePersistence.MessageToMessageData
-  override implicit def MessageGenerator = Gen.oneOf(
+  override implicit def MessageConversion: Conversion[Message, MessageData] = MessagePersistence.MessageToMessageData
+  override implicit def MessageGenerator: Gen[Message] = Gen.oneOf(
     Gen.resultOf(ToPce.apply _),
     Gen.const(FromPce(PceMessageSpec.pathComputationResponse)),
     Gen.const(AckFromPce(PceMessageSpec.pathComputationFailedAck)),
     Gen.const(AckFromPce(PceMessageSpec.pathComputationAcceptedAck)),
     Gen.const(FromRequester(initialReserveMessage)),
     Gen.const(FromRequester(NsiProviderMessage(nsiProviderHeaders(A.provider, InitialReserveCorrelationId, SessionSecurityAttr :: Nil), InitialReserve(InitialReserveType)))),
-    Gen.const(FromProvider(NsiRequesterMessage(nsiRequesterHeaders(CorrelationId.random()), ReserveConfirmed(newConnectionId, ConfirmCriteria)))),
+    Gen.const(FromProvider(NsiRequesterMessage(nsiRequesterHeaders(CorrelationId.random()), ReserveConfirmed(newConnectionId(), ConfirmCriteria)))),
     Gen.const(ToProvider(initialReserveMessage, ProviderEndPoint("urn:nsa:surf", URI.create("http://localhost")))))
 }
