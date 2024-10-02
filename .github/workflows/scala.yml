@@ -40,3 +40,5 @@ jobs:
         sudo -u postgres -i createdb -O nsi-safnari-user nsi-safnari-test
     - name: Run tests
       run: sbt test
+    - name: Check code formatting
+      run: sbt scalafmtCheckAll scalafmtSbtCheck
