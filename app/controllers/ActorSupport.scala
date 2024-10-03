@@ -23,7 +23,7 @@
 package controllers
 
 import akka.util.Timeout
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 case object HealthCheck
 case object ReachabilityCheck

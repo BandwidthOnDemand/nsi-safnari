@@ -22,24 +22,23 @@
  */
 package controllers
 
-import akka.actor.ActorRef
-import akka.actor._
-import anorm.SqlParser._
-import anorm._
+import akka.actor.*
+import anorm.SqlParser.*
+import anorm.*
 import com.google.inject.{AbstractModule, Provides}
-import javax.inject._
-import nl.surfnet.nsiv2.soap._
+import javax.inject.*
+import nl.surfnet.nsiv2.soap.*
 import nl.surfnet.safnari.SafnariMessageStore
 import play.api.Logger
 import play.api.db.Database
 import play.api.inject.ApplicationLifecycle
-import play.api.mvc._
-import scala.concurrent._
+import play.api.mvc.*
+import scala.concurrent.*
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 
 class StartModule extends AbstractModule {
-  override def configure() = {
+  override def configure(): Unit = {
     bind(classOf[GlobalSettings]).asEagerSingleton()
   }
 
@@ -57,14 +56,13 @@ class StartModule extends AbstractModule {
       connectionRequester: ConnectionRequester,
       controllerComponents: ControllerComponents
   )(implicit ec: ExecutionContext): ApplicationController = {
-    val applicationController = new ApplicationController(
+    new ApplicationController(
+      controllerComponents,
       settings.connectionManager,
       settings.pceRequester,
       connectionRequester,
       configuration
     )
-    applicationController.setControllerComponents(controllerComponents)
-    applicationController
   }
   @Singleton @Provides def discoveryService(
       settings: GlobalSettings,
@@ -102,7 +100,7 @@ class GlobalSettings @Inject() (
     messageStore
   )
 
-  if (configuration.CleanDbOnStart) {
+  if configuration.CleanDbOnStart then {
     cleanDatabase()
   }
 
@@ -110,7 +108,7 @@ class GlobalSettings @Inject() (
 
   lifecycle.addStopHook { () =>
     Future.successful {
-      if (configuration.CleanDbOnStop) {
+      if configuration.CleanDbOnStop then {
         cleanDatabase()
       }
     }

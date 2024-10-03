@@ -5,37 +5,39 @@ import javax.xml.transform.dom.DOMResult
 import jakarta.xml.ws.Holder
 
 import controllers.NsiWebService
-import nl.surfnet.nsiv2.soap.NsiSoapConversions._
+import nl.surfnet.nsiv2.soap.NsiSoapConversions.*
 import nl.surfnet.nsiv2.soap.ExtraBodyParsers
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.safnari.*
 import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
-import org.ogf.schemas.nsi._2013._12.connection.types._
-import org.ogf.schemas.nsi._2013._12.framework.headers._
-import org.ogf.schemas.nsi._2013._12.framework.types._
+import org.ogf.schemas.nsi._2013._12.connection.types.*
+import org.ogf.schemas.nsi._2013._12.framework.headers.*
+import org.ogf.schemas.nsi._2013._12.framework.types.*
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import org.w3c.dom.{Document, Element}
-import play.api.libs.json._
+import play.api.libs.json.*
 import play.api.libs.ws.WSClient
-import play.api.mvc._
-import play.api.test._
+import play.api.libs.ws.JsonBodyWritables.writeableOf_JsValue
+import play.api.mvc.*
+import play.api.test.*
 import play.api.inject.guice.GuiceApplicationBuilder
-import play.api.routing.sird._
+import play.api.routing.sird.*
 
-import scala.concurrent._
+import scala.concurrent.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ReserveRequestSpec extends helpers.Specification {
   sequential
 
-  val reserveConfirmed = Promise[NsiRequesterMessage[ReserveConfirmed]]()
+  val reserveConfirmed: Promise[NsiRequesterMessage[ReserveConfirmed]] =
+    Promise[NsiRequesterMessage[ReserveConfirmed]]()
 
-  val FakePceUri = s"http://localhost:$ServerPort"
-  val FakeRequesterUri = s"http://localhost:$ServerPort/fake/requester"
-  val FakeProviderUri = s"http://localhost:$ServerPort/fake/provider"
+  val FakePceUri: String = s"http://localhost:$ServerPort"
+  val FakeRequesterUri: String = s"http://localhost:$ServerPort/fake/requester"
+  val FakeProviderUri: String = s"http://localhost:$ServerPort/fake/provider"
   val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
-  val builder = new GuiceApplicationBuilder().configure(
+  val builder: GuiceApplicationBuilder = new GuiceApplicationBuilder().configure(
     "nsi.actor" -> "real",
     "pce.actor" -> "real",
     "pce.endpoint" -> FakePceUri,
@@ -152,17 +154,19 @@ class ReserveRequestSpec extends helpers.Specification {
       application,
       ServerPort
     ) {
-      val service = new ConnectionServiceProvider(
-        URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider").toURL()
-      )
+      override def running() = {
+        val service = new ConnectionServiceProvider(
+          URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider").toURL()
+        )
 
-      service
-        .getConnectionServiceProviderPort()
-        .reserve(ConnectionId, null, "description", Criteria, NsiHeader)
+        service
+          .getConnectionServiceProviderPort()
+          .reserve(ConnectionId, null, "description", Criteria, NsiHeader)
 
-      await(reserveConfirmed.future).correlationId must beEqualTo(
-        CorrelationId.fromString("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def").get
-      )
+        await(reserveConfirmed.future).correlationId must beEqualTo(
+          CorrelationId.fromString("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def").get
+        )
+      }
     }
 
   }

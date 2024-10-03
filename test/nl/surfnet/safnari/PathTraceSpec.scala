@@ -1,14 +1,14 @@
 package nl.surfnet.safnari
 
-import helpers.NsiMessages._
-import nl.surfnet.nsiv2.messages._
+import helpers.NsiMessages.*
+import nl.surfnet.nsiv2.messages.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PathTraceSpec extends helpers.ConnectionEntitySpecification {
 
   "Root aggregator" should {
     "add path trace element to reserve request" in new fixture {
-      given(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
+      `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
       when(pce.confirm(CorrelationId(0, 1), A))
 
@@ -18,7 +18,7 @@ class PathTraceSpec extends helpers.ConnectionEntitySpecification {
     }
 
     "add aggregated path trace element in reserve confirmed reply with single segment" in new fixture {
-      given(
+      `given`(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType), any = Nil),
         pce.confirm(CorrelationId(0, 1), A),
         upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA"))
@@ -50,7 +50,7 @@ class PathTraceSpec extends helpers.ConnectionEntitySpecification {
     }
 
     "add aggregated path trace element in reserve confirmed reply with multiple segments" in new fixture {
-      given(
+      `given`(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType), any = Nil),
         pce.confirm(CorrelationId(0, 1), A, B),
         upa.response(
@@ -91,7 +91,7 @@ class PathTraceSpec extends helpers.ConnectionEntitySpecification {
     }
 
     "add aggregated path trace element in reserve commit request" in new fixture {
-      given(
+      `given`(
         ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType), any = Nil),
         pce.confirm(CorrelationId(0, 1), A),
         upa.response(
@@ -124,7 +124,7 @@ class PathTraceSpec extends helpers.ConnectionEntitySpecification {
   "Intermediate aggregator connection" should {
     "send reserve request with existing path trace element" in new fixture {
       val pathTraceHeader = emptyPathTrace("RootAG", "RootAG-ConnectionId")
-      given(
+      `given`(
         ura.request(
           ReserveCorrelationId,
           InitialReserve(InitialReserveType),
@@ -141,7 +141,7 @@ class PathTraceSpec extends helpers.ConnectionEntitySpecification {
 
     "send aggregated path trace element in reserve confirmed reply" in new fixture {
       val pathTraceHeader = emptyPathTrace("RootAG", "RootAG-ConnectionId")
-      given(
+      `given`(
         ura.request(
           ReserveCorrelationId,
           InitialReserve(InitialReserveType),
@@ -183,7 +183,7 @@ class PathTraceSpec extends helpers.ConnectionEntitySpecification {
         "RootAG-ConnectionId",
         ("ChildA", "ConnectionIdA") -> List("stp-1", "stp-2")
       )
-      given(
+      `given`(
         ura.request(
           ReserveCorrelationId,
           InitialReserve(InitialReserveType),

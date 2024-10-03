@@ -34,11 +34,11 @@ case class ConnectionPathSegmentPresenter(private val data: ConnectionData) {
 
   def connectionId = data.connectionId
   def providerNsa = data.providerNsa
-  def providerNsaShort = shorten(data.providerNsa)
+  def providerNsaShort: String = shorten(data.providerNsa)
   def source = data.sourceStp
-  def sourceShort = shorten(data.sourceStp)
+  def sourceShort: String = shorten(data.sourceStp)
   def destination = data.destinationStp
-  def destinationShort = shorten(data.destinationStp)
+  def destinationShort: String = shorten(data.destinationStp)
   def status = statusPresenter.status
   def dataPlaneStatus = statusPresenter.dataPlaneState
   def lastServiceException = data.lastServiceException

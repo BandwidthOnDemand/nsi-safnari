@@ -22,21 +22,21 @@
  */
 package controllers
 
-import akka.actor._
+import akka.actor.*
 import akka.event.LoggingReceive
 import java.time.Instant
 import java.util.concurrent.TimeoutException
-import javax.inject._
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.soap._
-import nl.surfnet.safnari._
+import javax.inject.*
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.soap.*
+import nl.surfnet.safnari.*
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 import play.api.Logger
-import play.api.mvc._
+import play.api.mvc.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-import controllers.ActorSupport._
+import controllers.ActorSupport.*
 
 @Singleton
 class ConnectionRequesterController @Inject() (
@@ -55,25 +55,26 @@ class ConnectionRequesterController @Inject() (
 
   override def serviceUrl: String = configuration.requesterServiceUrl
 
-  def request = extraBodyParsers.NsiRequesterEndPoint(configuration.NsaId) {
-    case message @ NsiRequesterMessage(headers, notification: NsiNotification) =>
-      val connection = connectionManager.findByChildConnectionId(notification.connectionId)
+  def request: Action[NsiRequesterMessage[NsiRequesterOperation]] =
+    extraBodyParsers.NsiRequesterEndPoint(configuration.NsaId) {
+      case message @ NsiRequesterMessage(headers, notification: NsiNotification) =>
+        val connection = connectionManager.findByChildConnectionId(notification.connectionId)
 
-      val ack = connection.map { c =>
-        (c ? Connection.Command(
-          Instant.now(),
-          FromProvider(NsiRequesterMessage(headers, notification))
-        ))
-      } getOrElse Future.successful(
-        ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId))
-      )
+        val ack = connection.map { c =>
+          (c ? Connection.Command(
+            Instant.now(),
+            FromProvider(NsiRequesterMessage(headers, notification))
+          ))
+        } getOrElse Future.successful(
+          ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId))
+        )
 
-      ack.map(message.ack)
-    case response =>
-      connectionRequester.handleResponse(response)
-      // FIXME return error when message cannot be handled?
-      Future.successful(response.ack(GenericAck()))
-  }
+        ack.map(message.ack)
+      case response =>
+        connectionRequester.handleResponse(response)
+        // FIXME return error when message cannot be handled?
+        Future.successful(response.ack(GenericAck()))
+    }
 
 }
 
@@ -103,7 +104,7 @@ class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService
     private val uuidGenerator = Uuid.randomUuidGenerator()
     private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
 
-    def receive = {
+    def receive: PartialFunction[Any, Unit] = {
       case HealthCheck =>
         sender() ! Future.successful("NSI requester (Real)" -> true)
 
@@ -167,7 +168,7 @@ class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService
   class DummyNsiRequesterActor extends Actor {
     private var connectionCriteria: Map[ConnectionId, ReservationConfirmCriteriaType] = Map.empty
 
-    def receive = LoggingReceive {
+    def receive: Receive = LoggingReceive {
       case HealthCheck =>
         sender() ! Future.successful("NSI requester (Dummy)" -> true)
       case ToProvider(message @ NsiProviderMessage(_, reserve: InitialReserve), _) =>
@@ -178,7 +179,7 @@ class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService
         val confirmCriteria = new ReservationConfirmCriteriaType()
           .withSchedule(requestCriteria.getSchedule)
           .withServiceType(requestCriteria.getServiceType)
-          .withVersion(if (requestCriteria.getVersion eq null) 1 else requestCriteria.getVersion)
+          .withVersion(if requestCriteria.getVersion eq null then 1 else requestCriteria.getVersion)
           .withAny(requestCriteria.getAny)
 
         requestCriteria.pointToPointService.foreach { p2ps =>

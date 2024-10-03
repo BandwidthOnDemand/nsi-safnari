@@ -24,18 +24,19 @@ package controllers
 
 import akka.actor.ActorRef
 import akka.pattern.ask
-import controllers.ActorSupport._
-import java.time._
+import controllers.ActorSupport.*
+import java.time.*
 import java.time.format.DateTimeFormatter
-import java.time.temporal._
+import java.time.temporal.*
 import nl.surfnet.safnari.PathComputationAlgorithm
 import nl.surfnet.safnari.ReachabilityTopologyEntry
 import play.api.http.ContentTypes
-import play.api.mvc._
+import play.api.mvc.*
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
+import scala.xml.NodeSeq
 
 class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(implicit
     ec: ExecutionContext
@@ -45,7 +46,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
     .withLocale(java.util.Locale.ENGLISH)
     .withZone(ZoneId.of("GMT"))
 
-  def index = Action.async { implicit request =>
+  def index: Action[AnyContent] = Action.async { implicit request =>
     def parseDate(date: String): Option[Instant] = try {
       val d = ZonedDateTime.parse(date, rfc1123Formatter).toInstant
       Some(d)
@@ -62,8 +63,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
             !ifModifiedSince.isBefore(lastModified.`with`(ChronoField.MILLI_OF_SECOND, 0))
           )
 
-        if (haveLatest)
-          NotModified
+        if haveLatest then NotModified
         else
           Ok(discoveryDocument(reachability, lastModified))
             .withHeaders(LAST_MODIFIED -> rfc1123Formatter.format(lastModified))
@@ -121,7 +121,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
       {
       configuration.NetworkId match {
         case Some(id) => <networkId>{id}</networkId>
-        case _        =>
+        case _        => NodeSeq.Empty
       }
     }
       {
@@ -131,7 +131,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
         <type>application/vnd.ogf.nsi.topology.v2+xml</type>
         <href>{url}</href>
       </interface>
-        case _ =>
+        case _ => NodeSeq.Empty
       }
     }
       {
@@ -141,7 +141,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
         <type>application/vnd.ogf.nsi.dds.v1+xml</type>
         <href>{url}</href>
       </interface>
-        case _ =>
+        case _ => NodeSeq.Empty
       }
     }
       <interface>
@@ -153,23 +153,22 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
         <href>{providerUrl}</href>
       </interface>
       {
-      if (configuration.NetworkId.isDefined) {
-        <feature type="vnd.ogf.nsi.cs.v2.role.uPA"/>
-      }
+      if configuration.NetworkId.isDefined
+      then <feature type="vnd.ogf.nsi.cs.v2.role.uPA"/>
+      else NodeSeq.Empty
     }
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
       {
       for (peer <- configuration.PeersWith) yield {
         peer.id match {
           case Some(id) => <peersWith>{id}</peersWith>
-          case _        =>
+          case _        => NodeSeq.Empty
         }
       }
     }
       {
-      if (
-        configuration.PceAlgorithm != PathComputationAlgorithm.Tree && configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty
-      ) {
+      if configuration.PceAlgorithm != PathComputationAlgorithm.Tree && configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty
+      then {
         <other>
           <gns:TopologyReachability>
             {
@@ -177,7 +176,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
         }
           </gns:TopologyReachability>
         </other>
-      }
+      } else NodeSeq.Empty
     }
     </nsa:nsa>
   }

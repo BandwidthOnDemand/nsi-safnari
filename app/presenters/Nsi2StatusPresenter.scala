@@ -22,7 +22,7 @@
  */
 package presenters
 
-import org.ogf.schemas.nsi._2013._12.connection.types.LifecycleStateEnumType._
+import org.ogf.schemas.nsi._2013._12.connection.types.LifecycleStateEnumType.*
 import org.ogf.schemas.nsi._2013._12.connection.types.{
   ConnectionStatesType,
   LifecycleStateEnumType,
@@ -37,7 +37,7 @@ case class Nsi2StatusPresenter(
     dataPlaneActive: Boolean
 ) {
 
-  def status = notifiableStates mkString ", "
+  def status: String = notifiableStates mkString ", "
 
   private def notifiableStates = lifecycle match {
     case TERMINATED => List(lifecycle.value)
@@ -46,9 +46,10 @@ case class Nsi2StatusPresenter(
   }
 
   private def reservationState =
-    if (reservation != ReservationStateEnumType.RESERVE_START) List(reservation.value) else Nil
-  private def provisionState = if (provision != null) List(provision.value, dataPlaneState) else Nil
-  def dataPlaneState = if (dataPlaneActive) "Active" else "Inactive"
+    if reservation != ReservationStateEnumType.RESERVE_START then List(reservation.value) else Nil
+  private def provisionState =
+    if provision != null then List(provision.value, dataPlaneState) else Nil
+  def dataPlaneState: String = if dataPlaneActive then "Active" else "Inactive"
 }
 
 object Nsi2StatusPresenter {

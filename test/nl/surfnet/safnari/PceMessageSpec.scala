@@ -5,18 +5,18 @@ import java.net.URI
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import nl.surfnet.nsiv2.messages.CorrelationId
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._12.services.types._
+import org.ogf.schemas.nsi._2013._12.services.types.*
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
-import play.api.libs.json._
+import play.api.libs.json.*
 
-import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.messages.*
 import javax.xml.namespace.QName
 
 object PceMessageSpec {
   val sourceStp = "network-id:source"
 
   val destStp = "network-id:dest"
-  val ServiceBaseType = new P2PServiceBaseType()
+  val ServiceBaseType: P2PServiceBaseType = new P2PServiceBaseType()
     .withDirectionality(DirectionalityType.BIDIRECTIONAL)
     .withCapacity(100)
     .withSourceSTP(sourceStp)
@@ -24,9 +24,9 @@ object PceMessageSpec {
 
   val ServiceTypeUrl = "http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE"
 
-  val correlationId = helpers.Specification.newCorrelationId()
+  val correlationId: CorrelationId = helpers.Specification.newCorrelationId()
 
-  val pathComputationRequest = PathComputationRequest(
+  val pathComputationRequest: PathComputationRequest = PathComputationRequest(
     correlationId,
     Some("NSA-ID"),
     URI.create("http://localhost/pce/reply"),
@@ -37,22 +37,24 @@ object PceMessageSpec {
     Nil
   )
 
-  val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"))
-  val computedSegment =
+  val providerEndPoint: ProviderEndPoint =
+    ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"))
+  val computedSegment: ComputedSegment =
     ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))
-  val pathComputationResponse = PathComputationConfirmed(correlationId, Seq(computedSegment))
+  val pathComputationResponse: PathComputationConfirmed =
+    PathComputationConfirmed(correlationId, Seq(computedSegment))
 
-  val pathComputationFailedAck = PceFailed(correlationId, 404, "Not Accepted", "")
-  val pathComputationAcceptedAck = PceAccepted(correlationId)
+  val pathComputationFailedAck: PceFailed = PceFailed(correlationId, 404, "Not Accepted", "")
+  val pathComputationAcceptedAck: PceAccepted = PceAccepted(correlationId)
 }
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PceMessageSpec extends helpers.Specification {
-  import nl.surfnet.safnari.PceMessageSpec._
+  import nl.surfnet.safnari.PceMessageSpec.*
 
   "PceMessages" should {
 
-    import nl.surfnet.safnari.PceMessage._
+    import nl.surfnet.safnari.PceMessage.*
 
     "serialize request with p2pServiceBaseType to json" in {
       val request: PceRequest = PathComputationRequest(

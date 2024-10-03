@@ -9,15 +9,13 @@ githubTokenSource := (
     || TokenSource.Environment("GITHUB_TOKEN")
 )
 
-scalaVersion := "2.13.14"
+scalaVersion := "3.3.4"
 
 scalacOptions ++= Seq(
   "-deprecation",
   "-feature",
   "-unchecked",
-  "-Xlint",
-  "-Ywarn-unused",
-  "-Ywarn-value-discard",
+  "-Wunused:imports,privates,locals,params",
   "-release:21"
 )
 
@@ -34,11 +32,11 @@ libraryDependencies ++= Seq(
   ws,
   jdbc,
   evolutions,
-  "org.scala-stm" %% "scala-stm" % "0.11.0",
+  "org.scala-stm" %% "scala-stm" % "0.11.1",
   "org.postgresql" % "postgresql" % "42.5.0",
-  "org.specs2" %% "specs2-junit" % "4.13.0" % "test",
-  "org.specs2" %% "specs2-matcher-extra" % "4.13.0" % "test",
-  "org.specs2" %% "specs2-scalacheck" % "4.13.0" % "test",
+  "org.specs2" %% "specs2-junit" % "4.20.7" % "test",
+  "org.specs2" %% "specs2-matcher-extra" % "4.20.7" % "test",
+  "org.specs2" %% "specs2-scalacheck" % "4.20.7" % "test",
   "com.typesafe.akka" %% "akka-testkit" % "2.6.21" % "test",
   "com.typesafe.play" %% "play-test" % playVersion % "test",
   "com.typesafe.play" %% "play-specs2" % playVersion % "test",

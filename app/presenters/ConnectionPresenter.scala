@@ -22,16 +22,16 @@
  */
 package presenters
 
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.utils._
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.utils.*
 import java.time.Instant
 import org.ogf.schemas.nsi._2013._12.connection.types.{
   QuerySummaryResultType,
   ReservationRequestCriteriaType,
   ScheduleType
 }
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
+import org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultCriteriaType
 
 case class ConnectionPresenter(
     private val data: QuerySummaryResultType,
@@ -45,11 +45,11 @@ case class ConnectionPresenter(
   def description: Option[String] = Option(data.getDescription).map(_.trim).filter(_.nonEmpty)
   def requesterNsa = data.getRequesterNSA
   def status = statusPresenter.status
-  def dataPlaneStatus =
-    if (data.getConnectionStates.getDataPlaneStatus.isActive) "active" else "inactive"
+  def dataPlaneStatus: String =
+    if data.getConnectionStates.getDataPlaneStatus.isActive then "active" else "inactive"
 
-  def committedCriteria =
-    if (data.getCriteria.isEmpty) None else Some(data.getCriteria.asScala.maxBy(_.getVersion))
+  def committedCriteria: Option[QuerySummaryResultCriteriaType] =
+    if data.getCriteria.isEmpty then None else Some(data.getCriteria.asScala.maxBy(_.getVersion))
 
   private val schedule = committedCriteria
     .map(_.getSchedule)
@@ -61,19 +61,19 @@ case class ConnectionPresenter(
 
   def startTime = schedule.startTime
   def endTime = schedule.endTime
-  def bandwidth = pointToPointService.map(_.getCapacity)
-  def sourceStp = pointToPointService.map(_.getSourceSTP)
-  def destinationStp = pointToPointService.map(_.getDestSTP)
+  def bandwidth: Option[Long] = pointToPointService.map(_.getCapacity)
+  def sourceStp: Option[String] = pointToPointService.map(_.getSourceSTP)
+  def destinationStp: Option[String] = pointToPointService.map(_.getDestSTP)
 
   def committedVersion: Option[Int] = committedCriteria.map(_.getVersion)
   def pendingVersion: Option[Int] =
     pendingCriteria.map(_.version orElse (committedVersion.map(_ + 1)) getOrElse 1)
 
-  def qualifier(now: Instant) = {
+  def qualifier(now: Instant): String = {
     def inFuture(dt: Instant) = dt.isAfter(now)
 
-    if (startTime.fold2(inFuture, false, false)) "future"
-    else if (endTime.fold2(inFuture, true, true)) "current"
+    if startTime.fold2(inFuture, false, false) then "future"
+    else if endTime.fold2(inFuture, true, true) then "current"
     else "past"
   }
 }

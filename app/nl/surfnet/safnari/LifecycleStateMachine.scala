@@ -22,11 +22,11 @@
  */
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.utils._
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.utils.*
 
-import org.ogf.schemas.nsi._2013._12.connection.types.LifecycleStateEnumType._
-import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.connection.types.LifecycleStateEnumType.*
+import org.ogf.schemas.nsi._2013._12.connection.types.*
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 case class LifecycleStateMachineData(
@@ -37,10 +37,10 @@ case class LifecycleStateMachineData(
 ) {
 
   def aggregatedLifecycleStatus: LifecycleStateEnumType = {
-    if (childConnectionStates.values.forall(_ == CREATED)) CREATED
-    else if (childConnectionStates.values.exists(_ == FAILED)) FAILED
-    else if (childConnectionStates.values.exists(_ == TERMINATING)) TERMINATING
-    else if (childConnectionStates.values.forall(_ == TERMINATED)) TERMINATED
+    if childConnectionStates.values.forall(_ == CREATED) then CREATED
+    else if childConnectionStates.values.exists(_ == FAILED) then FAILED
+    else if childConnectionStates.values.exists(_ == TERMINATING) then TERMINATING
+    else if childConnectionStates.values.forall(_ == TERMINATED) then TERMINATED
     else
       throw new IllegalStateException(
         s"cannot determine aggregated status from ${childConnectionStates.values}"
@@ -50,7 +50,7 @@ case class LifecycleStateMachineData(
   def startTerminate(
       command: NsiProviderMessage[NsiProviderOperation],
       children: ChildConnectionIds
-  ) = {
+  ): LifecycleStateMachineData = {
     def transitionalState(id: CorrelationId) =
       children.connectionByInitialCorrelationId.get(id) match {
         case Some(Never) => TERMINATED
@@ -66,26 +66,29 @@ case class LifecycleStateMachineData(
     )
   }
 
-  def updateChild(correlationId: CorrelationId, state: LifecycleStateEnumType) =
+  def updateChild(
+      correlationId: CorrelationId,
+      state: LifecycleStateEnumType
+  ): LifecycleStateMachineData =
     copy(childConnectionStates = childConnectionStates.updated(correlationId, state))
 
   def updateChild(
       children: ChildConnectionIds,
       connectionId: ConnectionId,
       state: LifecycleStateEnumType
-  ) =
+  ): LifecycleStateMachineData =
     copy(childConnectionStates =
       childConnectionStates.updated(children.initialCorrelationIdFor(connectionId), state)
     )
 
-  def childHasState(correlationId: CorrelationId, state: LifecycleStateEnumType) =
+  def childHasState(correlationId: CorrelationId, state: LifecycleStateEnumType): Boolean =
     childConnectionStates.getOrElse(correlationId, CREATED) == state
 
   def childHasState(
       children: ChildConnectionIds,
       connectionId: ConnectionId,
       state: LifecycleStateEnumType
-  ) =
+  ): Boolean =
     childConnectionStates.getOrElse(
       children.initialCorrelationIdFor(connectionId),
       CREATED
@@ -217,7 +220,7 @@ class LifecycleStateMachine(
           .withOriginatingNSA(original.notification.getOriginatingNSA())
           .withAdditionalInfo(original.notification.getAdditionalInfo())
       )
-      if (original.notification.getServiceException() ne null) {
+      if original.notification.getServiceException() ne null then {
         event.notification.withServiceException(
           new ServiceExceptionType()
             .withConnectionId(connectionId)
@@ -234,7 +237,7 @@ class LifecycleStateMachine(
   }
 
   def lifecycleState = stateName
-  def childConnectionState(connectionId: ConnectionId) =
+  def childConnectionState(connectionId: ConnectionId): LifecycleStateEnumType =
     stateData.childConnectionStates.getOrElse(
       children.initialCorrelationIdFor(connectionId),
       CREATED

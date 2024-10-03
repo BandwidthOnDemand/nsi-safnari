@@ -23,17 +23,17 @@
 package nl.surfnet.safnari
 
 import javax.xml.datatype.XMLGregorianCalendar
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.utils._
-import org.ogf.schemas.nsi._2013._12.connection.types._
-import scala.jdk.CollectionConverters._
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.utils.*
+import org.ogf.schemas.nsi._2013._12.connection.types.*
+import scala.jdk.CollectionConverters.*
 
 object QueryRecursiveState extends Enumeration {
   type QueryRecursiveState = Value
   val Initial, Collecting, Collected, Failed = Value
 }
 
-import QueryRecursiveState._
+import QueryRecursiveState.*
 
 case class QueryRecursiveStateMachineData(
     providers: Map[ConnectionId, ProviderEndPoint],
@@ -43,10 +43,10 @@ case class QueryRecursiveStateMachineData(
 ) {
 
   def aggregatedState: QueryRecursiveState =
-    if (childStates.isEmpty) Collected
-    else if (childStates.values.exists(_ == Collecting)) Collecting
-    else if (childStates.values.forall(s => s == Failed || s == Collected))
-      if (childStates.values.exists(_ == Failed)) Failed else Collected
+    if childStates.isEmpty then Collected
+    else if childStates.values.exists(_ == Collecting) then Collecting
+    else if childStates.values.forall(s => s == Failed || s == Collected) then
+      if childStates.values.exists(_ == Failed) then Failed else Collected
     else
       throw new IllegalStateException(
         s"cannot determine aggregated status from ${childStates.values}"

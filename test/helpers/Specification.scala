@@ -14,9 +14,9 @@ abstract class Specification
     with play.api.test.DefaultAwaitTimeout
     with play.api.test.FutureAwaits
     with play.api.test.ResultExtractors {
-  def newCorrelationId() = Specification.newCorrelationId()
+  def newCorrelationId(): CorrelationId = Specification.newCorrelationId()
 
-  lazy val ServerPort =
+  lazy val ServerPort: Int =
     sys.props.get("testserver.port").map(_.toInt).getOrElse(19000 + util.Random.nextInt(10000))
 }
 

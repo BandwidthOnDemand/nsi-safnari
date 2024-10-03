@@ -22,7 +22,7 @@
  */
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.connection.types.*
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._12.services.types.StpListType
 

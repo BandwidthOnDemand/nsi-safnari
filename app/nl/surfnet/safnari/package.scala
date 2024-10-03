@@ -23,7 +23,7 @@
 package nl.surfnet
 
 import java.net.URI
-import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.messages.*
 
 package object safnari {
   type RequesterNsa = String

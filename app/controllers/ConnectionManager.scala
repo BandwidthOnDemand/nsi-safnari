@@ -22,26 +22,26 @@
  */
 package controllers
 
-import akka.actor._
+import akka.actor.*
 import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
 import java.net.URI
 import java.time.{Clock, Instant, ZoneOffset}
-import java.time.temporal._
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.persistence._
-import nl.surfnet.nsiv2.utils._
-import nl.surfnet.safnari._
-import org.ogf.schemas.nsi._2013._12.connection.types._
+import java.time.temporal.*
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.persistence.*
+import nl.surfnet.nsiv2.utils.*
+import nl.surfnet.safnari.*
+import org.ogf.schemas.nsi._2013._12.connection.types.*
 import play.api.Logger
-import scala.concurrent._
-import scala.concurrent.duration._
-import scala.concurrent.stm._
+import scala.concurrent.*
+import scala.concurrent.duration.*
+import scala.concurrent.stm.*
 import scala.reflect.ClassTag
 import scala.util.{Failure, Try}
 
-import controllers.ActorSupport._
+import controllers.ActorSupport.*
 
 case class Connection(actor: ActorRef) {
   def !(operation: Connection.Operation)(implicit sender: ActorRef): Unit = actor ! operation
@@ -59,35 +59,35 @@ object Connection {
         pendingCriteria: Option[ReservationRequestCriteriaType],
         lastModifiedAt: Instant
     )
-    final val resultClassTag = implicitly[ClassTag[Result]]
+    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Result]]
   }
   case object QuerySegments extends Operation {
     type Result = Seq[ConnectionData]
-    final val resultClassTag = implicitly[ClassTag[Result]]
+    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Result]]
   }
   case object QueryNotifications extends Operation {
     type Result = Seq[NotificationBaseType]
-    final val resultClassTag = implicitly[ClassTag[Result]]
+    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Result]]
   }
   case class QueryRecursive(message: FromRequester) extends Operation {
     type Result = ToRequester
-    final val resultClassTag = implicitly[ClassTag[Result]]
+    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Result]]
   }
   case object QueryResults extends Operation {
     type Result = Seq[QueryResultResponseType]
-    final val resultClassTag = implicitly[ClassTag[Result]]
+    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Result]]
   }
   case class Command[+T <: Message](timestamp: Instant, message: T) extends Operation {
     type Result = NsiAcknowledgement
-    final val resultClassTag = implicitly[ClassTag[Result]]
+    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Result]]
   }
   case class Replay(messages: Seq[Command[Message]]) extends Operation {
     type Result = Try[Unit]
-    final val resultClassTag = implicitly[ClassTag[Result]]
+    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Result]]
   }
   case object Delete extends Operation {
-    type Result = Nothing
-    final val resultClassTag = implicitly[ClassTag[Result]]
+    type Result = Void
+    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Void]]
   }
 }
 
@@ -112,7 +112,12 @@ class ConnectionManager(
       connectionId: ConnectionId
   )(f: InTxn => Unit)(implicit tx: InTxn): Unit = {
     val existing = deleteHooks.getOrElse(connectionId, (_: InTxn) => ())
-    deleteHooks.put(connectionId, { txn => existing(txn); f(txn) })
+    deleteHooks.put(
+      connectionId,
+      { txn =>
+        existing(txn); f(txn)
+      }
+    )
     ()
   }
 
@@ -126,7 +131,9 @@ class ConnectionManager(
       connection: Connection
   ): Unit = atomic { implicit txn =>
     connections(connectionId) = connection
-    addDeleteHook(connectionId) { implicit txn => connections.remove(connectionId); () }
+    addDeleteHook(connectionId) { implicit txn =>
+      connections.remove(connectionId); ()
+    }
     globalReservationId foreach { globalReservationId =>
       globalReservationIdsMap(globalReservationId) =
         globalReservationIdsMap.getOrElse(globalReservationId, Set()) + connection
@@ -204,7 +211,7 @@ class ConnectionManager(
   ): Future[Unit] = {
     val replayedConnections = Future
       .sequence(for {
-        (
+        case (
           connectionId,
           records @ (MessageRecord(
             _,
@@ -236,7 +243,7 @@ class ConnectionManager(
       })
 
     replayedConnections.flatMap { exceptions =>
-      if (exceptions.isEmpty) {
+      if exceptions.isEmpty then {
         Future.successful(())
       } else {
         val exception = new Exception(s"replay failed with exceptions ${exceptions.mkString(", ")}")
@@ -316,7 +323,7 @@ class ConnectionManager(
       expirationCancellable.foreach(_.cancel())
     }
 
-    override def receive = LoggingReceive {
+    override def receive: Receive = LoggingReceive {
       case Connection.Query =>
         sender() ! Connection.Query.Result(
           connection.query,
@@ -435,21 +442,21 @@ class ConnectionManager(
 
     private def scheduleExpiration(lastMessageTimestamp: Instant): Unit = {
       expirationCancellable.foreach(_.cancel())
-      expirationCancellable = if (
-        connection.psm.isDefined && connection.lsm.lifecycleState == LifecycleStateEnumType.CREATED
-      ) None
-      else {
-        val expirationTime = lastMessageTimestamp.plus(
-          configuration.ConnectionExpirationTime.toMillis,
-          ChronoUnit.MILLIS
-        )
-        val delay = (expirationTime.toEpochMilli - Instant.now().toEpochMilli).milliseconds
-        val message = Connection.Delete
-        logger.debug(s"Scheduling $message for execution after $delay")
-        Some(context.system.scheduler.scheduleOnce(delay) {
-          self ! message
-        }(context.dispatcher))
-      }
+      expirationCancellable =
+        if connection.psm.isDefined && connection.lsm.lifecycleState == LifecycleStateEnumType.CREATED
+        then None
+        else {
+          val expirationTime = lastMessageTimestamp.plus(
+            configuration.ConnectionExpirationTime.toMillis,
+            ChronoUnit.MILLIS
+          )
+          val delay = (expirationTime.toEpochMilli - Instant.now().toEpochMilli).milliseconds
+          val message = Connection.Delete
+          logger.debug(s"Scheduling $message for execution after $delay")
+          Some(context.system.scheduler.scheduleOnce(delay) {
+            self ! message
+          }(context.dispatcher))
+        }
     }
 
     private def PersistMessages[E](
@@ -467,7 +474,7 @@ class ConnectionManager(
         wrapped: InboundMessage => ConnectionContext => Either[E, A]
     )(inbound: InboundMessage)(context: ConnectionContext): Either[E, A] = {
       val outbound = wrapped(inbound)(context)
-      if (outbound.isRight) {
+      if outbound.isRight then {
         updateChildConnection(inbound)
       }
       outbound

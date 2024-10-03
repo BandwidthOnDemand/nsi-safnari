@@ -24,7 +24,7 @@ package nl.surfnet.safnari
 
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 
-import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.messages.*
 
 trait InitialReserveAlgorithm {
   def forSegments(segments: ComputedPathSegments): InitialReserveAlgorithm
@@ -48,7 +48,8 @@ object InitialReserveAlgorithm {
   private case class SimultaneousInitialReserveAlgorithm(
       nextSegments: Map[CorrelationId, ComputedSegment]
   ) extends InitialReserveAlgorithm {
-    def forSegments(segments: ComputedPathSegments) = copy(nextSegments = segments.toMap)
+    def forSegments(segments: ComputedPathSegments): SimultaneousInitialReserveAlgorithm =
+      copy(nextSegments = segments.toMap)
     def clearNextSegments: InitialReserveAlgorithm = copy(nextSegments = Map.empty)
     def reserveConfirmed(
         correlationId: CorrelationId,
@@ -62,7 +63,7 @@ object InitialReserveAlgorithm {
       remainingSegments: ComputedPathSegments
   ) extends InitialReserveAlgorithm {
 
-    def forSegments(segments: ComputedPathSegments) = copy(
+    def forSegments(segments: ComputedPathSegments): SequentialInitialReserveAlgorithm = copy(
       nextSegments = segments.headOption.toMap,
       outstandingSegment = segments.headOption,
       remainingSegments = segments.drop(1)

@@ -1,38 +1,40 @@
 package helpers
 
 import java.time.{Clock, Instant, ZoneId}
-import java.time.temporal._
+import java.time.temporal.*
 import javax.xml.datatype.{DatatypeFactory, XMLGregorianCalendar}
 
-import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.connection.types.*
 import org.specs2.execute.{Failure, FailureException}
 
 import nl.surfnet.bod.nsi.Nillable
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.utils._
-import nl.surfnet.safnari._
-import NsiMessages._
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.utils.*
+import nl.surfnet.safnari.*
+import NsiMessages.*
+import java.{util as ju}
 
 abstract class ConnectionEntitySpecification extends helpers.Specification {
 
-  def dataPlaneStatusType(active: Boolean, consistent: Boolean) = new DataPlaneStatusType()
-    .withActive(active)
-    .withVersion(ConfirmedCriteriaVersion)
-    .withVersionConsistent(consistent)
+  def dataPlaneStatusType(active: Boolean, consistent: Boolean): DataPlaneStatusType =
+    new DataPlaneStatusType()
+      .withActive(active)
+      .withVersion(ConfirmedCriteriaVersion)
+      .withVersionConsistent(consistent)
 
   abstract class fixture extends org.specs2.matcher.Scope {
     def pathComputationAlgorithm: PathComputationAlgorithm = PathComputationAlgorithm.Chain
 
-    val mockUuidGenerator = Uuid.mockUuidGenerator(1)
-    def newCorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
+    val mockUuidGenerator: () => ju.UUID = Uuid.mockUuidGenerator(1)
+    def newCorrelationId: CorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
 
     val ConnectionId = "ConnectionId"
     val ReserveCorrelationId = newCorrelationId
     val CommitCorrelationId = newCorrelationId
     val AbortCorrelationId = CommitCorrelationId
 
-    val ModifyCorrelationId = helpers.Specification.newCorrelationId()
-    def ModifyReserveType = new ReserveType()
+    val ModifyCorrelationId: CorrelationId = helpers.Specification.newCorrelationId()
+    def ModifyReserveType: ReserveType = new ReserveType()
       .withConnectionId(connection.id)
       .withCriteria(
         new ReservationRequestCriteriaType()
@@ -44,19 +46,20 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
     val NsiReplyToUri = agg.ProviderReplyToUri
     val PceReplyToUri = agg.PceReplyToUri
 
-    def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId) = NsiHeaders(
-      correlationId,
-      AggregatorNsa,
-      provider.nsa,
-      Some(NsiReplyToUri),
-      NsiHeaders.ProviderProtocolVersion
-    )
+    def toProviderHeaders(provider: ProviderEndPoint, correlationId: CorrelationId): NsiHeaders =
+      NsiHeaders(
+        correlationId,
+        AggregatorNsa,
+        provider.nsa,
+        Some(NsiReplyToUri),
+        NsiHeaders.ProviderProtocolVersion
+      )
 
     var connection: ConnectionEntity = _
     var processInbound: IdempotentProvider = _
     var context: ConnectionContext = ConnectionContext(clock = Clock.systemDefaultZone)
 
-    def schedule = connection.rsm.committedCriteria.map(
+    def schedule: ScheduleType = connection.rsm.committedCriteria.map(
       _.getSchedule
     ) getOrElse connection.rsm.pendingCriteria.get.getSchedule()
 
@@ -113,13 +116,13 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
         // Validate outbound messages against XML schema.
         outbound.foreach {
           case ToRequester(msg) =>
-            import nl.surfnet.nsiv2.soap.NsiSoapConversions._
+            import nl.surfnet.nsiv2.soap.NsiSoapConversions.*
             val conversion = NsiRequesterMessageToDocument(None)(
               NsiRequesterOperationToElement
             ) andThen NsiXmlDocumentConversion
             conversion.apply(msg).get
           case ToProvider(msg, _) =>
-            import nl.surfnet.nsiv2.soap.NsiSoapConversions._
+            import nl.surfnet.nsiv2.soap.NsiSoapConversions.*
             val conversion = NsiProviderMessageToDocument(None)(
               NsiProviderOperationToElement
             ) andThen NsiXmlDocumentConversion
@@ -139,14 +142,18 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
         throw new FailureException(Failure(s"no child data for $childConnectionId"))
       }
 
-    def reservationState = connectionData.getConnectionStates().getReservationState()
-    def provisionState = connectionData.getConnectionStates().getProvisionState()
-    def lifecycleState = connectionData.getConnectionStates().getLifecycleState()
-    def dataPlaneStatus = connectionData.getConnectionStates().getDataPlaneStatus()
+    def reservationState: ReservationStateEnumType =
+      connectionData.getConnectionStates().getReservationState()
+    def provisionState: ProvisionStateEnumType =
+      connectionData.getConnectionStates().getProvisionState()
+    def lifecycleState: LifecycleStateEnumType =
+      connectionData.getConnectionStates().getLifecycleState()
+    def dataPlaneStatus: DataPlaneStatusType =
+      connectionData.getConnectionStates().getDataPlaneStatus()
   }
 
   abstract class ReservedConnection extends fixture {
-    given(
+    `given`(
       ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
       pce.confirm(CorrelationId(0, 1), A),
       upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)),
@@ -156,7 +163,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
   }
 
   abstract class ReserveHeldConnectionWithTwoSegments extends fixture {
-    given(
+    `given`(
       ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
       pce.confirm(CorrelationId(0, 1), A, B),
       upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA")),
@@ -167,7 +174,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
   }
 
   abstract class ReservedConnectionWithTwoSegments extends ReserveHeldConnectionWithTwoSegments {
-    given(
+    `given`(
       ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)),
       upa.response(CorrelationId(0, 8), ReserveCommitConfirmed("ConnectionIdA")),
       upa.response(CorrelationId(0, 9), ReserveCommitConfirmed("ConnectionIdB"))
@@ -175,7 +182,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
   }
 
   trait Modified { this: ReservedConnection =>
-    given(ura.request(ModifyCorrelationId, ModifyReserve(ModifyReserveType)))
+    `given`(ura.request(ModifyCorrelationId, ModifyReserve(ModifyReserveType)))
   }
 
   trait Released { this: ReservedConnection => }
@@ -185,14 +192,14 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
   trait Provisioned { this: ReservedConnection =>
     val ProvisionCorrelationId = newCorrelationId
 
-    given(
+    `given`(
       ura.request(ProvisionCorrelationId, Provision(ConnectionId)),
       upa.response(CorrelationId(0, 8), ProvisionConfirmed("ConnectionIdA"))
     )
   }
 
   trait DataPlaneActive { this: ReservedConnection =>
-    given(
+    `given`(
       upa.notification(
         newCorrelationId,
         DataPlaneStateChange(
@@ -208,15 +215,16 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
   }
 
   trait PassedEndTime { this: ReservedConnection =>
-    val endTime = schedule.endTime.fold2(identity, Instant.now, Instant.now)
+    val endTime: Instant = schedule.endTime.fold2(identity, Instant.now, Instant.now)
     context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault()))
-    given(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
+    `given`(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
   }
 
   trait Failed { this: ReservedConnection =>
-    val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
+    val TimeStamp: XMLGregorianCalendar =
+      Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
 
-    given(
+    `given`(
       upa.notification(
         newCorrelationId,
         ErrorEvent(
@@ -233,7 +241,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
   trait ProvisionedSegments { this: ReservedConnectionWithTwoSegments =>
     val ProvisionCorrelationId = newCorrelationId
 
-    given(
+    `given`(
       ura.request(ProvisionCorrelationId, Provision(ConnectionId)),
       upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")),
       upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB"))

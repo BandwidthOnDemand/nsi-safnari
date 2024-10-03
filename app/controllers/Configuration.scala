@@ -25,42 +25,44 @@ package controllers
 import com.typesafe.config.ConfigUtil
 import java.net.URI
 import java.time.LocalDateTime
-import javax.inject._
-import nl.surfnet.safnari._
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
+import javax.inject.*
+import nl.surfnet.safnari.*
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 @Singleton
 class Configuration @Inject() (configuration: play.api.Configuration) {
   val StartTime = LocalDateTime.now
-  def NsaId = getStringOrFail("safnari.nsa.id")
-  def NsaName = getStringOrFail("safnari.nsa.name")
-  def AdminContactGiven = getStringOrFail("safnari.adminContact.given")
-  def AdminContactSurname = getStringOrFail("safnari.adminContact.surname")
-  def AdminContact = s"$AdminContactGiven $AdminContactSurname"
-  def AdminContactProdid = getStringOrFail("safnari.adminContact.prodid")
-  def Use2WayTLS = configuration
+  def NsaId: String = getStringOrFail("safnari.nsa.id")
+  def NsaName: String = getStringOrFail("safnari.nsa.name")
+  def AdminContactGiven: String = getStringOrFail("safnari.adminContact.given")
+  def AdminContactSurname: String = getStringOrFail("safnari.adminContact.surname")
+  def AdminContact: String = s"$AdminContactGiven $AdminContactSurname"
+  def AdminContactProdid: String = getStringOrFail("safnari.adminContact.prodid")
+  def Use2WayTLS: Boolean = configuration
     .getOptional[Boolean]("nsi.twoway.tls")
     .getOrElse(sys.error("nsi.twoway.tls option is not set"))
-  def VersionString = s"${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})"
-  def Longitude = getStringOrFail("safnari.location.longitude")
-  def Latitude = getStringOrFail("safnari.location.latitude")
-  def AsyncReplyTimeout = readFiniteDuration("safnari.async.reply.timeout")
-  def NetworkId = configuration.getOptional[String]("safnari.network.id")
-  def NetworkUrl = configuration.getOptional[String]("safnari.network.url")
-  def DdsUrl = configuration.getOptional[String]("safnari.dds.url")
+  def VersionString: String = s"${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})"
+  def Longitude: String = getStringOrFail("safnari.location.longitude")
+  def Latitude: String = getStringOrFail("safnari.location.latitude")
+  def AsyncReplyTimeout: FiniteDuration = readFiniteDuration("safnari.async.reply.timeout")
+  def NetworkId: Option[String] = configuration.getOptional[String]("safnari.network.id")
+  def NetworkUrl: Option[String] = configuration.getOptional[String]("safnari.network.url")
+  def DdsUrl: Option[String] = configuration.getOptional[String]("safnari.dds.url")
   def PceAlgorithm: PathComputationAlgorithm = configuration
     .getOptional[String]("pce.algorithm")
     .flatMap(PathComputationAlgorithm.parse)
     .getOrElse(sys.error("pce.algorithm option is not set or invalid"))
-  def PceEndpoint = getStringOrFail("pce.endpoint")
+  def PceEndpoint: String = getStringOrFail("pce.endpoint")
 
-  def NsiActor = configuration.getOptional[String]("nsi.actor")
-  def PceActor = configuration.getOptional[String]("pce.actor")
+  def NsiActor: Option[String] = configuration.getOptional[String]("nsi.actor")
+  def PceActor: Option[String] = configuration.getOptional[String]("pce.actor")
 
-  def CleanDbOnStart = configuration.getOptional[Boolean]("clean.db.on.start") getOrElse false
-  def CleanDbOnStop = configuration.getOptional[Boolean]("clean.db.on.stop") getOrElse false
+  def CleanDbOnStart: Boolean =
+    configuration.getOptional[Boolean]("clean.db.on.start") getOrElse false
+  def CleanDbOnStop: Boolean =
+    configuration.getOptional[Boolean]("clean.db.on.stop") getOrElse false
 
   def PeersWith: Seq[PeerEntity] = {
     val configOption = Try(
@@ -84,9 +86,10 @@ class Configuration @Inject() (configuration: play.api.Configuration) {
     "contactText" -> getStringOrFail("web.contactText")
   )
 
-  def ConnectionExpirationTime = readFiniteDuration("safnari.connection.expiration.time")
+  def ConnectionExpirationTime: FiniteDuration =
+    readFiniteDuration("safnari.connection.expiration.time")
 
-  def BaseUrl = getStringOrFail("nsi.base.url")
+  def BaseUrl: String = getStringOrFail("nsi.base.url")
 
   lazy val providerServiceUrl: String =
     s"${BaseUrl}${routes.ConnectionProviderController.request.url}"

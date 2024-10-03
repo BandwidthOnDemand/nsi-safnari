@@ -1,9 +1,9 @@
 package presenters
 
 import java.time.Instant
-import java.time.temporal._
-import nl.surfnet.nsiv2.utils._
-import org.ogf.schemas.nsi._2013._12.connection.types._
+import java.time.temporal.*
+import nl.surfnet.nsiv2.utils.*
+import org.ogf.schemas.nsi._2013._12.connection.types.*
 
 class ConnectionPresenterTest extends helpers.Specification {
   "A connection" >> {
@@ -42,7 +42,7 @@ class ConnectionPresenterTest extends helpers.Specification {
       }
 
       "have a status" in {
-        subject.status must not(beEmpty)
+        subject.status must not(beEmpty[String])
       }
     }
 

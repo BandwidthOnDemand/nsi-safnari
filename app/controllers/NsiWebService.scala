@@ -23,19 +23,19 @@
 package controllers
 
 import java.net.URI
-import javax.inject._
+import javax.inject.*
 import javax.xml.namespace.QName
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.soap.NsiSoapConversions._
-import nl.surfnet.nsiv2.soap._
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.soap.NsiSoapConversions.*
+import nl.surfnet.nsiv2.soap.*
+import nl.surfnet.safnari.*
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.w3c.dom.Document
 import play.api.Logger
-import play.api.http.Status._
+import play.api.http.Status.*
 import play.api.libs.ws.{WSBodyWritables, WSClient, WSRequest}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
 @Singleton
@@ -44,7 +44,7 @@ class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext)
   private val logger = Logger(classOf[NsiWebService])
 
   implicit class SoapRequestHolder(val request: WSRequest) {
-    def withSoapActionHeader(action: String) =
+    def withSoapActionHeader(action: String): WSRequest =
       request.addHttpHeaders("SOAPAction" -> (s"\"$action\""))
   }
 
@@ -93,7 +93,7 @@ class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext)
 
     for {
       providerUrl <-
-        if (configuration.Use2WayTLS)
+        if configuration.Use2WayTLS then
           Future.fromTry(configuration.translateToStunnelAddress(nsa, url))
         else Future.successful(url)
       request = ws

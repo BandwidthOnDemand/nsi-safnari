@@ -22,11 +22,11 @@
  */
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.utils._
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.utils.*
 
 import org.ogf.schemas.nsi._2013._12.connection.types.ProvisionStateEnumType
-import org.ogf.schemas.nsi._2013._12.connection.types.ProvisionStateEnumType._
+import org.ogf.schemas.nsi._2013._12.connection.types.ProvisionStateEnumType.*
 
 case class ProvisionStateMachineData(
     children: Map[ConnectionId, ProviderEndPoint],
@@ -35,10 +35,10 @@ case class ProvisionStateMachineData(
 ) {
 
   def aggregatedProvisionStatus: ProvisionStateEnumType =
-    if (childStates.values.exists(_ == RELEASING)) RELEASING
-    else if (childStates.values.forall(_ == RELEASED)) RELEASED
-    else if (childStates.values.exists(_ == PROVISIONING)) PROVISIONING
-    else if (childStates.values.forall(_ == PROVISIONED)) PROVISIONED
+    if childStates.values.exists(_ == RELEASING) then RELEASING
+    else if childStates.values.forall(_ == RELEASED) then RELEASED
+    else if childStates.values.exists(_ == PROVISIONING) then PROVISIONING
+    else if childStates.values.forall(_ == PROVISIONED) then PROVISIONED
     else
       throw new IllegalStateException(
         s"cannot determine aggregated status from ${childStates.values}"
@@ -47,13 +47,16 @@ case class ProvisionStateMachineData(
   def startCommand(
       newCommand: NsiProviderMessage[NsiProviderOperation],
       transitionalState: ProvisionStateEnumType
-  ) =
+  ): ProvisionStateMachineData =
     copy(command = Some(newCommand), childStates = childStates.map(_._1 -> transitionalState))
 
-  def updateChild(connectionId: ConnectionId, state: ProvisionStateEnumType) =
+  def updateChild(
+      connectionId: ConnectionId,
+      state: ProvisionStateEnumType
+  ): ProvisionStateMachineData =
     copy(childStates = childStates.updated(connectionId, state))
 
-  def childHasState(connectionId: ConnectionId, state: ProvisionStateEnumType) =
+  def childHasState(connectionId: ConnectionId, state: ProvisionStateEnumType): Boolean =
     childStates.getOrElse(connectionId, RELEASED) == state
 }
 
@@ -127,5 +130,6 @@ class ProvisionStateMachine(
 
   def provisionState = stateName
 
-  def childConnectionState(connectionId: ConnectionId) = stateData.childStates(connectionId)
+  def childConnectionState(connectionId: ConnectionId): ProvisionStateEnumType =
+    stateData.childStates(connectionId)
 }

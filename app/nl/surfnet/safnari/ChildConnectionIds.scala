@@ -22,7 +22,7 @@
  */
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.messages.*
 
 case class ChildConnectionIds(
     segments: ComputedPathSegments = Seq.empty,
@@ -42,15 +42,17 @@ case class ChildConnectionIds(
 
   def childrenByConnectionId: Map[ConnectionId, ProviderEndPoint] = (for {
     (correlationId, segment) <- segments
-    Present(connectionId) <- connectionByInitialCorrelationId.get(correlationId)
+    case Present(connectionId) <- connectionByInitialCorrelationId.get(correlationId)
   } yield connectionId -> segment.provider).toMap
 
   def awaitingConnectionId: Set[CorrelationId] =
     initialCorrelationIds -- connectionByInitialCorrelationId.keySet
 
-  def receivedConnectionId(correlationId: CorrelationId, connectionId: ConnectionId) = if (
-    segments.exists(_._1 == correlationId)
-  ) {
+  def receivedConnectionId(
+      correlationId: CorrelationId,
+      connectionId: ConnectionId
+  ): ChildConnectionIds = if segments.exists(_._1 == correlationId)
+  then {
     copy(
       connectionByInitialCorrelationId =
         connectionByInitialCorrelationId.updated(correlationId, Present(connectionId)),

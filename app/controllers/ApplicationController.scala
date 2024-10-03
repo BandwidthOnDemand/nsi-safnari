@@ -24,27 +24,28 @@ package controllers
 
 import akka.actor.ActorRef
 import akka.pattern.ask
-import controllers.ActorSupport._
+import controllers.ActorSupport.*
 import java.time.ZonedDateTime
-import java.time.temporal._
-import nl.surfnet.nsiv2.utils._
-import nl.surfnet.safnari._
-import play.api.mvc._
+import java.time.temporal.*
+import nl.surfnet.nsiv2.utils.*
+import nl.surfnet.safnari.*
+import play.api.mvc.*
 import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
-import scala.concurrent._
+import scala.concurrent.*
 
 class ApplicationController(
+    val controllerComponents: ControllerComponents,
     connectionManager: ConnectionManager,
     pceRequester: ActorRef,
     connectionRequester: ConnectionRequester,
     configuration: Configuration
 )(implicit ec: ExecutionContext)
-    extends InjectedController {
-  def index = Action { implicit request =>
+    extends BaseController {
+  def index: Action[AnyContent] = Action { implicit request =>
     Ok(views.html.index(configuration))
   }
 
-  def healthcheck = Action.async {
+  def healthcheck: Action[AnyContent] = Action.async {
     val pceHealth = (pceRequester ? HealthCheck).mapTo[Future[(String, Boolean)]].flatMap(identity)
     val nsiHealth = (connectionRequester.nsiRequester ? HealthCheck)
       .mapTo[Future[(String, Boolean)]]
@@ -57,14 +58,13 @@ class ApplicationController(
         configuration.WebParams
       )
 
-      if (healthStates forall { case (_, healthy) => healthy })
-        Ok(view)
-      else
-        InternalServerError(view)
+      if healthStates.forall { case (_, healthy) => healthy }
+      then Ok(view)
+      else InternalServerError(view)
     }
   }
 
-  def connections = Action.async {
+  def connections: Action[AnyContent] = Action.async {
     val now = ZonedDateTime.now
     val timeBound = now.minus(1, ChronoUnit.WEEKS)
 
@@ -76,7 +76,7 @@ class ApplicationController(
         cs.map { case (summary, pendingCriteria, segments) =>
           (
             ConnectionPresenter(summary, pendingCriteria),
-            segments.map { ConnectionPathSegmentPresenter }
+            segments.map(ConnectionPathSegmentPresenter.apply)
           )
         }.filter { case (connection, _) =>
           connection.endTime.fold2(_.compareTo(timeBound.toInstant) > 0, true, true)
@@ -91,7 +91,7 @@ class ApplicationController(
     }
   }
 
-  def connection(id: ConnectionId) = Action.async {
+  def connection(id: ConnectionId): Action[AnyContent] = Action.async {
     // FIXME data consistency (db query + two messages may be interleaved with other messages)
     connectionManager
       .get(id)
@@ -101,7 +101,7 @@ class ApplicationController(
           Ok(
             views.html.connection(
               ConnectionPresenter(summary, pendingCriteria),
-              segments.map { ConnectionPathSegmentPresenter },
+              segments.map(ConnectionPathSegmentPresenter.apply),
               messages,
               configuration.WebParams
             )

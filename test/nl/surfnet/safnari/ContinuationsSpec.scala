@@ -3,22 +3,25 @@ package nl.surfnet.safnari
 import akka.actor.ActorSystem
 import java.util.concurrent.TimeoutException
 import scala.concurrent.{Await, ExecutionContext}
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
+import scala.util.Try
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import akka.actor.Terminated
+import nl.surfnet.nsiv2.messages
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ContinuationsSpec extends helpers.Specification {
   sequential
 
   trait fixture extends org.specs2.mutable.After {
-    val actorSystem = ActorSystem("test")
+    val actorSystem: ActorSystem = ActorSystem("test")
 
-    val CorrelationId = newCorrelationId()
+    val CorrelationId: messages.CorrelationId = newCorrelationId()
     val continuations = new Continuations[String](actorSystem.scheduler)(ExecutionContext.global)
 
-    override def after = Await.result(actorSystem.terminate(), 10.seconds)
+    override def after: Terminated = Await.result(actorSystem.terminate(), 10.seconds)
   }
 
   "Continuations" should {
@@ -56,7 +59,7 @@ class ContinuationsSpec extends helpers.Specification {
     "remove callback after timeout has been exceeded" in new fixture {
       val reply = continuations.register(CorrelationId, within = 10.milliseconds)
 
-      Await.ready(reply, 100.milliseconds).value must beSome.like { case Failure(e) =>
+      Await.ready(reply, 100.milliseconds).value must beSome[Try[String]].like { case Failure(e) =>
         e must beAnInstanceOf[TimeoutException]
       }
 

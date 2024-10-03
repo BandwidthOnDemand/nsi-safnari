@@ -23,32 +23,35 @@
 package controllers
 
 import java.net.URI
-import javax.inject._
+import javax.inject.*
 
-import akka.actor._
+import akka.actor.*
 import nl.surfnet.nsiv2.messages.CorrelationId
-import nl.surfnet.nsiv2.utils._
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.utils.*
+import nl.surfnet.safnari.*
 import java.time.Instant
 import play.api.Logger
-import play.api.http.ContentTypes._
-import play.api.http.HeaderNames._
-import play.api.http.Status._
-import play.api.libs.json._
+import play.api.http.ContentTypes.*
+import play.api.http.HeaderNames.*
+import play.api.http.Status.*
+import play.api.libs.json.*
 import play.api.libs.ws.WSClient
-import play.api.mvc._
+import play.api.libs.ws.JsonBodyWritables.writeableOf_JsValue
+import play.api.mvc.*
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.stm.Ref
 import scala.util.{Failure, Success}
 
 @Singleton
-class PathComputationEngineController @Inject() (pce: PathComputationEngine)
-    extends InjectedController {
+class PathComputationEngineController @Inject() (
+    val controllerComponents: ControllerComponents,
+    pce: PathComputationEngine
+) extends BaseController {
   private val logger = Logger(classOf[PathComputationEngineController])
 
-  def pceReply = Action(parse.json) { implicit request =>
+  def pceReply: Action[JsValue] = Action(parse.json) { implicit request =>
     Json.fromJson[PceResponse](request.body) match {
       case JsSuccess(response, _) =>
         logger.info(s"Pce reply: $response")
@@ -83,7 +86,7 @@ class PathComputationEngine @Inject() (actorSystem: ActorSystem, ws: WSClient)(i
       new LastModifiedCache()
     private val endPoint = configuration.PceEndpoint
 
-    def receive = {
+    def receive: PartialFunction[Any, Unit] = {
       case HealthCheck =>
         val topologyHealth =
           ws.url(s"$endPoint/management/status/topology").addHttpHeaders(ACCEPT -> JSON).get()
@@ -209,7 +212,7 @@ class PathComputationEngine @Inject() (actorSystem: ActorSystem, ws: WSClient)(i
       Instant.now()
     )
 
-    def receive = {
+    def receive: PartialFunction[Any, Unit] = {
       case HealthCheck =>
         sender() ! Future.successful("PCE (Dummy)" -> true)
 

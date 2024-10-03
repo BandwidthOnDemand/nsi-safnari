@@ -1,6 +1,6 @@
 package presenters
 
-import nl.surfnet.safnari._
+import nl.surfnet.safnari.*
 import org.ogf.schemas.nsi._2013._12.connection.types.{
   DataPlaneStatusType,
   ProvisionStateEnumType,
@@ -42,7 +42,7 @@ class ConnectionPathSegmentPresenterTest extends helpers.Specification {
       }
 
       "have a status" in {
-        subject.status must not(beEmpty)
+        subject.status must not(beEmpty[String])
       }
 
       "have an active data plane status" in {

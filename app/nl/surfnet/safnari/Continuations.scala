@@ -25,7 +25,7 @@ package nl.surfnet.safnari
 import akka.actor.Scheduler
 import nl.surfnet.nsiv2.messages.CorrelationId
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.stm.TMap
 import akka.actor.Cancellable
 import java.util.concurrent.TimeoutException

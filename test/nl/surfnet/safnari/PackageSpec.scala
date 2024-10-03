@@ -1,24 +1,25 @@
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.utils._
+import nl.surfnet.nsiv2.utils.*
 
 import javax.xml.datatype.XMLGregorianCalendar
 import java.time.{Instant, ZoneOffset}
-import java.time.temporal._
+import java.time.temporal.*
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
+import javax.xml.datatype.DatatypeFactory
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PackageSpec extends helpers.Specification {
   object XmlGregorianCalendar {
-    lazy val factory = javax.xml.datatype.DatatypeFactory.newInstance()
+    lazy val factory: DatatypeFactory = javax.xml.datatype.DatatypeFactory.newInstance()
 
     def apply(date: String): XMLGregorianCalendar = factory.newXMLGregorianCalendar(date)
   }
 
   implicit val arbitraryXmlGregorianCalendar: Arbitrary[XMLGregorianCalendar] = {
     Arbitrary(for {
-      timeInMillis <- Gen.choose(0, System.currentTimeMillis() * 3)
+      timeInMillis <- Gen.choose(0L, System.currentTimeMillis() * 3)
       timezoneOffset <- Gen.choose(-14 * 60, 14 * 60)
     } yield {
       val dt = Instant.ofEpochMilli(timeInMillis).atOffset(ZoneOffset.ofHours(timezoneOffset))

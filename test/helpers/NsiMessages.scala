@@ -2,34 +2,34 @@ package helpers
 
 import java.net.URI
 import java.time.Instant
-import java.time.temporal._
+import java.time.temporal.*
 import jakarta.xml.bind.JAXBElement
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.utils._
-import nl.surfnet.safnari._
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.utils.*
+import nl.surfnet.safnari.*
 import oasis.names.tc.saml._2_0.assertion.AttributeType
-import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.connection.types.*
 import org.ogf.schemas.nsi._2013._12.framework.headers.SessionSecurityAttrType
-import org.ogf.schemas.nsi._2013._12.framework.types._
+import org.ogf.schemas.nsi._2013._12.framework.types.*
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import org.ogf.schemas.nsi._2015._04.connection.pathtrace.{
   PathTraceType,
   PathType,
-  ObjectFactory => PathTraceTypeOF,
+  ObjectFactory as PathTraceTypeOF,
   SegmentType,
   StpType
 }
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 object NsiMessages {
   val AggregatorNsa = "urn:ogf:network:aggregator.tld:2015:nsa:aggregator-nsa"
   val RequesterNsa = "urn:ogf:network:requester.tld:2015:nsa:requester-nsa"
 
-  val Aggregator =
+  val Aggregator: ProviderEndPoint =
     ProviderEndPoint(AggregatorNsa, URI.create("http://nsi-agent.example.com/provider"))
 
-  val SessionSecurityAttr = new SessionSecurityAttrType()
+  val SessionSecurityAttr: SessionSecurityAttrType = new SessionSecurityAttrType()
     .withAttributeOrEncryptedAttribute(
       new AttributeType()
         .withName("token")
@@ -74,66 +74,67 @@ object NsiMessages {
       XmlAny(any)
     )
 
-  def Service = new P2PServiceBaseType()
+  def Service: P2PServiceBaseType = new P2PServiceBaseType()
     .withDirectionality(DirectionalityType.BIDIRECTIONAL)
     .withCapacity(100)
     .withSourceSTP("networkId:A")
     .withDestSTP("networkId:B")
 
-  val StartTime = Instant.now().plus(5, ChronoUnit.MINUTES)
-  val EndTime = Instant.now().plus(30, ChronoUnit.MINUTES)
+  val StartTime: Instant = Instant.now().plus(5, ChronoUnit.MINUTES)
+  val EndTime: Instant = Instant.now().plus(30, ChronoUnit.MINUTES)
 
   val ConfirmedCriteriaVersion = 3
-  def Schedule = new ScheduleType()
+  def Schedule: ScheduleType = new ScheduleType()
     .withStartTime(StartTime.toXMLGregorianCalendar())
     .withEndTime(EndTime.toXMLGregorianCalendar())
-  def ConfirmCriteria = new ReservationConfirmCriteriaType()
+  def ConfirmCriteria: ReservationConfirmCriteriaType = new ReservationConfirmCriteriaType()
     .withVersion(ConfirmedCriteriaVersion)
     .withSchedule(Schedule)
     .withServiceType("ServiceType")
     .withPointToPointService(Service)
-  def RequestCriteria = new ReservationRequestCriteriaType()
+  def RequestCriteria: ReservationRequestCriteriaType = new ReservationRequestCriteriaType()
     .withVersion(ConfirmedCriteriaVersion)
     .withSchedule(Schedule)
     .withServiceType("ServiceType")
     .withPointToPointService(Service)
 
-  def InitialReserveType = new ReserveType()
+  def InitialReserveType: ReserveType = new ReserveType()
     .withCriteria(RequestCriteria)
     .withDescription("description")
     .withGlobalReservationId("global-reservation-id")
-  val InitialReserveCorrelationId = helpers.Specification.newCorrelationId()
+  val InitialReserveCorrelationId: CorrelationId = helpers.Specification.newCorrelationId()
 
-  def initialReserveMessage = NsiProviderMessage(
+  def initialReserveMessage: NsiProviderMessage[InitialReserve] = NsiProviderMessage(
     nsiProviderHeaders(Aggregator, InitialReserveCorrelationId).copy(requesterNSA = RequesterNsa),
     InitialReserve(InitialReserveType)
   )
-  def reserveConfirmed = NsiRequesterMessage(
+  def reserveConfirmed: NsiRequesterMessage[ReserveConfirmed] = NsiRequesterMessage(
     nsiRequesterHeaders(InitialReserveCorrelationId),
     ReserveConfirmed("ConnectionIdA", ConfirmCriteria)
   )
 
-  def A = ComputedSegment(
+  def A: ComputedSegment = ComputedSegment(
     serviceType =
       ServiceType("ServiceType", Service.shallowCopy.withSourceSTP("A").withDestSTP("X")),
     provider = ProviderEndPoint("urn:ogf:network:es.net", URI.create("http://example.com/provider"))
   )
-  def B = ComputedSegment(
+  def B: ComputedSegment = ComputedSegment(
     serviceType =
       ServiceType("ServiceType", Service.shallowCopy.withSourceSTP("X").withDestSTP("B")),
     provider =
       ProviderEndPoint("urn:ogf:network:surfnet.nl", URI.create("http://excample.com/provider"))
   )
 
-  def emptyPathTrace(nsa: String, connectionId: ConnectionId) = pathTrace(nsa, connectionId)
+  def emptyPathTrace(nsa: String, connectionId: ConnectionId): JAXBElement[PathTraceType] =
+    pathTrace(nsa, connectionId)
 
   def pathTrace(
       nsa: String,
       connectionId: ConnectionId,
       segments: ((String, ConnectionId), List[String])*
-  ) = {
+  ): JAXBElement[PathTraceType] = {
     val result = new PathTraceType().withId(nsa).withConnectionId(connectionId)
-    if (segments.nonEmpty) {
+    if segments.nonEmpty then {
       result.getPath.add(
         new PathType().withSegment((for {
           (((nsa, connectionId), stps), order) <- segments.zipWithIndex
@@ -157,7 +158,7 @@ object NsiMessages {
         operation: NsiProviderOperation,
         sessionSecurityAttrs: List[SessionSecurityAttrType] = Nil,
         any: List[JAXBElement[_]] = Nil
-    ) = {
+    ): FromRequester = {
       val headers = nsiProviderHeaders(Aggregator, correlationId, sessionSecurityAttrs, any)
         .copy(requesterNSA = RequesterNsa)
       FromRequester(NsiProviderMessage(headers, operation))
@@ -165,11 +166,14 @@ object NsiMessages {
   }
 
   implicit class ProviderEndPointOps(provider: ProviderEndPoint) {
-    def acknowledge(correlationId: CorrelationId, acknowledgment: NsiAcknowledgement) =
+    def acknowledge(
+        correlationId: CorrelationId,
+        acknowledgment: NsiAcknowledgement
+    ): AckFromProvider =
       AckFromProvider(
         NsiProviderMessage(nsiProviderHeaders(provider, correlationId).forSyncAck, acknowledgment)
       )
-    def error(correlationId: CorrelationId, exception: ServiceExceptionType) =
+    def error(correlationId: CorrelationId, exception: ServiceExceptionType): AckFromProvider =
       AckFromProvider(
         NsiProviderMessage(
           nsiProviderHeaders(provider, correlationId).forSyncAck,
@@ -180,7 +184,7 @@ object NsiMessages {
         correlationId: CorrelationId,
         operation: NsiRequesterOperation,
         any: List[JAXBElement[_]] = Nil
-    ) =
+    ): FromProvider =
       FromProvider(
         NsiRequesterMessage(
           nsiProviderHeaders(provider, correlationId, Nil, Nil).forAsyncReply
@@ -188,13 +192,13 @@ object NsiMessages {
           operation
         )
       )
-    def notification(correlationId: CorrelationId, operation: NsiRequesterOperation) =
+    def notification(correlationId: CorrelationId, operation: NsiRequesterOperation): FromProvider =
       FromProvider(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
     def timeout(
         correlationId: CorrelationId,
         originalCorrelationId: CorrelationId,
         timestamp: Instant
-    ) =
+    ): MessageDeliveryFailure =
       MessageDeliveryFailure(
         correlationId,
         None,
@@ -205,18 +209,18 @@ object NsiMessages {
       )
   }
 
-  val upa = ProviderEndPointOps(A.provider)
+  val upa: ProviderEndPointOps = ProviderEndPointOps(A.provider)
 
   object agg {
-    val ProviderReplyToUri = URI.create("http://example.com/nsi/requester")
-    val PceReplyToUri = URI.create("http://example.com/pce/reply")
+    val ProviderReplyToUri: URI = URI.create("http://example.com/nsi/requester")
+    val PceReplyToUri: URI = URI.create("http://example.com/pce/reply")
 
     def request(
         correlationId: CorrelationId,
         operation: NsiProviderOperation,
         segment: ComputedSegment = A,
         any: List[JAXBElement[_]] = Nil
-    ) = {
+    ): ToProvider = {
       val headers = NsiHeaders(
         correlationId,
         AggregatorNsa,
@@ -231,7 +235,7 @@ object NsiMessages {
         correlationId: CorrelationId,
         operation: NsiRequesterOperation,
         any: List[JAXBElement[_]] = Nil
-    ) = {
+    ): ToRequester = {
       val headers = NsiHeaders(
         correlationId,
         RequesterNsa,
@@ -242,22 +246,22 @@ object NsiMessages {
       )
       ToRequester(NsiRequesterMessage(headers, operation))
     }
-    def notification(correlationId: CorrelationId, operation: NsiNotification) =
+    def notification(correlationId: CorrelationId, operation: NsiNotification): ToRequester =
       ToRequester(NsiRequesterMessage(nsiRequesterHeaders(correlationId), operation))
   }
 
   object pce {
-    def confirm(correlationId: CorrelationId, segments: ComputedSegment*) = {
+    def confirm(correlationId: CorrelationId, segments: ComputedSegment*): FromPce = {
       FromPce(PathComputationConfirmed(correlationId, segments))
     }
-    def fail(correlationId: CorrelationId, error: NsiError) = {
+    def fail(correlationId: CorrelationId, error: NsiError): FromPce = {
       FromPce(PathComputationFailed(correlationId, error))
     }
     def timeout(
         correlationId: CorrelationId,
         originalCorrelationId: CorrelationId,
         timestamp: Instant
-    ) = {
+    ): MessageDeliveryFailure = {
       MessageDeliveryFailure(
         correlationId,
         None,
@@ -272,10 +276,10 @@ object NsiMessages {
         status: Int = 400,
         statusText: String = "Bad Request",
         message: String = "Find path request not accepted"
-    ) = {
+    ): AckFromPce = {
       AckFromPce(PceFailed(correlationId, status, statusText, message))
     }
-    def acceptedAck(correlationId: CorrelationId) = {
+    def acceptedAck(correlationId: CorrelationId): AckFromPce = {
       AckFromPce(PceAccepted(correlationId))
     }
   }

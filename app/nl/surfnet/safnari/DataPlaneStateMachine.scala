@@ -22,7 +22,7 @@
  */
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.utils._
+import nl.surfnet.nsiv2.utils.*
 
 import javax.xml.datatype.XMLGregorianCalendar
 import nl.surfnet.nsiv2.messages.{DataPlaneStateChange, NsiRequesterMessage, NsiHeaders}
@@ -43,7 +43,7 @@ case class DataPlaneStateMachineData(
     _.isVersionConsistent
   ) && childStates.values.forall(_.getVersion == highestVersion)
 
-  def dataPlaneStatus = new DataPlaneStatusType()
+  def dataPlaneStatus: DataPlaneStatusType = new DataPlaneStatusType()
     .withVersion(highestVersion)
     .withActive(isActive)
     .withVersionConsistent(isVersionConsistent)
@@ -52,7 +52,7 @@ case class DataPlaneStateMachineData(
       connectionId: ConnectionId,
       state: DataPlaneStatusType,
       newTimeStamp: XMLGregorianCalendar
-  ) = {
+  ): DataPlaneStateMachineData = {
     val latestTimeStamp = timeStamp
       .map(implicitly[Ordering[XMLGregorianCalendar]].max(_, newTimeStamp))
       .orElse(Some(newTimeStamp))
@@ -83,8 +83,7 @@ class DataPlaneStateMachine(
   onTransition { case _ =>
     val previous = stateData.dataPlaneStatus
     val next = nextStateData.dataPlaneStatus
-    if (previous == next)
-      Seq.empty
+    if previous == next then Seq.empty
     else
       Seq(
         ToRequester(
@@ -104,5 +103,6 @@ class DataPlaneStateMachine(
 
   def dataPlaneStatus = nextStateData.dataPlaneStatus
 
-  def childConnectionState(connectionId: ConnectionId) = nextStateData.childStates(connectionId)
+  def childConnectionState(connectionId: ConnectionId): DataPlaneStatusType =
+    nextStateData.childStates(connectionId)
 }

@@ -27,22 +27,22 @@ import java.time.Instant
 import javax.xml.XMLConstants
 import javax.xml.namespace.QName
 import javax.xml.datatype.{DatatypeFactory, XMLGregorianCalendar}
-import scala.jdk.CollectionConverters._
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.utils._
+import scala.jdk.CollectionConverters.*
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.utils.*
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._12.services.types._
-import play.api.libs.functional.syntax._
-import play.api.libs.json._
+import org.ogf.schemas.nsi._2013._12.services.types.*
+import play.api.libs.functional.syntax.*
+import play.api.libs.json.*
 
 import scala.util.Try
 
 case class ServiceType(serviceType: String, service: P2PServiceBaseType)
 
 sealed trait PceMessage {
-  final def action = this.getClass.getSimpleName
+  final def action: String = this.getClass.getSimpleName
   def correlationId: CorrelationId
 }
 sealed trait PceRequest extends PceMessage
@@ -139,7 +139,7 @@ object PceMessage {
       )
 
   implicit val ProviderEndPointFormat: OFormat[ProviderEndPoint] = ((__ \ "nsa").format[String] and
-    (__ \ "csProviderURL").format[URI])(ProviderEndPoint.apply, unlift(ProviderEndPoint.unapply))
+    (__ \ "csProviderURL").format[URI])(ProviderEndPoint.apply, Tuple.fromProductTyped)
 
   implicit val pointToPointServiceFormat: OFormat[P2PServiceBaseType] = (
     (__ \ "capacity").format[Long] and
@@ -189,7 +189,7 @@ object PceMessage {
   implicit val ComputedSegmentFormat: Format[ComputedSegment] =
     (ProviderEndPointFormat and ServiceTypeFormat)(
       ComputedSegment.apply,
-      unlift(ComputedSegment.unapply)
+      Tuple.fromProductTyped
     )
 
   implicit val PceResponseReads: Reads[PceResponse] = Reads { json =>
@@ -222,12 +222,12 @@ object PceMessage {
   private implicit val NsiErrorVariableReads: Reads[NsiErrorVariable] =
     ((__ \ "@namespace").readNullable[String] and
       (__ \ "@type").read[String] and
-      (__ \ "value").read[String]) { NsiErrorVariable }
+      (__ \ "value").read[String])(NsiErrorVariable.apply _)
 
   private implicit val NsiErrorVariableWrites: Writes[NsiErrorVariable] =
     ((__ \ "@namespace").writeNullable[String] and
       (__ \ "@type").write[String] and
-      (__ \ "value").write[String])(unlift(NsiErrorVariable.unapply))
+      (__ \ "value").write[String])(Tuple.fromProductTyped[NsiErrorVariable])
 
   private implicit val NsiErrorReads: Reads[NsiError] = ((__ \ "code").read[String] and
     (__ \ "label").read[String] and

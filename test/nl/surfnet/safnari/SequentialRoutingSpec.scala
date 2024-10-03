@@ -1,13 +1,13 @@
 package nl.surfnet.safnari
 
-import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.connection.types.*
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
-import nl.surfnet.nsiv2.messages._
-import helpers.NsiMessages._
+import nl.surfnet.nsiv2.messages.*
+import helpers.NsiMessages.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
@@ -22,7 +22,7 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
           Service.withSourceSTP("networkId:A?vlan=1").withDestSTP("networkId:B?vlan=2")
         )
 
-        given(
+        `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A),
           upa.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA"))
@@ -53,7 +53,7 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
       }
 
       "be in reservation held state when both segments are confirmed" in new SequentialRoutingFixture {
-        given(
+        `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A, B),
           A.provider.acknowledge(CorrelationId(0, 4), ReserveResponse("ConnectionIdA"))
@@ -93,7 +93,7 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
         messages must contain(beLike[Message] {
           case ToProvider(NsiProviderMessage(_, reserve @ InitialReserve(_)), provider)
               if provider == B.provider =>
-            reserve.service must beSome.which((x: P2PServiceBaseType) =>
+            reserve.service must beSome[P2PServiceBaseType].which((x: P2PServiceBaseType) =>
               x.getSourceSTP() must_== "X?vlan=99"
             )
         })
@@ -200,7 +200,7 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
       }
 
       "immediately fail the reservation with two segments when the first one fails" in new SequentialRoutingFixture {
-        given(
+        `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B)
         )
@@ -230,7 +230,7 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
       }
 
       "duplicate initial reserve request should resend reserve request for current segment" in new SequentialRoutingFixture {
-        given(
+        `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B)
         )
@@ -262,7 +262,7 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
       }
 
       "duplicate initial reserve request should resend reserve confirm reply" in new SequentialRoutingFixture {
-        given(
+        `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
           A.provider.response(
@@ -305,7 +305,7 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
       }
 
       "terminate the reservation when downstream initial reserve communication fails" in new SequentialRoutingFixture {
-        given(
+        `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B)
         )

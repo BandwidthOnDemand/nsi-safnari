@@ -1,7 +1,7 @@
 package nl.surfnet.safnari
 
 import java.net.URI
-import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.messages.*
 import nl.surfnet.nsiv2.persistence.MessageData
 import nl.surfnet.nsiv2.persistence.MessageStoreSpecification
 import nl.surfnet.nsiv2.soap.Conversion
@@ -11,8 +11,8 @@ import org.scalacheck.Gen
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class MessagePersistenceSpec extends MessageStoreSpecification {
-  import helpers.NsiMessages._
-  import Generators._
+  import helpers.NsiMessages.*
+  import Generators.*
 
   private implicit val ArbitraryPathComputationAlgorithm: Arbitrary[PathComputationAlgorithm] =
     Arbitrary(Gen.oneOf(PathComputationAlgorithm.values))

@@ -22,25 +22,25 @@
  */
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.messages.*
 import nl.surfnet.nsiv2.persistence.MessageData
 import nl.surfnet.nsiv2.soap.Conversion
-import play.api.libs.json._
+import play.api.libs.json.*
 import scala.util.Success
 
 object MessagePersistence {
-  import MessageData._
+  import MessageData.*
   import PceMessage.ProviderEndPointFormat
 
   // Json.format doesn't work, so use manual conversion instead.
   implicit val FromRequesterFormat: OFormat[FromRequester] =
-    unaryCaseClassFormat("message")(FromRequester.apply, FromRequester.unapply)
+    unaryCaseClassFormat("message")(FromRequester.apply, _.message)
   implicit val ToRequesterFormat: OFormat[ToRequester] =
-    unaryCaseClassFormat("message")(ToRequester.apply, ToRequester.unapply)
+    unaryCaseClassFormat("message")(ToRequester.apply, _.message)
   implicit val FromProviderFormat: OFormat[FromProvider] =
-    unaryCaseClassFormat("message")(FromProvider.apply, FromProvider.unapply)
+    unaryCaseClassFormat("message")(FromProvider.apply, _.message)
   implicit val AckFromProviderFormat: OFormat[AckFromProvider] =
-    unaryCaseClassFormat("message")(AckFromProvider.apply, AckFromProvider.unapply)
+    unaryCaseClassFormat("message")(AckFromProvider.apply, _.message)
   implicit val ToProviderFormat: OFormat[ToProvider] = Json.format[ToProvider]
   implicit val FromPceFormat: OFormat[FromPce] = Json.format[FromPce]
   implicit val AckFromPceFormat: OFormat[AckFromPce] = Json.format[AckFromPce]

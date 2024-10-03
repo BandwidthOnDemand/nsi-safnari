@@ -2,13 +2,13 @@ package nl.surfnet.safnari
 
 import javax.xml.datatype.XMLGregorianCalendar
 
-import org.ogf.schemas.nsi._2013._12.connection.types._
+import org.ogf.schemas.nsi._2013._12.connection.types.*
 import org.ogf.schemas.nsi._2013._12.services.types.TypeValueType
 
 import nl.surfnet.bod.nsi.Nillable
-import nl.surfnet.nsiv2.messages._
-import nl.surfnet.nsiv2.utils._
-import helpers.NsiMessages._
+import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.utils.*
+import helpers.NsiMessages.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
@@ -108,7 +108,7 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
       "become reserve committing when confirmed modification is committed" in new ReservedConnection
         with Modified {
         val ModifyCommitCorrelationId = newCorrelationId
-        given(
+        `given`(
           upa.response(
             CorrelationId(0, 7),
             ReserveConfirmed(
@@ -139,7 +139,7 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
 
       "become committed when modify commit is confirmed" in new ReservedConnection with Modified {
         val ModifyCommitCorrelationId = newCorrelationId
-        given(
+        `given`(
           upa.response(
             CorrelationId(0, 7),
             ReserveConfirmed(
@@ -169,7 +169,7 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
 
       "allow aborting modified reservation before commit" in new ReservedConnection with Modified {
         val AbortModifyCorrelationId = newCorrelationId
-        given(
+        `given`(
           upa.response(
             CorrelationId(0, 7),
             ReserveConfirmed(
@@ -202,7 +202,7 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
       "allow modify after aborting previous modify" in new ReservedConnection with Modified {
         val AbortModifyCorrelationId = newCorrelationId
         val NewModifyCorrelationId = newCorrelationId
-        given(
+        `given`(
           upa.response(
             CorrelationId(0, 7),
             ReserveConfirmed(
@@ -287,7 +287,7 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
 
       "not send ReserveAbort to child that does not support modify" in new ReservedConnection
         with Modified {
-        given(
+        `given`(
           upa.acknowledge(
             CorrelationId(0, 7),
             ServiceException(
