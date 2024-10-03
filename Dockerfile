@@ -9,7 +9,11 @@ COPY app/ app/
 COPY conf/ conf/
 COPY project/ project/
 COPY public/ public/
-RUN sbt packageZipTarball
+RUN --mount=type=secret,id=github_token <<EOF
+set -e
+export GITHUB_TOKEN="$(cat /run/secrets/github_token)"
+sbt packageZipTarball
+EOF
 
 
 FROM eclipse-temurin:21
