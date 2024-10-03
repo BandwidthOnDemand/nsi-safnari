@@ -73,7 +73,7 @@ Test / testOptions := Seq(Tests.Argument(TestFrameworks.Specs2, "junitxml", "con
 
 // sbt-github-packages configuration
 githubOwner := "BandwidthOnDemand"
-githubRepository := "play-nsi-support"
+githubRepository := "nsi-safnari"
 resolvers += Resolver.githubPackages("BandwidthOnDemand")
 
 // sbt-native-packager configuration
