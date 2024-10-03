@@ -77,7 +77,7 @@ githubRepository := "play-nsi-support"
 resolvers += Resolver.githubPackages("BandwidthOnDemand")
 
 // sbt-native-packager configuration
-enablePlugins(JavaAppPackaging)
+enablePlugins(JavaAppPackaging, UniversalDeployPlugin)
 
 //PublishDist.publishSettings
 
