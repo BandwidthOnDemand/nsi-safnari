@@ -77,18 +77,9 @@ spec:
             - "-Djavax.net.ssl.keyStorePassword=secret"
             - {{ printf "-Djavax.net.ssl.trustStore=%s/nsi-safnari-truststore.jks" .Values.config.mountPath | quote }}
             - {{ printf "-Djavax.net.ssl.keyStore=%s/nsi-safnari-keystore.jks" .Values.config.mountPath | quote }}
-            - "-J-Xms512m"
-            - "-J-Xmx512m"
-            - "-J-server"
-            - "-J-verbose:gc"
-            - "-J-XX:+PrintGCDetails"
-            - "-J-XX:+PrintGCDateStamps"
-            - "-J-Xloggc:./nsi-safnari/logs/gc.log"
-            - "-J-XX:+UseGCLogFileRotation"
-            - "-J-XX:NumberOfGCLogFiles=10"
-            - "-J-XX:GCLogFileSize=10M"
-            - "-J-XX:+UseParallelGC"
-            - "-J-XX:+UseParallelOldGC"
+            - "-J-XX:MaxRAMPercentage=75"
+            - "-J-Xlog:gc:file=./logs/gc.log:time,level,tags:filecount=5,filesize=10M"
+            - "-J-XshowSettings:vm"
           env:
             - name: SAFNARI_APPLICATION_SECRET
               valueFrom:
