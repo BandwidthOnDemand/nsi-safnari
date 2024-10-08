@@ -21,13 +21,14 @@ FROM eclipse-temurin:21
 ENV PORT=9000
 ENV ADDRESS="0.0.0.0"
 ENV CONFIG=/config/config-overrides.conf
-ENV EXTRA="-J-Xms512m -J-Xmx512m -J-server -J-verbose:gc -J-XX:+PrintGCDetails -J-XX:+PrintGCDateStamps -J-XX:+UseGCLogFileRotation -J-XX:NumberOfGCLogFiles=10 -J-XX:GCLogFileSize=10M"
+ENV EXTRA="-XX:MaxRAMPercentage=75 -J-Xlog:gc:file=./logs/gc.log:time,level,tags:filecount=5,filesize=10M -J-XshowSettings:vm"
 # default trust store in configured here, the key store is configured in the config file
 ENV TRUSTSTORE="-Djavax.net.ssl.trustStoreType=jks -Djavax.net.ssl.trustStorePassword=secret -Djavax.net.ssl.trustStore=target/universal/stage/conf/nsi-safnari-truststore.jks"
 
 RUN useradd --uid 12345 --comment 'Safnari user' safnari
 USER safnari:safnari
 WORKDIR /nsi-safnari
+RUN mkdir -p logs
 COPY --from=build /usr/local/src/nsi-safnari/target/universal/*.tgz nsi-safnari.tgz
 RUN tar xvzf nsi-safnari.tgz --strip-components=1 && rm nsi-safnari.tgz
 
