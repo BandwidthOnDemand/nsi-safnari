@@ -21,7 +21,7 @@ FROM eclipse-temurin:21
 ENV PORT=9000
 ENV ADDRESS="0.0.0.0"
 ENV CONFIG=/config/config-overrides.conf
-ENV EXTRA="-XX:MaxRAMPercentage=75 -J-Xlog:gc:file=./logs/gc.log:time,level,tags:filecount=5,filesize=10M -J-XshowSettings:vm"
+ENV EXTRA="-XX:MaxRAMPercentage=75.0 -J-Xlog:gc:file=./logs/gc.log:time,level,tags:filecount=5,filesize=10M -J-XshowSettings:vm"
 # default trust store in configured here, the key store is configured in the config file
 ENV TRUSTSTORE="-Djavax.net.ssl.trustStoreType=jks -Djavax.net.ssl.trustStorePassword=secret -Djavax.net.ssl.trustStore=target/universal/stage/conf/nsi-safnari-truststore.jks"
 

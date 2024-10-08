@@ -77,7 +77,7 @@ spec:
             - "-Djavax.net.ssl.keyStorePassword=secret"
             - {{ printf "-Djavax.net.ssl.trustStore=%s/nsi-safnari-truststore.jks" .Values.config.mountPath | quote }}
             - {{ printf "-Djavax.net.ssl.keyStore=%s/nsi-safnari-keystore.jks" .Values.config.mountPath | quote }}
-            - "-XX:MaxRAMPercentage=75"
+            - "-XX:MaxRAMPercentage=75.0"
             - "-J-Xlog:gc:file=./logs/gc.log:time,level,tags:filecount=5,filesize=10M"
             - "-J-XshowSettings:vm"
           env:
