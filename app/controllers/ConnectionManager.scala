@@ -86,8 +86,8 @@ object Connection {
     final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Result]]
   }
   case object Delete extends Operation {
-    type Result = Void
-    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Void]]
+    type Result = Unit
+    final val resultClassTag: ClassTag[Result] = implicitly[ClassTag[Result]]
   }
 }
 
