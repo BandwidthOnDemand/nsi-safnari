@@ -6,7 +6,7 @@ import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 
 import scala.jdk.CollectionConverters.*
 
-import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.messages.{given, *}
 import helpers.NsiMessages.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])

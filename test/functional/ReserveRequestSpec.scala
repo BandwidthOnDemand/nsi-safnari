@@ -7,7 +7,7 @@ import jakarta.xml.ws.Holder
 import controllers.NsiWebService
 import nl.surfnet.nsiv2.soap.NsiSoapConversions.*
 import nl.surfnet.nsiv2.soap.ExtraBodyParsers
-import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.messages.{given, *}
 import nl.surfnet.safnari.*
 import org.ogf.schemas.nsi._2013._12.connection.provider.ConnectionServiceProvider
 import org.ogf.schemas.nsi._2013._12.connection.types.*

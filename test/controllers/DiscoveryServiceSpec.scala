@@ -4,7 +4,6 @@ import java.time.{ZoneId, ZonedDateTime}
 import java.time.format.DateTimeFormatter
 import java.time.temporal.*
 import play.api.http.HeaderNames
-import play.api.mvc.Results
 import play.api.test.{FakeRequest, PlaySpecification, WithApplication}
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.mvc.*

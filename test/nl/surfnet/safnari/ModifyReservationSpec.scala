@@ -6,7 +6,7 @@ import org.ogf.schemas.nsi._2013._12.connection.types.*
 import org.ogf.schemas.nsi._2013._12.services.types.TypeValueType
 
 import nl.surfnet.bod.nsi.Nillable
-import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.messages.{given, *}
 import nl.surfnet.nsiv2.utils.*
 import helpers.NsiMessages.*
 

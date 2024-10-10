@@ -1,6 +1,6 @@
 @(connection: presenters.ConnectionPresenter, segments: Seq[presenters.ConnectionPathSegmentPresenter])
-@import nl.surfnet.nsiv2.messages._
-@import nl.surfnet.nsiv2.utils._
+@import nl.surfnet.nsiv2.messages.{given, *}
+@import nl.surfnet.nsiv2.utils.*
 
 @formatCommittedAndPending[A](committed: Option[A], pending: Option[A]) = @{
   (committed, pending) match {

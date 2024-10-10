@@ -22,8 +22,8 @@
  */
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.messages.*
-import nl.surfnet.nsiv2.persistence.MessageData
+import nl.surfnet.nsiv2.messages.{given, *}
+import nl.surfnet.nsiv2.persistence.{MessageData, given}
 import nl.surfnet.nsiv2.soap.Conversion
 import play.api.libs.json.*
 import scala.util.Success

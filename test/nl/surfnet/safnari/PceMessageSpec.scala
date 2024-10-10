@@ -3,7 +3,6 @@ package nl.surfnet.safnari
 import java.net.URI
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import nl.surfnet.nsiv2.messages.CorrelationId
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
 import org.ogf.schemas.nsi._2013._12.services.types.*
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType

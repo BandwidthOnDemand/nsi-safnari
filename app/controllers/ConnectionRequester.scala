@@ -27,7 +27,7 @@ import akka.event.LoggingReceive
 import java.time.Instant
 import java.util.concurrent.TimeoutException
 import javax.inject.*
-import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.messages.{given, *}
 import nl.surfnet.nsiv2.soap.*
 import nl.surfnet.safnari.*
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType

@@ -27,7 +27,7 @@ import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 import javax.xml.namespace.QName
 
-import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.messages.{given, *}
 import nl.surfnet.nsiv2.utils.*
 
 import org.ogf.schemas.nsi._2013._12.connection.types.*

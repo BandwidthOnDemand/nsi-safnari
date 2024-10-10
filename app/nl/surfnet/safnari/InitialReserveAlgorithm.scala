@@ -24,7 +24,7 @@ package nl.surfnet.safnari
 
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 
-import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.messages.{given, *}
 
 trait InitialReserveAlgorithm {
   def forSegments(segments: ComputedPathSegments): InitialReserveAlgorithm

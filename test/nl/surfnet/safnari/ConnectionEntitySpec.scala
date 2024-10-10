@@ -14,7 +14,7 @@ import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 import scala.jdk.CollectionConverters.*
 
-import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.messages.{given, *}
 import nl.surfnet.nsiv2.utils.*
 import helpers.NsiMessages.*
 

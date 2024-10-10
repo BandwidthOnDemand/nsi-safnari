@@ -4,7 +4,7 @@ import java.net.URI
 import java.time.Instant
 import java.time.temporal.*
 import jakarta.xml.bind.JAXBElement
-import nl.surfnet.nsiv2.messages.*
+import nl.surfnet.nsiv2.messages.{given, *}
 import nl.surfnet.nsiv2.utils.*
 import nl.surfnet.safnari.*
 import oasis.names.tc.saml._2_0.assertion.AttributeType
