@@ -89,7 +89,7 @@ class ConnectionEntity(
   private var pathComputationAlgorithm = initialReserve.body.service
     .flatMap(
       _.parameters(PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE)
-        .flatMap(PathComputationAlgorithm.parse)
+        .flatMap(PathComputationAlgorithm.fromString)
     )
     .getOrElse(defaultPathComputationAlgorithm)
 

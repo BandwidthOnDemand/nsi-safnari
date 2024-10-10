@@ -44,7 +44,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification:
               startTime = Schedule.startTime.toOption(None),
               endTime = Schedule.endTime.toOption(None),
               serviceType = ServiceType("ServiceType", Service),
-              algorithm = PathComputationAlgorithm.Chain,
+              algorithm = PathComputationAlgorithm.CHAIN,
               connectionTrace = connectionTrace :: Nil
             )
           )

@@ -56,7 +56,7 @@ class ConnectionManagerSpec extends helpers.Specification:
             id,
             reserve,
             () => newCorrelationId(),
-            PathComputationAlgorithm.Chain,
+            PathComputationAlgorithm.CHAIN,
             URI.create("http://localhost"),
             URI.create("http://localhost")
           )
@@ -192,7 +192,7 @@ class ConnectionManagerSpec extends helpers.Specification:
               id,
               reserve,
               () => newCorrelationId(),
-              PathComputationAlgorithm.Chain,
+              PathComputationAlgorithm.CHAIN,
               URI.create("http://localhost"),
               URI.create("http://localhost")
             )

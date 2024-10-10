@@ -56,19 +56,12 @@ case class PathComputationRequest(
     connectionTrace: List[ConnectionType]
 ) extends PceRequest
 
-sealed trait PathComputationAlgorithm:
-  def name: String
+enum PathComputationAlgorithm:
+  case CHAIN, TREE, SEQUENTIAL
 object PathComputationAlgorithm:
-  case object Chain extends PathComputationAlgorithm:
-    val name = "CHAIN"
-  case object Tree extends PathComputationAlgorithm:
-    val name = "TREE"
-  case object Sequential extends PathComputationAlgorithm:
-    val name = "SEQUENTIAL"
-
-  val values: Seq[PathComputationAlgorithm] = Vector(Chain, Tree, Sequential)
-  def parse(value: String): Option[PathComputationAlgorithm] =
-    values.find(_.name == value.toUpperCase())
+  def fromString(s: String): Option[PathComputationAlgorithm] = values.find {
+    _.toString == s.toUpperCase()
+  }
 
 sealed trait PceResponse extends PceMessage
 case class PathComputationFailed(correlationId: CorrelationId, error: NsiError) extends PceResponse
@@ -101,13 +94,13 @@ object PceMessage:
   implicit val CorrelationIdWrites: Writes[CorrelationId] = Writes { x => JsString(x.toString) }
 
   implicit val PathFindingAlgorithmWrites: Writes[PathComputationAlgorithm] = Writes { case algo =>
-    JsString(algo.name)
+    JsString(algo.toString)
   }
   implicit val PathFindingAlgorithmReads: Reads[PathComputationAlgorithm] = Reads { json =>
     json match
       case JsString(value) =>
         PathComputationAlgorithm
-          .parse(value)
+          .fromString(value)
           .fold[JsResult[PathComputationAlgorithm]](
             JsError(s"Unknown path computation algorithm '$value'")
           )(JsSuccess(_))

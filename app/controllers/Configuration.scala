@@ -52,7 +52,7 @@ class Configuration @Inject() (configuration: play.api.Configuration):
   def DdsUrl: Option[String] = configuration.getOptional[String]("safnari.dds.url")
   def PceAlgorithm: PathComputationAlgorithm = configuration
     .getOptional[String]("pce.algorithm")
-    .flatMap(PathComputationAlgorithm.parse)
+    .flatMap(PathComputationAlgorithm.fromString)
     .getOrElse(sys.error("pce.algorithm option is not set or invalid"))
   def PceEndpoint: String = getStringOrFail("pce.endpoint")
 

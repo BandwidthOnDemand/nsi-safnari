@@ -38,9 +38,9 @@ trait InitialReserveAlgorithm:
   ): InitialReserveAlgorithm
 object InitialReserveAlgorithm:
   def forAlgorithm(algorithm: PathComputationAlgorithm): InitialReserveAlgorithm = algorithm match
-    case PathComputationAlgorithm.Chain | PathComputationAlgorithm.Tree =>
+    case PathComputationAlgorithm.CHAIN | PathComputationAlgorithm.TREE =>
       SimultaneousInitialReserveAlgorithm(Map.empty)
-    case PathComputationAlgorithm.Sequential =>
+    case PathComputationAlgorithm.SEQUENTIAL =>
       SequentialInitialReserveAlgorithm(Map.empty, None, Seq.empty)
 
   private case class SimultaneousInitialReserveAlgorithm(

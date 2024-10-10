@@ -32,7 +32,7 @@ object PceMessageSpec:
     None,
     None,
     ServiceType(ServiceTypeUrl, ServiceBaseType),
-    PathComputationAlgorithm.Chain,
+    PathComputationAlgorithm.CHAIN,
     Nil
   )
 
@@ -63,7 +63,7 @@ class PceMessageSpec extends helpers.Specification:
         None,
         None,
         ServiceType(ServiceTypeUrl, ServiceBaseType),
-        PathComputationAlgorithm.Chain,
+        PathComputationAlgorithm.CHAIN,
         Nil
       )
 
@@ -89,7 +89,7 @@ class PceMessageSpec extends helpers.Specification:
         None,
         None,
         ServiceType(ServiceTypeUrl, ServiceBaseType),
-        PathComputationAlgorithm.Chain,
+        PathComputationAlgorithm.CHAIN,
         connectionTrace
       )
 

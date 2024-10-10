@@ -62,7 +62,7 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification:
           _.getCriteria.withModifiedParameters(
             new TypeValueType()
               .withType(PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE)
-              .withValue(PathComputationAlgorithm.Tree.name)
+              .withValue(PathComputationAlgorithm.TREE.toString)
           )
         )
 

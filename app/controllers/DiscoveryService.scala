@@ -159,7 +159,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
           case _        => NodeSeq.Empty
       }
       {
-        if configuration.PceAlgorithm != PathComputationAlgorithm.Tree && configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty
+        if configuration.PceAlgorithm != PathComputationAlgorithm.TREE && configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty
         then
           <other>
           <gns:TopologyReachability>

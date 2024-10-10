@@ -23,7 +23,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification:
       .withVersionConsistent(consistent)
 
   abstract class fixture extends org.specs2.matcher.Scope:
-    def pathComputationAlgorithm: PathComputationAlgorithm = PathComputationAlgorithm.Chain
+    def pathComputationAlgorithm: PathComputationAlgorithm = PathComputationAlgorithm.CHAIN
 
     val mockUuidGenerator: () => ju.UUID = Uuid.mockUuidGenerator(1)
     def newCorrelationId: CorrelationId = CorrelationId.fromUuid(mockUuidGenerator())

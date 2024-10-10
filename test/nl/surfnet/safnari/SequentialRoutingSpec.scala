@@ -14,7 +14,7 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification:
   "Connection Entity" >> {
     "with sequential routing" should {
       abstract class SequentialRoutingFixture extends fixture:
-        override def pathComputationAlgorithm = PathComputationAlgorithm.Sequential
+        override def pathComputationAlgorithm = PathComputationAlgorithm.SEQUENTIAL
 
       "confirm the reservation with a single path segment with sequential routing" in new SequentialRoutingFixture:
         val ConfirmCriteriaWithQualifiedStps = ConfirmCriteria.withPointToPointService(

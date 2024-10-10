@@ -28,9 +28,8 @@ import nl.surfnet.nsiv2.utils.*
 import org.ogf.schemas.nsi._2013._12.connection.types.*
 import scala.jdk.CollectionConverters.*
 
-object QueryRecursiveState extends Enumeration:
-  type QueryRecursiveState = Value
-  val Initial, Collecting, Collected, Failed = Value
+enum QueryRecursiveState:
+  case Initial, Collecting, Collected, Failed
 
 import QueryRecursiveState.*
 
