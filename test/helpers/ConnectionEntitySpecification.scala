@@ -95,6 +95,8 @@ abstract class ConnectionEntitySpecification extends helpers.Specification:
 
     var messages: Seq[Message] = Nil
     def when(message: InboundMessage): Option[Seq[OutboundMessage]] =
+      import nl.surfnet.nsiv2.soap.NsiSoapConversions.{given, *}
+
       messages = Nil
 
       val response = message match
@@ -114,16 +116,14 @@ abstract class ConnectionEntitySpecification extends helpers.Specification:
         // Validate outbound messages against XML schema.
         outbound.foreach {
           case ToRequester(msg) =>
-            import nl.surfnet.nsiv2.soap.NsiSoapConversions.*
-            val conversion = NsiRequesterMessageToDocument(None)(
-              NsiRequesterOperationToElement
-            ) andThen NsiXmlDocumentConversion
+            val conversion = NsiRequesterMessageToDocument[NsiRequesterOperation](None).andThen(
+              NsiXmlDocumentConversion
+            )
             conversion.apply(msg).get
           case ToProvider(msg, _) =>
-            import nl.surfnet.nsiv2.soap.NsiSoapConversions.*
-            val conversion = NsiProviderMessageToDocument(None)(
-              NsiProviderOperationToElement
-            ) andThen NsiXmlDocumentConversion
+            val conversion = NsiProviderMessageToDocument[NsiProviderOperation](None).andThen(
+              NsiXmlDocumentConversion
+            )
             conversion.apply(msg).get
           case ToPce(_) =>
           // No schema to validate against.

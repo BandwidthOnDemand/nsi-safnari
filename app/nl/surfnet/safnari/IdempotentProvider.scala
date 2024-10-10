@@ -139,7 +139,7 @@ class IdempotentProvider(
   ): Boolean =
     // JAXB documents cannot be compared directly due to broken equals implementation of the DOM tree.
     // Serialize both messages to XML and compare the resulting strings instead.
-    import soap.NsiSoapConversions.*
+    import soap.NsiSoapConversions.{given, *}
     val conversion =
       NsiProviderMessageToDocument[NsiProviderOperation](None).andThen(DocumentToString)
     conversion(a) == conversion(b)

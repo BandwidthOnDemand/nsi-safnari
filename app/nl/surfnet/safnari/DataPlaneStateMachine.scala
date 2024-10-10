@@ -22,7 +22,7 @@
  */
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.utils.*
+import nl.surfnet.nsiv2.utils.{given, *}
 
 import javax.xml.datatype.XMLGregorianCalendar
 import nl.surfnet.nsiv2.messages.{DataPlaneStateChange, NsiRequesterMessage, NsiHeaders}

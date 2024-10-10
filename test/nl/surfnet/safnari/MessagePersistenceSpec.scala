@@ -12,21 +12,19 @@ import org.scalacheck.Gen
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class MessagePersistenceSpec extends MessageStoreSpecification:
   import helpers.NsiMessages.*
-  import Generators.*
+  import Generators.given
 
-  private implicit val ArbitraryPathComputationAlgorithm: Arbitrary[PathComputationAlgorithm] =
-    Arbitrary(Gen.oneOf(PathComputationAlgorithm.values.toIndexedSeq))
-  private implicit val ArbitraryServiceType: Arbitrary[ServiceType] =
-    Arbitrary(Gen.resultOf(ServiceType.apply _))
-  private implicit val ArbitraryPathComputationRequest: Arbitrary[PathComputationRequest] =
-    Arbitrary(Gen.resultOf(PathComputationRequest.apply _))
-  private implicit val ArbitraryPceRequest: Arbitrary[PceRequest] =
-    Arbitrary(arbitrary[PathComputationRequest])
+  given Arbitrary[PathComputationAlgorithm] = Arbitrary(
+    Gen.oneOf(PathComputationAlgorithm.values.toIndexedSeq)
+  )
+  given Arbitrary[ServiceType] = Arbitrary(Gen.resultOf(ServiceType.apply _))
+  given Arbitrary[PathComputationRequest] = Arbitrary(Gen.resultOf(PathComputationRequest.apply _))
+  given Arbitrary[PceRequest] = Arbitrary(arbitrary[PathComputationRequest])
 
   override type Message = nl.surfnet.safnari.Message
-  override implicit def MessageConversion: Conversion[Message, MessageData] =
+  override given MessageConversion: Conversion[Message, MessageData] =
     MessagePersistence.MessageToMessageData
-  override implicit def MessageGenerator: Gen[Message] = Gen.oneOf(
+  override given MessageGenerator: Gen[Message] = Gen.oneOf(
     Gen.resultOf(ToPce.apply _),
     Gen.const(FromPce(PceMessageSpec.pathComputationResponse)),
     Gen.const(AckFromPce(PceMessageSpec.pathComputationFailedAck)),

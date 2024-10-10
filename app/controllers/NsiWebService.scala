@@ -26,7 +26,7 @@ import java.net.URI
 import javax.inject.*
 import javax.xml.namespace.QName
 import nl.surfnet.nsiv2.messages.*
-import nl.surfnet.nsiv2.soap.NsiSoapConversions.*
+import nl.surfnet.nsiv2.soap.NsiSoapConversions.{given, *}
 import nl.surfnet.nsiv2.soap.*
 import nl.surfnet.safnari.*
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
@@ -42,7 +42,7 @@ import scala.util.{Failure, Success, Try}
 class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext) extends WSBodyWritables:
   private val logger = Logger(classOf[NsiWebService])
 
-  implicit class SoapRequestHolder(val request: WSRequest):
+  extension (request: WSRequest)
     def withSoapActionHeader(action: String): WSRequest =
       request.addHttpHeaders("SOAPAction" -> (s"\"$action\""))
 
