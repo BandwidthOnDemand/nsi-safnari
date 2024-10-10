@@ -10,7 +10,7 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class MessagePersistenceSpec extends MessageStoreSpecification {
+class MessagePersistenceSpec extends MessageStoreSpecification:
   import helpers.NsiMessages.*
   import Generators.*
 
@@ -55,4 +55,4 @@ class MessagePersistenceSpec extends MessageStoreSpecification {
       )
     )
   )
-}
+end MessagePersistenceSpec

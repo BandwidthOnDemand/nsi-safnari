@@ -19,10 +19,10 @@ import nl.surfnet.nsiv2.utils.*
 import helpers.NsiMessages.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
+class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification:
   "A connection" >> {
     "in initial state" should {
-      "send a path computation request when reserve is received" in new fixture {
+      "send a path computation request when reserve is received" in new fixture:
         val connectionTrace = new ConnectionType().withIndex(0).withValue("foo")
         when(
           ura.request(
@@ -49,17 +49,15 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
-      "reject commit" in new fixture {
+      "reject commit" in new fixture:
         `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
         val ack = when(ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)))
 
         ack must beNone
-      }
 
-      "terminate immediately when no child connections have been reserved yet" in new fixture {
+      "terminate immediately when no child connections have been reserved yet" in new fixture:
         `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
         when(ura.request(CorrelationId(2, 1), Terminate(ConnectionId)))
@@ -73,11 +71,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         when(pce.confirm(CorrelationId(0, 1), A))
 
         messages must haveSize(0)
-      }
     }
 
     "in path computation state" should {
-      "send reserve request for each segment when path computation confirmed is received" in new fixture {
+      "send reserve request for each segment when path computation confirmed is received" in new fixture:
         `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
         when(pce.confirm(CorrelationId(0, 1), A, B))
@@ -91,9 +88,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
               if provider == B.provider =>
             reserve.service must beSome(B.serviceType.service)
         }).forall
-      }
 
-      "send reserve request for each segment including the session security attributes" in new fixture {
+      "send reserve request for each segment including the session security attributes" in new fixture:
         `given`(
           ura.request(
             ReserveCorrelationId,
@@ -110,9 +106,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToProvider(NsiProviderMessage(headers, _), provider) if provider == B.provider =>
             headers.sessionSecurityAttrs must contain(SessionSecurityAttr)
         })
-      }
 
-      "send reserve request including the connection trace" in new fixture {
+      "send reserve request including the connection trace" in new fixture:
         val requesterTrace = new ConnectionTraceTypeOF().createConnectionTrace(
           new ConnectionTraceType().withConnection(
             new ConnectionType().withIndex(2).withValue("urn:ogf:network:someone:noId")
@@ -139,9 +134,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
               equalTo(requesterTrace.getValue.getConnection.get(0))
             )
         })
-      }
 
-      "fail the connection when pce did not accept the find path request" in new fixture {
+      "fail the connection when pce did not accept the find path request" in new fixture:
         `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
         when(pce.failedAck(CorrelationId(0, 1)))
@@ -149,9 +143,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         messages must contain(like[Message] {
           case ToRequester(NsiRequesterMessage(_, ReserveFailed(_))) => ok
         }).exactly(1)
-      }
 
-      "fail the connection when path computation fails" in new fixture {
+      "fail the connection when path computation fails" in new fixture:
         `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
         when(pce.fail(CorrelationId(0, 1), NsiError.NoServicePlanePathFound))
@@ -166,9 +159,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
-      }
 
-      "notify timeout when path computation times out" in new fixture {
+      "notify timeout when path computation times out" in new fixture:
         val TimeoutTimestamp = Instant.now().plus(2, ChronoUnit.MINUTES)
         `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
@@ -187,11 +179,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           )
         )
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-      }
     }
 
     "in reserve checking state" should {
-      "confirm the reservation with a single path segment" in new fixture {
+      "confirm the reservation with a single path segment" in new fixture:
         val ConfirmCriteriaWithQualifiedStps = ConfirmCriteria.withPointToPointService(
           Service.withSourceSTP("networkId:A?vlan=1").withDestSTP("networkId:B?vlan=2")
         )
@@ -224,9 +215,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         childConnectionData("ConnectionIdA").sourceStp must beEqualTo("networkId:A?vlan=1")
         childConnectionData("ConnectionIdA").destinationStp must beEqualTo("networkId:B?vlan=2")
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-      }
 
-      "notify timeout to requester when child times out" in new fixture {
+      "notify timeout to requester when child times out" in new fixture:
         val TimeoutTimestamp = Instant.now().plus(2, ChronoUnit.MINUTES)
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
@@ -253,9 +243,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
-      "ignore reserve response after async reserve confirm" in new fixture {
+      "ignore reserve response after async reserve confirm" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A),
@@ -266,9 +255,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
 
         messages must beEmpty
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-      }
 
-      "be in reservation held state when both segments are confirmed" in new fixture {
+      "be in reservation held state when both segments are confirmed" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A, B),
@@ -387,9 +375,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
               ) =>
             ok
         })
-      }
 
-      "fail the reservation with a single path segment" in new fixture {
+      "fail the reservation with a single path segment" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A)
@@ -421,9 +408,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
-      }
 
-      "fail the reservation with two segments and at least one fails" in new fixture {
+      "fail the reservation with two segments and at least one fails" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
@@ -452,9 +438,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             failed.getServiceException().getChildException().asScala must haveSize(1)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
-      }
 
-      "fail the reservation with two segments and one downstream communication fails" in new fixture {
+      "fail the reservation with two segments and one downstream communication fails" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
@@ -480,9 +465,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             failed.getServiceException().getChildException().asScala must haveSize(1)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
-      }
 
-      "fail the reservation with two segments when both fail" in new fixture {
+      "fail the reservation with two segments when both fail" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
@@ -522,9 +506,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             failed.getServiceException().getChildException().asScala must haveSize(2)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
-      }
 
-      "terminate the child connection when terminating and the child connectionId is received" in new fixture {
+      "terminate the child connection when terminating and the child connectionId is received" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
@@ -552,9 +535,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             body.connectionId must_== "ConnectionIdB"
         })
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-      }
 
-      "terminate the connection when first child connection is FORCED_END when second child connectionId is received" in new fixture {
+      "terminate the connection when first child connection is FORCED_END when second child connectionId is received" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
@@ -590,9 +572,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             body.connectionId must_== "ConnectionIdB"
         })
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
-      }
 
-      "terminate the reservation when downstream initial reserve communication fails" in new fixture {
+      "terminate the reservation when downstream initial reserve communication fails" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A),
@@ -608,9 +589,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         when(ura.request(CorrelationId(1, 0), Terminate(ConnectionId)))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-      }
 
-      "pass child reserve timeout to requester" in new fixture {
+      "pass child reserve timeout to requester" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A),
@@ -656,9 +636,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         ).reservationState aka "child A reservation state" must beEqualTo(
           ReservationStateEnumType.RESERVE_CHECKING
         )
-      }
 
-      "pass child reserve timeout to requester for each segment" in new fixture {
+      "pass child reserve timeout to requester for each segment" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
@@ -745,9 +724,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           ReservationStateEnumType.RESERVE_CHECKING
         )
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_CHECKING)
-      }
 
-      "confirm reservation on B confirmed when A is timed out" in new fixture {
+      "confirm reservation on B confirmed when A is timed out" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
@@ -791,11 +769,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToRequester(NsiRequesterMessage(_, body: ReserveConfirmed)) =>
             body.connectionId must_== "ConnectionId"
         })
-      }
     }
 
     "in reserve held state" should {
-      "be in committing state when reserve commit is received" in new fixture {
+      "be in committing state when reserve commit is received" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A),
@@ -808,9 +785,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToProvider(NsiProviderMessage(_, _: ReserveCommit), _) => ok
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_COMMITTING)
-      }
 
-      "be in aborting state when reserve abort is received" in new fixture {
+      "be in aborting state when reserve abort is received" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A),
@@ -823,9 +799,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToProvider(NsiProviderMessage(_, _: ReserveAbort), _) => ok
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
-      }
 
-      "be in reserve timeout state when provider times out" in new fixture {
+      "be in reserve timeout state when provider times out" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A),
@@ -873,11 +848,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         )
 
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_TIMEOUT)
-      }
     }
 
     "in reserve committing state" should {
-      "be in reserved state when reserve commit confirmed is received" in new fixture {
+      "be in reserved state when reserve commit confirmed is received" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A),
@@ -896,11 +870,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           )
         )
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
-      }
     }
 
     "in reserve failed state" should {
-      "be in reserve aborting state when reserve abort is received" in new fixture {
+      "be in reserve aborting state when reserve abort is received" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A),
@@ -922,9 +895,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToProvider(NsiProviderMessage(_, _: ReserveAbort), _) => ok
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_ABORTING)
-      }
 
-      "be in reserve start state when reserve abort is received with a single child connection without connection id" in new fixture {
+      "be in reserve start state when reserve abort is received with a single child connection without connection id" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A),
@@ -940,11 +912,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToRequester(NsiRequesterMessage(_, _: ReserveAbortConfirmed)) => ok
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_START)
-      }
     }
 
     "in reserve aborting state" should {
-      "be in reserve start state when reserve abort confirm is received" in new fixture {
+      "be in reserve start state when reserve abort confirm is received" in new fixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A),
@@ -972,9 +943,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) =>
             operation.connectionId must beEqualTo(ConnectionId)
         })
-      }
 
-      "be in reserve start state when reserve abort confirm is received from two two children" in new ReserveHeldConnectionWithTwoSegments {
+      "be in reserve start state when reserve abort confirm is received from two two children" in new ReserveHeldConnectionWithTwoSegments:
         `given`(ura.request(AbortCorrelationId, ReserveAbort(ConnectionId)))
 
         when(upa.response(CorrelationId(0, 8), ReserveAbortConfirmed("ConnectionIdA")))
@@ -999,11 +969,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           case ToRequester(NsiRequesterMessage(_, operation: ReserveAbortConfirmed)) =>
             operation.connectionId must beEqualTo(ConnectionId)
         })
-      }
     }
 
     "that is not yet committed" should {
-      "provide basic information about uncommitted connections" in new fixture {
+      "provide basic information about uncommitted connections" in new fixture:
         `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
         val result = connection.query
@@ -1012,17 +981,15 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         result.getDescription() must beEqualTo(InitialReserveType.getDescription())
         result.getGlobalReservationId() must beEqualTo(InitialReserveType.getGlobalReservationId())
         result.getCriteria() must haveSize(0)
-      }
     }
 
     "that has been committed" should {
-      "be in released state" in new fixture {
+      "be in released state" in new fixture:
         `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
         provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
-      }
 
-      "provide detailed information about committed connections with children" in new ReservedConnection {
+      "provide detailed information about committed connections with children" in new ReservedConnection:
         val result = connection.query
 
         result.getCriteria() must haveSize(1)
@@ -1031,9 +998,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         committed.getSchedule() must beEqualTo(RequestCriteria.getSchedule())
         committed.getServiceType() must beEqualTo(RequestCriteria.getServiceType())
         committed.getChildren().getChild() must haveSize(1)
-      }
 
-      "be in terminating state when terminate is received" in new ReservedConnection {
+      "be in terminating state when terminate is received" in new ReservedConnection:
         val TerminateCorrelationId = newCorrelationId
 
         when(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
@@ -1053,9 +1019,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             A.provider
           )
         )
-      }
 
-      "be in terminating state when terminate is received (multi segment)" in new ReservedConnectionWithTwoSegments {
+      "be in terminating state when terminate is received (multi segment)" in new ReservedConnectionWithTwoSegments:
         val TerminateCorrelationId = newCorrelationId
 
         when(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
@@ -1087,15 +1052,13 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
     }
 
     "data plane state machine (DSM)" should {
-      "have a data plane inactive" in new ReservedConnection with Provisioned {
+      "have a data plane inactive" in new ReservedConnection with Provisioned:
         dataPlaneStatus.isActive() must beFalse
-      }
 
-      "have a data plane inactive on data plane change" in new ReservedConnection with Provisioned {
+      "have a data plane inactive on data plane change" in new ReservedConnection with Provisioned:
         `given`(
           upa.notification(
             newCorrelationId,
@@ -1140,10 +1103,9 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
       "have data plane active when data plane state change is received" in new ReservedConnection
-        with Provisioned {
+        with Provisioned:
         when(
           upa.notification(
             newCorrelationId,
@@ -1176,10 +1138,9 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
       "have data plane active when data plane state change is received (multi segement)" in new ReservedConnectionWithTwoSegments
-        with ProvisionedSegments {
+        with ProvisionedSegments:
         when(
           upa.notification(
             newCorrelationId,
@@ -1241,11 +1202,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
       "be in terminating state when terminate is received" in new ReservedConnection
         with Provisioned
-        with DataPlaneActive {
+        with DataPlaneActive:
         val TerminateCorrelationId = newCorrelationId
 
         when(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
@@ -1265,11 +1225,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             A.provider
           )
         )
-      }
     }
 
     "in terminating state" should {
-      "send a terminate confirmed to requester when terminate confirmed is received" in new ReservedConnection {
+      "send a terminate confirmed to requester when terminate confirmed is received" in new ReservedConnection:
         val TerminateCorrelationId = newCorrelationId
 
         `given`(
@@ -1288,9 +1247,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
-      "send a terminate confirmed to requester when terminate confirmed for each segment is received" in new ReservedConnectionWithTwoSegments {
+      "send a terminate confirmed to requester when terminate confirmed for each segment is received" in new ReservedConnectionWithTwoSegments:
         val TerminateCorrelationId = newCorrelationId
 
         `given`(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
@@ -1371,22 +1329,20 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
     }
 
     "lifecycle state machine (LSM)" should {
-      "initialize the provisioning state machine when the path is confirmed" in new fixture {
+      "initialize the provisioning state machine when the path is confirmed" in new fixture:
         `given`(ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)))
 
         when(pce.confirm(CorrelationId(0, 1), A))
 
         provisionState must beEqualTo(ProvisionStateEnumType.RELEASED)
-      }
     }
 
     "in created state" should {
-      "become failed on ForcedEnd error event" in new ReservedConnection {
+      "become failed on ForcedEnd error event" in new ReservedConnection:
         val ProviderErrorEventCorrelationId = newCorrelationId
         val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
         val ChildException = new ServiceExceptionType()
@@ -1439,18 +1395,16 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
-      "become PassedEndTime on PassedEndTime event" in new ReservedConnection {
+      "become PassedEndTime on PassedEndTime event" in new ReservedConnection:
         val endTime = schedule.endTime.fold2(identity, Instant.now, Instant.now)
         context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault))
 
         when(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.PASSED_END_TIME)
-      }
 
-      "ignore PassedEndTime message before scheduled end time" in new ReservedConnection {
+      "ignore PassedEndTime message before scheduled end time" in new ReservedConnection:
         val endTime =
           schedule.endTime.fold2(_.minus(5, ChronoUnit.MINUTES), Instant.now, Instant.now)
         context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault))
@@ -1458,12 +1412,11 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         when(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.CREATED)
-      }
     }
 
     "in passed end time state" should {
       "be terminating when terminate request is received" in new ReservedConnection
-        with PassedEndTime {
+        with PassedEndTime:
         when(ura.request(newCorrelationId, Terminate(ConnectionId)))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
@@ -1480,11 +1433,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             A.provider
           )
         )
-      }
     }
 
     "in failed state" should {
-      "be terminating when terminate request is received" in new ReservedConnection with Failed {
+      "be terminating when terminate request is received" in new ReservedConnection with Failed:
         when(ura.request(newCorrelationId, Terminate(ConnectionId)))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
@@ -1501,11 +1453,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             A.provider
           )
         )
-      }
     }
 
     "in released state" should {
-      "become provisioning on provision request" in new ReservedConnection with Released {
+      "become provisioning on provision request" in new ReservedConnection with Released:
         when(ura.request(newCorrelationId, Provision(ConnectionId)))
 
         messages must contain(
@@ -1517,9 +1468,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             A.provider
           )
         )
-      }
 
-      "send a provision confirmed to requester" in new ReservedConnection with Released {
+      "send a provision confirmed to requester" in new ReservedConnection with Released:
         val ProvisionCorrelationId = newCorrelationId
 
         `given`(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
@@ -1537,10 +1487,9 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
       "send a provision confirmed with multiple segments" in new ReservedConnectionWithTwoSegments
-        with ReleasedSegments {
+        with ReleasedSegments:
         val ProvisionCorrelationId = newCorrelationId
 
         `given`(ura.request(ProvisionCorrelationId, Provision(ConnectionId)))
@@ -1653,17 +1602,15 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
-      "reject release request" in new ReservedConnection with Released {
+      "reject release request" in new ReservedConnection with Released:
         val ack = when(ura.request(newCorrelationId, Release(ConnectionId)))
 
         ack must beNone
-      }
     }
 
     "in provisioned state" should {
-      "become releasing on release request" in new ReservedConnection with Provisioned {
+      "become releasing on release request" in new ReservedConnection with Provisioned:
         val ReleaseCorrelationId = newCorrelationId
 
         when(ura.request(ReleaseCorrelationId, Release(ConnectionId)))
@@ -1678,9 +1625,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             A.provider
           )
         )
-      }
 
-      "send release confirmed to requester" in new ReservedConnection with Provisioned {
+      "send release confirmed to requester" in new ReservedConnection with Provisioned:
         val ReleaseCorrelationId = newCorrelationId
 
         `given`(
@@ -1699,18 +1645,16 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
-      "reject provision request when provisioned" in new ReservedConnection with Provisioned {
+      "reject provision request when provisioned" in new ReservedConnection with Provisioned:
         val ack = when(ura.request(newCorrelationId, Provision(ConnectionId)))
 
         ack must beNone
-      }
     }
   }
 
   "Connection entity" should {
-    "pass MessageDeliveryTimeout notifications to requester" in new ReservedConnection {
+    "pass MessageDeliveryTimeout notifications to requester" in new ReservedConnection:
       val TimedOutMessageCorrelationId = newCorrelationId.toString
       val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
 
@@ -1739,9 +1683,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           )
         )
       )
-    }
 
-    "pass ErrorEvent notifications to requester" in new ReservedConnection {
+    "pass ErrorEvent notifications to requester" in new ReservedConnection:
       val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
 
       when(
@@ -1773,9 +1716,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           )
         )
       )
-    }
 
-    "pass ErrorEvent notifications to requester with child exceptions" in new ReservedConnection {
+    "pass ErrorEvent notifications to requester with child exceptions" in new ReservedConnection:
       val TimeStamp = Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
       val ChildException = new ServiceExceptionType()
         .withConnectionId("ConnectionIdA")
@@ -1823,9 +1765,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
           )
         )
       )
-    }
 
-    "send query recursive to all child providers" in new ReservedConnectionWithTwoSegments {
+    "send query recursive to all child providers" in new ReservedConnectionWithTwoSegments:
       when(ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)), None)))
 
       messages must haveSize(2)
@@ -1841,9 +1782,8 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
             ) =>
           provider must_== B.provider
       }).forall
-    }
 
-    "send query recursive confirm to requester when all child providers replied" in new ReservedConnectionWithTwoSegments {
+    "send query recursive confirm to requester when all child providers replied" in new ReservedConnectionWithTwoSegments:
       `given`(
         ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)), None)),
         upa.response(CorrelationId(0, 11), QueryRecursiveConfirmed(Nil))
@@ -1856,6 +1796,5 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification {
         case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(results))) =>
           results must haveSize(1)
       }).forall
-    }
   }
-}
+end ConnectionEntitySpec

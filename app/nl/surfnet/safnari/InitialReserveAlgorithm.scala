@@ -26,7 +26,7 @@ import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteria
 
 import nl.surfnet.nsiv2.messages.{given, *}
 
-trait InitialReserveAlgorithm {
+trait InitialReserveAlgorithm:
   def forSegments(segments: ComputedPathSegments): InitialReserveAlgorithm
 
   def nextSegments: Map[CorrelationId, ComputedSegment]
@@ -36,18 +36,16 @@ trait InitialReserveAlgorithm {
       correlationId: CorrelationId,
       criteria: ReservationConfirmCriteriaType
   ): InitialReserveAlgorithm
-}
-object InitialReserveAlgorithm {
-  def forAlgorithm(algorithm: PathComputationAlgorithm): InitialReserveAlgorithm = algorithm match {
+object InitialReserveAlgorithm:
+  def forAlgorithm(algorithm: PathComputationAlgorithm): InitialReserveAlgorithm = algorithm match
     case PathComputationAlgorithm.Chain | PathComputationAlgorithm.Tree =>
       SimultaneousInitialReserveAlgorithm(Map.empty)
     case PathComputationAlgorithm.Sequential =>
       SequentialInitialReserveAlgorithm(Map.empty, None, Seq.empty)
-  }
 
   private case class SimultaneousInitialReserveAlgorithm(
       nextSegments: Map[CorrelationId, ComputedSegment]
-  ) extends InitialReserveAlgorithm {
+  ) extends InitialReserveAlgorithm:
     def forSegments(segments: ComputedPathSegments): SimultaneousInitialReserveAlgorithm =
       copy(nextSegments = segments.toMap)
     def clearNextSegments: InitialReserveAlgorithm = copy(nextSegments = Map.empty)
@@ -55,13 +53,12 @@ object InitialReserveAlgorithm {
         correlationId: CorrelationId,
         criteria: ReservationConfirmCriteriaType
     ): InitialReserveAlgorithm = clearNextSegments
-  }
 
   private case class SequentialInitialReserveAlgorithm(
       nextSegments: Map[CorrelationId, ComputedSegment],
       outstandingSegment: Option[(CorrelationId, ComputedSegment)],
       remainingSegments: ComputedPathSegments
-  ) extends InitialReserveAlgorithm {
+  ) extends InitialReserveAlgorithm:
 
     def forSegments(segments: ComputedPathSegments): SequentialInitialReserveAlgorithm = copy(
       nextSegments = segments.headOption.toMap,
@@ -72,12 +69,12 @@ object InitialReserveAlgorithm {
     def reserveConfirmed(
         correlationId: CorrelationId,
         criteria: ReservationConfirmCriteriaType
-    ): InitialReserveAlgorithm = {
+    ): InitialReserveAlgorithm =
       assert(
         outstandingSegment.exists(_._1 == correlationId),
         s"reservation confirm $correlationId does not match any outstanding request: $outstandingSegment"
       )
-      remainingSegments match {
+      remainingSegments match
         case Seq() =>
           SequentialInitialReserveAlgorithm(Map.empty, None, Seq.empty)
         case next +: remaining =>
@@ -87,19 +84,19 @@ object InitialReserveAlgorithm {
 
           val nextSegment = service.destStp.vlan
             .map { vlan =>
-              next.copy(_2 = next._2.copy(serviceType = next._2.serviceType.copy(service = {
+              next.copy(_2 = next._2.copy(serviceType = next._2.serviceType.copy(service =
                 val nextService = next._2.serviceType.service.shallowCopy
                 nextService.withSourceSTP(
                   nextService.sourceStp.withLabel("vlan", vlan.toString()).toString()
                 )
-              })))
+              )))
             }
             .getOrElse(next)
 
           SequentialInitialReserveAlgorithm(Map(nextSegment), Some(nextSegment), remaining)
-      }
-    }
+      end match
+    end reserveConfirmed
 
     def clearNextSegments: InitialReserveAlgorithm = copy(nextSegments = Map.empty)
-  }
-}
+  end SequentialInitialReserveAlgorithm
+end InitialReserveAlgorithm

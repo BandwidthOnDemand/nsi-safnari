@@ -28,10 +28,9 @@ import nl.surfnet.nsiv2.utils.*
 import org.ogf.schemas.nsi._2013._12.connection.types.*
 import scala.jdk.CollectionConverters.*
 
-object QueryRecursiveState extends Enumeration {
+object QueryRecursiveState extends Enumeration:
   type QueryRecursiveState = Value
   val Initial, Collecting, Collected, Failed = Value
-}
 
 import QueryRecursiveState.*
 
@@ -40,7 +39,7 @@ case class QueryRecursiveStateMachineData(
     childStates: Map[ConnectionId, QueryRecursiveState],
     answers: Map[ConnectionId, NsiRequesterOperation] = Map.empty,
     segments: Map[CorrelationId, ConnectionId] = Map.empty
-) {
+):
 
   def aggregatedState: QueryRecursiveState =
     if childStates.isEmpty then Collected
@@ -64,7 +63,7 @@ case class QueryRecursiveStateMachineData(
       childStates = childStates.updated(segments(correlationId), state),
       answers = answers.updated(segments(correlationId), answer)
     )
-}
+end QueryRecursiveStateMachineData
 
 class QueryRecursiveStateMachine(
     id: ConnectionId,
@@ -86,7 +85,7 @@ class QueryRecursiveStateMachine(
         children.collect(QueryRecursiveStateMachine.toConnectionIdProviderMap),
         children.collect(QueryRecursiveStateMachine.toConnectionIdStateMap)
       )
-    ) {
+    ):
 
   when(Initial) { case Event(FromRequester(NsiProviderMessage(_, _: QueryRecursive)), data) =>
     val segments = data.providers.map(newCorrelationId() -> _._1)
@@ -149,7 +148,7 @@ class QueryRecursiveStateMachine(
 
   private def queryRecursiveResultType(
       childs: List[ChildRecursiveType]
-  ): QueryRecursiveResultType = {
+  ): QueryRecursiveResultType =
     new QueryRecursiveResultType()
       .withRequesterNSA(initialReserve.headers.requesterNSA)
       .withConnectionId(id)
@@ -162,11 +161,9 @@ class QueryRecursiveStateMachine(
           .withAny(initialReserve.body.criteria.getAny())
           .withChildren(new ChildRecursiveListType().withChild(childs.asJava))
       )
-  }
+end QueryRecursiveStateMachine
 
-}
-
-object QueryRecursiveStateMachine {
+object QueryRecursiveStateMachine:
   val toConnectionIdProviderMap: PartialFunction[
     (ProviderEndPoint, FutureVal[ConnectionId]),
     (ConnectionId, ProviderEndPoint)
@@ -180,4 +177,3 @@ object QueryRecursiveStateMachine {
   ] = { case (_, Present(connectionId)) =>
     connectionId -> Initial
   }
-}

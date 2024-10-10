@@ -29,14 +29,13 @@ import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 private case class RequesterCommandStatus(
     command: FromRequester,
     outstandingCommandsOrReply: Either[Map[CorrelationId, OutboundMessage], ToRequester]
-) {
-  def replySent(reply: ToRequester): RequesterCommandStatus = {
+):
+  def replySent(reply: ToRequester): RequesterCommandStatus =
     assert(
       command.correlationId == reply.correlationId,
       s"reply $reply correlationId did not match command $command correlationId"
     )
     copy(outstandingCommandsOrReply = Right(reply))
-  }
 
   def commandsSent(commands: Seq[OutboundMessage]): RequesterCommandStatus =
     copy(outstandingCommandsOrReply =
@@ -44,11 +43,11 @@ private case class RequesterCommandStatus(
     )
 
   def commandReplyReceived(outstandingCommand: InboundMessage): RequesterCommandStatus =
-    copy(outstandingCommandsOrReply = outstandingCommandsOrReply match {
+    copy(outstandingCommandsOrReply = outstandingCommandsOrReply match
       case Left(outstandingCommands) => Left(outstandingCommands - outstandingCommand.correlationId)
       case reply @ Right(_)          => reply
-    })
-}
+    )
+end RequesterCommandStatus
 
 class IdempotentProvider(
     providerNsa: String,
@@ -57,22 +56,22 @@ class IdempotentProvider(
     ]]
 ) extends (
         InboundMessage => ConnectionContext => Either[ServiceExceptionType, Seq[OutboundMessage]]
-    ) {
+    ):
   private var requesterCommands = Map.empty[CorrelationId, RequesterCommandStatus]
   private var outgoingToRequesterCommands = Map.empty[CorrelationId, CorrelationId]
 
   override def apply(
       message: InboundMessage
-  ): ConnectionContext => Either[ServiceExceptionType, Seq[OutboundMessage]] = { context =>
-    message match {
+  ): ConnectionContext => Either[ServiceExceptionType, Seq[OutboundMessage]] = context =>
+    message match
       case inbound @ FromRequester(NsiProviderMessage(_, _: NsiProviderCommand)) =>
-        requesterCommands.get(inbound.correlationId) match {
+        requesterCommands.get(inbound.correlationId) match
           case None =>
             val result = wrapped(inbound)(context)
             result.foreach(recordOutput(inbound, _))
             result
           case Some(RequesterCommandStatus(original, outstandingCommandsOrReply)) =>
-            if !sameMessage(inbound.message, original.message) then {
+            if !sameMessage(inbound.message, original.message) then
               Left(
                 NsiError.GenericMessagePayloadError
                   .toServiceException(providerNsa)
@@ -80,41 +79,35 @@ class IdempotentProvider(
                     s"duplicate request with existing correlation id ${inbound.correlationId} does not match the original"
                   )
               )
-            } else {
-              Right(outstandingCommandsOrReply match {
+            else
+              Right(outstandingCommandsOrReply match
                 case Left(outstandingCommands) =>
                   outstandingCommands.values.toSeq
                 case Right(reply) =>
                   List(reply)
-              })
-            }
-        }
+              )
       case _: FromRequester =>
         wrapped(message)(context)
       case _: FromProvider | _: FromPce | _: MessageDeliveryFailure | _: PassedEndTime |
           _: AckFromProvider | _: AckFromPce =>
         val output = wrapped(message)(context)
-        for {
+        for
           requesterCommandCorrelationId <- outgoingToRequesterCommands.get(message.correlationId)
           RequesterCommandStatus(originalRequest, _) <- requesterCommands.get(
             requesterCommandCorrelationId
           )
           messages <- output.toOption
-        } {
+        do
           recordOutput(originalRequest, messages)
-          message match {
+          message match
             case _: FromProvider | _: FromPce =>
               requesterCommands += originalRequest.correlationId -> requesterCommands(
                 originalRequest.correlationId
               ).commandReplyReceived(message)
             case _ =>
-          }
-        }
         output
-    }
-  }
 
-  private def recordOutput(requesterCommand: FromRequester, output: Seq[OutboundMessage]): Unit = {
+  private def recordOutput(requesterCommand: FromRequester, output: Seq[OutboundMessage]): Unit =
     val requesterReply = output.collectFirst {
       case reply @ ToRequester(NsiRequesterMessage(_, _: NsiCommandReply)) => reply
     }
@@ -132,24 +125,22 @@ class IdempotentProvider(
       RequesterCommandStatus(requesterCommand, Left(Map.empty))
     )
 
-    val updatedStatus = requesterReply match {
+    val updatedStatus = requesterReply match
       case None =>
         currentStatus.commandsSent(newOutstandingCommands)
       case Some(reply) =>
         currentStatus.replySent(reply)
-    }
     requesterCommands = requesterCommands.updated(requesterCommand.correlationId, updatedStatus)
-  }
+  end recordOutput
 
   private def sameMessage(
       a: NsiProviderMessage[NsiProviderOperation],
       b: NsiProviderMessage[NsiProviderOperation]
-  ): Boolean = {
+  ): Boolean =
     // JAXB documents cannot be compared directly due to broken equals implementation of the DOM tree.
     // Serialize both messages to XML and compare the resulting strings instead.
     import soap.NsiSoapConversions.*
     val conversion =
       NsiProviderMessageToDocument[NsiProviderOperation](None).andThen(DocumentToString)
     conversion(a) == conversion(b)
-  }
-}
+end IdempotentProvider

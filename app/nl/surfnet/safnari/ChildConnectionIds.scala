@@ -28,7 +28,7 @@ case class ChildConnectionIds(
     segments: ComputedPathSegments = Seq.empty,
     connectionByInitialCorrelationId: Map[CorrelationId, FutureVal[ConnectionId]] = Map.empty,
     initialCorrelationIdByConnectionId: Map[ConnectionId, CorrelationId] = Map.empty
-) {
+):
 
   def segmentByCorrelationId(correlationId: CorrelationId): ComputedSegment =
     segments
@@ -40,10 +40,10 @@ case class ChildConnectionIds(
       )
       ._2
 
-  def childrenByConnectionId: Map[ConnectionId, ProviderEndPoint] = (for {
+  def childrenByConnectionId: Map[ConnectionId, ProviderEndPoint] = (for
     (correlationId, segment) <- segments
     case Present(connectionId) <- connectionByInitialCorrelationId.get(correlationId)
-  } yield connectionId -> segment.provider).toMap
+  yield connectionId -> segment.provider).toMap
 
   def awaitingConnectionId: Set[CorrelationId] =
     initialCorrelationIds -- connectionByInitialCorrelationId.keySet
@@ -52,14 +52,14 @@ case class ChildConnectionIds(
       correlationId: CorrelationId,
       connectionId: ConnectionId
   ): ChildConnectionIds = if segments.exists(_._1 == correlationId)
-  then {
+  then
     copy(
       connectionByInitialCorrelationId =
         connectionByInitialCorrelationId.updated(correlationId, Present(connectionId)),
       initialCorrelationIdByConnectionId =
         initialCorrelationIdByConnectionId.updated(connectionId, correlationId)
     )
-  } else this
+  else this
 
   def childConnections: Seq[(ComputedSegment, CorrelationId, FutureVal[ConnectionId])] =
     segments.map { case (correlationId, segment) =>
@@ -77,32 +77,29 @@ case class ChildConnectionIds(
     )
 
   def hasConnectionId(initialCorrelationId: CorrelationId): Boolean =
-    connectionByInitialCorrelationId.get(initialCorrelationId) match {
+    connectionByInitialCorrelationId.get(initialCorrelationId) match
       case Some(Present(_)) => true
       case _                => false
-    }
 
   def update(message: InboundMessage, newCorrelationId: () => CorrelationId): ChildConnectionIds =
-    message match {
+    message match
       case FromPce(message: PathComputationConfirmed) =>
         copy(segments = message.segments.map(newCorrelationId() -> _))
       case AckFromProvider(NsiProviderMessage(headers, ReserveResponse(connectionId))) =>
         receivedConnectionId(headers.correlationId, connectionId)
       case AckFromProvider(NsiProviderMessage(headers, ServiceException(serviceException))) =>
-        serviceException.getConnectionId match {
+        serviceException.getConnectionId match
           case null =>
             copy(connectionByInitialCorrelationId =
               connectionByInitialCorrelationId.updated(headers.correlationId, Never)
             )
           case connectionId => receivedConnectionId(headers.correlationId, connectionId)
-        }
       case FromProvider(NsiRequesterMessage(headers, message: ReserveConfirmed)) =>
         receivedConnectionId(headers.correlationId, message.connectionId)
       case FromProvider(NsiRequesterMessage(headers, message: ReserveFailed)) =>
         receivedConnectionId(headers.correlationId, message.connectionId)
       case _ =>
         this
-    }
 
   private def initialCorrelationIds: Set[CorrelationId] = segments.map(_._1).toSet
-}
+end ChildConnectionIds

@@ -40,7 +40,7 @@ class ApplicationController(
     connectionRequester: ConnectionRequester,
     configuration: Configuration
 )(implicit ec: ExecutionContext)
-    extends BaseController {
+    extends BaseController:
   def index: Action[AnyContent] = Action { implicit request =>
     Ok(views.html.index(configuration))
   }
@@ -113,11 +113,8 @@ class ApplicationController(
       }
   }
 
-  private def connectionDetails(connection: Connection) = for {
+  private def connectionDetails(connection: Connection) = for
     queryResult <- (connection ? Connection.Query)
     segments <- (connection ? Connection.QuerySegments)
-  } yield {
-    (queryResult.summary, queryResult.pendingCriteria, segments)
-  }
-
-}
+  yield (queryResult.summary, queryResult.pendingCriteria, segments)
+end ApplicationController

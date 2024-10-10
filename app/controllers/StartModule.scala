@@ -37,10 +37,9 @@ import scala.concurrent.*
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 
-class StartModule extends AbstractModule {
-  override def configure(): Unit = {
+class StartModule extends AbstractModule:
+  override def configure(): Unit =
     bind(classOf[GlobalSettings]).asEagerSingleton()
-  }
 
   @Singleton @Provides def extraBodyParsers(implicit
       ec: ExecutionContext,
@@ -55,7 +54,7 @@ class StartModule extends AbstractModule {
       configuration: Configuration,
       connectionRequester: ConnectionRequester,
       controllerComponents: ControllerComponents
-  )(implicit ec: ExecutionContext): ApplicationController = {
+  )(implicit ec: ExecutionContext): ApplicationController =
     new ApplicationController(
       controllerComponents,
       settings.connectionManager,
@@ -63,17 +62,15 @@ class StartModule extends AbstractModule {
       connectionRequester,
       configuration
     )
-  }
   @Singleton @Provides def discoveryService(
       settings: GlobalSettings,
       configuration: Configuration,
       controllerComponents: ControllerComponents
-  )(implicit ec: ExecutionContext): DiscoveryService = {
+  )(implicit ec: ExecutionContext): DiscoveryService =
     val discoveryService = new DiscoveryService(settings.pceRequester, configuration)
     discoveryService.setControllerComponents(controllerComponents)
     discoveryService
-  }
-}
+end StartModule
 
 @Singleton
 class GlobalSettings @Inject() (
@@ -85,7 +82,7 @@ class GlobalSettings @Inject() (
     connectionProvider: ConnectionProvider,
     connectionRequester: ConnectionRequester,
     database: Database
-)(implicit ec: ExecutionContext) {
+)(implicit ec: ExecutionContext):
   private val logger = Logger(classOf[GlobalSettings])
 
   val pceRequester: ActorRef = pathComputationEngine.createPceRequesterActor(configuration)
@@ -100,35 +97,29 @@ class GlobalSettings @Inject() (
     messageStore
   )
 
-  if configuration.CleanDbOnStart then {
-    cleanDatabase()
-  }
+  if configuration.CleanDbOnStart then cleanDatabase()
 
   restoreConnectionsFromDatabase()
 
   lifecycle.addStopHook { () =>
     Future.successful {
-      if configuration.CleanDbOnStop then {
-        cleanDatabase()
-      }
+      if configuration.CleanDbOnStop then cleanDatabase()
     }
   }
 
-  private def restoreConnectionsFromDatabase(): Unit = {
+  private def restoreConnectionsFromDatabase(): Unit =
     implicit val implicitActorSystem = actorSystem
-    try {
+    try
       logger.info("Start replaying of connection messages")
       Await.result(connectionManager.restore, Duration.Inf)
       logger.info("Completed replaying of connection messages")
-    } catch {
+    catch
       case NonFatal(e) =>
         val suppressed = e.getSuppressed()
         suppressed.foreach { e =>
           logger.error(s"Connection replay failed with suppressed exception", e)
         }
         throw e
-    }
-  }
 
   private def cleanDatabase(): Unit = database.withTransaction { implicit connection =>
     val tables = SQL(
@@ -139,4 +130,4 @@ class GlobalSettings @Inject() (
     SQL(truncate).executeUpdate()
     ()
   }
-}
+end GlobalSettings

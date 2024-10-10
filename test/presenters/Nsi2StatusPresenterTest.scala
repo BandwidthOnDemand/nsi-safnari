@@ -6,7 +6,7 @@ import org.ogf.schemas.nsi._2013._12.connection.types.{
   LifecycleStateEnumType
 }
 
-class Nsi2StatusPresenterTest extends helpers.Specification {
+class Nsi2StatusPresenterTest extends helpers.Specification:
   "Nsi2StatusPresenter" >> {
     "given a terminated connection state" should {
       val subject = Nsi2StatusPresenter(
@@ -68,4 +68,4 @@ class Nsi2StatusPresenterTest extends helpers.Specification {
       }
     }
   }
-}
+end Nsi2StatusPresenterTest

@@ -10,18 +10,17 @@ import org.scalacheck.Gen
 import javax.xml.datatype.DatatypeFactory
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class PackageSpec extends helpers.Specification {
-  object XmlGregorianCalendar {
+class PackageSpec extends helpers.Specification:
+  object XmlGregorianCalendar:
     lazy val factory: DatatypeFactory = javax.xml.datatype.DatatypeFactory.newInstance()
 
     def apply(date: String): XMLGregorianCalendar = factory.newXMLGregorianCalendar(date)
-  }
 
-  implicit val arbitraryXmlGregorianCalendar: Arbitrary[XMLGregorianCalendar] = {
-    Arbitrary(for {
+  implicit val arbitraryXmlGregorianCalendar: Arbitrary[XMLGregorianCalendar] =
+    Arbitrary(for
       timeInMillis <- Gen.choose(0L, System.currentTimeMillis() * 3)
       timezoneOffset <- Gen.choose(-14 * 60, 14 * 60)
-    } yield {
+    yield
       val dt = Instant.ofEpochMilli(timeInMillis).atOffset(ZoneOffset.ofHours(timezoneOffset))
       XmlGregorianCalendar.factory.newXMLGregorianCalendar(
         dt.getYear(),
@@ -33,8 +32,7 @@ class PackageSpec extends helpers.Specification {
         dt.get(ChronoField.MILLI_OF_SECOND),
         dt.getOffset().getTotalSeconds() / 60
       )
-    })
-  }
+    )
 
   "XML Gregorian Calender order" should {
     "sort a list of calendars" in {
@@ -58,4 +56,4 @@ class PackageSpec extends helpers.Specification {
       dates.max must beEqualTo(XmlGregorianCalendar("2002-10-09T11:00:00"))
     }
   }
-}
+end PackageSpec

@@ -34,9 +34,9 @@ case class LifecycleStateMachineData(
     command: Option[NsiProviderMessage[NsiProviderOperation]] = None,
     errorEvent: Option[ErrorEvent] = None,
     sendTerminateRequest: Map[ConnectionId, ProviderEndPoint] = Map.empty
-) {
+):
 
-  def aggregatedLifecycleStatus: LifecycleStateEnumType = {
+  def aggregatedLifecycleStatus: LifecycleStateEnumType =
     if childConnectionStates.values.forall(_ == CREATED) then CREATED
     else if childConnectionStates.values.exists(_ == FAILED) then FAILED
     else if childConnectionStates.values.exists(_ == TERMINATING) then TERMINATING
@@ -45,18 +45,16 @@ case class LifecycleStateMachineData(
       throw new IllegalStateException(
         s"cannot determine aggregated status from ${childConnectionStates.values}"
       )
-  }
 
   def startTerminate(
       command: NsiProviderMessage[NsiProviderOperation],
       children: ChildConnectionIds
-  ): LifecycleStateMachineData = {
+  ): LifecycleStateMachineData =
     def transitionalState(id: CorrelationId) =
-      children.connectionByInitialCorrelationId.get(id) match {
+      children.connectionByInitialCorrelationId.get(id) match
         case Some(Never) => TERMINATED
         case None        => TERMINATED // Initial Reserve for this segment was not yet started
         case _           => TERMINATING
-      }
 
     copy(
       command = Some(command),
@@ -64,7 +62,6 @@ case class LifecycleStateMachineData(
         correlationId -> transitionalState(correlationId)
       }.toMap
     )
-  }
 
   def updateChild(
       correlationId: CorrelationId,
@@ -93,7 +90,7 @@ case class LifecycleStateMachineData(
       children.initialCorrelationIdFor(connectionId),
       CREATED
     ) == state
-}
+end LifecycleStateMachineData
 
 /** Implementation of the NSI v2.0 Lifecycle State Machine. The implementation is complicated by the
   * fact that a `Terminate` request may be received before all the child connection ids are known.
@@ -112,7 +109,7 @@ class LifecycleStateMachine(
       LifecycleStateMachineData,
       InboundMessage,
       OutboundMessage
-    ](CREATED, LifecycleStateMachineData()) {
+    ](CREATED, LifecycleStateMachineData()):
 
   when(CREATED) {
     case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data)
@@ -220,7 +217,7 @@ class LifecycleStateMachine(
           .withOriginatingNSA(original.notification.getOriginatingNSA())
           .withAdditionalInfo(original.notification.getAdditionalInfo())
       )
-      if original.notification.getServiceException() ne null then {
+      if original.notification.getServiceException() ne null then
         event.notification.withServiceException(
           new ServiceExceptionType()
             .withConnectionId(connectionId)
@@ -230,7 +227,6 @@ class LifecycleStateMachine(
             .withServiceType(original.notification.getServiceException().getServiceType())
             .withChildException(original.notification.getServiceException())
         )
-      }
       Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event)))
     case CREATED -> PASSED_END_TIME =>
       Seq.empty
@@ -242,4 +238,4 @@ class LifecycleStateMachine(
       children.initialCorrelationIdFor(connectionId),
       CREATED
     )
-}
+end LifecycleStateMachine

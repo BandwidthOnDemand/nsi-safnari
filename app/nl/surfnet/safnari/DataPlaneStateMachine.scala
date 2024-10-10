@@ -33,7 +33,7 @@ case class DataPlaneStateMachineData(
     providers: Map[ConnectionId, ProviderEndPoint],
     childStates: Map[ConnectionId, DataPlaneStatusType],
     timeStamp: Option[XMLGregorianCalendar]
-) {
+):
 
   def highestVersion: Int = childStates.values.map(_.getVersion).max
 
@@ -52,13 +52,12 @@ case class DataPlaneStateMachineData(
       connectionId: ConnectionId,
       state: DataPlaneStatusType,
       newTimeStamp: XMLGregorianCalendar
-  ): DataPlaneStateMachineData = {
+  ): DataPlaneStateMachineData =
     val latestTimeStamp = timeStamp
       .map(implicitly[Ordering[XMLGregorianCalendar]].max(_, newTimeStamp))
       .orElse(Some(newTimeStamp))
     copy(childStates = childStates + (connectionId -> state), timeStamp = latestTimeStamp)
-  }
-}
+end DataPlaneStateMachineData
 
 class DataPlaneStateMachine(
     connectionId: ConnectionId,
@@ -68,7 +67,7 @@ class DataPlaneStateMachine(
 ) extends FiniteStateMachine[Unit, DataPlaneStateMachineData, InboundMessage, OutboundMessage](
       (),
       DataPlaneStateMachineData(children, children.map(_._1 -> new DataPlaneStatusType()), None)
-    ) {
+    ):
 
   when(()) {
     case Event(FromProvider(NsiRequesterMessage(_, DataPlaneStateChange(notification))), data) =>
@@ -105,4 +104,4 @@ class DataPlaneStateMachine(
 
   def childConnectionState(connectionId: ConnectionId): DataPlaneStatusType =
     nextStateData.childStates(connectionId)
-}
+end DataPlaneStateMachine

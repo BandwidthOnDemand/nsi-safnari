@@ -19,26 +19,25 @@ import scala.concurrent.ExecutionContext
 import java.{util as ju}
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ConnectionManagerSpec extends helpers.Specification {
+class ConnectionManagerSpec extends helpers.Specification:
   sequential
 
   private def FakeApplication(additionalConfiguration: Map[String, Any]) =
     new GuiceApplicationBuilder().configure(additionalConfiguration).build()
 
-  class RecordingActor extends Actor {
+  class RecordingActor extends Actor:
     @volatile var messages: Vector[Any] = Vector.empty[Any]
 
     def receive: PartialFunction[Any, Unit] = { case m =>
       messages :+= m
     }
-  }
 
   private def command(
       message: Message,
       timestamp: Instant = Instant.ofEpochMilli(System.currentTimeMillis)
   ) = Connection.Command(timestamp, message)
 
-  abstract class DummyConnectionFixture extends WithApplication() {
+  abstract class DummyConnectionFixture extends WithApplication():
     lazy val messageStore: SafnariMessageStore = app.injector.instanceOf[SafnariMessageStore]
     lazy val configuration: Configuration = app.injector.instanceOf[Configuration]
     implicit lazy val system: ActorSystem = app.injector.instanceOf[ActorSystem]
@@ -65,20 +64,18 @@ class ConnectionManagerSpec extends helpers.Specification {
       configuration,
       messageStore
     )
-  }
+  end DummyConnectionFixture
 
   "Connection manager" should {
-    "find a created connection" in new DummyConnectionFixture {
-      override def running() = {
+    "find a created connection" in new DummyConnectionFixture:
+      override def running() =
         val actor = connectionManager.createConnection(newConnectionId(), initialReserveMessage)
         val data = await(actor ? Connection.Query).summary
 
         connectionManager.get(data.getConnectionId) must beSome(actor)
-      }
-    }
 
-    "add child connection id" in new DummyConnectionFixture {
-      override def running() = {
+    "add child connection id" in new DummyConnectionFixture:
+      override def running() =
         implicit val sender: ActorRef = Actor.noSender
         val initialReserve = ura.request(CorrelationId(0, 0), initialReserveMessage.body)
         val connection = connectionManager.createConnection(
@@ -97,11 +94,9 @@ class ConnectionManagerSpec extends helpers.Specification {
         )
 
         connectionManager.findByChildConnectionId("ChildConnectionId") must beSome(connection)
-      }
-    }
 
-    "add child connection id during replay" in new DummyConnectionFixture {
-      override def running() = {
+    "add child connection id during replay" in new DummyConnectionFixture:
+      override def running() =
         val actor = connectionManager.createConnection(newConnectionId(), initialReserveMessage)
 
         await(
@@ -120,28 +115,23 @@ class ConnectionManagerSpec extends helpers.Specification {
         )
 
         connectionManager.findByChildConnectionId("ChildConnection") must beSome(actor)
-      }
-    }
 
-    "find connection by requester correlationId for idempotent command handling" in new DummyConnectionFixture {
-      override def running() = {
+    "find connection by requester correlationId for idempotent command handling" in new DummyConnectionFixture:
+      override def running() =
         val actor1 = connectionManager.findOrCreateConnection(initialReserveMessage)
         val actor2 = connectionManager.findOrCreateConnection(initialReserveMessage)
 
         actor1 must beSome
         actor1 must_== actor2
-      }
-    }
 
-    "accept duplicate globalReservationId" in new DummyConnectionFixture {
-      override def running() = {
-        def newReserveWithGlobalReservationId(globalReservationId: String) = {
+    "accept duplicate globalReservationId" in new DummyConnectionFixture:
+      override def running() =
+        def newReserveWithGlobalReservationId(globalReservationId: String) =
           val message =
             initialReserveMessage.tap(_.body.body.setGlobalReservationId(globalReservationId))
           message.copy(
             message.headers.copy(correlationId = helpers.Specification.newCorrelationId())
           )
-        }
         val connection1 = connectionManager.createConnection(
           newConnectionId(),
           newReserveWithGlobalReservationId("urn:A")
@@ -154,20 +144,17 @@ class ConnectionManagerSpec extends helpers.Specification {
         connectionManager.findByGlobalReservationIds(Seq(URI.create("urn:A"))) must beEqualTo(
           Seq(connection1, connection2)
         )
-      }
-    }
 
-    "delete single connection from globalReservationIdMap" in new DummyConnectionFixture {
-      override def running() = {
+    "delete single connection from globalReservationIdMap" in new DummyConnectionFixture:
+      override def running() =
         implicit val sender: ActorRef = Actor.noSender
 
-        def newReserveWithGlobalReservationId(globalReservationId: String) = {
+        def newReserveWithGlobalReservationId(globalReservationId: String) =
           val message =
             initialReserveMessage.tap(_.body.body.setGlobalReservationId(globalReservationId))
           message.copy(
             message.headers.copy(correlationId = helpers.Specification.newCorrelationId())
           )
-        }
         val connection1 = connectionManager.createConnection(
           newConnectionId(),
           newReserveWithGlobalReservationId("urn:A")
@@ -182,19 +169,18 @@ class ConnectionManagerSpec extends helpers.Specification {
         connectionManager.findByGlobalReservationIds(Seq(URI.create("urn:A"))) must beEqualTo(
           Seq(connection2)
         ).eventually
-      }
-    }
+      end running
   }
 
   class SingleConnectionActorFixture(additionalConfiguration: Map[String, Any] = Map.empty)
-      extends WithApplication(FakeApplication(additionalConfiguration = additionalConfiguration)) {
+      extends WithApplication(FakeApplication(additionalConfiguration = additionalConfiguration)):
     lazy val messageStore: SafnariMessageStore = app.injector.instanceOf[SafnariMessageStore]
     lazy val configuration: Configuration = app.injector.instanceOf[Configuration]
 
     implicit lazy val system: ActorSystem = app.injector.instanceOf[ActorSystem]
     implicit lazy val executionContext: ExecutionContext = system.dispatcher
 
-    def createConnectionManager(): ConnectionManager = {
+    def createConnectionManager(): ConnectionManager =
       val mockUuidGenerator = Uuid.mockUuidGenerator(1)
       def newCorrelationId() = CorrelationId.fromUuid(mockUuidGenerator())
       new ConnectionManager(
@@ -214,7 +200,7 @@ class ConnectionManagerSpec extends helpers.Specification {
         configuration,
         messageStore
       )
-    }
+    end createConnectionManager
 
     lazy val outbound: TestActorRef[RecordingActor] = TestActorRef(new RecordingActor)
     lazy val connectionManager: ConnectionManager = createConnectionManager()
@@ -224,7 +210,7 @@ class ConnectionManagerSpec extends helpers.Specification {
 
     def query(): QuerySummaryResultType = await(connection ? Connection.Query).summary
 
-    def reserveWithEndTime(endTime: Instant): Unit = {
+    def reserveWithEndTime(endTime: Instant): Unit =
       val reserve = initialReserveMessage.tap(
         _.body.body.getCriteria().getSchedule().withEndTime(endTime.toXMLGregorianCalendar())
       )
@@ -239,18 +225,16 @@ class ConnectionManagerSpec extends helpers.Specification {
       messages.foreach { message =>
         await(connection ? command(message))
       }
-    }
 
-    def output[A](f: => A): Vector[Any] = {
+    def output[A](f: => A): Vector[Any] =
       outbound.underlyingActor.messages = Vector.empty
       f
       outbound.underlyingActor.messages
-    }
-  }
+  end SingleConnectionActorFixture
 
   "Connection actor" should {
-    "persist and restore from the database" in new SingleConnectionActorFixture {
-      override def running() = {
+    "persist and restore from the database" in new SingleConnectionActorFixture:
+      override def running() =
         val messages = Seq(
           FromRequester(initialReserveMessage),
           pce.confirm(CorrelationId(0, 1), A),
@@ -268,11 +252,9 @@ class ConnectionManagerSpec extends helpers.Specification {
 
         restoredConnection aka "restored connection" must beSome
         await(restoredConnection.get ? Connection.Query) must_== originalQueryResult
-      }
-    }
 
-    "ensure retransmitted message is exactly the same as the original" in new SingleConnectionActorFixture {
-      override def running() = {
+    "ensure retransmitted message is exactly the same as the original" in new SingleConnectionActorFixture:
+      override def running() =
         val OriginalReserve = InitialReserveType.withDescription("original")
         val ModifiedReserve = InitialReserveType.withDescription("modified")
 
@@ -298,11 +280,10 @@ class ConnectionManagerSpec extends helpers.Specification {
               s"duplicate request with existing correlation id ${initialReserveMessage.headers.correlationId} does not match the original"
             )
         }
-      }
-    }
+      end running
 
-    "retransmit original async reply on duplicate request" in new SingleConnectionActorFixture {
-      override def running() = {
+    "retransmit original async reply on duplicate request" in new SingleConnectionActorFixture:
+      override def running() =
         val ack = await(connection ? command(FromRequester(initialReserveMessage)))
         await(connection ? command(pce.confirm(CorrelationId(0, 1), A)))
 
@@ -322,11 +303,10 @@ class ConnectionManagerSpec extends helpers.Specification {
         }
 
         retransmitted must_== original
-      }
-    }
+      end running
 
-    "retransmit PCE message when no async reply has been received" in new SingleConnectionActorFixture {
-      override def running() = {
+    "retransmit PCE message when no async reply has been received" in new SingleConnectionActorFixture:
+      override def running() =
         val original = output {
           await(connection ? command(FromRequester(initialReserveMessage)))
         }
@@ -336,11 +316,9 @@ class ConnectionManagerSpec extends helpers.Specification {
         }
 
         retransmitted aka "retransmitted" must_== original
-      }
-    }
 
-    "retransmit ToProvider messages without async reply" in new SingleConnectionActorFixture {
-      override def running() = {
+    "retransmit ToProvider messages without async reply" in new SingleConnectionActorFixture:
+      override def running() =
         await(connection ? command(FromRequester(initialReserveMessage)))
         val original = output {
           await(connection ? command(pce.confirm(CorrelationId(0, 1), A, B)))
@@ -364,11 +342,10 @@ class ConnectionManagerSpec extends helpers.Specification {
           case message @ ToProvider(NsiProviderMessage(_, _), provider) if provider == B.provider =>
             message
         })
-      }
-    }
+      end running
 
-    "restore state from replayed messages" in new SingleConnectionActorFixture {
-      override def running() = {
+    "restore state from replayed messages" in new SingleConnectionActorFixture:
+      override def running() =
         await(
           connection ? Connection.Replay(
             Seq(
@@ -399,11 +376,10 @@ class ConnectionManagerSpec extends helpers.Specification {
             ) :: Nil
           )
         )
-      }
-    }
+      end running
 
-    "send PassedEndTime message after reservation end time" in new SingleConnectionActorFixture {
-      override def running() = {
+    "send PassedEndTime message after reservation end time" in new SingleConnectionActorFixture:
+      override def running() =
         reserveWithEndTime(Instant.now())
 
         eventually(
@@ -411,28 +387,22 @@ class ConnectionManagerSpec extends helpers.Specification {
             .getConnectionStates()
             .getLifecycleState() must_== LifecycleStateEnumType.PASSED_END_TIME
         )
-      }
-    }
 
-    "support PassedEndTime more than 248 days into the future" in new SingleConnectionActorFixture {
-      override def running() = {
+    "support PassedEndTime more than 248 days into the future" in new SingleConnectionActorFixture:
+      override def running() =
         reserveWithEndTime(Instant.now().plus(300, ChronoUnit.DAYS))
-      }
-    }
 
-    "ignore PassedEndTime message received before end time" in new SingleConnectionActorFixture {
-      override def running() = {
+    "ignore PassedEndTime message received before end time" in new SingleConnectionActorFixture:
+      override def running() =
         reserveWithEndTime(Instant.now().plus(1, ChronoUnit.DAYS))
 
         await(connection ? command(PassedEndTime(newCorrelationId(), connectionId, Instant.now())))
 
         query().getConnectionStates().getLifecycleState() must_== LifecycleStateEnumType.CREATED
-      }
-    }
 
     "be deleted after a grace period" should {
-      "when never successfully reserved" in new SingleConnectionActorFixture() {
-        override def running() = {
+      "when never successfully reserved" in new SingleConnectionActorFixture():
+        override def running() =
           await(
             connection ? command(
               ura.request(CorrelationId(0, 0), initialReserveMessage.body),
@@ -446,18 +416,14 @@ class ConnectionManagerSpec extends helpers.Specification {
           connectionManager.messageStore.loadEverything().map(_._1) must not(
             contain(===(connectionId))
           )
-        }
-      }
 
       "delete connections with LSM state different from CREATED after a grace period" in new SingleConnectionActorFixture(
         additionalConfiguration = Map("safnari.connection.expiration.time" -> "250 milliseconds")
-      ) {
-        override def running() = {
+      ):
+        override def running() =
           reserveWithEndTime(Instant.now())
 
           eventually(connectionManager.get(connectionId) must beNone)
-        }
-      }
     }
   }
-}
+end ConnectionManagerSpec

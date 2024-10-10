@@ -47,7 +47,7 @@ class ConnectionRequesterController @Inject() (
     val actionBuilder: DefaultActionBuilder
 )(implicit ec: ExecutionContext)
     extends InjectedController
-    with SoapWebService {
+    with SoapWebService:
 
   override val WsdlRoot = "wsdl/2.0"
   override val WsdlPath = ""
@@ -75,15 +75,14 @@ class ConnectionRequesterController @Inject() (
         // FIXME return error when message cannot be handled?
         Future.successful(response.ack(GenericAck()))
     }
-
-}
+end ConnectionRequesterController
 
 @Singleton
 class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService: NsiWebService)(
     implicit
     actorSystem: ActorSystem,
     ec: ExecutionContext
-) {
+):
   private val logger = Logger(classOf[ConnectionRequester])
 
   private val continuations =
@@ -95,12 +94,11 @@ class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService
     continuations.replyReceived(message.headers.correlationId, message)
 
   def nsiRequester: ActorRef =
-    configuration.NsiActor match {
+    configuration.NsiActor match
       case None | Some("dummy") => actorSystem.actorOf(Props(new DummyNsiRequesterActor))
       case _                    => actorSystem.actorOf(Props(new NsiRequesterActor(configuration)))
-    }
 
-  class NsiRequesterActor(configuration: Configuration) extends Actor {
+  class NsiRequesterActor(configuration: Configuration) extends Actor:
     private val uuidGenerator = Uuid.randomUuidGenerator()
     private def newCorrelationId() = CorrelationId.fromUuid(uuidGenerator())
 
@@ -112,10 +110,9 @@ class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService
             message @ NsiProviderMessage(headers, operation: NsiProviderOperation),
             provider
           ) =>
-        val connectionId = operation match {
+        val connectionId = operation match
           case command: NsiProviderCommand => command.optionalConnectionId
           case _                           => None
-        }
 
         val connection = Connection(sender())
 
@@ -163,9 +160,9 @@ class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService
             connection ! Connection.Command(Instant.now(), AckFromProvider(ack))
         }
     }
-  }
+  end NsiRequesterActor
 
-  class DummyNsiRequesterActor extends Actor {
+  class DummyNsiRequesterActor extends Actor:
     private var connectionCriteria: Map[ConnectionId, ReservationConfirmCriteriaType] = Map.empty
 
     def receive: Receive = LoggingReceive {
@@ -285,12 +282,10 @@ class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService
     private def qualifyStp(s: String): String = Stp
       .fromString(s)
       .map { stp =>
-        stp.vlan match {
+        stp.vlan match
           case None            => stp.toString
           case Some(vlanRange) => stp.withLabel("vlan", vlanRange.lowerBound.toString).toString
-        }
       }
       .getOrElse(s)
-  }
-
-}
+  end DummyNsiRequesterActor
+end ConnectionRequester

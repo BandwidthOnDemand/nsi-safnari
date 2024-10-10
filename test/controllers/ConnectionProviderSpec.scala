@@ -11,7 +11,7 @@ import helpers.NsiMessages.*
 import akka.actor.ActorRef
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ConnectionProviderSpec extends helpers.Specification {
+class ConnectionProviderSpec extends helpers.Specification:
   sequential
 
   val DefaultConfiguration: Map[String, String] =
@@ -20,7 +20,7 @@ class ConnectionProviderSpec extends helpers.Specification {
   def Application(extraConfig: (String, String)*): Application =
     new GuiceApplicationBuilder().configure(DefaultConfiguration ++ extraConfig).build()
 
-  abstract class Fixture(application: Application) extends WithApplication(application) {
+  abstract class Fixture(application: Application) extends WithApplication(application):
     lazy val configuration: Configuration = app.injector.instanceOf[Configuration]
     lazy val pathComputationEngine: PathComputationEngine =
       app.injector.instanceOf[PathComputationEngine]
@@ -29,12 +29,11 @@ class ConnectionProviderSpec extends helpers.Specification {
     lazy val connectionProvider: ConnectionProviderController =
       app.injector.instanceOf[ConnectionProviderController]
     lazy val requesterOperation: Promise[NsiRequesterOperation] = Promise[NsiRequesterOperation]()
-  }
 
   "Reserve operation" should {
 
-    "return the connection id and confirm the reservation" in new Fixture(Application()) {
-      override def running() = {
+    "return the connection id and confirm the reservation" in new Fixture(Application()):
+      override def running() =
         val response = await(connectionProvider.handleCommand(initialReserveMessage) { reply =>
           requesterOperation.success(reply.body); ()
         })
@@ -62,16 +61,15 @@ class ConnectionProviderSpec extends helpers.Specification {
               reservation.getConnectionId() must beEqualTo(op.connectionId)
           }
         }
-      }
-    }
+      end running
 
   }
 
   "Any operation" should {
     "check requester NSA against TLS configuration" in new Fixture(
       Application("nsi.twoway.tls" -> "yes")
-    ) {
-      override def running() = {
+    ):
+      override def running() =
         val response =
           connectionProvider.request.apply(FakeRequest().withBody(initialReserveMessage))
 
@@ -79,7 +77,5 @@ class ConnectionProviderSpec extends helpers.Specification {
         body must \\("text") \> NsiError.UnsupportedParameter.text
         body must \\("variable", "type" -> "requesterNSA")
         body must \\("variable") \ ("value") \> RequesterNsa
-      }
-    }
   }
-}
+end ConnectionProviderSpec

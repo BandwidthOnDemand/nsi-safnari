@@ -50,7 +50,7 @@ class ConnectionEntity(
     defaultPathComputationAlgorithm: PathComputationAlgorithm,
     nsiReplyToUri: URI,
     pceReplyUri: URI
-) {
+):
   private final val PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE = "pathComputationAlgorithm"
   private val logger = Logger(classOf[ConnectionEntity])
 
@@ -130,7 +130,7 @@ class ConnectionEntity(
   private var providerConversations
       : Map[CorrelationId, FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = Map.empty
 
-  def queryRecursive(message: FromRequester): Option[Seq[OutboundMessage]] = message match {
+  def queryRecursive(message: FromRequester): Option[Seq[OutboundMessage]] = message match
     case FromRequester(pm @ NsiProviderMessage(_, QueryRecursive(ids, ifModifiedSince))) =>
       require(ids.fold(true) {
         case Left(connectionIds)         => connectionIds.contains(id)
@@ -154,9 +154,8 @@ class ConnectionEntity(
 
       output
     case _ => throw RuntimeException(s"unexpected query $message")
-  }
 
-  def queryRecursiveResult(message: FromProvider): Option[Seq[OutboundMessage]] = message match {
+  def queryRecursiveResult(message: FromProvider): Option[Seq[OutboundMessage]] = message match
     case FromProvider(NsiRequesterMessage(_, QueryRecursiveConfirmed(_))) | FromProvider(
           NsiRequesterMessage(_, ErrorReply(_))
         ) =>
@@ -165,14 +164,13 @@ class ConnectionEntity(
 
       qrsm.flatMap(_.process(message))
     case _ => throw RuntimeException(s"unexpected query result $message")
-  }
 
   def process(
       message: InboundMessage
-  )(context: ConnectionContext): Either[ServiceExceptionType, Seq[OutboundMessage]] = {
+  )(context: ConnectionContext): Either[ServiceExceptionType, Seq[OutboundMessage]] =
     children = children.update(message, newCorrelationId)
 
-    message match {
+    message match
       case AckFromProvider(NsiProviderMessage(_, ServiceException(exception))) =>
         Option(exception.getConnectionId()).foreach { connectionId =>
           mostRecentChildExceptions += connectionId -> exception;
@@ -189,26 +187,22 @@ class ConnectionEntity(
             .toServiceException(childNsaId.getOrElse(""))
         }
       case _ =>
-    }
 
-    if lsm.lifecycleState == LifecycleStateEnumType.TERMINATED then {
-      Left(messageNotApplicable)
-    } else {
+    if lsm.lifecycleState == LifecycleStateEnumType.TERMINATED then Left(messageNotApplicable)
+    else
       val outputs = stateMachines(message, context).flatMap { stateMachine =>
         applyMessageToStateMachine(stateMachine, message)
       }
 
-      if outputs.isEmpty then {
+      if outputs.isEmpty then
         handleUnhandledProviderNotifications(message).toRight(messageNotApplicable)
-      } else {
+      else
         lastUpdatedAt = context.clock.instant
 
         Right(outputs.flatten)
-      }
-    }
-  }
+  end process
 
-  def process(message: OutboundMessage)(context: ConnectionContext): Unit = message match {
+  def process(message: OutboundMessage)(context: ConnectionContext): Unit = message match
     case ToPce(request: PathComputationRequest) =>
       pathComputationAlgorithm = request.algorithm
     case ToRequester(NsiRequesterMessage(_, notification: NsiNotification)) =>
@@ -217,7 +211,7 @@ class ConnectionEntity(
       def genericConfirmed(connectionId: ConnectionId) =
         new GenericConfirmedType().withConnectionId(connectionId)
 
-      val nsiResult = (result match {
+      val nsiResult = (result match
         case ReserveConfirmed(connectionId, criteria) =>
           new QueryResultResponseType().withReserveConfirmed(
             new ReserveConfirmedType().withConnectionId(connectionId).withCriteria(criteria)
@@ -235,17 +229,17 @@ class ConnectionEntity(
           new QueryResultResponseType().withReserveCommitFailed(failed)
         case TerminateConfirmed(connectionId) =>
           new QueryResultResponseType().withTerminateConfirmed(genericConfirmed(connectionId))
-      }).withCorrelationId(headers.correlationId.toString())
+      )
+      .withCorrelationId(headers.correlationId.toString())
         .withResultId(newResultId())
         .withTimeStamp(Instant.now(context.clock).toXMLGregorianCalendar())
       nsiResults = nsiResult :: nsiResults
     case _ =>
-  }
 
   private def stateMachines(
       message: InboundMessage,
       context: ConnectionContext
-  ): List[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match {
+  ): List[FiniteStateMachine[_, _, InboundMessage, OutboundMessage]] = message match
     case FromRequester(NsiProviderMessage(_, _: InitialReserve)) => List(rsm)
     case FromRequester(NsiProviderMessage(_, _: ModifyReserve))  => List(rsm)
     case FromRequester(NsiProviderMessage(_, _: ReserveCommit))  => List(rsm)
@@ -269,35 +263,33 @@ class ConnectionEntity(
     case FromProvider(NsiRequesterMessage(headers, body)) =>
       val stateMachine = providerConversations.get(headers.correlationId)
       providerConversations -= headers.correlationId
-      stateMachine match {
+      stateMachine match
         case None =>
           logger.debug(
             s"No active conversation for reply ${message.toShortString}, one of [${providerConversations.keySet.mkString(", ")}] expected"
           )
           Nil
         case Some(sm) =>
-          List(sm) ++ (body match {
+          List(sm) ++ (body match
             case _: ReserveConfirmed | _: ReserveFailed => List(lsm)
             case _                                      => Nil
-          })
-      }
+          )
 
     case AckFromProvider(NsiProviderMessage(headers, body)) =>
       val stateMachine = providerConversations.get(headers.correlationId)
       if stateMachine.isEmpty then
         logger.debug(s"No active conversation for ack ${message.toShortString}")
-      stateMachine match {
+      stateMachine match
         case None =>
           logger.debug(
             s"No active conversation for ack ${message.toShortString}, one of [${providerConversations.keySet.mkString(", ")}] expected"
           )
           Nil
         case Some(sm) =>
-          List(sm) ++ (body match {
+          List(sm) ++ (body match
             case _: ReserveResponse => List(lsm)
             case _                  => Nil
-          })
-      }
+          )
 
     case _: MessageDeliveryFailure =>
       Nil
@@ -314,12 +306,11 @@ class ConnectionEntity(
           .exists(_ <= Instant.now(context.clock))
       then List(lsm)
       else Nil
-  }
 
   private def applyMessageToStateMachine(
       stateMachine: FiniteStateMachine[?, ?, InboundMessage, OutboundMessage],
       message: InboundMessage
-  ): Option[Seq[OutboundMessage]] = {
+  ): Option[Seq[OutboundMessage]] =
     val output = stateMachine.process(message)
     output.foreach { messages =>
       registerProviderConversations(messages, stateMachine)
@@ -342,7 +333,7 @@ class ConnectionEntity(
     }
 
     output
-  }
+  end applyMessageToStateMachine
 
   private lazy val messageNotApplicable: ServiceExceptionType =
     NsiError.InvalidTransition.toServiceException(aggregatorNsa)
@@ -350,16 +341,15 @@ class ConnectionEntity(
   private def registerProviderConversations(
       messages: Seq[OutboundMessage],
       stateMachine: FiniteStateMachine[?, ?, InboundMessage, OutboundMessage]
-  ): Unit = {
+  ): Unit =
     providerConversations ++= messages.collect { case message: ToProvider =>
       logger.trace(s"Registering conversation for ${message.toShortString}")
       message.correlationId -> stateMachine
     }
-  }
 
   private def handleUnhandledProviderNotifications(
       message: InboundMessage
-  ): Option[Seq[OutboundMessage]] = {
+  ): Option[Seq[OutboundMessage]] =
     val eventOption: Option[NsiNotification] = Some(message).collect {
       case FromProvider(NsiRequesterMessage(_, error: ErrorEvent)) =>
         val event = ErrorEvent(
@@ -372,7 +362,7 @@ class ConnectionEntity(
             .withOriginatingNSA(error.notification.getOriginatingNSA())
             .withAdditionalInfo(error.notification.getAdditionalInfo())
         )
-        if error.notification.getServiceException() ne null then {
+        if error.notification.getServiceException() ne null then
           event.notification.withServiceException(
             new ServiceExceptionType()
               .withConnectionId(id)
@@ -384,7 +374,6 @@ class ConnectionEntity(
               ) // FIXME own service type?
               .withChildException(error.notification.getServiceException())
           )
-        }
         event
       case FromProvider(NsiRequesterMessage(_, timeout: MessageDeliveryTimeout)) =>
         MessageDeliveryTimeout(
@@ -407,12 +396,12 @@ class ConnectionEntity(
     eventOption.map { event =>
       Seq(ToRequester(NsiRequesterMessage(newNotifyHeaders(), event)))
     }
-  }
+  end handleUnhandledProviderNotifications
 
   private def childP2PServiceType(
       correlationId: CorrelationId,
       segment: ComputedSegment
-  ): P2PServiceBaseType = {
+  ): P2PServiceBaseType =
     val childConnectionCriteria = rsm.childConnectionCriteria(correlationId)
 
     val confirmCriteria =
@@ -422,9 +411,8 @@ class ConnectionEntity(
       .flatMap(_.pointToPointService)
       .orElse(childConnectionCriteria.requested.flatMap(_.pointToPointService))
       .getOrElse(segment.serviceType.service)
-  }
 
-  def query: QuerySummaryResultType = {
+  def query: QuerySummaryResultType =
     val result = new QuerySummaryResultType()
       .withGlobalReservationId(initialReserve.body.body.getGlobalReservationId())
       .withDescription(initialReserve.body.body.getDescription())
@@ -458,15 +446,14 @@ class ConnectionEntity(
     }
 
     result
-  }
+  end query
 
-  def connectionStates: ConnectionStatesType = {
+  def connectionStates: ConnectionStatesType =
     new ConnectionStatesType()
       .withReservationState(rsm.reservationState)
       .withLifecycleState(lsm.lifecycleState)
       .withProvisionState(psm.map(_.provisionState).getOrElse(ProvisionStateEnumType.RELEASED))
       .withDataPlaneStatus(dsm.map(_.dataPlaneStatus).getOrElse(new DataPlaneStatusType()))
-  }
 
   def segments: Seq[ConnectionData] = children.childConnections.map {
     case (segment, correlationId, id) =>
@@ -500,5 +487,4 @@ class ConnectionEntity(
   }
 
   def results: Seq[QueryResultResponseType] = nsiResults
-
-}
+end ConnectionEntity

@@ -35,28 +35,25 @@ case class Nsi2StatusPresenter(
     reservation: ReservationStateEnumType,
     provision: ProvisionStateEnumType,
     dataPlaneActive: Boolean
-) {
+):
 
   def status: String = notifiableStates mkString ", "
 
-  private def notifiableStates = lifecycle match {
+  private def notifiableStates = lifecycle match
     case TERMINATED => List(lifecycle.value)
     case CREATED    => reservationState ++ provisionState
     case _          => reservationState :+ lifecycle.value
-  }
 
   private def reservationState =
     if reservation != ReservationStateEnumType.RESERVE_START then List(reservation.value) else Nil
   private def provisionState =
     if provision != null then List(provision.value, dataPlaneState) else Nil
   def dataPlaneState: String = if dataPlaneActive then "Active" else "Inactive"
-}
 
-object Nsi2StatusPresenter {
+object Nsi2StatusPresenter:
   def apply(states: ConnectionStatesType) = new Nsi2StatusPresenter(
     states.getLifecycleState,
     states.getReservationState,
     states.getProvisionState,
     states.getDataPlaneStatus.isActive
   )
-}

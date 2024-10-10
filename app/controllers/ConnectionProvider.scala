@@ -48,7 +48,7 @@ class ConnectionProviderController @Inject() (
     val actionBuilder: DefaultActionBuilder
 )(implicit actorSystem: ActorSystem, ec: ExecutionContext)
     extends BaseController
-    with SoapWebService {
+    with SoapWebService:
   private val logger = Logger(classOf[ConnectionProviderController])
 
   override val WsdlRoot = "wsdl/2.0"
@@ -59,7 +59,7 @@ class ConnectionProviderController @Inject() (
 
   def request: Action[NsiProviderMessage[NsiProviderOperation]] =
     extraBodyParsers.NsiProviderEndPoint(configuration.NsaId) { request =>
-      validateRequest(request).map(Future.successful) getOrElse (request match {
+      validateRequest(request).map(Future.successful) getOrElse (request match
         case message @ NsiProviderMessage(headers, query: NsiProviderQuery) =>
           handleQuery(NsiProviderMessage(headers, query))(
             connectionProvider.replyToClient(configuration, headers.replyTo)
@@ -68,7 +68,7 @@ class ConnectionProviderController @Inject() (
           handleCommand(NsiProviderMessage(headers, command))(
             connectionProvider.replyToClient(configuration, headers.replyTo)
           ).map(message.ack)
-      })
+      )
     }
 
   private def validateRequest(
@@ -80,8 +80,8 @@ class ConnectionProviderController @Inject() (
       message: NsiProviderMessage[?]
   ): Option[NsiProviderMessage[ServiceException]] = message.headers.replyTo.flatMap { replyTo =>
     val nsa = message.headers.requesterNSA
-    if configuration.Use2WayTLS then {
-      configuration.translateToStunnelAddress(nsa, replyTo) match {
+    if configuration.Use2WayTLS then
+      configuration.translateToStunnelAddress(nsa, replyTo) match
         case Success(_) =>
           None
         case Failure(_) =>
@@ -91,13 +91,12 @@ class ConnectionProviderController @Inject() (
               .toServiceException(configuration.NsaId, NsiHeaders.REQUESTER_NSA -> nsa)
           )
           Some(message ack serviceException)
-      }
-    } else None
+    else None
   }
 
   private def validateServiceType(
       message: NsiProviderMessage[?]
-  ): Option[NsiProviderMessage[ServiceException]] = message match {
+  ): Option[NsiProviderMessage[ServiceException]] = message match
     case NsiProviderMessage(_, reserve: InitialReserve)
         if reserve.body.getCriteria.getServiceType eq null =>
       val x = message ack ServiceException(
@@ -107,12 +106,11 @@ class ConnectionProviderController @Inject() (
       Some(x)
     case _ =>
       None
-  }
 
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderCommand])(
       sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit
   ): Future[NsiAcknowledgement] =
-    connectionManager.findOrCreateConnection(request) match {
+    connectionManager.findOrCreateConnection(request) match
       case None =>
         Future.successful(
           ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId))
@@ -123,11 +121,10 @@ class ConnectionProviderController @Inject() (
           .foreach(sendAsyncReply)
 
         connection ? Connection.Command(Instant.now, FromRequester(request))
-    }
 
   private[controllers] def handleQuery(message: NsiProviderMessage[NsiProviderQuery])(
       sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit
-  ): Future[NsiAcknowledgement] = message.body match {
+  ): Future[NsiAcknowledgement] = message.body match
     case QuerySummary(ids, ifModifiedSince) =>
       queryConnections(ids, ifModifiedSince.map(_.toInstant)) onComplete {
         case Success((reservations, lastModifiedAt)) =>
@@ -201,11 +198,10 @@ class ConnectionProviderController @Inject() (
       )
     case q @ QueryRecursive(_, _) =>
       handleQueryRecursive(message.copy(body = q))(sendAsyncReply)
-  }
 
   private[controllers] def handleQueryRecursive(message: NsiProviderMessage[QueryRecursive])(
       sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit
-  ): Future[NsiAcknowledgement] = {
+  ): Future[NsiAcknowledgement] =
     val connections = connectionIdsToConnections(message.body.ids)
 
     val answers =
@@ -225,32 +221,30 @@ class ConnectionProviderController @Inject() (
     }
 
     Future.successful(GenericAck())
-  }
+  end handleQueryRecursive
 
   private def queryNotifications(
       connection: Connection,
       start: Option[Long],
       end: Option[Long]
-  ): Future[Seq[NotificationBaseType]] = {
+  ): Future[Seq[NotificationBaseType]] =
     val range = start.getOrElse(1L) to end.getOrElse(Long.MaxValue)
     val notifications = (connection ? Connection.QueryNotifications)
     notifications.map(ns => ns.filter(n => range.contains(n.getNotificationId())))
-  }
 
   private def queryResults(
       connection: Connection,
       start: Option[Long],
       end: Option[Long]
-  ): Future[Seq[QueryResultResponseType]] = {
+  ): Future[Seq[QueryResultResponseType]] =
     val range = start.getOrElse(1L) to end.getOrElse(Long.MaxValue)
     val results = (connection ? Connection.QueryResults)
     results.map(rs => rs.filter(r => range.contains(r.getResultId())))
-  }
 
   private def queryConnections(
       ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]],
       ifModifiedSince: Option[Instant]
-  ): Future[(Seq[QuerySummaryResultType], Option[Instant])] = {
+  ): Future[(Seq[QuerySummaryResultType], Option[Instant])] =
     val maxInstant = (a: Instant, b: Instant) => if a.isBefore(b) then b else a
     val connections = connectionIdsToConnections(ids)
     Future
@@ -263,24 +257,21 @@ class ConnectionProviderController @Inject() (
           .reduceOption(maxInstant)
           .orElse(ifModifiedSince)
       )
-  }
 
   private def connectionIdsToConnections(
       ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]]
-  ): Seq[Connection] = ids match {
+  ): Seq[Connection] = ids match
     case Some(Left(connectionIds)) => connectionManager.find(connectionIds)
     case Some(Right(globalReservationIds)) =>
       connectionManager.findByGlobalReservationIds(globalReservationIds)
     case None => connectionManager.all
-  }
-
-}
+end ConnectionProviderController
 
 @Singleton
 class ConnectionProvider @Inject() (nsiWebService: NsiWebService)(implicit
     actorSystem: ActorSystem,
     ec: ExecutionContext
-) {
+):
   private val logger = Logger(classOf[ConnectionProvider])
 
   val requesterContinuations =
@@ -292,7 +283,7 @@ class ConnectionProvider @Inject() (nsiWebService: NsiWebService)(implicit
   )(
       connectionId: ConnectionId,
       initialReserve: NsiProviderMessage[InitialReserve]
-  ): (ActorRef, ConnectionEntity) = {
+  ): (ActorRef, ConnectionEntity) =
     val outbound = createOutboundActor(initialReserve)
     val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
 
@@ -308,7 +299,7 @@ class ConnectionProvider @Inject() (nsiWebService: NsiWebService)(implicit
         URI.create(configuration.pceReplyUrl)
       )
     )
-  }
+  end connectionFactory
 
   def outboundActor(
       configuration: Configuration,
@@ -329,7 +320,7 @@ class ConnectionProvider @Inject() (nsiWebService: NsiWebService)(implicit
       nsiRequester: ActorRef,
       pceRequester: ActorRef,
       notify: NsiRequesterMessage[NsiRequesterOperation] => Unit
-  ) extends Actor {
+  ) extends Actor:
     def receive: PartialFunction[Any, Unit] = {
       case pceRequest: ToPce      => pceRequester forward pceRequest
       case nsiRequest: ToProvider => nsiRequester forward nsiRequest
@@ -337,7 +328,6 @@ class ConnectionProvider @Inject() (nsiWebService: NsiWebService)(implicit
         notify(notification)
       case ToRequester(response) => handleResponse(response)
     }
-  }
 
   def replyToClient(configuration: Configuration, replyTo: Option[URI])(
       response: NsiRequesterMessage[NsiRequesterOperation]
@@ -356,5 +346,4 @@ class ConnectionProvider @Inject() (nsiWebService: NsiWebService)(implicit
 
   def handleResponse(message: NsiRequesterMessage[NsiRequesterOperation]): Unit =
     requesterContinuations.replyReceived(message.headers.correlationId, message)
-
-}
+end ConnectionProvider

@@ -41,10 +41,9 @@ import scala.util.Try
 
 case class ServiceType(serviceType: String, service: P2PServiceBaseType)
 
-sealed trait PceMessage {
+sealed trait PceMessage:
   final def action: String = this.getClass.getSimpleName
   def correlationId: CorrelationId
-}
 sealed trait PceRequest extends PceMessage
 case class PathComputationRequest(
     correlationId: CorrelationId,
@@ -57,16 +56,19 @@ case class PathComputationRequest(
     connectionTrace: List[ConnectionType]
 ) extends PceRequest
 
-sealed trait PathComputationAlgorithm { def name: String }
-object PathComputationAlgorithm {
-  case object Chain extends PathComputationAlgorithm { val name = "CHAIN" }
-  case object Tree extends PathComputationAlgorithm { val name = "TREE" }
-  case object Sequential extends PathComputationAlgorithm { val name = "SEQUENTIAL" }
+sealed trait PathComputationAlgorithm:
+  def name: String
+object PathComputationAlgorithm:
+  case object Chain extends PathComputationAlgorithm:
+    val name = "CHAIN"
+  case object Tree extends PathComputationAlgorithm:
+    val name = "TREE"
+  case object Sequential extends PathComputationAlgorithm:
+    val name = "SEQUENTIAL"
 
   val values: Seq[PathComputationAlgorithm] = Vector(Chain, Tree, Sequential)
   def parse(value: String): Option[PathComputationAlgorithm] =
     values.find(_.name == value.toUpperCase())
-}
 
 sealed trait PceResponse extends PceMessage
 case class PathComputationFailed(correlationId: CorrelationId, error: NsiError) extends PceResponse
@@ -84,12 +86,11 @@ case class ComputedSegment(provider: ProviderEndPoint, serviceType: ServiceType)
 
 case class ReachabilityTopologyEntry(id: String, cost: Int)
 
-object ReachabilityTopologyEntry {
+object ReachabilityTopologyEntry:
   implicit val ReachabilityTopologyEntryFormat: Format[ReachabilityTopologyEntry] =
     Json.format[ReachabilityTopologyEntry]
-}
 
-object PceMessage {
+object PceMessage:
   implicit val CorrelationIdReads: Reads[CorrelationId] = Reads[CorrelationId] {
     case JsString(s) =>
       CorrelationId.fromString(s).map { x => JsSuccess(x) }.getOrElse {
@@ -103,7 +104,7 @@ object PceMessage {
     JsString(algo.name)
   }
   implicit val PathFindingAlgorithmReads: Reads[PathComputationAlgorithm] = Reads { json =>
-    json match {
+    json match
       case JsString(value) =>
         PathComputationAlgorithm
           .parse(value)
@@ -111,7 +112,6 @@ object PceMessage {
             JsError(s"Unknown path computation algorithm '$value'")
           )(JsSuccess(_))
       case _ => JsError("Could not read path finding algorithm")
-    }
   }
 
   implicit val OrderedStpTypeFormat: OFormat[OrderedStpType] = (
@@ -155,7 +155,7 @@ object PceMessage {
       (__ \ "ero").formatNullable[StpListType] and
       (__ \ "parameter").format[Seq[TypeValueType]]
   ).apply(
-    (capacity, directionality, symmetricPath, source, dest, ero, parameter) => {
+    (capacity, directionality, symmetricPath, source, dest, ero, parameter) =>
       new P2PServiceBaseType()
         .withCapacity(capacity)
         .withDirectionality(directionality.getOrElse(DirectionalityType.BIDIRECTIONAL))
@@ -163,8 +163,7 @@ object PceMessage {
         .withSourceSTP(source)
         .withDestSTP(dest)
         .withEro(ero.orNull)
-        .withParameter(parameter.asJava)
-    },
+        .withParameter(parameter.asJava),
     { p2ps =>
       (
         p2ps.getCapacity(),
@@ -193,13 +192,12 @@ object PceMessage {
     )
 
   implicit val PceResponseReads: Reads[PceResponse] = Reads { json =>
-    (__ \ "status").read[String].reads(json) match {
+    (__ \ "status").read[String].reads(json) match
       case JsSuccess("SUCCESS", _) => Json.fromJson[PathComputationConfirmed](json)
       case JsSuccess("FAILED", _)  => Json.fromJson[PathComputationFailed](json)
       case JsSuccess(status, path) =>
         JsError(path -> JsonValidationError("bad.response.status", status))
       case errors: JsError => errors
-    }
   }
 
   implicit val PceResponseWrites: Writes[PceResponse] = Writes {
@@ -310,7 +308,7 @@ object PceMessage {
             constraints,
             serviceType,
             connectionTrace
-        ) => {
+        ) =>
           PathComputationRequest(
             correlationId,
             nsaId,
@@ -320,8 +318,7 @@ object PceMessage {
             serviceType,
             algorithm,
             connectionTrace.toList
-          )
-        },
+          ),
         { case request: PathComputationRequest =>
           (
             request.correlationId,
@@ -344,14 +341,13 @@ object PceMessage {
   }
 
   implicit val PceAcknowledgementReads: Reads[PceAcknowledgement] = Reads { json =>
-    (__ \ "status").read[Int].reads(json) match {
+    (__ \ "status").read[Int].reads(json) match
       case JsSuccess(202, _) => Json.fromJson[PceAccepted](json)
       case JsSuccess(_, _)   => Json.fromJson[PceFailed](json)
       case errors: JsError   => errors
-    }
   }
   private implicit val PceAcceptedReads: Reads[PceAccepted] =
     ((__ \ "correlationId").read[CorrelationId] and
       (__ \ "status").read[Int]) { (correlationId, _) => PceAccepted(correlationId) }
   private implicit val PceFailedReads: Reads[PceFailed] = Json.reads[PceFailed]
-}
+end PceMessage

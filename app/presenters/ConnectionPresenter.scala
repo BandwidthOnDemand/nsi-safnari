@@ -36,7 +36,7 @@ import org.ogf.schemas.nsi._2013._12.connection.types.QuerySummaryResultCriteria
 case class ConnectionPresenter(
     private val data: QuerySummaryResultType,
     val pendingCriteria: Option[ReservationRequestCriteriaType]
-) {
+):
   private val statusPresenter = Nsi2StatusPresenter(data.getConnectionStates)
 
   def connectionId: ConnectionId = data.getConnectionId
@@ -69,11 +69,10 @@ case class ConnectionPresenter(
   def pendingVersion: Option[Int] =
     pendingCriteria.map(_.version orElse (committedVersion.map(_ + 1)) getOrElse 1)
 
-  def qualifier(now: Instant): String = {
+  def qualifier(now: Instant): String =
     def inFuture(dt: Instant) = dt.isAfter(now)
 
     if startTime.fold2(inFuture, false, false) then "future"
     else if endTime.fold2(inFuture, true, true) then "current"
     else "past"
-  }
-}
+end ConnectionPresenter

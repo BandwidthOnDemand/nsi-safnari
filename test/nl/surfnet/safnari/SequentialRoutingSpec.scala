@@ -10,14 +10,13 @@ import nl.surfnet.nsiv2.messages.{given, *}
 import helpers.NsiMessages.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
+class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification:
   "Connection Entity" >> {
     "with sequential routing" should {
-      abstract class SequentialRoutingFixture extends fixture {
+      abstract class SequentialRoutingFixture extends fixture:
         override def pathComputationAlgorithm = PathComputationAlgorithm.Sequential
-      }
 
-      "confirm the reservation with a single path segment with sequential routing" in new SequentialRoutingFixture {
+      "confirm the reservation with a single path segment with sequential routing" in new SequentialRoutingFixture:
         val ConfirmCriteriaWithQualifiedStps = ConfirmCriteria.withPointToPointService(
           Service.withSourceSTP("networkId:A?vlan=1").withDestSTP("networkId:B?vlan=2")
         )
@@ -50,9 +49,8 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
         childConnectionData("ConnectionIdA").sourceStp must beEqualTo("networkId:A?vlan=1")
         childConnectionData("ConnectionIdA").destinationStp must beEqualTo("networkId:B?vlan=2")
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_HELD)
-      }
 
-      "be in reservation held state when both segments are confirmed" in new SequentialRoutingFixture {
+      "be in reservation held state when both segments are confirmed" in new SequentialRoutingFixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 1), A, B),
@@ -197,9 +195,8 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
               ) =>
             ok
         })
-      }
 
-      "immediately fail the reservation with two segments when the first one fails" in new SequentialRoutingFixture {
+      "immediately fail the reservation with two segments when the first one fails" in new SequentialRoutingFixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B)
@@ -227,9 +224,8 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
             failed.getServiceException().getChildException().asScala must haveSize(1)
         })
         reservationState must beEqualTo(ReservationStateEnumType.RESERVE_FAILED)
-      }
 
-      "duplicate initial reserve request should resend reserve request for current segment" in new SequentialRoutingFixture {
+      "duplicate initial reserve request should resend reserve request for current segment" in new SequentialRoutingFixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B)
@@ -259,9 +255,8 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
 
         messages must haveSize(1)
         messages must contain(reserveB)
-      }
 
-      "duplicate initial reserve request should resend reserve confirm reply" in new SequentialRoutingFixture {
+      "duplicate initial reserve request should resend reserve confirm reply" in new SequentialRoutingFixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B),
@@ -302,9 +297,8 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
 
         messages must haveSize(1)
         messages must contain(reserveConfirmed)
-      }
 
-      "terminate the reservation when downstream initial reserve communication fails" in new SequentialRoutingFixture {
+      "terminate the reservation when downstream initial reserve communication fails" in new SequentialRoutingFixture:
         `given`(
           ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
           pce.confirm(CorrelationId(0, 3), A, B)
@@ -325,7 +319,6 @@ class SequentialRoutingSpec extends helpers.ConnectionEntitySpecification {
         when(ura.request(CorrelationId(1, 0), Terminate(ConnectionId)))
 
         lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
-      }
     }
   }
-}
+end SequentialRoutingSpec

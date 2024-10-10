@@ -32,7 +32,7 @@ case class ProvisionStateMachineData(
     children: Map[ConnectionId, ProviderEndPoint],
     childStates: Map[ConnectionId, ProvisionStateEnumType],
     command: Option[NsiProviderMessage[NsiProviderOperation]] = None
-) {
+):
 
   def aggregatedProvisionStatus: ProvisionStateEnumType =
     if childStates.values.exists(_ == RELEASING) then RELEASING
@@ -58,7 +58,7 @@ case class ProvisionStateMachineData(
 
   def childHasState(connectionId: ConnectionId, state: ProvisionStateEnumType): Boolean =
     childStates.getOrElse(connectionId, RELEASED) == state
-}
+end ProvisionStateMachineData
 
 class ProvisionStateMachine(
     connectionId: ConnectionId,
@@ -72,7 +72,7 @@ class ProvisionStateMachine(
     ](
       RELEASED,
       ProvisionStateMachineData(children, children.map(_._1 -> RELEASED))
-    ) {
+    ):
 
   when(RELEASED) { case Event(FromRequester(message @ NsiProviderMessage(_, _: Provision)), data) =>
     goto(PROVISIONING) using data.startCommand(message, PROVISIONING)
@@ -132,4 +132,4 @@ class ProvisionStateMachine(
 
   def childConnectionState(connectionId: ConnectionId): ProvisionStateEnumType =
     stateData.childStates(connectionId)
-}
+end ProvisionStateMachine

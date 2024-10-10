@@ -28,7 +28,7 @@ import nl.surfnet.nsiv2.soap.Conversion
 import play.api.libs.json.*
 import scala.util.Success
 
-object MessagePersistence {
+object MessagePersistence:
   import MessageData.*
   import PceMessage.ProviderEndPointFormat
 
@@ -74,7 +74,7 @@ object MessagePersistence {
       case message: PassedEndTime =>
         Success(MessageData(Some(message.correlationId), "PassedEndTime", formatJson(message)))
     } { serialized =>
-      serialized.tpe match {
+      serialized.tpe match
         case "FromRequester"          => parseJson[FromRequester](serialized.content)
         case "ToRequester"            => parseJson[ToRequester](serialized.content)
         case "FromProvider"           => parseJson[FromProvider](serialized.content)
@@ -85,6 +85,5 @@ object MessagePersistence {
         case "ToPce"                  => parseJson[ToPce](serialized.content)
         case "MessageDeliveryFailure" => parseJson[MessageDeliveryFailure](serialized.content)
         case "PassedEndTime"          => parseJson[PassedEndTime](serialized.content)
-      }
     }
-}
+end MessagePersistence

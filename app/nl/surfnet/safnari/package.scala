@@ -25,7 +25,7 @@ package nl.surfnet
 import java.net.URI
 import nl.surfnet.nsiv2.messages.*
 
-package object safnari {
+package object safnari:
   type RequesterNsa = String
   type ConnectionId = String
   type GlobalReservationId = URI
@@ -35,4 +35,3 @@ package object safnari {
   private val UuidGenerator = Uuid.randomUuidGenerator()
 
   def newConnectionId(): ConnectionId = UuidGenerator().toString
-}

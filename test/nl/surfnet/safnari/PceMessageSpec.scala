@@ -11,7 +11,7 @@ import play.api.libs.json.*
 import nl.surfnet.nsiv2.messages.*
 import javax.xml.namespace.QName
 
-object PceMessageSpec {
+object PceMessageSpec:
   val sourceStp = "network-id:source"
 
   val destStp = "network-id:dest"
@@ -45,10 +45,10 @@ object PceMessageSpec {
 
   val pathComputationFailedAck: PceFailed = PceFailed(correlationId, 404, "Not Accepted", "")
   val pathComputationAcceptedAck: PceAccepted = PceAccepted(correlationId)
-}
+end PceMessageSpec
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class PceMessageSpec extends helpers.Specification {
+class PceMessageSpec extends helpers.Specification:
   import nl.surfnet.safnari.PceMessageSpec.*
 
   "PceMessages" should {
@@ -369,4 +369,4 @@ class PceMessageSpec extends helpers.Specification {
     }
 
   }
-}
+end PceMessageSpec

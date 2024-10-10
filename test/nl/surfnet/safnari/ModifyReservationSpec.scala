@@ -11,10 +11,10 @@ import nl.surfnet.nsiv2.utils.*
 import helpers.NsiMessages.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
+class ModifyReservationSpec extends helpers.ConnectionEntitySpecification:
   "A connection" >> {
     "that has been committed" should {
-      "become reserve checking when modify is received" in new ReservedConnection {
+      "become reserve checking when modify is received" in new ReservedConnection:
         when(ura.request(ModifyCorrelationId, ModifyReserve(ModifyReserveType)))
 
         reservationState must_== ReservationStateEnumType.RESERVE_CHECKING
@@ -41,9 +41,8 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
-      "fail modify when requested version is less than committed version" in new ReservedConnection {
+      "fail modify when requested version is less than committed version" in new ReservedConnection:
         when(
           ura.request(
             ModifyCorrelationId,
@@ -57,9 +56,8 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
           case ToRequester(NsiRequesterMessage(_, ReserveFailed(failed))) =>
             failed.getServiceException.getErrorId must_== NsiError.GenericMessagePayloadError.id
         })
-      }
 
-      "fail modify when unmodifiable parameter is provided" in new ReservedConnection {
+      "fail modify when unmodifiable parameter is provided" in new ReservedConnection:
         val modify = ModifyReserveType.tap(
           _.getCriteria.withModifiedParameters(
             new TypeValueType()
@@ -71,11 +69,10 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
         when(ura.request(ModifyCorrelationId, ModifyReserve(modify)))
 
         reservationState must_== ReservationStateEnumType.RESERVE_FAILED
-      }
     }
 
     "in modifying state" should {
-      "become reserve held when modify is confirmed" in new ReservedConnection with Modified {
+      "become reserve held when modify is confirmed" in new ReservedConnection with Modified:
         when(
           upa.response(
             CorrelationId(0, 7),
@@ -103,10 +100,9 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
       "become reserve committing when confirmed modification is committed" in new ReservedConnection
-        with Modified {
+        with Modified:
         val ModifyCommitCorrelationId = newCorrelationId
         `given`(
           upa.response(
@@ -135,9 +131,8 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
-      "become committed when modify commit is confirmed" in new ReservedConnection with Modified {
+      "become committed when modify commit is confirmed" in new ReservedConnection with Modified:
         val ModifyCommitCorrelationId = newCorrelationId
         `given`(
           upa.response(
@@ -165,9 +160,8 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
         connection.rsm.pendingCriteria must beNone
         connection.rsm.committedCriteria must beSome
         connection.query.getCriteria.get(0).pointToPointService.map(_.getCapacity) must beSome(500L)
-      }
 
-      "allow aborting modified reservation before commit" in new ReservedConnection with Modified {
+      "allow aborting modified reservation before commit" in new ReservedConnection with Modified:
         val AbortModifyCorrelationId = newCorrelationId
         `given`(
           upa.response(
@@ -197,9 +191,8 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
         )
 
         when(upa.response(CorrelationId(0, 9), ReserveAbortConfirmed("ConnectionIdA"))) must beSome
-      }
 
-      "allow modify after aborting previous modify" in new ReservedConnection with Modified {
+      "allow modify after aborting previous modify" in new ReservedConnection with Modified:
         val AbortModifyCorrelationId = newCorrelationId
         val NewModifyCorrelationId = newCorrelationId
         `given`(
@@ -242,9 +235,8 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
             )
           )
         )
-      }
 
-      "become failed when modify is declined" in new ReservedConnection with Modified {
+      "become failed when modify is declined" in new ReservedConnection with Modified:
         when(
           upa.response(
             CorrelationId(0, 7),
@@ -263,10 +255,8 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
             failed.getServiceException.getErrorId must_== NsiError.ChildSegmentError.id
         })
         reservationState must_== ReservationStateEnumType.RESERVE_FAILED
-      }
 
-      "become failed when modify is not supported by child" in new ReservedConnection
-        with Modified {
+      "become failed when modify is not supported by child" in new ReservedConnection with Modified:
         when(
           upa.acknowledge(
             CorrelationId(0, 7),
@@ -283,10 +273,9 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
             failed.getServiceException.getErrorId must_== NsiError.ChildSegmentError.id
         })
         reservationState must_== ReservationStateEnumType.RESERVE_FAILED
-      }
 
       "not send ReserveAbort to child that does not support modify" in new ReservedConnection
-        with Modified {
+        with Modified:
         `given`(
           upa.acknowledge(
             CorrelationId(0, 7),
@@ -306,7 +295,6 @@ class ModifyReservationSpec extends helpers.ConnectionEntitySpecification {
             ok
         })
         reservationState must_== ReservationStateEnumType.RESERVE_START
-      }
     }
   }
-}
+end ModifyReservationSpec

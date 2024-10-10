@@ -5,7 +5,7 @@ import org.scalacheck.Prop.forAll
 import org.scalacheck.Arbitrary.arbitrary
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class UuidSpec extends helpers.Specification {
+class UuidSpec extends helpers.Specification:
   "The deterministic UUID generator" should {
     "generate version 4 (random) and variant 2 (IETF) UUIDs" in prop { (seed: Long) =>
       val generator = Uuid.deterministicUuidGenerator(seed)
@@ -35,4 +35,4 @@ class UuidSpec extends helpers.Specification {
       )
     }
   }
-}
+end UuidSpec

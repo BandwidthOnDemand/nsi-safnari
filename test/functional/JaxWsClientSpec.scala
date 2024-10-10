@@ -12,7 +12,7 @@ import jakarta.xml.ws.Holder
 import play.api
 
 @RunWith(classOf[org.specs2.runner.JUnitRunner])
-class JaxWsClientSpec extends helpers.Specification {
+class JaxWsClientSpec extends helpers.Specification:
   sequential
 
   val SafnariNsa = "urn:ogf:network:nsa:surfnet-nsi-safnari"
@@ -27,8 +27,8 @@ class JaxWsClientSpec extends helpers.Specification {
     "be able to talk to the connection provider endpoint" in new WithServer(
       Application,
       ServerPort
-    ) {
-      override def running() = {
+    ):
+      override def running() =
         val service = new ConnectionServiceProvider(
           URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider").toURL()
         )
@@ -44,14 +44,12 @@ class JaxWsClientSpec extends helpers.Specification {
         service
           .getConnectionServiceProviderPort()
           .querySummary(Collections.emptyList[String], Collections.emptyList[String], null, header)
-      }
-    }
 
     "be able to talk to the connection requester endpoint" in new WithServer(
       Application,
       ServerPort
-    ) {
-      override def running() = {
+    ):
+      override def running() =
         val service = new ConnectionServiceRequester(
           URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceRequester").toURL()
         )
@@ -65,8 +63,5 @@ class JaxWsClientSpec extends helpers.Specification {
         )
 
         service.getConnectionServiceRequesterPort().reserveCommitConfirmed("123-abc", header)
-      }
-    }
   }
-
-}
+end JaxWsClientSpec

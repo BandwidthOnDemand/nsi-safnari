@@ -32,7 +32,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 @Singleton
-class Configuration @Inject() (configuration: play.api.Configuration) {
+class Configuration @Inject() (configuration: play.api.Configuration):
   val StartTime = LocalDateTime.now
   def NsaId: String = getStringOrFail("safnari.nsa.id")
   def NsaName: String = getStringOrFail("safnari.nsa.name")
@@ -64,7 +64,7 @@ class Configuration @Inject() (configuration: play.api.Configuration) {
   def CleanDbOnStop: Boolean =
     configuration.getOptional[Boolean]("clean.db.on.stop") getOrElse false
 
-  def PeersWith: Seq[PeerEntity] = {
+  def PeersWith: Seq[PeerEntity] =
     val configOption = Try(
       configuration.underlying
         .getConfigList("safnari.peersWith")
@@ -76,7 +76,6 @@ class Configuration @Inject() (configuration: play.api.Configuration) {
         PeerEntity(peer.getOptional[String]("id"), peer.getOptional[String]("dn"))
       )
     )
-  }
 
   // Web page footer information for main.scala.html.
   def WebParams: Map[String, String] = Map(
@@ -103,14 +102,13 @@ class Configuration @Inject() (configuration: play.api.Configuration) {
     configuration.getOptional[String](property).getOrElse(sys.error(s"$property is not set"))
 
   private def readFiniteDuration(key: String): FiniteDuration =
-    configuration.getOptional[String](key).map(Duration.apply) match {
+    configuration.getOptional[String](key).map(Duration.apply) match
       case Some(fd: FiniteDuration) => fd
       case Some(_)                  => sys.error(s"$key is not finite")
       case None                     => sys.error(s"$key not set")
-    }
 
   def translateToStunnelAddress(nsa: String, url: URI): Try[URI] = Try {
-    configuration.getOptional[String](ConfigUtil.joinPath("nsi", "tlsmap", nsa)) match {
+    configuration.getOptional[String](ConfigUtil.joinPath("nsi", "tlsmap", nsa)) match
       case Some(hostAndPort) =>
         val splitted = hostAndPort.split(":")
         new URI(
@@ -126,6 +124,5 @@ class Configuration @Inject() (configuration: play.api.Configuration) {
         throw new IllegalArgumentException(
           s"No stunnel detour configured for NSA ${nsa} while TLS was enabled."
         )
-    }
   }
-}
+end Configuration

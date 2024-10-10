@@ -5,7 +5,7 @@ import java.time.temporal.*
 import nl.surfnet.nsiv2.utils.*
 import org.ogf.schemas.nsi._2013._12.connection.types.*
 
-class ConnectionPresenterTest extends helpers.Specification {
+class ConnectionPresenterTest extends helpers.Specification:
   "A connection" >> {
     def states = new ConnectionStatesType()
       .withReservationState(ReservationStateEnumType.RESERVE_HELD)
@@ -106,4 +106,4 @@ class ConnectionPresenterTest extends helpers.Specification {
       }
     }
   }
-}
+end ConnectionPresenterTest

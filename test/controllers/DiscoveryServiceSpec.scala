@@ -10,7 +10,7 @@ import play.api.mvc.*
 import play.api
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class DiscoveryServiceSpec extends PlaySpecification with Results {
+class DiscoveryServiceSpec extends PlaySpecification with Results:
 
   def Application: api.Application = new GuiceApplicationBuilder()
     .configure(Map("nsi.actor" -> "dummy", "pce.actor" -> "dummy"))
@@ -18,8 +18,8 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
 
   "Discovery service" should {
 
-    "serve discovery document with fake reachability" in new WithApplication(Application) {
-      override def running() = {
+    "serve discovery document with fake reachability" in new WithApplication(Application):
+      override def running() =
         val controller = app.injector.instanceOf[DiscoveryService]
         controller.setControllerComponents(app.injector.instanceOf[ControllerComponents])
 
@@ -31,13 +31,11 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
         body must contain(
           """<Topology id="urn:ogf:network:surfnet.nl:1990:nsa:bod-dev" cost="0"/>"""
         )
-      }
-    }
 
     "return a not modified if if-modified-since header is in the future" in new WithApplication(
       Application
-    ) {
-      override def running() = {
+    ):
+      override def running() =
         val dateTimeFormatter = DateTimeFormatter.RFC_1123_DATE_TIME
           .withLocale(java.util.Locale.ENGLISH)
           .withZone(ZoneId.of("GMT"))
@@ -50,7 +48,5 @@ class DiscoveryServiceSpec extends PlaySpecification with Results {
           .apply(FakeRequest().withHeaders(HeaderNames.IF_MODIFIED_SINCE -> dateInTheFuture))
 
         status(result) must beEqualTo(NOT_MODIFIED)
-      }
-    }
   }
-}
+end DiscoveryServiceSpec

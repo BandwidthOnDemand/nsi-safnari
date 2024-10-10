@@ -71,7 +71,7 @@ case class ReservationStateMachineData(
     pceError: Option[NsiError] = None,
     reserveError: Option[NsiError] = None,
     aggregatedPathTrace: Option[PathTraceType] = None
-) {
+):
 
   def receivedSegments(
       algorithm: PathComputationAlgorithm,
@@ -84,16 +84,15 @@ case class ReservationStateMachineData(
   def initialReserveConfirmed(
       correlationId: CorrelationId,
       criteria: ReservationConfirmCriteriaType
-  ): ReservationStateMachineData = {
+  ): ReservationStateMachineData =
     copy(initialReserveAlgorithm =
       initialReserveAlgorithm.reserveConfirmed(correlationId, criteria)
     )
-  }
 
   def clearNextSegments: ReservationStateMachineData =
     copy(initialReserveAlgorithm = initialReserveAlgorithm.clearNextSegments)
 
-  def reserveNextSegments: ReservationStateMachineData = {
+  def reserveNextSegments: ReservationStateMachineData =
     val Some(Left(requestedCriteria)) = criteria.pending: @unchecked
 
     val nextChildConnectionCriteria: Map[CorrelationId, ConnectionCriteria] =
@@ -114,7 +113,7 @@ case class ReservationStateMachineData(
       childConnectionCriteria = childConnectionCriteria ++ nextChildConnectionCriteria,
       childConnectionStates = childConnectionStates ++ nextChildConnectionStates
     )
-  }
+  end reserveNextSegments
 
   def aggregatedReservationState: ReservationState =
     if segments.isEmpty then PathComputationState
@@ -148,7 +147,7 @@ case class ReservationStateMachineData(
   def startProcessingNewCommand(
       command: NsiProviderMessage[NsiProviderOperation],
       transitionalState: ReservationState
-  ): ReservationStateMachineData = {
+  ): ReservationStateMachineData =
     // Skip aborted state when we never received a child connection id due to an immediate service exception.
     val stateForChildConnectionsThatDidNotAcceptReserveRequest =
       if transitionalState == AbortingReservationState then AbortedReservationState
@@ -163,62 +162,56 @@ case class ReservationStateMachineData(
       childReserveTimeouts = Vector.empty,
       childResponses = Map.empty
     )
-  }
 
-  def childHasState(initialCorrelationId: CorrelationId, state: ReservationState): Boolean = {
+  def childHasState(initialCorrelationId: CorrelationId, state: ReservationState): Boolean =
     childConnectionStates.get(initialCorrelationId).exists(_ == state)
-  }
 
   def childHasState(
       children: ChildConnectionIds,
       connectionId: ConnectionId,
       state: ReservationState
-  ): Boolean = {
+  ): Boolean =
     val correlationId = children.initialCorrelationIdByConnectionId.getOrElse(
       connectionId,
       throw new IllegalStateException(s"missing child connection id for $connectionId")
     )
     childHasState(correlationId, state)
-  }
 
   def updateChild(
       initialCorrelationId: CorrelationId,
       reservationState: ReservationState,
       exception: Option[ServiceExceptionType]
-  ): ReservationStateMachineData = {
+  ): ReservationStateMachineData =
     copy(
       childConnectionStates = childConnectionStates.updated(initialCorrelationId, reservationState),
       childExceptions = exception.fold(childExceptions - initialCorrelationId)(exception =>
         childExceptions.updated(initialCorrelationId, exception)
       )
     )
-  }
 
   def updateChildByConnectionId(
       children: ChildConnectionIds,
       connectionId: ConnectionId,
       reservationState: ReservationState,
       exception: Option[ServiceExceptionType]
-  ): ReservationStateMachineData = {
+  ): ReservationStateMachineData =
     val correlationId = children.initialCorrelationIdByConnectionId.getOrElse(
       connectionId,
       throw new IllegalStateException(s"missing child connection id for ${connectionId}")
     )
     updateChild(correlationId, reservationState, exception)
-  }
 
   def updateChild(
       initialCorrelationId: CorrelationId,
       message: NsiRequesterMessage[NsiRequesterUpdate],
       reservationState: ReservationState,
       exception: Option[ServiceExceptionType] = None
-  ): ReservationStateMachineData = {
-    val responses = message match {
+  ): ReservationStateMachineData =
+    val responses = message match
       case message @ NsiRequesterMessage(_, reply: NsiCommandReply) =>
         childResponses.updated(initialCorrelationId, message.copy(body = reply))
       case _ =>
         childResponses
-    }
     copy(
       childConnectionStates = childConnectionStates.updated(initialCorrelationId, reservationState),
       childExceptions = exception.fold(childExceptions - initialCorrelationId)(exception =>
@@ -226,14 +219,13 @@ case class ReservationStateMachineData(
       ),
       childResponses = responses
     )
-  }
 
   def updateChildByConnectionId(
       children: ChildConnectionIds,
       message: NsiRequesterMessage[NsiRequesterUpdate],
       reservationState: ReservationState,
       exception: Option[ServiceExceptionType] = None
-  ): ReservationStateMachineData = {
+  ): ReservationStateMachineData =
     val correlationId = children.initialCorrelationIdByConnectionId.getOrElse(
       message.body.connectionId,
       throw new IllegalStateException(
@@ -241,28 +233,25 @@ case class ReservationStateMachineData(
       )
     )
     updateChild(correlationId, message, reservationState, exception)
-  }
 
   def modifyChildCriteria(children: ChildConnectionIds, connectionId: ConnectionId)(
       f: ConnectionCriteria => ConnectionCriteria
-  ): ReservationStateMachineData = {
+  ): ReservationStateMachineData =
     val correlationId = children.initialCorrelationIdByConnectionId.getOrElse(
       connectionId,
       throw new IllegalStateException(s"missing child connection id for $connectionId")
     )
     modifyChildCriteria(correlationId)(f)
-  }
 
   def modifyChildCriteria(
       initialCorrelationId: CorrelationId
-  )(f: ConnectionCriteria => ConnectionCriteria): ReservationStateMachineData = {
+  )(f: ConnectionCriteria => ConnectionCriteria): ReservationStateMachineData =
     copy(childConnectionCriteria =
       childConnectionCriteria.updated(
         initialCorrelationId,
         f(childConnectionCriteria.getOrElse(initialCorrelationId, ConnectionCriteria.Initial))
       )
     )
-  }
 
   private def requestedToConfirmCriteria: Option[ReservationConfirmCriteriaType] =
     criteria.requested.flatMap { requestedCriteria =>
@@ -283,18 +272,17 @@ case class ReservationStateMachineData(
   def pendingVersion = criteria.pendingVersion
 
   def processReserveTimeouts(children: ChildConnectionIds): ReservationStateMachineData =
-    aggregatedReservationState match {
+    aggregatedReservationState match
       case HeldReservationState =>
         childReserveTimeouts.foldLeft(this)((acc, timeout) =>
           acc.updateChildByConnectionId(children, timeout, TimeoutReservationState)
         )
       case _ => this
-    }
 
   def aggregatePathTrace(
       aggregatorNsa: String,
       connectionId: ConnectionId
-  ): ReservationStateMachineData = command match {
+  ): ReservationStateMachineData = command match
     case NsiProviderMessage(headers, _: InitialReserve) =>
       val pathTrace = headers.pathTrace.map { original =>
         new PathTraceType().withId(original.getId()).withConnectionId(original.getConnectionId())
@@ -302,13 +290,12 @@ case class ReservationStateMachineData(
         new PathTraceType().withId(aggregatorNsa).withConnectionId(connectionId)
       }
 
-      def extractProviderSegment(pathTrace: PathTraceType): Option[Vector[SegmentType]] = {
+      def extractProviderSegment(pathTrace: PathTraceType): Option[Vector[SegmentType]] =
         pathTrace.getPath.asScala.headOption.map(_.getSegment.asScala.toVector.sortBy(_.getOrder))
-      }
 
       val pathTraceSegments = segments
         .flatMap { case (correlationId, _) =>
-          for {
+          for
             reply <- childResponses.get(correlationId).toVector
             segment <- reply.headers.pathTrace.flatMap(extractProviderSegment) getOrElse {
               Vector(
@@ -317,7 +304,7 @@ case class ReservationStateMachineData(
                   .withConnectionId(reply.body.connectionId)
               )
             }
-          } yield segment
+          yield segment
         }
         .zipWithIndex
         .map { case (segment, order) =>
@@ -328,17 +315,14 @@ case class ReservationStateMachineData(
             .withStp(segment.getStp())
         }
 
-      if pathTraceSegments.isEmpty then {
-        this
-      } else {
+      if pathTraceSegments.isEmpty then this
+      else
         copy(aggregatedPathTrace =
           Some(pathTrace.withPath(new PathType().withSegment(pathTraceSegments.asJava)))
         )
-      }
     case _ =>
       this
-  }
-}
+end ReservationStateMachineData
 
 class ReservationStateMachine(
     aggregatorNsa: String,
@@ -366,16 +350,15 @@ class ReservationStateMachine(
         ConnectionCriteria.Initial,
         InitialReserveAlgorithm.forAlgorithm(pathComputationAlgorithm)
       )
-    ) {
+    ):
 
-  private def newInitialReserveNsiHeaders(provider: ProviderEndPoint) = {
+  private def newInitialReserveNsiHeaders(provider: ProviderEndPoint) =
     val pathTrace = initialReserve.headers.pathTrace getOrElse {
       new PathTraceType().withId(aggregatorNsa).withConnectionId(id)
     }
     newRequestHeaders(initialReserve, provider)
       .addConnectionTrace(s"$aggregatorNsa:$id")
       .withPathTrace(pathTrace)
-  }
 
   when(InitialReservationState) {
     case Event(FromRequester(NsiProviderMessage(_, message: InitialReserve)), data) =>
@@ -411,11 +394,10 @@ class ReservationStateMachine(
         .modifyChildCriteria(children, message.connectionId)(_.withHeld(message.criteria))
         .initialReserveConfirmed(headers.correlationId, message.criteria)
         .reserveNextSegments
-      val newData2 = newData.aggregatedReservationState match {
+      val newData2 = newData.aggregatedReservationState match
         case HeldReservationState =>
           newData.requestedCriteriaToHeld.aggregatePathTrace(aggregatorNsa, id)
         case _ => newData
-      }
       val newData3 = newData2.processReserveTimeouts(children)
       goto(newData3.aggregatedReservationState) using newData3
     case Event(FromProvider(reply @ NsiRequesterMessage(headers, message: ReserveFailed)), data)
@@ -735,13 +717,11 @@ class ReservationStateMachine(
 
   def childConnectionStateByInitialCorrelationId(
       correlationId: CorrelationId
-  ): ReservationStateEnumType = {
+  ): ReservationStateEnumType =
     stateData.childConnectionStates.getOrElse(correlationId, CheckingReservationState).jaxb
-  }
 
-  def childConnectionCriteria(correlationId: CorrelationId): ConnectionCriteria = {
+  def childConnectionCriteria(correlationId: CorrelationId): ConnectionCriteria =
     nextStateData.childConnectionCriteria.getOrElse(correlationId, ConnectionCriteria.Initial)
-  }
 
   def reservationState = nextStateName.jaxb
   def pendingCriteria = nextStateData.criteria.requested
@@ -773,7 +753,7 @@ class ReservationStateMachine(
       )
     )
 
-  private def validateModify(requestedCriteria: ReservationRequestCriteriaType) = {
+  private def validateModify(requestedCriteria: ReservationRequestCriteriaType) =
     val requestedVersion: Int =
       if requestedCriteria.getVersion ne null then requestedCriteria.getVersion else 0
     if committedVersion >= requestedVersion then
@@ -791,5 +771,4 @@ class ReservationStateMachine(
           .copy(text = s"parameter ${PATH_COMPUTATION_ALGORITHM_PARAMETER_TYPE} is not modifiable")
       )
     else None
-  }
-}
+end ReservationStateMachine

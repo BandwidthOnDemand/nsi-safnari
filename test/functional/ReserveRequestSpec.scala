@@ -27,7 +27,7 @@ import play.api.routing.sird.*
 import scala.concurrent.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ReserveRequestSpec extends helpers.Specification {
+class ReserveRequestSpec extends helpers.Specification:
   sequential
 
   val reserveConfirmed: Promise[NsiRequesterMessage[ReserveConfirmed]] =
@@ -97,7 +97,7 @@ class ReserveRequestSpec extends helpers.Specification {
         val bodyParsers = app.injector.instanceOf[PlayBodyParsers]
         actionBuilder(bodyParsers.json) { request =>
           val pceRequest = Json.fromJson[PceRequest](request.body)
-          pceRequest match {
+          pceRequest match
             case JsSuccess(request: PathComputationRequest, _) =>
               val response: PceResponse = PathComputationConfirmed(
                 request.correlationId,
@@ -113,18 +113,16 @@ class ReserveRequestSpec extends helpers.Specification {
               Results.Accepted
             case _ =>
               Results.BadRequest
-          }
         }
     })
     .build()
 
-  def marshal(p2ps: P2PServiceBaseType): Element = {
+  def marshal(p2ps: P2PServiceBaseType): Element =
     val jaxb =
       new org.ogf.schemas.nsi._2013._12.services.point2point.ObjectFactory().createP2Ps(p2ps)
     val result = new DOMResult()
     jaxbContext.createMarshaller().marshal(jaxb, result)
     result.getNode().asInstanceOf[Document].getDocumentElement();
-  }
 
   "A reserve request" should {
 
@@ -153,8 +151,8 @@ class ReserveRequestSpec extends helpers.Specification {
     "send a reserve request to the ultimate provider agent" in new WithServer(
       application,
       ServerPort
-    ) {
-      override def running() = {
+    ):
+      override def running() =
         val service = new ConnectionServiceProvider(
           URI.create(s"http://localhost:$port/nsi-v2/ConnectionServiceProvider").toURL()
         )
@@ -166,9 +164,6 @@ class ReserveRequestSpec extends helpers.Specification {
         await(reserveConfirmed.future).correlationId must beEqualTo(
           CorrelationId.fromString("urn:uuid:f8a23b90-832b-0130-d364-20c9d0879def").get
         )
-      }
-    }
 
   }
-
-}
+end ReserveRequestSpec

@@ -10,7 +10,7 @@ import org.ogf.schemas.nsi._2013._12.connection.types.{
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ConnectionPathSegmentPresenterTest extends helpers.Specification {
+class ConnectionPathSegmentPresenterTest extends helpers.Specification:
   "A ConnectionPathSegmentPresenter" >> {
     val data = ConnectionData(
       Present("ID"),
@@ -73,4 +73,4 @@ class ConnectionPathSegmentPresenterTest extends helpers.Specification {
       }
     }
   }
-}
+end ConnectionPathSegmentPresenterTest

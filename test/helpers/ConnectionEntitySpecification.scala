@@ -14,7 +14,7 @@ import nl.surfnet.safnari.*
 import NsiMessages.*
 import java.{util as ju}
 
-abstract class ConnectionEntitySpecification extends helpers.Specification {
+abstract class ConnectionEntitySpecification extends helpers.Specification:
 
   def dataPlaneStatusType(active: Boolean, consistent: Boolean): DataPlaneStatusType =
     new DataPlaneStatusType()
@@ -22,7 +22,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
       .withVersion(ConfirmedCriteriaVersion)
       .withVersionConsistent(consistent)
 
-  abstract class fixture extends org.specs2.matcher.Scope {
+  abstract class fixture extends org.specs2.matcher.Scope:
     def pathComputationAlgorithm: PathComputationAlgorithm = PathComputationAlgorithm.Chain
 
     val mockUuidGenerator: () => ju.UUID = Uuid.mockUuidGenerator(1)
@@ -78,7 +78,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
         connection.process(outbound)(context)
     }
 
-    private def initialReserve(reserve: FromRequester) = {
+    private def initialReserve(reserve: FromRequester) =
       connection = new ConnectionEntity(
         AggregatorNsa,
         ConnectionId,
@@ -92,13 +92,12 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
       processInbound = new IdempotentProvider(AggregatorNsa, connection.process)
 
       processInbound(reserve)(context).toOption
-    }
 
     var messages: Seq[Message] = Nil
-    def when(message: InboundMessage): Option[Seq[OutboundMessage]] = {
+    def when(message: InboundMessage): Option[Seq[OutboundMessage]] =
       messages = Nil
 
-      val response = message match {
+      val response = message match
         case query @ FromRequester(NsiProviderMessage(_, _: QueryRecursive)) =>
           connection.queryRecursive(query)
         case reserve @ FromRequester(NsiProviderMessage(_, _: InitialReserve))
@@ -111,7 +110,6 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
           first
         case _: InboundMessage =>
           processInbound(message)(context).toOption
-      }
       response.tap(_.foreach { outbound =>
         // Validate outbound messages against XML schema.
         outbound.foreach {
@@ -132,7 +130,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
         }
         messages = outbound
       })
-    }
+    end when
 
     def connectionData = connection.query
     def segments = connection.segments
@@ -150,9 +148,9 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
       connectionData.getConnectionStates().getLifecycleState()
     def dataPlaneStatus: DataPlaneStatusType =
       connectionData.getConnectionStates().getDataPlaneStatus()
-  }
+  end fixture
 
-  abstract class ReservedConnection extends fixture {
+  abstract class ReservedConnection extends fixture:
     `given`(
       ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
       pce.confirm(CorrelationId(0, 1), A),
@@ -160,9 +158,8 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
       ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)),
       upa.response(CorrelationId(0, 6), ReserveCommitConfirmed("ConnectionIdA"))
     )
-  }
 
-  abstract class ReserveHeldConnectionWithTwoSegments extends fixture {
+  abstract class ReserveHeldConnectionWithTwoSegments extends fixture:
     `given`(
       ura.request(ReserveCorrelationId, InitialReserve(InitialReserveType)),
       pce.confirm(CorrelationId(0, 1), A, B),
@@ -171,34 +168,35 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
       upa.response(CorrelationId(0, 4), ReserveConfirmed("ConnectionIdA", ConfirmCriteria)),
       upa.response(CorrelationId(0, 5), ReserveConfirmed("ConnectionIdB", ConfirmCriteria))
     )
-  }
 
-  abstract class ReservedConnectionWithTwoSegments extends ReserveHeldConnectionWithTwoSegments {
+  abstract class ReservedConnectionWithTwoSegments extends ReserveHeldConnectionWithTwoSegments:
     `given`(
       ura.request(CommitCorrelationId, ReserveCommit(ConnectionId)),
       upa.response(CorrelationId(0, 8), ReserveCommitConfirmed("ConnectionIdA")),
       upa.response(CorrelationId(0, 9), ReserveCommitConfirmed("ConnectionIdB"))
     )
-  }
 
-  trait Modified { this: ReservedConnection =>
+  trait Modified:
+    this: ReservedConnection =>
     `given`(ura.request(ModifyCorrelationId, ModifyReserve(ModifyReserveType)))
-  }
 
-  trait Released { this: ReservedConnection => }
+  trait Released:
+    this: ReservedConnection =>
 
-  trait ReleasedSegments { this: ReservedConnectionWithTwoSegments => }
+  trait ReleasedSegments:
+    this: ReservedConnectionWithTwoSegments =>
 
-  trait Provisioned { this: ReservedConnection =>
+  trait Provisioned:
+    this: ReservedConnection =>
     val ProvisionCorrelationId = newCorrelationId
 
     `given`(
       ura.request(ProvisionCorrelationId, Provision(ConnectionId)),
       upa.response(CorrelationId(0, 8), ProvisionConfirmed("ConnectionIdA"))
     )
-  }
 
-  trait DataPlaneActive { this: ReservedConnection =>
+  trait DataPlaneActive:
+    this: ReservedConnection =>
     `given`(
       upa.notification(
         newCorrelationId,
@@ -212,15 +210,15 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
         )
       )
     )
-  }
 
-  trait PassedEndTime { this: ReservedConnection =>
+  trait PassedEndTime:
+    this: ReservedConnection =>
     val endTime: Instant = schedule.endTime.fold2(identity, Instant.now, Instant.now)
     context = context.copy(clock = Clock.fixed(endTime, ZoneId.systemDefault()))
     `given`(PassedEndTime(CorrelationId(3, 0), connection.id, endTime))
-  }
 
-  trait Failed { this: ReservedConnection =>
+  trait Failed:
+    this: ReservedConnection =>
     val TimeStamp: XMLGregorianCalendar =
       Instant.now().minus(3, ChronoUnit.MINUTES).toXMLGregorianCalendar()
 
@@ -236,9 +234,9 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
         )
       )
     )
-  }
 
-  trait ProvisionedSegments { this: ReservedConnectionWithTwoSegments =>
+  trait ProvisionedSegments:
+    this: ReservedConnectionWithTwoSegments =>
     val ProvisionCorrelationId = newCorrelationId
 
     `given`(
@@ -246,6 +244,4 @@ abstract class ConnectionEntitySpecification extends helpers.Specification {
       upa.response(CorrelationId(0, 11), ProvisionConfirmed("ConnectionIdA")),
       upa.response(CorrelationId(0, 12), ProvisionConfirmed("ConnectionIdB"))
     )
-  }
-
-}
+end ConnectionEntitySpecification

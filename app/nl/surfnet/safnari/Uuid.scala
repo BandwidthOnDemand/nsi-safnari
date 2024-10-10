@@ -31,19 +31,17 @@ import scala.util.Random
   * applications. Fortunately, we only use the UUIDs for generating message correlatio ids, which
   * should not be security-sensitive.
   */
-object Uuid {
+object Uuid:
   def randomUuidGenerator(): () => UUID = deterministicUuidGenerator(new SecureRandom().nextLong())
 
-  def deterministicUuidGenerator(seed: Long): () => UUID = {
+  def deterministicUuidGenerator(seed: Long): () => UUID =
     val random = new Random(seed)
-    () => {
+    () =>
       val mostSig = (random.nextLong() & ~0x000000000000f000L) | 0x0000000000004000L
       val leastSig = (random.nextLong() & ~0xc000000000000000L) | 0x8000000000000000L
       new UUID(mostSig, leastSig)
-    }
-  }
 
-  def mockUuidGenerator(start: Long = 1): () => UUID = {
+  def mockUuidGenerator(start: Long = 1): () => UUID =
     val lock = new Object
     var next = start
     () =>
@@ -52,5 +50,3 @@ object Uuid {
         next += 1
         result
       }
-  }
-}

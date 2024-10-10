@@ -39,14 +39,12 @@ import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
 @Singleton
-class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext)
-    extends WSBodyWritables {
+class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext) extends WSBodyWritables:
   private val logger = Logger(classOf[NsiWebService])
 
-  implicit class SoapRequestHolder(val request: WSRequest) {
+  implicit class SoapRequestHolder(val request: WSRequest):
     def withSoapActionHeader(action: String): WSRequest =
       request.addHttpHeaders("SOAPAction" -> (s"\"$action\""))
-  }
 
   def callProvider(
       provider: ProviderEndPoint,
@@ -89,9 +87,8 @@ class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext)
       convertAck: (NsiHeaders, Document) => Try[M[NsiAcknowledgement]],
       convertError: (NsiHeaders, ServiceExceptionType) => M[NsiAcknowledgement],
       configuration: Configuration
-  )(implicit messageConversion: Conversion[M[T], Document]): Future[M[NsiAcknowledgement]] = {
-
-    for {
+  )(implicit messageConversion: Conversion[M[T], Document]): Future[M[NsiAcknowledgement]] =
+    for
       providerUrl <-
         if configuration.Use2WayTLS then
           Future.fromTry(configuration.translateToStunnelAddress(nsa, url))
@@ -105,10 +102,10 @@ class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext)
         s"Sending NSA ${nsa} at ${request.url} the SOAP message: ${Conversion[Document, String].apply(messageBody)}"
       )
       ack <- request.post(messageBody)
-    } yield {
+    yield
       val defaultAckHeaders = message.headers.forSyncAck
 
-      ack.status match {
+      ack.status match
         case OK | CREATED | ACCEPTED | INTERNAL_SERVER_ERROR =>
           logger.debug(
             s"Parsing SOAP ack (${ack.status}) from ${nsa} at ${request.url}: ${ack.body}"
@@ -116,7 +113,7 @@ class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext)
 
           DocumentToString.invert(ack.body).flatMap { document =>
             convertAck(defaultAckHeaders, document)
-          } match {
+          } match
             case Failure(error) =>
               logger.warn(
                 s"Communication error with provider ${nsa} at ${request.url}: $error",
@@ -134,7 +131,7 @@ class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext)
             case Success(ack) =>
               logger.debug(s"Received ack from ${nsa} at ${request.url}: $ack")
               ack
-          }
+          end match
         case FORBIDDEN =>
           logger.warn(
             s"Authentication failed (${ack.status}) from ${nsa} at ${request.url}: ${ack.body}"
@@ -155,7 +152,5 @@ class NsiWebService @Inject() (ws: WSClient)(implicit ec: ExecutionContext)
               )
               .toServiceException(nsa)
           )
-      }
-    }
-  }
-}
+      end match
+end NsiWebService

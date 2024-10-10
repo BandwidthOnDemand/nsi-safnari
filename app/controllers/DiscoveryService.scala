@@ -40,19 +40,17 @@ import scala.xml.NodeSeq
 
 class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(implicit
     ec: ExecutionContext
-) extends InjectedController {
+) extends InjectedController:
   private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v1+xml"
   private val rfc1123Formatter = DateTimeFormatter.RFC_1123_DATE_TIME
     .withLocale(java.util.Locale.ENGLISH)
     .withZone(ZoneId.of("GMT"))
 
   def index: Action[AnyContent] = Action.async { implicit request =>
-    def parseDate(date: String): Option[Instant] = try {
+    def parseDate(date: String): Option[Instant] = try
       val d = ZonedDateTime.parse(date, rfc1123Formatter).toInstant
       Some(d)
-    } catch {
-      case NonFatal(_) => None
-    }
+    catch case NonFatal(_) => None
 
     (pceRequester ? ReachabilityCheck).mapTo[Try[(Seq[ReachabilityTopologyEntry], Instant)]] map {
       case Success((reachability, lastModified)) =>
@@ -76,7 +74,7 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
   def discoveryDocument(
       reachabilityEntries: Seq[ReachabilityTopologyEntry],
       lastModified: Instant
-  ): xml.Elem = {
+  ): xml.Elem =
     val providerUrl = configuration.providerServiceUrl
     val requesterUrl = configuration.requesterServiceUrl
 
@@ -99,8 +97,8 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
           </vcard:prodid>
           <vcard:rev>
             <vcard:timestamp>{
-      DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").format(configuration.StartTime)
-    }</vcard:timestamp>
+              DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").format(configuration.StartTime)
+            }</vcard:timestamp>
           </vcard:rev>
           <vcard:kind>
             <vcard:text>individual</vcard:text>
@@ -119,31 +117,28 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
         <latitude>{configuration.Latitude}</latitude>
       </location>
       {
-      configuration.NetworkId match {
-        case Some(id) => <networkId>{id}</networkId>
-        case _        => NodeSeq.Empty
+        configuration.NetworkId match
+          case Some(id) => <networkId>{id}</networkId>
+          case _        => NodeSeq.Empty
       }
-    }
       {
-      configuration.NetworkUrl match {
-        case Some(url) =>
-          <interface>
-        <type>application/vnd.ogf.nsi.topology.v2+xml</type>
-        <href>{url}</href>
-      </interface>
-        case _ => NodeSeq.Empty
+        configuration.NetworkUrl match
+          case Some(url) =>
+            <interface>
+              <type>application/vnd.ogf.nsi.topology.v2+xml</type>
+              <href>{url}</href>
+            </interface>
+          case _ => NodeSeq.Empty
       }
-    }
       {
-      configuration.DdsUrl match {
-        case Some(url) =>
-          <interface>
-        <type>application/vnd.ogf.nsi.dds.v1+xml</type>
-        <href>{url}</href>
-      </interface>
-        case _ => NodeSeq.Empty
+        configuration.DdsUrl match
+          case Some(url) =>
+            <interface>
+              <type>application/vnd.ogf.nsi.dds.v1+xml</type>
+              <href>{url}</href>
+            </interface>
+          case _ => NodeSeq.Empty
       }
-    }
       <interface>
         <type>application/vnd.ogf.nsi.cs.v2.requester+soap</type>
         <href>{requesterUrl}</href>
@@ -153,31 +148,30 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
         <href>{providerUrl}</href>
       </interface>
       {
-      if configuration.NetworkId.isDefined
-      then <feature type="vnd.ogf.nsi.cs.v2.role.uPA"/>
-      else NodeSeq.Empty
-    }
+        if configuration.NetworkId.isDefined
+        then <feature type="vnd.ogf.nsi.cs.v2.role.uPA"/>
+        else NodeSeq.Empty
+      }
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
       {
-      for (peer <- configuration.PeersWith) yield {
-        peer.id match {
+        for (peer <- configuration.PeersWith) yield peer.id match
           case Some(id) => <peersWith>{id}</peersWith>
           case _        => NodeSeq.Empty
-        }
       }
-    }
       {
-      if configuration.PceAlgorithm != PathComputationAlgorithm.Tree && configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty
-      then {
-        <other>
+        if configuration.PceAlgorithm != PathComputationAlgorithm.Tree && configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty
+        then
+          <other>
           <gns:TopologyReachability>
             {
-          reachabilityEntries.map(entry => <Topology id={entry.id} cost={entry.cost.toString} />)
-        }
+              reachabilityEntries.map(entry =>
+                <Topology id={entry.id} cost={entry.cost.toString} />
+              )
+            }
           </gns:TopologyReachability>
         </other>
-      } else NodeSeq.Empty
-    }
+        else NodeSeq.Empty
+      }
     </nsa:nsa>
-  }
-}
+  end discoveryDocument
+end DiscoveryService
