@@ -265,6 +265,8 @@ class ConnectionManagerSpec extends helpers.Specification:
             )
           )
         )
+        ack must beAnInstanceOf[ReserveResponse]
+
         val error = await(
           connection ? command(
             FromRequester(
@@ -285,6 +287,8 @@ class ConnectionManagerSpec extends helpers.Specification:
     "retransmit original async reply on duplicate request" in new SingleConnectionActorFixture:
       override def running() =
         val ack = await(connection ? command(FromRequester(initialReserveMessage)))
+        ack must beAnInstanceOf[ReserveResponse]
+
         await(connection ? command(pce.confirm(CorrelationId(0, 1), A)))
 
         val original = output {

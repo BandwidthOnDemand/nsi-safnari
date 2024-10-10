@@ -15,7 +15,7 @@ class MessagePersistenceSpec extends MessageStoreSpecification:
   import Generators.*
 
   private implicit val ArbitraryPathComputationAlgorithm: Arbitrary[PathComputationAlgorithm] =
-    Arbitrary(Gen.oneOf(PathComputationAlgorithm.values))
+    Arbitrary(Gen.oneOf(PathComputationAlgorithm.values.toIndexedSeq))
   private implicit val ArbitraryServiceType: Arbitrary[ServiceType] =
     Arbitrary(Gen.resultOf(ServiceType.apply _))
   private implicit val ArbitraryPathComputationRequest: Arbitrary[PathComputationRequest] =
