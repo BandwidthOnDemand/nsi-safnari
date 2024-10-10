@@ -28,7 +28,7 @@ app.table = function(){
                     height: rowHeight + details[0]._originalHeight + 20
                 });
 
-                details.animate({
+                details.show().animate({
                     height: details[0]._originalHeight,
                     opacity: 1
                 });

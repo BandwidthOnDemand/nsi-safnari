@@ -3,20 +3,19 @@ package nl.surfnet.safnari
 import java.net.URI
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
-import nl.surfnet.nsiv2.messages.CorrelationId
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
-import org.ogf.schemas.nsi._2013._12.services.types._
+import org.ogf.schemas.nsi._2013._12.services.types.*
 import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
-import play.api.libs.json._
+import play.api.libs.json.*
 
-import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.messages.*
 import javax.xml.namespace.QName
 
-object PceMessageSpec {
+object PceMessageSpec:
   val sourceStp = "network-id:source"
 
   val destStp = "network-id:dest"
-  val ServiceBaseType = new P2PServiceBaseType()
+  val ServiceBaseType: P2PServiceBaseType = new P2PServiceBaseType()
     .withDirectionality(DirectionalityType.BIDIRECTIONAL)
     .withCapacity(100)
     .withSourceSTP(sourceStp)
@@ -24,28 +23,49 @@ object PceMessageSpec {
 
   val ServiceTypeUrl = "http://services.ogf.org/nsi/2013/07/descriptions/EVTS.A-GOLE"
 
-  val correlationId = helpers.Specification.newCorrelationId
+  val correlationId: CorrelationId = helpers.Specification.newCorrelationId()
 
-  val pathComputationRequest = PathComputationRequest(correlationId, Some("NSA-ID"), URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, Nil)
+  val pathComputationRequest: PathComputationRequest = PathComputationRequest(
+    correlationId,
+    Some("NSA-ID"),
+    URI.create("http://localhost/pce/reply"),
+    None,
+    None,
+    ServiceType(ServiceTypeUrl, ServiceBaseType),
+    PathComputationAlgorithm.CHAIN,
+    Nil
+  )
 
-  val providerEndPoint = ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"))
-  val computedSegment = ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))
-  val pathComputationResponse = PathComputationConfirmed(correlationId, Seq(computedSegment))
+  val providerEndPoint: ProviderEndPoint =
+    ProviderEndPoint("provider-nsa", URI.create("http://localhost/pce/reply"))
+  val computedSegment: ComputedSegment =
+    ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))
+  val pathComputationResponse: PathComputationConfirmed =
+    PathComputationConfirmed(correlationId, Seq(computedSegment))
 
-  val pathComputationFailedAck = PceFailed(correlationId, 404, "Not Accepted", "")
-  val pathComputationAcceptedAck = PceAccepted(correlationId)
-}
+  val pathComputationFailedAck: PceFailed = PceFailed(correlationId, 404, "Not Accepted", "")
+  val pathComputationAcceptedAck: PceAccepted = PceAccepted(correlationId)
+end PceMessageSpec
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class PceMessageSpec extends helpers.Specification {
-  import nl.surfnet.safnari.PceMessageSpec._
+class PceMessageSpec extends helpers.Specification:
+  import nl.surfnet.safnari.PceMessageSpec.*
 
   "PceMessages" should {
 
-    import nl.surfnet.safnari.PceMessage._
+    import nl.surfnet.safnari.PceMessage.*
 
     "serialize request with p2pServiceBaseType to json" in {
-      val request = PathComputationRequest(correlationId, Some("NSA-ID"), URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, Nil)
+      val request: PceRequest = PathComputationRequest(
+        correlationId,
+        Some("NSA-ID"),
+        URI.create("http://localhost/pce/reply"),
+        None,
+        None,
+        ServiceType(ServiceTypeUrl, ServiceBaseType),
+        PathComputationAlgorithm.CHAIN,
+        Nil
+      )
 
       val json = Json.toJson(request)
 
@@ -62,7 +82,16 @@ class PceMessageSpec extends helpers.Specification {
       val first = new ConnectionType().withIndex(0).withValue("firstnsa")
       val second = new ConnectionType().withIndex(1).withValue("secondnsa")
       val connectionTrace = List(first, second)
-      val request = PathComputationRequest(correlationId, Some("NSA-ID"), URI.create("http://localhost/pce/reply"), None, None, ServiceType(ServiceTypeUrl, ServiceBaseType), PathComputationAlgorithm.Chain, connectionTrace)
+      val request: PceRequest = PathComputationRequest(
+        correlationId,
+        Some("NSA-ID"),
+        URI.create("http://localhost/pce/reply"),
+        None,
+        None,
+        ServiceType(ServiceTypeUrl, ServiceBaseType),
+        PathComputationAlgorithm.CHAIN,
+        connectionTrace
+      )
 
       val json = Json.toJson(request)
       (json \ "trace" apply 0) \ "index" must beEqualTo(JsDefined(JsNumber(first.getIndex)))
@@ -84,7 +113,10 @@ class PceMessageSpec extends helpers.Specification {
     }
 
     "serialize computation confirmed response to json" in {
-      val response = PathComputationConfirmed(correlationId, List(ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType))))
+      val response = PathComputationConfirmed(
+        correlationId,
+        List(ComputedSegment(providerEndPoint, ServiceType(ServiceTypeUrl, ServiceBaseType)))
+      )
 
       val json = Json.toJson[PceResponse](response)
 
@@ -97,7 +129,10 @@ class PceMessageSpec extends helpers.Specification {
         """{"correlationId":"urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640","status":"FAILED",
             "m.findPathError":{"code":"00702","label":"LABEL","description":"oops!","variable":{"@type":"type", "value":"value"}}}""".stripMargin
 
-      val output = PathComputationFailed(CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get, NsiError("00702", "LABEL", "oops!", Seq(new QName("type") -> "value")))
+      val output = PathComputationFailed(
+        CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get,
+        NsiError("00702", "LABEL", "oops!", Seq(new QName("type") -> "value"))
+      )
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
     }
@@ -106,7 +141,10 @@ class PceMessageSpec extends helpers.Specification {
       val input =
         """{"correlationId":"urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640","status":"FAILED", "message": "oops!"}""".stripMargin
 
-      val output = PathComputationFailed(CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get, NsiError.TopologyError.copy(text = "oops!"))
+      val output = PathComputationFailed(
+        CorrelationId.fromString("urn:uuid:e679ca48-ec51-4d7d-a24f-e23eca170640").get,
+        NsiError.TopologyError.copy(text = "oops!")
+      )
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
     }
@@ -158,31 +196,47 @@ class PceMessageSpec extends helpers.Specification {
       val output = PathComputationConfirmed(
         CorrelationId.fromString("urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02").get,
         ComputedSegment(
-          ProviderEndPoint("urn:ogf:network:nsa:internet2.edu",
-            URI.create("http://oscars.internet2.edu/provider")),
-          ServiceType("http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE", new P2PServiceBaseType()
-            .withCapacity(100)
-            .withDirectionality(DirectionalityType.BIDIRECTIONAL)
-            .withSymmetricPath(true)
-            .withSourceSTP("urn:ogf:network:internet2.edu:i2-edge?vlan=1780")
-            .withDestSTP("urn:ogf:network:internet2.edu:to-esnet?vlan=1780")))
-        :: ComputedSegment(
-          ProviderEndPoint("urn:ogf:network:nsa:es.net",
-            URI.create("http://oscars.es.net/nsi/ConnectionService")),
-          ServiceType("http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE", new P2PServiceBaseType()
-            .withCapacity(100)
-            .withDirectionality(DirectionalityType.BIDIRECTIONAL)
-            .withSymmetricPath(true)
-            .withSourceSTP("urn:ogf:network:es.net:to-internet2?vlan=1780")
-            .withDestSTP("urn:ogf:network:es.net:esnet-edge-one?vlan=1780")))
-        :: Nil)
+          ProviderEndPoint(
+            "urn:ogf:network:nsa:internet2.edu",
+            URI.create("http://oscars.internet2.edu/provider")
+          ),
+          ServiceType(
+            "http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE",
+            new P2PServiceBaseType()
+              .withCapacity(100)
+              .withDirectionality(DirectionalityType.BIDIRECTIONAL)
+              .withSymmetricPath(true)
+              .withSourceSTP("urn:ogf:network:internet2.edu:i2-edge?vlan=1780")
+              .withDestSTP("urn:ogf:network:internet2.edu:to-esnet?vlan=1780")
+          )
+        )
+          :: ComputedSegment(
+            ProviderEndPoint(
+              "urn:ogf:network:nsa:es.net",
+              URI.create("http://oscars.es.net/nsi/ConnectionService")
+            ),
+            ServiceType(
+              "http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE",
+              new P2PServiceBaseType()
+                .withCapacity(100)
+                .withDirectionality(DirectionalityType.BIDIRECTIONAL)
+                .withSymmetricPath(true)
+                .withSourceSTP("urn:ogf:network:es.net:to-internet2?vlan=1780")
+                .withDestSTP("urn:ogf:network:es.net:esnet-edge-one?vlan=1780")
+            )
+          )
+          :: Nil
+      )
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
     }
 
     "deserialize provider end point" in {
-      Json.fromJson[ProviderEndPoint](Json.parse("""{"nsa":"urn:nsa:surfnet.nl", "csProviderURL":"http://localhost"}""")) must beEqualTo(
-        JsSuccess(ProviderEndPoint("urn:nsa:surfnet.nl", URI.create("http://localhost"))))
+      Json.fromJson[ProviderEndPoint](
+        Json.parse("""{"nsa":"urn:nsa:surfnet.nl", "csProviderURL":"http://localhost"}""")
+      ) must beEqualTo(
+        JsSuccess(ProviderEndPoint("urn:nsa:surfnet.nl", URI.create("http://localhost")))
+      )
     }
 
     "deserialize path computation confirmed with ero and parameters" in {
@@ -251,37 +305,68 @@ class PceMessageSpec extends helpers.Specification {
       val output = PathComputationConfirmed(
         CorrelationId.fromString("urn:uuid:f36d84dc-6713-4e27-a023-d753a80dcf02").get,
         ComputedSegment(
-          ProviderEndPoint("urn:ogf:network:kddilabs.jp:2013:nsa",
-            URI.create("http://210.196.65.114:9352/2013/07/connectionprovider")),
-          ServiceType("http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE", new P2PServiceBaseType()
-            .withCapacity(100)
-            .withDirectionality(DirectionalityType.BIDIRECTIONAL)
-            .withSymmetricPath(true)
-            .withSourceSTP("urn:ogf:network:kddilabs.jp:2013:topology:bi-ps?vlan=1782")
-            .withDestSTP("urn:ogf:network:kddilabs.jp:2013:topology:bi-kddilabs-jgn-x?vlan=1782")
-            .withEro(new StpListType()
-              .withOrderedSTP(new OrderedStpType().withOrder(0).withStp("urn:ogf:network:kddilabs.jp:2013:topology:internalA"))
-              .withOrderedSTP(new OrderedStpType().withOrder(1).withStp("urn:ogf:network:kddilabs.jp:2013:topology:internalB")))
-            .withParameter(new TypeValueType().withType("poopies").withValue("doodies"))
-          ))
+          ProviderEndPoint(
+            "urn:ogf:network:kddilabs.jp:2013:nsa",
+            URI.create("http://210.196.65.114:9352/2013/07/connectionprovider")
+          ),
+          ServiceType(
+            "http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE",
+            new P2PServiceBaseType()
+              .withCapacity(100)
+              .withDirectionality(DirectionalityType.BIDIRECTIONAL)
+              .withSymmetricPath(true)
+              .withSourceSTP("urn:ogf:network:kddilabs.jp:2013:topology:bi-ps?vlan=1782")
+              .withDestSTP("urn:ogf:network:kddilabs.jp:2013:topology:bi-kddilabs-jgn-x?vlan=1782")
+              .withEro(
+                new StpListType()
+                  .withOrderedSTP(
+                    new OrderedStpType()
+                      .withOrder(0)
+                      .withStp("urn:ogf:network:kddilabs.jp:2013:topology:internalA")
+                  )
+                  .withOrderedSTP(
+                    new OrderedStpType()
+                      .withOrder(1)
+                      .withStp("urn:ogf:network:kddilabs.jp:2013:topology:internalB")
+                  )
+              )
+              .withParameter(new TypeValueType().withType("poopies").withValue("doodies"))
+          )
+        )
           :: ComputedSegment(
-          ProviderEndPoint("urn:ogf:network:netherlight.net:2013:nsa:safnari",
-            URI.create("https://agg.netherlight.net/nsi-v2/ConnectionServiceProvider")),
-          ServiceType("http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE", new P2PServiceBaseType()
-            .withCapacity(100)
-            .withDirectionality(DirectionalityType.BIDIRECTIONAL)
-            .withSymmetricPath(true)
-            .withSourceSTP("urn:ogf:network:uvalight.net:2013:topology:netherlight?vlan=1782")
-            .withDestSTP("urn:ogf:network:uvalight.net:2013:topology:ps?vlan=1782")
-            .withEro(new StpListType()
-              .withOrderedSTP(new OrderedStpType().withOrder(0).withStp("urn:ogf:network:uvalight.net:2013:topology:internalA"))
-              .withOrderedSTP(new OrderedStpType().withOrder(1).withStp("urn:ogf:network:uvalight.net:2013:topology:internalB")))
-            .withParameter(new TypeValueType().withType("poopies").withValue("doodies"))
-          ))
-          :: Nil)
+            ProviderEndPoint(
+              "urn:ogf:network:netherlight.net:2013:nsa:safnari",
+              URI.create("https://agg.netherlight.net/nsi-v2/ConnectionServiceProvider")
+            ),
+            ServiceType(
+              "http://services.ogf.org/nsi/2013/12/descriptions/EVTS.A-GOLE",
+              new P2PServiceBaseType()
+                .withCapacity(100)
+                .withDirectionality(DirectionalityType.BIDIRECTIONAL)
+                .withSymmetricPath(true)
+                .withSourceSTP("urn:ogf:network:uvalight.net:2013:topology:netherlight?vlan=1782")
+                .withDestSTP("urn:ogf:network:uvalight.net:2013:topology:ps?vlan=1782")
+                .withEro(
+                  new StpListType()
+                    .withOrderedSTP(
+                      new OrderedStpType()
+                        .withOrder(0)
+                        .withStp("urn:ogf:network:uvalight.net:2013:topology:internalA")
+                    )
+                    .withOrderedSTP(
+                      new OrderedStpType()
+                        .withOrder(1)
+                        .withStp("urn:ogf:network:uvalight.net:2013:topology:internalB")
+                    )
+                )
+                .withParameter(new TypeValueType().withType("poopies").withValue("doodies"))
+            )
+          )
+          :: Nil
+      )
 
       Json.fromJson[PceResponse](Json.parse(input)) must beEqualTo(JsSuccess(output))
     }
 
   }
-}
+end PceMessageSpec

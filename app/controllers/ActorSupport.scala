@@ -23,8 +23,10 @@
 package controllers
 
 import akka.util.Timeout
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-private[controllers] object ActorSupport {
-  implicit val timeout = Timeout(30.seconds)
-}
+case object HealthCheck
+case object ReachabilityCheck
+
+private[controllers] object ActorSupport:
+  implicit val timeout: Timeout = Timeout(30.seconds)
