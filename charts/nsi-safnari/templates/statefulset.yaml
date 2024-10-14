@@ -70,25 +70,16 @@ spec:
             - {{ printf "-Dconfig.file=%s/config-overrides.conf" .Values.config.mountPath | quote }}
             - "-Dhttp.port=8080"
             - "-Dhttp.address=0.0.0.0"
-            - "-DapplyEvolutions.default=true"
+            - "-Dplay.evolutions.db.default.autoApply=true"
             - "-Djavax.net.ssl.trustStoreType=jks"
             - "-Djavax.net.ssl.keyStoreType=jks"
             - "-Djavax.net.ssl.trustStorePassword=secret"
             - "-Djavax.net.ssl.keyStorePassword=secret"
             - {{ printf "-Djavax.net.ssl.trustStore=%s/nsi-safnari-truststore.jks" .Values.config.mountPath | quote }}
             - {{ printf "-Djavax.net.ssl.keyStore=%s/nsi-safnari-keystore.jks" .Values.config.mountPath | quote }}
-            - "-J-Xms512m"
-            - "-J-Xmx512m"
-            - "-J-server"
-            - "-J-verbose:gc"
-            - "-J-XX:+PrintGCDetails"
-            - "-J-XX:+PrintGCDateStamps"
-            - "-J-Xloggc:./nsi-safnari/logs/gc.log"
-            - "-J-XX:+UseGCLogFileRotation"
-            - "-J-XX:NumberOfGCLogFiles=10"
-            - "-J-XX:GCLogFileSize=10M"
-            - "-J-XX:+UseParallelGC"
-            - "-J-XX:+UseParallelOldGC"
+            - "-XX:MaxRAMPercentage=75.0"
+            - "-J-Xlog:gc:file=/nsi-safnari/logs/gc.log:time,level,tags:filecount=5,filesize=10M"
+            - "-J-XshowSettings:vm"
           env:
             - name: SAFNARI_APPLICATION_SECRET
               valueFrom:

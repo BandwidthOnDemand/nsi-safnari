@@ -1,13 +1,13 @@
 @(connection: presenters.ConnectionPresenter, segments: Seq[presenters.ConnectionPathSegmentPresenter], messages: Seq[nl.surfnet.nsiv2.persistence.MessageRecord[nl.surfnet.safnari.Message]], webParams: Map[String,String])
 
-@import nl.surfnet.nsiv2.soap.NsiSoapConversions._
-@import nl.surfnet.nsiv2.messages._
-@import nl.surfnet.safnari._
-@import nl.surfnet.safnari.MessagePersistence._
-@import org.w3c.dom.Document
-@import scala.xml.PrettyPrinter
-@import play.api.libs.json.{ Json, Writes, JsString }
 @import java.time.Instant
+@import nl.surfnet.nsiv2.messages.*
+@import nl.surfnet.nsiv2.soap.NsiSoapConversions.{given, *}
+@import nl.surfnet.safnari.*
+@import nl.surfnet.safnari.MessagePersistence.*
+@import org.w3c.dom.Document
+@import play.api.libs.json.{Json, Writes}
+@import scala.xml.PrettyPrinter
 
 @id() = {
     @{connection.connectionId}@{connection.globalReservationId.map(s => " (" ++ s ++ ")")}@{connection.description.map(s => " - " ++ s)}

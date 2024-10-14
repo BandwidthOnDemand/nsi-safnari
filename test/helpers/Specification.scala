@@ -13,12 +13,13 @@ abstract class Specification
     with play.api.http.Status
     with play.api.test.DefaultAwaitTimeout
     with play.api.test.FutureAwaits
-    with play.api.test.ResultExtractors {
-  def newCorrelationId = Specification.newCorrelationId
-}
+    with play.api.test.ResultExtractors:
+  def newCorrelationId(): CorrelationId = Specification.newCorrelationId()
 
-object Specification {
-  private val UuidGenerator = Uuid.randomUuidGenerator
+  lazy val ServerPort: Int =
+    sys.props.get("testserver.port").map(_.toInt).getOrElse(19000 + util.Random.nextInt(10000))
 
-  def newCorrelationId: CorrelationId = CorrelationId.fromUuid(UuidGenerator())
-}
+object Specification:
+  private val UuidGenerator = Uuid.randomUuidGenerator()
+
+  def newCorrelationId(): CorrelationId = CorrelationId.fromUuid(UuidGenerator())

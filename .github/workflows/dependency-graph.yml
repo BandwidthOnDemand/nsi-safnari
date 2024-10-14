@@ -1,0 +1,19 @@
+# .github/workflows/dependency-graph.yml
+name: Update Dependency Graph
+on:
+  push:
+    branches:
+      - master # default branch of the project
+permissions:
+  contents: write # for dependency graph upload
+
+env:
+  GITHUB_TOKEN: ${{ github.token }}
+
+jobs:
+  dependency-graph:
+    name: Update Dependency Graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: scalacenter/sbt-dependency-submission@v3
