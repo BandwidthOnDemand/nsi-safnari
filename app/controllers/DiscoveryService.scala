@@ -22,20 +22,19 @@
  */
 package controllers
 
-import akka.actor.ActorRef
-import akka.pattern.ask
 import controllers.ActorSupport.*
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.time.temporal.*
 import nl.surfnet.safnari.PathComputationAlgorithm
 import nl.surfnet.safnari.ReachabilityTopologyEntry
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.pattern.ask
 import play.api.http.ContentTypes
 import play.api.mvc.*
-
 import scala.concurrent.ExecutionContext
-import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 import scala.xml.NodeSeq
 
 class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(implicit

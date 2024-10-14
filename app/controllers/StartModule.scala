@@ -22,13 +22,13 @@
  */
 package controllers
 
-import akka.actor.*
-import anorm.SqlParser.*
 import anorm.*
+import anorm.SqlParser.*
 import com.google.inject.{AbstractModule, Provides}
 import javax.inject.*
 import nl.surfnet.nsiv2.soap.*
 import nl.surfnet.safnari.SafnariMessageStore
+import org.apache.pekko.actor.*
 import play.api.Logger
 import play.api.db.Database
 import play.api.inject.ApplicationLifecycle

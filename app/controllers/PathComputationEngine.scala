@@ -23,25 +23,23 @@
 package controllers
 
 import java.net.URI
+import java.time.Instant
 import javax.inject.*
-
-import akka.actor.*
 import nl.surfnet.nsiv2.messages.CorrelationId
 import nl.surfnet.nsiv2.utils.*
 import nl.surfnet.safnari.*
-import java.time.Instant
+import org.apache.pekko.actor.*
 import play.api.Logger
 import play.api.http.ContentTypes.*
 import play.api.http.HeaderNames.*
 import play.api.http.Status.*
 import play.api.libs.json.*
-import play.api.libs.ws.WSClient
 import play.api.libs.ws.JsonBodyWritables.writeableOf_JsValue
+import play.api.libs.ws.WSClient
 import play.api.mvc.*
-
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.concurrent.stm.Ref
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 @Singleton

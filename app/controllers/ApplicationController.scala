@@ -22,13 +22,13 @@
  */
 package controllers
 
-import akka.actor.ActorRef
-import akka.pattern.ask
 import controllers.ActorSupport.*
 import java.time.ZonedDateTime
 import java.time.temporal.*
 import nl.surfnet.nsiv2.utils.*
 import nl.surfnet.safnari.*
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.pattern.ask
 import play.api.mvc.*
 import presenters.{ConnectionPathSegmentPresenter, ConnectionPresenter}
 import scala.concurrent.*

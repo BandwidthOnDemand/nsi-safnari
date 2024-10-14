@@ -3,6 +3,8 @@ import scala.sys.process.Process
 organization := "nl.surfnet"
 name := "nsi-safnari"
 
+Global / onChangedBuildSource := ReloadOnSourceChanges
+
 githubTokenSource := (
   TokenSource.GitConfig("github.token")
     || TokenSource.Environment("GITHUB_USERTOKEN")
@@ -24,7 +26,7 @@ scalacOptions ++= Seq(
 lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run maven")
 lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
-val playVersion = "2.9.4"
+val playVersion = "3.0.5"
 val playNsiSupportVersion = "3.0.0-SNAPSHOT"
 
 libraryDependencies ++= Seq(
@@ -37,9 +39,9 @@ libraryDependencies ++= Seq(
   "org.specs2" %% "specs2-junit" % "4.20.7" % "test",
   "org.specs2" %% "specs2-matcher-extra" % "4.20.7" % "test",
   "org.specs2" %% "specs2-scalacheck" % "4.20.7" % "test",
-  "com.typesafe.akka" %% "akka-testkit" % "2.6.21" % "test",
-  "com.typesafe.play" %% "play-test" % playVersion % "test",
-  "com.typesafe.play" %% "play-specs2" % playVersion % "test",
+  "org.apache.pekko" %% "pekko-testkit" % "1.0.3" % "test",
+  "org.playframework" %% "play-test" % playVersion % "test",
+  "org.playframework" %% "play-specs2" % playVersion % "test",
   "org.glassfish.hk2" % "osgi-resource-locator" % "2.4.0" % "test",
   "com.sun.xml.ws" % "jaxws-rt" % "4.0.3" % "test",
   "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion,
@@ -59,8 +61,6 @@ lazy val root = (project in file("."))
     buildInfoPackage := "nl.surfnet.safnari",
     exportJars := true
   )
-//  .enablePlugins(PlayScala, PlayNettyServer)
-//  .disablePlugins(PlayAkkaHttpServer)
 
 Test / javaOptions += "-Dconfig.file=conf/test.conf"
 

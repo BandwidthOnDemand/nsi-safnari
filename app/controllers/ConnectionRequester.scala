@@ -22,21 +22,20 @@
  */
 package controllers
 
-import akka.actor.*
-import akka.event.LoggingReceive
+import controllers.ActorSupport.*
 import java.time.Instant
 import java.util.concurrent.TimeoutException
 import javax.inject.*
 import nl.surfnet.nsiv2.messages.{given, *}
 import nl.surfnet.nsiv2.soap.*
 import nl.surfnet.safnari.*
+import org.apache.pekko.actor.*
+import org.apache.pekko.event.LoggingReceive
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 import play.api.Logger
 import play.api.mvc.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
-
-import controllers.ActorSupport.*
 
 @Singleton
 class ConnectionRequesterController @Inject() (

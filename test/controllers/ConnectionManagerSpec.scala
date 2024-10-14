@@ -1,22 +1,21 @@
 package controllers
 
-import java.net.URI
-
-import akka.actor.ActorRef
-import akka.actor.{Actor, ActorSystem}
-import akka.testkit.TestActorRef
 import controllers.Connection.Delete
 import helpers.NsiMessages.*
+import java.net.URI
 import java.time.Instant
 import java.time.temporal.*
+import java.util.UUID
 import nl.surfnet.nsiv2.messages.*
 import nl.surfnet.nsiv2.utils.*
 import nl.surfnet.safnari.*
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.{Actor, ActorSystem}
+import org.apache.pekko.testkit.TestActorRef
 import org.ogf.schemas.nsi._2013._12.connection.types.*
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.*
 import scala.concurrent.ExecutionContext
-import java.{util as ju}
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionManagerSpec extends helpers.Specification:
@@ -42,7 +41,7 @@ class ConnectionManagerSpec extends helpers.Specification:
     lazy val configuration: Configuration = app.injector.instanceOf[Configuration]
     implicit lazy val system: ActorSystem = app.injector.instanceOf[ActorSystem]
 
-    lazy val mockUuidGenerator: () => ju.UUID = Uuid.mockUuidGenerator(1)
+    lazy val mockUuidGenerator: () => UUID = Uuid.mockUuidGenerator(1)
     def newCorrelationId(): CorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
 
     lazy val outbound: TestActorRef[RecordingActor] = TestActorRef(new RecordingActor)

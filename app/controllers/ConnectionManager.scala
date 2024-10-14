@@ -22,17 +22,18 @@
  */
 package controllers
 
-import akka.actor.*
-import akka.event.LoggingReceive
-import akka.pattern.ask
-import akka.util.Timeout
+import controllers.ActorSupport.*
 import java.net.URI
-import java.time.{Clock, Instant, ZoneOffset}
 import java.time.temporal.*
+import java.time.{Clock, Instant, ZoneOffset}
 import nl.surfnet.nsiv2.messages.*
 import nl.surfnet.nsiv2.persistence.*
 import nl.surfnet.nsiv2.utils.*
 import nl.surfnet.safnari.*
+import org.apache.pekko.actor.*
+import org.apache.pekko.event.LoggingReceive
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.util.Timeout
 import org.ogf.schemas.nsi._2013._12.connection.types.*
 import play.api.Logger
 import scala.concurrent.*
@@ -40,8 +41,6 @@ import scala.concurrent.duration.*
 import scala.concurrent.stm.*
 import scala.reflect.ClassTag
 import scala.util.{Failure, Try}
-
-import controllers.ActorSupport.*
 
 case class Connection(actor: ActorRef):
   def !(operation: Connection.Operation)(implicit sender: ActorRef): Unit = actor ! operation
@@ -405,7 +404,7 @@ class ConnectionManager(
           }(context.dispatcher)
         catch
           case _: IllegalArgumentException =>
-            // Akka's scheduled currently limits delays to 248 days or less. Retry scheduling later when the real delay fails.
+            // Pekko's scheduled currently limits delays to 248 days or less. Retry scheduling later when the real delay fails.
             context.system.scheduler.scheduleOnce(100.days) {
               schedulePassedEndTimeMessage()
             }(context.dispatcher)

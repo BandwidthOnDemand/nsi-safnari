@@ -1,15 +1,15 @@
 package nl.surfnet.safnari
 
-import akka.actor.ActorSystem
-import java.util.concurrent.TimeoutException
-import scala.concurrent.{Await, ExecutionContext}
-import scala.concurrent.duration.*
-import scala.util.Failure
-import scala.util.Try
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import akka.actor.Terminated
+import java.util.concurrent.TimeoutException
 import nl.surfnet.nsiv2.messages
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.Terminated
+import scala.concurrent.duration.*
+import scala.concurrent.{Await, ExecutionContext}
+import scala.util.Failure
+import scala.util.Try
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ContinuationsSpec extends helpers.Specification:

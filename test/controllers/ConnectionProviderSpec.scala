@@ -1,14 +1,13 @@
 package controllers
 
+import helpers.NsiMessages.*
 import nl.surfnet.nsiv2.messages.*
+import org.apache.pekko.actor.ActorRef
 import org.ogf.schemas.nsi._2013._12.connection.types.*
 import play.api.Application
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.*
-
 import scala.concurrent.Promise
-import helpers.NsiMessages.*
-import akka.actor.ActorRef
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionProviderSpec extends helpers.Specification:

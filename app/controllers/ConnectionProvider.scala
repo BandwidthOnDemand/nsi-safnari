@@ -22,7 +22,6 @@
  */
 package controllers
 
-import akka.actor.*
 import controllers.ActorSupport.*
 import java.net.URI
 import java.time.Instant
@@ -32,6 +31,7 @@ import nl.surfnet.nsiv2.messages.*
 import nl.surfnet.nsiv2.soap.*
 import nl.surfnet.nsiv2.utils.*
 import nl.surfnet.safnari.*
+import org.apache.pekko.actor.*
 import org.ogf.schemas.nsi._2013._12.connection.types.*
 import play.api.Logger
 import play.api.mvc.*

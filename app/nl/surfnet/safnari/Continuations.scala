@@ -22,13 +22,13 @@
  */
 package nl.surfnet.safnari
 
-import akka.actor.Scheduler
+import java.util.concurrent.TimeoutException
 import nl.surfnet.nsiv2.messages.CorrelationId
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.Scheduler
 import scala.concurrent.duration.*
 import scala.concurrent.stm.TMap
-import akka.actor.Cancellable
-import java.util.concurrent.TimeoutException
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /** Track all messages that await an asynchronous reply. Thread safe.
   *
