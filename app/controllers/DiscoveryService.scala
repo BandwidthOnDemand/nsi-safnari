@@ -22,47 +22,58 @@
  */
 package controllers
 
-import akka.actor.ActorRef
-import akka.pattern.ask
-import controllers.ActorSupport._
-import java.time._
+import controllers.ActorSupport.*
+import java.time.*
 import java.time.format.DateTimeFormatter
-import java.time.temporal._
+import java.time.temporal.*
 import nl.surfnet.safnari.PathComputationAlgorithm
 import nl.surfnet.safnari.ReachabilityTopologyEntry
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.pattern.ask
 import play.api.http.ContentTypes
-import play.api.mvc._
-
+import play.api.mvc.*
 import scala.concurrent.ExecutionContext
-import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
+import scala.xml.NodeSeq
 
-class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(implicit ec: ExecutionContext) extends InjectedController {
+class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(implicit
+    ec: ExecutionContext
+) extends InjectedController:
   private val ContentTypeDiscoveryDocument = "application/vnd.ogf.nsi.nsa.v1+xml"
-  private val rfc1123Formatter = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(java.util.Locale.ENGLISH).withZone(ZoneId.of("GMT"))
+  private val rfc1123Formatter = DateTimeFormatter.RFC_1123_DATE_TIME
+    .withLocale(java.util.Locale.ENGLISH)
+    .withZone(ZoneId.of("GMT"))
 
-  def index = Action.async { implicit request =>
-    def parseDate(date: String): Option[Instant] = try {
+  def index: Action[AnyContent] = Action.async { implicit request =>
+    def parseDate(date: String): Option[Instant] = try
       val d = ZonedDateTime.parse(date, rfc1123Formatter).toInstant
       Some(d)
-    } catch {
-      case NonFatal(_) => None
-    }
+    catch case NonFatal(_) => None
 
-    (pceRequester ? 'reachability).mapTo[Try[(Seq[ReachabilityTopologyEntry], Instant)]] map {
+    (pceRequester ? ReachabilityCheck).mapTo[Try[(Seq[ReachabilityTopologyEntry], Instant)]] map {
       case Success((reachability, lastModified)) =>
-        val haveLatest = request.headers.get(IF_MODIFIED_SINCE).flatMap(parseDate).exists(ifModifiedSince => !ifModifiedSince.isBefore(lastModified.`with`(ChronoField.MILLI_OF_SECOND, 0)))
+        val haveLatest = request.headers
+          .get(IF_MODIFIED_SINCE)
+          .flatMap(parseDate)
+          .exists(ifModifiedSince =>
+            !ifModifiedSince.isBefore(lastModified.`with`(ChronoField.MILLI_OF_SECOND, 0))
+          )
 
-        if (haveLatest)
-          NotModified
+        if haveLatest then NotModified
         else
-          Ok(discoveryDocument(reachability, lastModified)).withHeaders(LAST_MODIFIED -> rfc1123Formatter.format(lastModified)).as(ContentTypes.withCharset(ContentTypeDiscoveryDocument))
+          Ok(discoveryDocument(reachability, lastModified))
+            .withHeaders(LAST_MODIFIED -> rfc1123Formatter.format(lastModified))
+            .as(ContentTypes.withCharset(ContentTypeDiscoveryDocument))
       case Failure(e) =>
         ServiceUnavailable(e.getMessage())
     }
   }
 
-  def discoveryDocument(reachabilityEntries: Seq[ReachabilityTopologyEntry], lastModified: Instant)(implicit request: RequestHeader): xml.Elem = {
+  def discoveryDocument(
+      reachabilityEntries: Seq[ReachabilityTopologyEntry],
+      lastModified: Instant
+  ): xml.Elem =
     val providerUrl = configuration.providerServiceUrl
     val requesterUrl = configuration.requesterServiceUrl
 
@@ -70,89 +81,96 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
         xmlns:vcard="urn:ietf:params:xml:ns:vcard-4.0"
         xmlns:nsa="http://schemas.ogf.org/nsi/2014/02/discovery/nsa"
         xmlns:gns="http://nordu.net/namespaces/2013/12/gnsbod"
-        id={ configuration.NsaId }
-        version={ lastModified.toString() }>
-      <name>{ configuration.NsaName }</name>
-      <softwareVersion>{ configuration.VersionString }</softwareVersion>
-      <startTime>{ configuration.StartTime.toString() }</startTime>
+        id={configuration.NsaId}
+        version={lastModified.toString()}>
+      <name>{configuration.NsaName}</name>
+      <softwareVersion>{configuration.VersionString}</softwareVersion>
+      <startTime>{configuration.StartTime.toString()}</startTime>
       <adminContact>
         <vcard:vcard>
           <vcard:uid>
-            <vcard:uri>{ providerUrl }#adminContact</vcard:uri>
+            <vcard:uri>{providerUrl}#adminContact</vcard:uri>
           </vcard:uid>
           <vcard:prodid>
-            <vcard:text>{ configuration.AdminContactProdid } </vcard:text>
+            <vcard:text>{configuration.AdminContactProdid} </vcard:text>
           </vcard:prodid>
           <vcard:rev>
-            <vcard:timestamp>{ DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").format(configuration.StartTime) }</vcard:timestamp>
+            <vcard:timestamp>{
+              DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").format(configuration.StartTime)
+            }</vcard:timestamp>
           </vcard:rev>
           <vcard:kind>
             <vcard:text>individual</vcard:text>
           </vcard:kind>
           <vcard:fn>
-            <vcard:text>{ configuration.AdminContact }</vcard:text>
+            <vcard:text>{configuration.AdminContact}</vcard:text>
           </vcard:fn>
           <vcard:n>
-            <vcard:surname>{ configuration.AdminContactSurname }</vcard:surname>
-            <vcard:given>{ configuration.AdminContactGiven }</vcard:given>
+            <vcard:surname>{configuration.AdminContactSurname}</vcard:surname>
+            <vcard:given>{configuration.AdminContactGiven}</vcard:given>
           </vcard:n>
         </vcard:vcard>
       </adminContact>
       <location>
-        <longitude>{ configuration.Longitude }</longitude>
-        <latitude>{ configuration.Latitude }</latitude>
+        <longitude>{configuration.Longitude}</longitude>
+        <latitude>{configuration.Latitude}</latitude>
       </location>
-      { configuration.NetworkId match {
-          case Some(id) => <networkId>{ id }</networkId>
-          case _ =>
-        }
+      {
+        configuration.NetworkId match
+          case Some(id) => <networkId>{id}</networkId>
+          case _        => NodeSeq.Empty
       }
-      { configuration.NetworkUrl match {
+      {
+        configuration.NetworkUrl match
           case Some(url) =>
-      <interface>
-        <type>application/vnd.ogf.nsi.topology.v2+xml</type>
-        <href>{ url }</href>
-      </interface>
-          case _ =>
-        }
+            <interface>
+              <type>application/vnd.ogf.nsi.topology.v2+xml</type>
+              <href>{url}</href>
+            </interface>
+          case _ => NodeSeq.Empty
       }
-      { configuration.DdsUrl match {
+      {
+        configuration.DdsUrl match
           case Some(url) =>
-      <interface>
-        <type>application/vnd.ogf.nsi.dds.v1+xml</type>
-        <href>{ url }</href>
-      </interface>
-          case _ =>
-        }
+            <interface>
+              <type>application/vnd.ogf.nsi.dds.v1+xml</type>
+              <href>{url}</href>
+            </interface>
+          case _ => NodeSeq.Empty
       }
       <interface>
         <type>application/vnd.ogf.nsi.cs.v2.requester+soap</type>
-        <href>{ requesterUrl }</href>
+        <href>{requesterUrl}</href>
       </interface>
       <interface>
         <type>application/vnd.ogf.nsi.cs.v2.provider+soap</type>
-        <href>{ providerUrl }</href>
+        <href>{providerUrl}</href>
       </interface>
-      { if (configuration.NetworkId.isDefined) {
-          <feature type="vnd.ogf.nsi.cs.v2.role.uPA"/>
-        }
+      {
+        if configuration.NetworkId.isDefined
+        then <feature type="vnd.ogf.nsi.cs.v2.role.uPA"/>
+        else NodeSeq.Empty
       }
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
-      { for (peer <- configuration.PeersWith) yield {
-          peer.id match {
-            case Some(id) => <peersWith>{id}</peersWith>
-            case _ =>
-          }
-        }
+      {
+        for (peer <- configuration.PeersWith) yield peer.id match
+          case Some(id) => <peersWith>{id}</peersWith>
+          case _        => NodeSeq.Empty
       }
-      { if (configuration.PceAlgorithm != PathComputationAlgorithm.Tree && configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty) {
-        <other>
+      {
+        if configuration.PceAlgorithm != PathComputationAlgorithm.TREE && configuration.NetworkId.isDefined && !reachabilityEntries.isEmpty
+        then
+          <other>
           <gns:TopologyReachability>
-            { reachabilityEntries.map(entry => <Topology id={ entry.id } cost={ entry.cost.toString } />) }
+            {
+              reachabilityEntries.map(entry =>
+                <Topology id={entry.id} cost={entry.cost.toString} />
+              )
+            }
           </gns:TopologyReachability>
         </other>
+        else NodeSeq.Empty
       }
-    }
     </nsa:nsa>
-  }
-}
+  end discoveryDocument
+end DiscoveryService

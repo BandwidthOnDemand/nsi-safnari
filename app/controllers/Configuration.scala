@@ -22,74 +22,107 @@
  */
 package controllers
 
-import scala.concurrent.duration._
-import scala.collection.JavaConverters._
+import com.typesafe.config.ConfigUtil
 import java.net.URI
 import java.time.LocalDateTime
-import javax.inject._
-import com.typesafe.config.ConfigUtil
-import nl.surfnet.safnari._
+import javax.inject.*
+import nl.surfnet.safnari.*
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 @Singleton
-class Configuration @Inject()(configuration: play.api.Configuration) {
+class Configuration @Inject() (configuration: play.api.Configuration):
   val StartTime = LocalDateTime.now
-  def NsaId = getStringOrFail("safnari.nsa.id")
-  def NsaName = getStringOrFail("safnari.nsa.name")
-  def AdminContactGiven = getStringOrFail("safnari.adminContact.given")
-  def AdminContactSurname = getStringOrFail("safnari.adminContact.surname")
-  def AdminContact = s"$AdminContactGiven $AdminContactSurname"
-  def AdminContactProdid = getStringOrFail("safnari.adminContact.prodid")
-  def Use2WayTLS = configuration.getOptional[Boolean]("nsi.twoway.tls").getOrElse(sys.error("nsi.twoway.tls option is not set"))
-  def VersionString = s"${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})"
-  def Longitude = getStringOrFail("safnari.location.longitude")
-  def Latitude = getStringOrFail("safnari.location.latitude")
-  def AsyncReplyTimeout = readFiniteDuration("safnari.async.reply.timeout")
-  def NetworkId = configuration.getOptional[String]("safnari.network.id")
-  def NetworkUrl = configuration.getOptional[String]("safnari.network.url")
-  def DdsUrl = configuration.getOptional[String]("safnari.dds.url")
-  def PceAlgorithm: PathComputationAlgorithm = configuration.getOptional[String]("pce.algorithm").flatMap(PathComputationAlgorithm.parse).getOrElse(sys.error("pce.algorithm option is not set or invalid"))
-  def PceEndpoint = getStringOrFail("pce.endpoint")
+  def NsaId: String = getStringOrFail("safnari.nsa.id")
+  def NsaName: String = getStringOrFail("safnari.nsa.name")
+  def AdminContactGiven: String = getStringOrFail("safnari.adminContact.given")
+  def AdminContactSurname: String = getStringOrFail("safnari.adminContact.surname")
+  def AdminContact: String = s"$AdminContactGiven $AdminContactSurname"
+  def AdminContactProdid: String = getStringOrFail("safnari.adminContact.prodid")
+  def Use2WayTLS: Boolean = configuration
+    .getOptional[Boolean]("nsi.twoway.tls")
+    .getOrElse(sys.error("nsi.twoway.tls option is not set"))
+  def VersionString: String = s"${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})"
+  def Longitude: String = getStringOrFail("safnari.location.longitude")
+  def Latitude: String = getStringOrFail("safnari.location.latitude")
+  def AsyncReplyTimeout: FiniteDuration = readFiniteDuration("safnari.async.reply.timeout")
+  def NetworkId: Option[String] = configuration.getOptional[String]("safnari.network.id")
+  def NetworkUrl: Option[String] = configuration.getOptional[String]("safnari.network.url")
+  def DdsUrl: Option[String] = configuration.getOptional[String]("safnari.dds.url")
+  def PceAlgorithm: PathComputationAlgorithm = configuration
+    .getOptional[String]("pce.algorithm")
+    .flatMap(PathComputationAlgorithm.fromString)
+    .getOrElse(sys.error("pce.algorithm option is not set or invalid"))
+  def PceEndpoint: String = getStringOrFail("pce.endpoint")
 
-  def NsiActor = configuration.getOptional[String]("nsi.actor")
-  def PceActor = configuration.getOptional[String]("pce.actor")
+  def NsiActor: Option[String] = configuration.getOptional[String]("nsi.actor")
+  def PceActor: Option[String] = configuration.getOptional[String]("pce.actor")
 
-  def CleanDbOnStart = configuration.getOptional[Boolean]("clean.db.on.start") getOrElse false
-  def CleanDbOnStop = configuration.getOptional[Boolean]("clean.db.on.stop") getOrElse false
+  def CleanDbOnStart: Boolean =
+    configuration.getOptional[Boolean]("clean.db.on.start") getOrElse false
+  def CleanDbOnStop: Boolean =
+    configuration.getOptional[Boolean]("clean.db.on.stop") getOrElse false
 
-  def PeersWith: Seq[PeerEntity] = {
-    val configOption = Try(configuration.underlying.getConfigList("safnari.peersWith").asInstanceOf[java.util.List[com.typesafe.config.Config]].asScala).toOption
-    configOption.toSeq.flatMap(_.map(cfg => play.api.Configuration(cfg)).map(peer => PeerEntity(peer.getOptional[String]("id"), peer.getOptional[String]("dn")) ))
-  }
+  def PeersWith: Seq[PeerEntity] =
+    val configOption = Try(
+      configuration.underlying
+        .getConfigList("safnari.peersWith")
+        .asInstanceOf[java.util.List[com.typesafe.config.Config]]
+        .asScala
+    ).toOption
+    configOption.toSeq.flatMap(
+      _.map(cfg => play.api.Configuration(cfg)).map(peer =>
+        PeerEntity(peer.getOptional[String]("id"), peer.getOptional[String]("dn"))
+      )
+    )
 
   // Web page footer information for main.scala.html.
-  def WebParams: Map[String,String] = Map("favicon" -> getStringOrFail("web.favicon"), "footer" -> getStringOrFail("web.footer"), "contactURL" -> getStringOrFail("web.contactURL"), "contactText" -> getStringOrFail("web.contactText"))
+  def WebParams: Map[String, String] = Map(
+    "favicon" -> getStringOrFail("web.favicon"),
+    "footer" -> getStringOrFail("web.footer"),
+    "contactURL" -> getStringOrFail("web.contactURL"),
+    "contactText" -> getStringOrFail("web.contactText")
+  )
 
-  def ConnectionExpirationTime = readFiniteDuration("safnari.connection.expiration.time")
+  def ConnectionExpirationTime: FiniteDuration =
+    readFiniteDuration("safnari.connection.expiration.time")
 
-  def BaseUrl = getStringOrFail("nsi.base.url")
+  def BaseUrl: String = getStringOrFail("nsi.base.url")
 
-  lazy val providerServiceUrl: String = s"${BaseUrl}${routes.ConnectionProviderController.request().url}"
+  lazy val providerServiceUrl: String =
+    s"${BaseUrl}${routes.ConnectionProviderController.request.url}"
 
-  lazy val requesterServiceUrl: String = s"${BaseUrl}${routes.ConnectionRequesterController.request().url}"
+  lazy val requesterServiceUrl: String =
+    s"${BaseUrl}${routes.ConnectionRequesterController.request.url}"
 
-  lazy val pceReplyUrl: String = s"${BaseUrl}${routes.PathComputationEngineController.pceReply().url}"
+  lazy val pceReplyUrl: String = s"${BaseUrl}${routes.PathComputationEngineController.pceReply.url}"
 
-  private def getStringOrFail(property: String) = configuration.getOptional[String](property).getOrElse(sys.error(s"$property is not set"))
+  private def getStringOrFail(property: String) =
+    configuration.getOptional[String](property).getOrElse(sys.error(s"$property is not set"))
 
-  private def readFiniteDuration(key: String): FiniteDuration = configuration.getOptional[String](key).map(Duration.apply) match {
-    case Some(fd: FiniteDuration) => fd
-    case Some(_)                  => sys.error(s"$key is not finite")
-    case None                     => sys.error(s"$key not set")
-  }
+  private def readFiniteDuration(key: String): FiniteDuration =
+    configuration.getOptional[String](key).map(Duration.apply) match
+      case Some(fd: FiniteDuration) => fd
+      case Some(_)                  => sys.error(s"$key is not finite")
+      case None                     => sys.error(s"$key not set")
 
   def translateToStunnelAddress(nsa: String, url: URI): Try[URI] = Try {
-    configuration.getOptional[String](ConfigUtil.joinPath("nsi", "tlsmap", nsa)) match {
+    configuration.getOptional[String](ConfigUtil.joinPath("nsi", "tlsmap", nsa)) match
       case Some(hostAndPort) =>
         val splitted = hostAndPort.split(":")
-        new URI("http", null, splitted(0), Integer.parseInt(splitted(1)), url.getPath, url.getQuery, url.getFragment)
+        new URI(
+          "http",
+          null,
+          splitted(0),
+          Integer.parseInt(splitted(1)),
+          url.getPath,
+          url.getQuery,
+          url.getFragment
+        )
       case None =>
-        throw new IllegalArgumentException(s"No stunnel detour configured for NSA ${nsa} while TLS was enabled.")
-    }
+        throw new IllegalArgumentException(
+          s"No stunnel detour configured for NSA ${nsa} while TLS was enabled."
+        )
   }
-}
+end Configuration

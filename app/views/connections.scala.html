@@ -1,22 +1,22 @@
-@(connections: Map[Symbol, Seq[(presenters.ConnectionPresenter, Seq[presenters.ConnectionPathSegmentPresenter])]], webParams: Map[String, String])
+@(connections: Map[String, Seq[(presenters.ConnectionPresenter, Seq[presenters.ConnectionPathSegmentPresenter])]], webParams: Map[String, String])
 
 @main("Connections", "connections", webParams) {
     <section>
         <h1>Connections <span class="header-right">filtered: future</span></h1>
         <div class="content">
-        @_connectionsList(connections('future))
+        @_connectionsList(connections("future"))
         </div>
     </section>
     <section>
         <h1>Connections <span class="header-right">filtered: current</span></h1>
         <div class="content">
-        @_connectionsList(connections('current))
+        @_connectionsList(connections("current"))
         </div>
     </section>
     <section>
         <h1>Connections <span class="header-right">filtered: end time no older than a week</span></h1>
         <div class="content">
-        @_connectionsList(connections('past))
+        @_connectionsList(connections("past"))
         </div>
     </section>
 }

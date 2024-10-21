@@ -24,45 +24,57 @@ package nl.surfnet.safnari
 
 import org.ogf.schemas.nsi._2013._12.connection.types.ReservationConfirmCriteriaType
 
-import nl.surfnet.nsiv2.messages._
+import nl.surfnet.nsiv2.messages.{given, *}
 
-trait InitialReserveAlgorithm {
+trait InitialReserveAlgorithm:
   def forSegments(segments: ComputedPathSegments): InitialReserveAlgorithm
 
   def nextSegments: Map[CorrelationId, ComputedSegment]
   def clearNextSegments: InitialReserveAlgorithm
 
-  def reserveConfirmed(correlationId: CorrelationId, criteria: ReservationConfirmCriteriaType): InitialReserveAlgorithm
-}
-object InitialReserveAlgorithm {
-  def forAlgorithm(algorithm: PathComputationAlgorithm): InitialReserveAlgorithm = algorithm match {
-    case PathComputationAlgorithm.Chain | PathComputationAlgorithm.Tree =>
+  def reserveConfirmed(
+      correlationId: CorrelationId,
+      criteria: ReservationConfirmCriteriaType
+  ): InitialReserveAlgorithm
+object InitialReserveAlgorithm:
+  def forAlgorithm(algorithm: PathComputationAlgorithm): InitialReserveAlgorithm = algorithm match
+    case PathComputationAlgorithm.CHAIN | PathComputationAlgorithm.TREE =>
       SimultaneousInitialReserveAlgorithm(Map.empty)
-    case PathComputationAlgorithm.Sequential =>
+    case PathComputationAlgorithm.SEQUENTIAL =>
       SequentialInitialReserveAlgorithm(Map.empty, None, Seq.empty)
-  }
 
-  private case class SimultaneousInitialReserveAlgorithm(nextSegments: Map[CorrelationId, ComputedSegment]) extends InitialReserveAlgorithm {
-    def forSegments(segments: ComputedPathSegments) = copy(nextSegments = segments.toMap)
+  private case class SimultaneousInitialReserveAlgorithm(
+      nextSegments: Map[CorrelationId, ComputedSegment]
+  ) extends InitialReserveAlgorithm:
+    def forSegments(segments: ComputedPathSegments): SimultaneousInitialReserveAlgorithm =
+      copy(nextSegments = segments.toMap)
     def clearNextSegments: InitialReserveAlgorithm = copy(nextSegments = Map.empty)
-    def reserveConfirmed(correlationId: CorrelationId, criteria: ReservationConfirmCriteriaType): InitialReserveAlgorithm = clearNextSegments
-  }
+    def reserveConfirmed(
+        correlationId: CorrelationId,
+        criteria: ReservationConfirmCriteriaType
+    ): InitialReserveAlgorithm = clearNextSegments
 
   private case class SequentialInitialReserveAlgorithm(
-    nextSegments: Map[CorrelationId, ComputedSegment],
-    outstandingSegment: Option[(CorrelationId, ComputedSegment)],
-    remainingSegments: ComputedPathSegments
-  ) extends InitialReserveAlgorithm {
+      nextSegments: Map[CorrelationId, ComputedSegment],
+      outstandingSegment: Option[(CorrelationId, ComputedSegment)],
+      remainingSegments: ComputedPathSegments
+  ) extends InitialReserveAlgorithm:
 
-    def forSegments(segments: ComputedPathSegments) = copy(
+    def forSegments(segments: ComputedPathSegments): SequentialInitialReserveAlgorithm = copy(
       nextSegments = segments.headOption.toMap,
       outstandingSegment = segments.headOption,
       remainingSegments = segments.drop(1)
     )
 
-    def reserveConfirmed(correlationId: CorrelationId, criteria: ReservationConfirmCriteriaType): InitialReserveAlgorithm = {
-      assert(outstandingSegment.exists(_._1 == correlationId), s"reservation confirm $correlationId does not match any outstanding request: $outstandingSegment")
-      remainingSegments match {
+    def reserveConfirmed(
+        correlationId: CorrelationId,
+        criteria: ReservationConfirmCriteriaType
+    ): InitialReserveAlgorithm =
+      assert(
+        outstandingSegment.exists(_._1 == correlationId),
+        s"reservation confirm $correlationId does not match any outstanding request: $outstandingSegment"
+      )
+      remainingSegments match
         case Seq() =>
           SequentialInitialReserveAlgorithm(Map.empty, None, Seq.empty)
         case next +: remaining =>
@@ -70,17 +82,21 @@ object InitialReserveAlgorithm {
             throw new RuntimeException("P2PService is missing")
           }
 
-          val nextSegment = service.destStp.vlan.map { vlan =>
-            next.copy(_2 = next._2.copy(serviceType = next._2.serviceType.copy(service = {
-              val nextService = next._2.serviceType.service.shallowCopy
-              nextService.withSourceSTP(nextService.sourceStp.withLabel("vlan", vlan.toString()).toString())
-            })))
-          }.getOrElse(next)
+          val nextSegment = service.destStp.vlan
+            .map { vlan =>
+              next.copy(_2 = next._2.copy(serviceType = next._2.serviceType.copy(service =
+                val nextService = next._2.serviceType.service.shallowCopy
+                nextService.withSourceSTP(
+                  nextService.sourceStp.withLabel("vlan", vlan.toString()).toString()
+                )
+              )))
+            }
+            .getOrElse(next)
 
           SequentialInitialReserveAlgorithm(Map(nextSegment), Some(nextSegment), remaining)
-      }
-    }
+      end match
+    end reserveConfirmed
 
     def clearNextSegments: InitialReserveAlgorithm = copy(nextSegments = Map.empty)
-  }
-}
+  end SequentialInitialReserveAlgorithm
+end InitialReserveAlgorithm

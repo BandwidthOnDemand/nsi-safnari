@@ -22,92 +22,112 @@
  */
 package controllers
 
-import akka.actor.ActorRef
-import akka.actor._
-import anorm.SqlParser._
-import anorm._
-import com.google.inject.{ AbstractModule, Provides }
-import javax.inject._
-import nl.surfnet.nsiv2.soap._
+import anorm.*
+import anorm.SqlParser.*
+import com.google.inject.{AbstractModule, Provides}
+import javax.inject.*
+import nl.surfnet.nsiv2.soap.*
 import nl.surfnet.safnari.SafnariMessageStore
+import org.apache.pekko.actor.*
 import play.api.Logger
 import play.api.db.Database
 import play.api.inject.ApplicationLifecycle
-import play.api.mvc._
-import scala.concurrent._
+import play.api.mvc.*
+import scala.concurrent.*
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 
-class StartModule extends AbstractModule {
-  override def configure() = {
+class StartModule extends AbstractModule:
+  override def configure(): Unit =
     bind(classOf[GlobalSettings]).asEagerSingleton()
-  }
 
-  @Singleton @Provides def extraBodyParsers(implicit ec: ExecutionContext, bodyParsers: PlayBodyParsers, actionBuilder: DefaultActionBuilder) = new ExtraBodyParsers
+  @Singleton @Provides def extraBodyParsers(implicit
+      ec: ExecutionContext,
+      bodyParsers: PlayBodyParsers,
+      actionBuilder: DefaultActionBuilder
+  ) = new ExtraBodyParsers
   @Singleton @Provides def messageStore(database: Database) = new SafnariMessageStore(database)
-  @Singleton @Provides def connectionManager(settings: GlobalSettings): ConnectionManager = settings.connectionManager
-  @Singleton @Provides def application(settings: GlobalSettings, configuration: Configuration, connectionRequester: ConnectionRequester, controllerComponents: ControllerComponents)(implicit ec: ExecutionContext): ApplicationController = {
-    val applicationController = new ApplicationController(settings.connectionManager, settings.pceRequester, connectionRequester, configuration)
-    applicationController.setControllerComponents(controllerComponents)
-    applicationController
-  }
-  @Singleton @Provides def discoveryService(settings: GlobalSettings, configuration: Configuration, controllerComponents: ControllerComponents)(implicit ec: ExecutionContext): DiscoveryService = {
+  @Singleton @Provides def connectionManager(settings: GlobalSettings): ConnectionManager =
+    settings.connectionManager
+  @Singleton @Provides def application(
+      settings: GlobalSettings,
+      configuration: Configuration,
+      connectionRequester: ConnectionRequester,
+      controllerComponents: ControllerComponents
+  )(implicit ec: ExecutionContext): ApplicationController =
+    new ApplicationController(
+      controllerComponents,
+      settings.connectionManager,
+      settings.pceRequester,
+      connectionRequester,
+      configuration
+    )
+  @Singleton @Provides def discoveryService(
+      settings: GlobalSettings,
+      configuration: Configuration,
+      controllerComponents: ControllerComponents
+  )(implicit ec: ExecutionContext): DiscoveryService =
     val discoveryService = new DiscoveryService(settings.pceRequester, configuration)
     discoveryService.setControllerComponents(controllerComponents)
     discoveryService
-  }
-}
+end StartModule
 
 @Singleton
-class GlobalSettings @Inject()(
-  lifecycle: ApplicationLifecycle,
-  configuration: Configuration,
-  actorSystem: ActorSystem,
-  pathComputationEngine: PathComputationEngine,
-  messageStore: SafnariMessageStore,
-  connectionProvider: ConnectionProvider,
-  connectionRequester: ConnectionRequester,
-  database: Database
-)(implicit ec: ExecutionContext) {
-  val pceRequester: ActorRef = pathComputationEngine.createPceRequesterActor(configuration)
-  private val createOutboundActor = connectionProvider.outboundActor(configuration, connectionRequester.nsiRequester, pceRequester) _
-  val connectionManager: ConnectionManager = new ConnectionManager(connectionProvider.connectionFactory(createOutboundActor, configuration), configuration, messageStore)
+class GlobalSettings @Inject() (
+    lifecycle: ApplicationLifecycle,
+    configuration: Configuration,
+    actorSystem: ActorSystem,
+    pathComputationEngine: PathComputationEngine,
+    messageStore: SafnariMessageStore,
+    connectionProvider: ConnectionProvider,
+    connectionRequester: ConnectionRequester,
+    database: Database
+)(implicit ec: ExecutionContext):
+  private val logger = Logger(classOf[GlobalSettings])
 
-  if (configuration.CleanDbOnStart) {
-    cleanDatabase()
-  }
+  val pceRequester: ActorRef = pathComputationEngine.createPceRequesterActor(configuration)
+  private val createOutboundActor = connectionProvider.outboundActor(
+    configuration,
+    connectionRequester.nsiRequester,
+    pceRequester
+  ) _
+  val connectionManager: ConnectionManager = new ConnectionManager(
+    connectionProvider.connectionFactory(createOutboundActor, configuration),
+    configuration,
+    messageStore
+  )
+
+  if configuration.CleanDbOnStart then cleanDatabase()
 
   restoreConnectionsFromDatabase()
 
   lifecycle.addStopHook { () =>
     Future.successful {
-      if (configuration.CleanDbOnStop) {
-        cleanDatabase()
-      }
+      if configuration.CleanDbOnStop then cleanDatabase()
     }
   }
 
-  private def restoreConnectionsFromDatabase(): Unit = {
+  private def restoreConnectionsFromDatabase(): Unit =
     implicit val implicitActorSystem = actorSystem
-    try {
-      Logger.info("Start replaying of connection messages")
+    try
+      logger.info("Start replaying of connection messages")
       Await.result(connectionManager.restore, Duration.Inf)
-      Logger.info("Completed replaying of connection messages")
-    } catch {
+      logger.info("Completed replaying of connection messages")
+    catch
       case NonFatal(e) =>
         val suppressed = e.getSuppressed()
         suppressed.foreach { e =>
-          Logger.error(s"Connection replay failed with suppressed exception", e)
+          logger.error(s"Connection replay failed with suppressed exception", e)
         }
         throw e
-    }
-  }
 
   private def cleanDatabase(): Unit = database.withTransaction { implicit connection =>
-    val tables = SQL("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'play_evolutions'").as(str("tablename").*).map("public." ++ _)
+    val tables = SQL(
+      "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'play_evolutions'"
+    ).as(str("tablename").*).map("public." ++ _)
     val truncate = s"TRUNCATE TABLE ${tables.mkString(",")} CASCADE"
-    Logger.debug(s"Cleaning database: $truncate")
+    logger.debug(s"Cleaning database: $truncate")
     SQL(truncate).executeUpdate()
     ()
   }
-}
+end GlobalSettings

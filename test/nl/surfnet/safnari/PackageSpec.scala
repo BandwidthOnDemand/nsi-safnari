@@ -1,33 +1,38 @@
 package nl.surfnet.safnari
 
-import nl.surfnet.nsiv2.utils._
+import nl.surfnet.nsiv2.utils.given
 
 import javax.xml.datatype.XMLGregorianCalendar
-import java.time.{ Instant, ZoneOffset }
-import java.time.temporal._
+import java.time.{Instant, ZoneOffset}
+import java.time.temporal.*
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
+import javax.xml.datatype.DatatypeFactory
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class PackageSpec extends helpers.Specification {
-  object XmlGregorianCalendar {
-    lazy val factory = javax.xml.datatype.DatatypeFactory.newInstance()
+class PackageSpec extends helpers.Specification:
+  object XmlGregorianCalendar:
+    lazy val factory: DatatypeFactory = javax.xml.datatype.DatatypeFactory.newInstance()
 
     def apply(date: String): XMLGregorianCalendar = factory.newXMLGregorianCalendar(date)
-  }
 
-  implicit val arbitraryXmlGregorianCalendar = {
-    Arbitrary(for {
-      timeInMillis <- Gen.choose(0, System.currentTimeMillis() * 3)
+  implicit val arbitraryXmlGregorianCalendar: Arbitrary[XMLGregorianCalendar] =
+    Arbitrary(for
+      timeInMillis <- Gen.choose(0L, System.currentTimeMillis() * 3)
       timezoneOffset <- Gen.choose(-14 * 60, 14 * 60)
-    } yield {
+    yield
       val dt = Instant.ofEpochMilli(timeInMillis).atOffset(ZoneOffset.ofHours(timezoneOffset))
       XmlGregorianCalendar.factory.newXMLGregorianCalendar(
-        dt.getYear(), dt.getMonthValue() - 1, dt.getDayOfMonth(),
-        dt.getHour(), dt.getMinute(), dt.getSecond(), dt.get(ChronoField.MILLI_OF_SECOND),
-        dt.getOffset().getTotalSeconds() / 60)
-    })
-  }
+        dt.getYear(),
+        dt.getMonthValue() - 1,
+        dt.getDayOfMonth(),
+        dt.getHour(),
+        dt.getMinute(),
+        dt.getSecond(),
+        dt.get(ChronoField.MILLI_OF_SECOND),
+        dt.getOffset().getTotalSeconds() / 60
+      )
+    )
 
   "XML Gregorian Calender order" should {
     "sort a list of calendars" in {
@@ -43,9 +48,12 @@ class PackageSpec extends helpers.Specification {
     }
 
     "find max in" in {
-      val dates = List(XmlGregorianCalendar("2002-10-09T11:00:00"), XmlGregorianCalendar("2001-10-09T11:00:00"))
+      val dates = List(
+        XmlGregorianCalendar("2002-10-09T11:00:00"),
+        XmlGregorianCalendar("2001-10-09T11:00:00")
+      )
 
       dates.max must beEqualTo(XmlGregorianCalendar("2002-10-09T11:00:00"))
     }
   }
-}
+end PackageSpec
