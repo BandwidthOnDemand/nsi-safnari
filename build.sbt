@@ -27,7 +27,7 @@ lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run mave
 lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
 val playVersion = "3.0.5"
-val playNsiSupportVersion = "3.0.0-SNAPSHOT"
+val playNsiSupportVersion = "3.0.0"
 
 libraryDependencies ++= Seq(
   guice,
