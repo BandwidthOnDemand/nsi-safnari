@@ -35,7 +35,7 @@ libraryDependencies ++= Seq(
   jdbc,
   evolutions,
   "org.scala-stm" %% "scala-stm" % "0.11.1",
-  "org.postgresql" % "postgresql" % "42.5.0",
+  "org.postgresql" % "postgresql" % "42.7.4",
   "org.specs2" %% "specs2-junit" % "4.20.7" % "test",
   "org.specs2" %% "specs2-matcher-extra" % "4.20.7" % "test",
   "org.specs2" %% "specs2-scalacheck" % "4.20.7" % "test",
