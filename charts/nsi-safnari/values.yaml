@@ -62,9 +62,9 @@ service:
 
 ingress:
   enabled: false
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    kubernetes.io/tls-acme: "true"
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
   hosts:
     - host: chart-example.local
       paths:
@@ -76,6 +76,24 @@ ingress:
     - secretName: chart-example-tls
       hosts:
         - chart-example.local
+
+# if you do not want to use ingress annotations to generate the Certificate manifest
+certificate:
+  enabled: false
+  name: chart-example-tls
+  dnsName: example.domain.toplevel
+  issuerRef:
+    name: letsencrypt
+  secretName: chart-example-tls
+  privateKey:
+    rotationPolicy: Always
+  keystores:
+    jks:
+      create: false
+      password: "secret"
+    pkcs12:
+      create: false
+      password: "secret"
 
 resources:
   requests:
@@ -92,7 +110,7 @@ tolerations: []
 affinity: {}
 
 postgresql:
-  enabled: true
+  enabled: false
   postgresqlUsername: nsi-safnari-user
   postgresqlPassword:
   postgresqlDatabase: nsi-safnari
@@ -107,11 +125,6 @@ postgresql:
       memory: 500Mi
   volumePermissions:
     enabled: true
-
-config:
-  name: "nsi-safnari-config"
-  mountPath: "/config"
-  configFilesGlob: "config/*"
 
 secretProviderClass:
   enabled: false
@@ -132,3 +145,119 @@ secretProviderClass:
     - key: "PGUSER"
       objectName: "ns-safnari-db-username"
 
+config:
+  #
+  waitForPceUrl: http://development-nsi-pce.development.svc.cluster.local:80/paths
+  #
+  # nsi-safnari needs the following single configuration file:
+  # - config-overrides.conf
+  #
+  # When config.configMapName is defined it must point to an existing configmap, managed outside of Helm,
+  # that contains all necessary configuration files. Otherwise, Helm will create a configmap with files from
+  # a folder pointed to by config.filesGlob, or the combination of config.inlineData and config.inlineBinaryData
+  # is used. Note that filesGlob takes precedence over inline data.
+  #
+  # When config.keystore.secretName is defined it must point to an existing secret, managed outside of Helm,
+  # the file pointed to by config.keystore.key will be mapped to nsi-safnari-keystore.jks. In this case the configmap
+  # does not need to contain a keystore. To use a truststore from a secret use config.truststore.
+  #
+  mountPath: "/config"
+  #configMapName: my-configmap-with-config
+  #configFilesGlob: "config/*"
+  inlineData: |-
+    config-overrides.conf: |-
+      include "application.conf"
+      db.default.url = "jdbc:postgresql://"${PGHOST}"/"${PGDATABASE}
+      db.default.password = ${PGPASSWORD}
+      db.default.user = ${PGUSER}
+      play {
+        server {
+          http {
+            secret {
+              key = ${SAFNARI_APPLICATION_SECRET}
+            }
+            port = 8080
+            address = "0.0.0.0"
+          }
+        }
+      }
+      safnari {
+        nsa {
+          id = "urn:ogf:network:example.domain:2017:nsa:safnari"
+          name = "Example Safnari"
+        }
+        network = null
+        dds {
+            url = "http://development-nsi-dds.development.svc.cluster.local:80"
+        }
+        peersWith = [
+            { id = "urn:ogf:network:example.domain:2017:nsa", dn = "/C=NL/O=Example Org/OU=network services/CN=supa.example.org" },
+        ]
+        async.reply.timeout = 120 seconds
+        connection.expiration.time = 1 day
+      }
+      pce {
+        actor = real
+        endpoint = "http://development-nsi-pce.development.svc.cluster.local:80"
+        algorithm = sequential
+      }
+      nsi {
+        actor = real
+        base.url = "https://safnari.example.domain"
+        twoway.tls = false
+        tlsmap = {
+        }
+      }
+      play.filters.hosts {
+        allowed = ["."]
+      }
+      play.ws.ssl {
+        keyManager = {
+          stores = [
+            {
+              path = "/config/key/nsi-safnari-keystore.jks"
+              type = "JKS"
+              password = "secret"
+            }
+          ]
+        }
+        trustManager = {
+          stores = [
+            {
+              path = "/config/trust/nsi-safnari-truststore.jks"
+              type = "JKS"
+              password = "secret"
+            }
+          ]
+        }
+      }
+# When using inline key and trust stores, please replace the Lorem Ipsum below with actual stores.
+  inlineBinaryData: |-
+    nsi-safnari-keystore.jks: |-
+      TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdCwgc2Vk
+      IGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRvbG9yZSBtYWduYSBhbGlx
+      dWEuIFV0IGVuaW0gYWQgbWluaW0gdmVuaWFtLCBxdWlzIG5vc3RydWQgZXhlcmNpdGF0aW9uIHVsbGFt
+      Y28gbGFib3JpcyBuaXNpIHV0IGFsaXF1aXAgZXggZWEgY29tbW9kbyBjb25zZXF1YXQuIER1aXMgYXV0
+      ZSBpcnVyZSBkb2xvciBpbiByZXByZWhlbmRlcml0IGluIHZvbHVwdGF0ZSB2ZWxpdCBlc3NlIGNpbGx1
+      bSBkb2xvcmUgZXUgZnVnaWF0IG51bGxhIHBhcmlhdHVyLiBFeGNlcHRldXIgc2ludCBvY2NhZWNhdCBj
+      dXBpZGF0YXQgbm9uIHByb2lkZW50LCBzdW50IGluIGN1bHBhIHF1aSBvZmZpY2lhIGRlc2VydW50IG1v
+      bGxpdCBhbmltIGlkIGVzdCBsYWJvcnVtLgo=
+    nsi-safnari-truststore.jks: |-
+      TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdCwgc2Vk
+      IGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRvbG9yZSBtYWduYSBhbGlx
+      dWEuIFV0IGVuaW0gYWQgbWluaW0gdmVuaWFtLCBxdWlzIG5vc3RydWQgZXhlcmNpdGF0aW9uIHVsbGFt
+      Y28gbGFib3JpcyBuaXNpIHV0IGFsaXF1aXAgZXggZWEgY29tbW9kbyBjb25zZXF1YXQuIER1aXMgYXV0
+      ZSBpcnVyZSBkb2xvciBpbiByZXByZWhlbmRlcml0IGluIHZvbHVwdGF0ZSB2ZWxpdCBlc3NlIGNpbGx1
+      bSBkb2xvcmUgZXUgZnVnaWF0IG51bGxhIHBhcmlhdHVyLiBFeGNlcHRldXIgc2ludCBvY2NhZWNhdCBj
+      dXBpZGF0YXQgbm9uIHByb2lkZW50LCBzdW50IGluIGN1bHBhIHF1aSBvZmZpY2lhIGRlc2VydW50IG1v
+      bGxpdCBhbmltIGlkIGVzdCBsYWJvcnVtLgo=
+  # Use keystore and truststore below to override the nsi-safnari-keystore.jks and/or nsi-safnari-truststore.jks
+  # from the configmap above. For example to use a keystore generated by certmanager.
+  keystore:
+    #secretName: my-nsi-safnari-keystore
+    #key: keystore.jks
+  truststore:
+    #secretName: my-nsi-safnari-truststore
+    #key: truststore.jks
+  # Create /config/trust/nsi-safnari-truststore.jks from ca.crt from caSecretName mounted under /ca
+  caSecretName: ""

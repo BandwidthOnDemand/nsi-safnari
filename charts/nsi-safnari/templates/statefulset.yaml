@@ -27,6 +27,32 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
+        {{- if .Values.config.caSecretName }}
+        - name: ca-to-truststore
+          securityContext:
+            runAsUser: 0
+          image: debian:trixie-slim
+          command:
+            - sh
+            - -c
+            - |
+              cd /truststore
+              cp /ca/ca.crt .
+              apt-get update
+              apt-get install -y --no-install-recommends openjdk-21-jdk-headless
+              awk '/-----BEGIN CERTIFICATE-----/ {out="cert" ++i ".pem"}; out {print >> out} /-----END CERTIFICATE-----/ {out=""}' ca.crt
+              for cert in cert*.pem; do
+                  cn=$(openssl x509 -in ${cert} -noout -subject | sed -n 's/^subject=//p')
+                  echo "${cn}"
+                  keytool -trustcacerts -storepass secret -importcert -alias "${cn}" -file ${cert} -keystore nsi-safnari-truststore.jks -noprompt
+              done
+              rm cert*.pem
+          volumeMounts:
+            - name: truststore
+              mountPath: /truststore
+            - name: ca
+              mountPath: /ca
+        {{- end }}
         - name: wait-for-postgres
           image: postgres:alpine
           {{- if .Values.secretProviderClass.enabled }}
@@ -44,7 +70,7 @@ spec:
             - secretRef:
                 name: {{ include "nsi-safnari.fullname" . }}-secret
           volumeMounts:
-            - name: secret-volume
+            - name: secret-store
               mountPath: "/mnt/secrets-store"
               readOnly: true
           {{- else }}
@@ -57,7 +83,7 @@ spec:
         - name: wait-for-pce
           image: curlimages/curl:latest
           command: ["sh", "-c",
-            {{ printf "until [ $(curl -sw '%%{http_code}' http://%s-nsi-pce.%s.svc.cluster.local:80/paths -o /dev/null) -eq 200 ]; do echo `date` sleeping 2 seconds ...; sleep 2; done" .Release.Name .Release.Namespace | quote }}
+            {{ printf "until [ $(curl -sw '%%{http_code}' %s -o /dev/null) -eq 200 ]; do echo `date` sleeping 2 seconds ...; sleep 2; done" .Values.config.waitForPceUrl | quote }}
           ]
       containers:
         - name: {{ .Chart.Name }}
@@ -68,15 +94,7 @@ spec:
           command: ["/nsi-safnari/bin/nsi-safnari"]
           args:
             - {{ printf "-Dconfig.file=%s/config-overrides.conf" .Values.config.mountPath | quote }}
-            - "-Dhttp.port=8080"
-            - "-Dhttp.address=0.0.0.0"
             - "-Dplay.evolutions.db.default.autoApply=true"
-            - "-Djavax.net.ssl.trustStoreType=jks"
-            - "-Djavax.net.ssl.keyStoreType=jks"
-            - "-Djavax.net.ssl.trustStorePassword=secret"
-            - "-Djavax.net.ssl.keyStorePassword=secret"
-            - {{ printf "-Djavax.net.ssl.trustStore=%s/nsi-safnari-truststore.jks" .Values.config.mountPath | quote }}
-            - {{ printf "-Djavax.net.ssl.keyStore=%s/nsi-safnari-keystore.jks" .Values.config.mountPath | quote }}
             - "-XX:MaxRAMPercentage=75.0"
             - "-J-Xlog:gc:file=/nsi-safnari/logs/gc.log:time,level,tags:filecount=5,filesize=10M"
             - "-J-XshowSettings:vm"
@@ -107,13 +125,27 @@ spec:
               containerPort: {{ .Values.service.containerPort }}
               protocol: TCP
           volumeMounts:
-            - name: {{ .Values.config.name }}
+            - name: config
               mountPath: {{ .Values.config.mountPath }}
               readOnly: true
+          {{- if (((.Values.config).keystore).secretName) }}
+            - name: keystore
+              mountPath: "{{ .Values.config.mountPath }}/key"
+              readOnly: true
+          {{- end }}
+          {{- if (((.Values.config).truststore).secretName) }}
+            - name: truststore
+              mountPath: "{{ .Values.config.mountPath }}/trust"
+              readOnly: true
+          {{- end }}
           {{- if .Values.secretProviderClass.enabled }}
-            - name: secret-volume
+            - name: secret-store
               mountPath: "/mnt/secrets-store"
               readOnly: true
+          {{- end }}
+          {{- if .Values.config.caSecretName }}
+            - name: truststore
+              mountPath: /truststore
           {{- end }}
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
@@ -138,11 +170,51 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
-        - name: {{ .Values.config.name }}
+        - name: config
           configMap:
-            name: {{ include "nsi-safnari.fullname" . }}-{{ .Values.config.name }}
+            {{- if .Values.config.configMapName }}
+            name: {{ .Values.config.configMapName }}
+            {{- else }}
+            name: {{ .Release.Name }}-config
+            {{- end }}
+            items:
+            - key: "config-overrides.conf"
+              path: "config-overrides.conf"
+            {{- if (((.Values.config).keystore).secretName) }}
+            {{- else }}
+            - key: "nsi-safnari-keystore.jks"
+              path: "key/nsi-safnari-keystore.jks"
+            {{- end }}
+            {{- if or (((.Values.config).truststore).secretName) ((.Values.config).caSecretName) }}
+            {{- else }}
+            - key: "nsi-safnari-truststore.jks"
+              path: "trust/nsi-safnari-truststore.jks"
+            {{- end }}
+        {{- if (((.Values.config).keystore).secretName) }}
+        - name: keystore
+          secret:
+            secretName: {{ .Values.config.keystore.secretName }}
+            items:
+            - key: {{ .Values.config.keystore.key }}
+              path: nsi-safnari-keystore.jks
+        {{- end }}
+        {{- if (((.Values.config).truststore).secretName) }}
+        - name: truststore
+          secret:
+            secretName: {{ .Values.config.truststore.secretName }}
+            items:
+            - key: {{ .Values.config.truststore.key }}
+              path: nsi-safnari-truststore.jks
+        {{- end }}
+        {{- if .Values.config.caSecretName }}
+        - name: ca
+          secret:
+            secretName: {{ .Values.config.caSecretName }}
+        - name: truststore
+          emptyDir: {}
+        {{- end }}
         {{- if .Values.secretProviderClass.enabled }}
-        - name: secret-volume
+        - name: secret-store
           csi:
             driver: secrets-store.csi.k8s.io
             readOnly: true
