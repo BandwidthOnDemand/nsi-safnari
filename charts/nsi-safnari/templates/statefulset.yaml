@@ -39,12 +39,12 @@ spec:
               cd /truststore
               cp /ca/ca.crt .
               apt-get update
-              apt-get install -y --no-install-recommends openjdk-21-jdk-headless
+              apt-get install -y --no-install-recommends openjdk-21-jre-headless
               awk '/-----BEGIN CERTIFICATE-----/ {out="cert" ++i ".pem"}; out {print >> out} /-----END CERTIFICATE-----/ {out=""}' ca.crt
               for cert in cert*.pem; do
                   cn=$(openssl x509 -in ${cert} -noout -subject | sed -n 's/^subject=//p')
                   echo "${cn}"
-                  keytool -trustcacerts -storepass secret -importcert -alias "${cn}" -file ${cert} -keystore nsi-safnari-truststore.jks -noprompt
+                  keytool -trustcacerts -storepass secret -importcert -alias "${cn}" -file ${cert} -keystore nsi-safnari-truststore.jks -storetype jks -noprompt
               done
               rm cert*.pem
           volumeMounts:
