@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master # default branch of the project
+  workflow_dispatch:
+
 permissions:
   contents: write # for dependency graph upload
 
