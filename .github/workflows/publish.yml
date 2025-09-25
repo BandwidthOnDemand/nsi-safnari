@@ -1,13 +1,12 @@
 name: Build and push container image
 
 on:
+  push:
+    branches-ignore:
+      - 'dependabot/**'
+    tags:
+      - '**'
   workflow_dispatch:
-  release:
-    types: [created]
-
-#on:
-#  release:
-#    types: [prereleased, released]
 
 env:
   REGISTRY: ghcr.io
