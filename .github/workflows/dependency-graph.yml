@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master # default branch of the project
+  workflow_dispatch:
+
 permissions:
   contents: write # for dependency graph upload
 
@@ -15,5 +17,12 @@ jobs:
     name: Update Dependency Graph
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: scalacenter/sbt-dependency-submission@v3
+      - name: Install JVM 21 + sbt
+        uses: coursier/setup-action@v1
+        with:
+          jvm: temurin:21
+          apps: sbt
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: SBT dependency submission
+        uses: scalacenter/sbt-dependency-submission@v3
