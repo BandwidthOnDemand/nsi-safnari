@@ -26,13 +26,13 @@ jobs:
     steps:
     - name: Start PostgreSQL
       run: sudo systemctl start postgresql.service
-    - uses: actions/checkout@v4
-    - name: Set up JDK 21
-      uses: actions/setup-java@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Install JVM 21 + sbt
+      uses: coursier/setup-action@v1
       with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: 'sbt'
+        jvm: temurin:21
+        apps: sbt
     - name: Initialize PostgreSQL database
       run: |
         sudo -u postgres -i createuser -D -R -S nsi-safnari-user
