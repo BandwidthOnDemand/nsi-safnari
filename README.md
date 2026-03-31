@@ -47,6 +47,22 @@ Like: `nsi-safnari -Dconfig.file=/path/to/prod.conf`. For further information
 you can look at
 the [Play site](http://www.playframework.com/documentation/2.2.x/Production).
 
+## Theming
+
+The web interface can be styled per organisation. All available themes are
+pre-built into the container image. To select a theme, set the `web.theme`
+property in your configuration overrides:
+
+```
+web.theme = "surfnet"
+```
+
+Available themes: `surfnet`, `ana`, `esnet`, `icair`.
+
+To add a new theme, create a `theme-<name>.less` file in
+`app/assets/css/` with the desired colour variables and an
+`@import "_shared.less";` at the bottom.
+
 ## PCE
 
 Safnari uses a JSON API to talk to the PCE (Path Computation Engine). Safnari is

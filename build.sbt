@@ -62,6 +62,9 @@ lazy val root = (project in file("."))
     exportJars := true
   )
 
+// Compile all theme entry points (variables-*.less) instead of the default main.less
+Assets / LessKeys.less / includeFilter := "theme-*.less"
+
 Test / javaOptions += "-Dconfig.file=conf/test.conf"
 
 Test / testFrameworks := Seq(TestFrameworks.Specs2)

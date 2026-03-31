@@ -79,6 +79,7 @@ class Configuration @Inject() (configuration: play.api.Configuration):
 
   // Web page footer information for main.scala.html.
   def WebParams: Map[String, String] = Map(
+    "theme" -> getStringOrFail("web.theme"),
     "favicon" -> getStringOrFail("web.favicon"),
     "footer" -> getStringOrFail("web.footer"),
     "contactURL" -> getStringOrFail("web.contactURL"),
