@@ -137,7 +137,9 @@ class MessagePersistenceSpec extends MessageStoreSpecification:
         val restored = MessagePersistence.MessageToMessageData.invert(data)
         restored must beLike { case Success(m: MessageDeliveryFailure) =>
           m.connectionId must beEqualTo(Some("conn-2"))
-          m.timestamp.toEpochMilli must beEqualTo(msg.asInstanceOf[MessageDeliveryFailure].timestamp.toEpochMilli)
+          m.timestamp.toEpochMilli must beEqualTo(
+            msg.asInstanceOf[MessageDeliveryFailure].timestamp.toEpochMilli
+          )
         }
       }
     }

@@ -345,7 +345,8 @@ class PceMessageSpec extends helpers.Specification:
       parsed must beLike { case JsSuccess(svc, _) =>
         svc.isSymmetricPath must beEqualTo(java.lang.Boolean.TRUE)
 
-        val roundTripped = Json.fromJson[P2PServiceBaseType](Json.toJson(svc)(pointToPointServiceFormat))
+        val roundTripped =
+          Json.fromJson[P2PServiceBaseType](Json.toJson(svc)(pointToPointServiceFormat))
         roundTripped must beLike { case JsSuccess(svc2, _) =>
           svc2.isSymmetricPath must beEqualTo(java.lang.Boolean.TRUE)
         }
@@ -382,7 +383,12 @@ class PceMessageSpec extends helpers.Specification:
 
     "round-trip NsiError with namespace and variable" in {
       val error =
-        NsiError("00702", "LABEL", "oops!", Seq(new QName("http://example.com/ns", "localName") -> "value"))
+        NsiError(
+          "00702",
+          "LABEL",
+          "oops!",
+          Seq(new QName("http://example.com/ns", "localName") -> "value")
+        )
 
       val json = Json.toJson[PceResponse](PathComputationFailed(correlationId, error))
       val parsed = Json.fromJson[PceResponse](json)
@@ -396,7 +402,12 @@ class PceMessageSpec extends helpers.Specification:
 
     "round-trip NsiError with null namespace variable" in {
       val error =
-        NsiError("00702", "LABEL", "oops!", Seq(new QName(XMLConstants.NULL_NS_URI, "localPart") -> "value"))
+        NsiError(
+          "00702",
+          "LABEL",
+          "oops!",
+          Seq(new QName(XMLConstants.NULL_NS_URI, "localPart") -> "value")
+        )
 
       val json = Json.toJson[PceResponse](PathComputationFailed(correlationId, error))
       val parsed = Json.fromJson[PceResponse](json)
