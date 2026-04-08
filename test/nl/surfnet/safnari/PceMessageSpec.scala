@@ -1,6 +1,7 @@
 package nl.surfnet.safnari
 
 import java.net.URI
+import java.time.Instant
 
 import net.nordu.namespaces._2013._12.gnsbod.ConnectionType
 import org.ogf.schemas.nsi._2013._12.services.point2point.P2PServiceBaseType
@@ -9,7 +10,9 @@ import org.ogf.schemas.nsi._2013._12.services.types.DirectionalityType
 import play.api.libs.json.*
 
 import nl.surfnet.nsiv2.messages.*
+import javax.xml.datatype.DatatypeFactory
 import javax.xml.namespace.QName
+import javax.xml.XMLConstants
 
 object PceMessageSpec:
   val sourceStp = "network-id:source"
@@ -237,6 +240,243 @@ class PceMessageSpec extends helpers.Specification:
       ) must beEqualTo(
         JsSuccess(ProviderEndPoint("urn:nsa:surfnet.nl", URI.create("http://localhost")))
       )
+    }
+
+    "round-trip request with all optional fields absent" in {
+      val request: PceRequest = PathComputationRequest(
+        correlationId,
+        None,
+        URI.create("http://localhost/pce/reply"),
+        None,
+        None,
+        ServiceType(ServiceTypeUrl, ServiceBaseType),
+        PathComputationAlgorithm.CHAIN,
+        Nil
+      )
+
+      val json = Json.toJson(request)
+      val parsed = Json.fromJson[PceRequest](json)
+
+      parsed must beLike { case JsSuccess(r: PathComputationRequest, _) =>
+        r.nsaId must beNone
+        r.startTime must beNone
+        r.endTime must beNone
+      }
+    }
+
+    "round-trip request with all optional fields present" in {
+      val now = Instant.now()
+      val later = now.plusSeconds(3600)
+      val request: PceRequest = PathComputationRequest(
+        correlationId,
+        Some("urn:ogf:network:example.net:2025:nsa"),
+        URI.create("http://localhost/pce/reply"),
+        Some(now),
+        Some(later),
+        ServiceType(ServiceTypeUrl, ServiceBaseType),
+        PathComputationAlgorithm.CHAIN,
+        Nil
+      )
+
+      val json = Json.toJson(request)
+      val parsed = Json.fromJson[PceRequest](json)
+
+      parsed must beLike { case JsSuccess(r: PathComputationRequest, _) =>
+        r.nsaId must beSome("urn:ogf:network:example.net:2025:nsa")
+        r.startTime must beSome
+        r.endTime must beSome
+        r.startTime.get.toEpochMilli must beEqualTo(now.toEpochMilli)
+        r.endTime.get.toEpochMilli must beEqualTo(later.toEpochMilli)
+      }
+    }
+
+    "round-trip request with large capacity value" in {
+      val largeCapacityService = new P2PServiceBaseType()
+        .withDirectionality(DirectionalityType.BIDIRECTIONAL)
+        .withCapacity(Long.MaxValue)
+        .withSourceSTP(PceMessageSpec.sourceStp)
+        .withDestSTP(PceMessageSpec.destStp)
+      val request: PceRequest = PathComputationRequest(
+        correlationId,
+        Some("NSA-ID"),
+        URI.create("http://localhost/pce/reply"),
+        None,
+        None,
+        ServiceType(ServiceTypeUrl, largeCapacityService),
+        PathComputationAlgorithm.CHAIN,
+        Nil
+      )
+
+      val json = Json.toJson(request)
+      val parsed = Json.fromJson[PceRequest](json)
+
+      parsed must beLike { case JsSuccess(r: PathComputationRequest, _) =>
+        r.serviceType.service.getCapacity must beEqualTo(Long.MaxValue)
+      }
+    }
+
+    "round-trip P2PServiceBaseType with null directionality defaults to Bidirectional" in {
+      val json = Json.parse("""{
+        "capacity": 100,
+        "sourceSTP": "urn:stp:a",
+        "destSTP": "urn:stp:b",
+        "parameter": []
+      }""")
+
+      val parsed = Json.fromJson[P2PServiceBaseType](json)
+      parsed must beLike { case JsSuccess(svc, _) =>
+        svc.getDirectionality must beEqualTo(DirectionalityType.BIDIRECTIONAL)
+        svc.isSymmetricPath must beNull
+        svc.getEro must beNull
+      }
+    }
+
+    "round-trip P2PServiceBaseType with symmetricPath boolean" in {
+      val json = Json.parse("""{
+        "capacity": 100,
+        "directionality": "Bidirectional",
+        "symmetricPath": true,
+        "sourceSTP": "urn:stp:a",
+        "destSTP": "urn:stp:b",
+        "parameter": []
+      }""")
+
+      val parsed = Json.fromJson[P2PServiceBaseType](json)
+      parsed must beLike { case JsSuccess(svc, _) =>
+        svc.isSymmetricPath must beEqualTo(java.lang.Boolean.TRUE)
+
+        val roundTripped = Json.fromJson[P2PServiceBaseType](Json.toJson(svc)(pointToPointServiceFormat))
+        roundTripped must beLike { case JsSuccess(svc2, _) =>
+          svc2.isSymmetricPath must beEqualTo(java.lang.Boolean.TRUE)
+        }
+      }
+    }
+
+    "round-trip P2PServiceBaseType with symmetricPath false" in {
+      val json = Json.parse("""{
+        "capacity": 100,
+        "directionality": "Bidirectional",
+        "symmetricPath": false,
+        "sourceSTP": "urn:stp:a",
+        "destSTP": "urn:stp:b",
+        "parameter": []
+      }""")
+
+      val parsed = Json.fromJson[P2PServiceBaseType](json)
+      parsed must beLike { case JsSuccess(svc, _) =>
+        svc.isSymmetricPath must beEqualTo(java.lang.Boolean.FALSE)
+      }
+    }
+
+    "round-trip NsiError with empty variables" in {
+      val error = NsiError.NoServicePlanePathFound
+
+      val json = Json.toJson[PceResponse](PathComputationFailed(correlationId, error))
+      val parsed = Json.fromJson[PceResponse](json)
+      parsed must beLike { case JsSuccess(PathComputationFailed(_, e), _) =>
+        e.id must beEqualTo(error.id)
+        e.description must beEqualTo(error.description)
+        e.text must beEqualTo(error.text)
+      }
+    }
+
+    "round-trip NsiError with namespace and variable" in {
+      val error =
+        NsiError("00702", "LABEL", "oops!", Seq(new QName("http://example.com/ns", "localName") -> "value"))
+
+      val json = Json.toJson[PceResponse](PathComputationFailed(correlationId, error))
+      val parsed = Json.fromJson[PceResponse](json)
+      parsed must beLike { case JsSuccess(PathComputationFailed(_, e), _) =>
+        e.variables must have size 1
+        e.variables.head._1.getLocalPart must beEqualTo("localName")
+        e.variables.head._1.getNamespaceURI must beEqualTo("http://example.com/ns")
+        e.variables.head._2 must beEqualTo("value")
+      }
+    }
+
+    "round-trip NsiError with null namespace variable" in {
+      val error =
+        NsiError("00702", "LABEL", "oops!", Seq(new QName(XMLConstants.NULL_NS_URI, "localPart") -> "value"))
+
+      val json = Json.toJson[PceResponse](PathComputationFailed(correlationId, error))
+      val parsed = Json.fromJson[PceResponse](json)
+      parsed must beLike { case JsSuccess(PathComputationFailed(_, e), _) =>
+        e.variables must have size 1
+        e.variables.head._1.getLocalPart must beEqualTo("localPart")
+      }
+    }
+
+    "round-trip XMLGregorianCalendar through JSON" in {
+      val cal = DatatypeFactory.newInstance().newXMLGregorianCalendar("2025-06-15T10:30:00.000Z")
+      val json = Json.toJson(cal)
+      json must beEqualTo(JsString("2025-06-15T10:30:00.000Z"))
+
+      val parsed = Json.fromJson[javax.xml.datatype.XMLGregorianCalendar](json)
+      parsed must beLike { case JsSuccess(c, _) =>
+        c.toXMLFormat must beEqualTo("2025-06-15T10:30:00.000Z")
+      }
+    }
+
+    "deserialize PceAccepted from status 202" in {
+      val json = Json.parse(s"""{"correlationId":"${correlationId}","status":202}""")
+      val parsed = Json.fromJson[PceAcknowledgement](json)
+      parsed must beLike { case JsSuccess(PceAccepted(id), _) =>
+        id must beEqualTo(correlationId)
+      }
+    }
+
+    "deserialize PceFailed from non-202 status" in {
+      val json = Json.parse(
+        s"""{"correlationId":"${correlationId}","status":500,"statusText":"Internal Server Error","message":"Something went wrong"}"""
+      )
+      val parsed = Json.fromJson[PceAcknowledgement](json)
+      parsed must beLike { case JsSuccess(PceFailed(id, status, statusText, message), _) =>
+        id must beEqualTo(correlationId)
+        status must beEqualTo(500)
+        statusText must beEqualTo("Internal Server Error")
+        message must beEqualTo("Something went wrong")
+      }
+    }
+
+    "round-trip PceAcknowledgement for accepted" in {
+      val ack: PceAcknowledgement = PceAccepted(correlationId)
+      val json = Json.toJson(ack)
+      val parsed = Json.fromJson[PceAcknowledgement](json)
+      parsed must beLike { case JsSuccess(PceAccepted(id), _) =>
+        id must beEqualTo(correlationId)
+      }
+    }
+
+    "round-trip PceAcknowledgement for failed" in {
+      val ack: PceAcknowledgement = PceFailed(correlationId, 404, "Not Found", "Path not found")
+      val json = Json.toJson(ack)
+      val parsed = Json.fromJson[PceAcknowledgement](json)
+      parsed must beLike { case JsSuccess(PceFailed(id, status, statusText, message), _) =>
+        id must beEqualTo(correlationId)
+        status must beEqualTo(404)
+        statusText must beEqualTo("Not Found")
+        message must beEqualTo("Path not found")
+      }
+    }
+
+    "round-trip all PathComputationAlgorithm values" in {
+      org.specs2.execute.Result.foreach(PathComputationAlgorithm.values.toSeq) { algo =>
+        val request: PceRequest = PathComputationRequest(
+          correlationId,
+          None,
+          URI.create("http://localhost/pce/reply"),
+          None,
+          None,
+          ServiceType(ServiceTypeUrl, ServiceBaseType),
+          algo,
+          Nil
+        )
+        val json = Json.toJson(request)
+        val parsed = Json.fromJson[PceRequest](json)
+        parsed must beLike { case JsSuccess(r: PathComputationRequest, _) =>
+          r.algorithm must beEqualTo(algo)
+        }
+      }
     }
 
     "deserialize path computation confirmed with ero and parameters" in {
