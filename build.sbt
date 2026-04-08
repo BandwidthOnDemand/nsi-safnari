@@ -26,8 +26,8 @@ scalacOptions ++= Seq(
 lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run maven")
 lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
-val playVersion = "3.0.5"
-val playNsiSupportVersion = "3.0.0"
+val playVersion = "3.0.10"
+val playNsiSupportVersion = "3.1.0"
 
 libraryDependencies ++= Seq(
   guice,
@@ -35,7 +35,7 @@ libraryDependencies ++= Seq(
   jdbc,
   evolutions,
   "org.scala-stm" %% "scala-stm" % "0.11.1",
-  "org.postgresql" % "postgresql" % "42.7.4",
+  "org.postgresql" % "postgresql" % "42.7.7",
   "org.specs2" %% "specs2-junit" % "4.20.7" % "test",
   "org.specs2" %% "specs2-matcher-extra" % "4.20.7" % "test",
   "org.specs2" %% "specs2-scalacheck" % "4.20.7" % "test",
@@ -46,6 +46,17 @@ libraryDependencies ++= Seq(
   "com.sun.xml.ws" % "jaxws-rt" % "4.0.3" % "test",
   "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion,
   "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion % "test" classifier "tests"
+)
+
+dependencyOverrides ++= Seq(
+  "com.fasterxml.jackson.core"       % "jackson-core"            % "2.18.6",
+  "com.fasterxml.jackson.core"       % "jackson-databind"        % "2.18.6",
+  "com.fasterxml.jackson.core"       % "jackson-annotations"     % "2.18.6",
+  "com.fasterxml.jackson.datatype"   % "jackson-datatype-jdk8"   % "2.18.6",
+  "com.fasterxml.jackson.datatype"   % "jackson-datatype-jsr310" % "2.18.6",
+  "com.fasterxml.jackson.module"    %% "jackson-module-scala"    % "2.18.6",
+  "commons-beanutils"                % "commons-beanutils"       % "1.11.0",
+  "org.apache.commons"               % "commons-lang3"           % "3.18.0",
 )
 
 val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
