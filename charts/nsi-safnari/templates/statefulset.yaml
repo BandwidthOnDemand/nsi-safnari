@@ -91,13 +91,20 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["/nsi-safnari/bin/nsi-safnari"]
+          command: ["java"]
           args:
+            - "-Duser.dir=/nsi-safnari"
             - {{ printf "-Dconfig.file=%s/config-overrides.conf" .Values.config.mountPath | quote }}
             - "-Dplay.evolutions.db.default.autoApply=true"
             - "-XX:MaxRAMPercentage=75.0"
-            - "-J-Xlog:gc:file=/nsi-safnari/logs/gc.log:time,level,tags:filecount=5,filesize=10M"
-            - "-J-XshowSettings:vm"
+            - "-Xlog:gc:file=/nsi-safnari/logs/gc.log:time,level,tags:filecount=5,filesize=10M"
+            - "-XshowSettings:vm"
+            - "-Djavax.net.ssl.trustStoreType=jks"
+            - "-Djavax.net.ssl.trustStorePassword=secret"
+            - {{ printf "-Djavax.net.ssl.trustStore=%s/trust/nsi-safnari-truststore.jks" .Values.config.mountPath | quote }}
+            - "-cp"
+            - "/nsi-safnari/conf/:/nsi-safnari/lib/*"
+            - "play.core.server.ProdServerStart"
           env:
             - name: SAFNARI_APPLICATION_SECRET
               valueFrom:
