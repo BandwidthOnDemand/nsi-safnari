@@ -52,7 +52,7 @@ class PathComputationEngineController @Inject() (
   def pceReply: Action[JsValue] = Action(parse.json) { implicit request =>
     Json.fromJson[PceResponse](request.body) match
       case JsSuccess(response, _) =>
-        logger.info(s"Pce reply: $response")
+        logger.debug(s"Pce reply: $response")
         pce.pceContinuations.replyReceived(response.correlationId, response)
         Ok
       case JsError(error) =>
@@ -124,7 +124,7 @@ class PathComputationEngine @Inject() (actorSystem: ActorSystem, ws: WSClient)(i
 
       case ToPce(request) =>
         val findPathEndPoint = s"$endPoint/paths/find"
-        logger.info(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
+        logger.debug(s"Sending request to pce ($findPathEndPoint): ${Json.toJson(request)}")
 
         val connection = Connection(sender())
         pceContinuations

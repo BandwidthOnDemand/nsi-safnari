@@ -294,6 +294,30 @@ class ConnectionManager(
     var endTimeCancellable: Option[Cancellable] = None
     var expirationCancellable: Option[Cancellable] = None
 
+    private def logInbound(message: InboundMessage): Unit = message match
+      case FromRequester(msg) =>
+        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=FromRequester operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}")
+      case FromProvider(msg) =>
+        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=FromProvider operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}")
+      case AckFromProvider(msg) =>
+        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=AckFromProvider operation=${msg.body.getClass.getSimpleName} providerNSA=${msg.headers.providerNSA}")
+      case FromPce(msg) =>
+        logger.info(s"connectionId=${connection.id} correlationId=${msg.correlationId} direction=FromPce operation=${msg.getClass.getSimpleName}")
+      case AckFromPce(msg) =>
+        logger.info(s"connectionId=${connection.id} correlationId=${msg.correlationId} direction=AckFromPce operation=${msg.getClass.getSimpleName}")
+      case failure: MessageDeliveryFailure =>
+        logger.info(s"connectionId=${connection.id} correlationId=${failure.correlationId} direction=MessageDeliveryFailure originalCorrelationId=${failure.originalCorrelationId} uri=${failure.uri}")
+      case passed: PassedEndTime =>
+        logger.info(s"connectionId=${connection.id} correlationId=${passed.correlationId} direction=PassedEndTime")
+
+    private def logOutbound(message: OutboundMessage): Unit = message match
+      case ToProvider(msg, provider) =>
+        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=ToProvider operation=${msg.body.getClass.getSimpleName} providerNSA=${provider.nsa} url=${provider.url}")
+      case ToRequester(msg) =>
+        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=ToRequester operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}")
+      case ToPce(msg) =>
+        logger.info(s"connectionId=${connection.id} correlationId=${msg.correlationId} direction=ToPce operation=${msg.getClass.getSimpleName}")
+
     override def postStop(): Unit =
       endTimeCancellable.foreach(_.cancel())
       expirationCancellable.foreach(_.cancel())
@@ -332,6 +356,8 @@ class ConnectionManager(
           requester ! msg
 
       case Connection.Command(timestamp, inbound: InboundMessage) =>
+        logInbound(inbound)
+
         val context = ConnectionContext(clock = Clock.fixed(timestamp, ZoneOffset.UTC))
         val result = PersistMessages(timestamp, process.apply)(inbound)(context)
 
@@ -345,6 +371,7 @@ class ConnectionManager(
 
             outbound.foreach(connection.process)
 
+            outbound.foreach(logOutbound)
             outbound.foreach(output ! _)
 
             inbound match
