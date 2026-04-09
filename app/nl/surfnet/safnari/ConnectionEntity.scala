@@ -119,7 +119,7 @@ class ConnectionEntity(
     children
   )
 
-  private val globalReservationId: Option[GlobalReservationId] = Try(
+  val globalReservationId: Option[GlobalReservationId] = Try(
     URI.create(initialReserve.body.body.getGlobalReservationId())
   ).toOption
 
