@@ -56,7 +56,8 @@ dependencyOverrides ++= Seq(
   "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.18.6",
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.18.6",
   "commons-beanutils" % "commons-beanutils" % "1.11.0",
-  "org.apache.commons" % "commons-lang3" % "3.18.0"
+  "org.apache.commons" % "commons-lang3" % "3.18.0",
+  "org.codehaus.plexus" % "plexus-utils" % "3.6.1"
 )
 
 val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
