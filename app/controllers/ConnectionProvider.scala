@@ -110,7 +110,9 @@ class ConnectionProviderController @Inject() (
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderCommand])(
       sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit
   ): Future[NsiAcknowledgement] =
-    logger.info(s"correlationId=${request.headers.correlationId} direction=FromRequester operation=${request.body.getClass.getSimpleName} requesterNSA=${request.headers.requesterNSA}")
+    logger.info(
+      s"correlationId=${request.headers.correlationId} direction=FromRequester operation=${request.body.getClass.getSimpleName} requesterNSA=${request.headers.requesterNSA}"
+    )
     connectionManager.findOrCreateConnection(request) match
       case None =>
         Future.successful(
@@ -126,81 +128,90 @@ class ConnectionProviderController @Inject() (
   private[controllers] def handleQuery(message: NsiProviderMessage[NsiProviderQuery])(
       sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit
   ): Future[NsiAcknowledgement] =
-    logger.info(s"correlationId=${message.headers.correlationId} direction=FromRequester operation=${message.body.getClass.getSimpleName} requesterNSA=${message.headers.requesterNSA}")
+    logger.info(
+      s"correlationId=${message.headers.correlationId} direction=FromRequester operation=${message.body.getClass.getSimpleName} requesterNSA=${message.headers.requesterNSA}"
+    )
     message.body match
-    case QuerySummary(ids, ifModifiedSince) =>
-      queryConnections(ids, ifModifiedSince.map(_.toInstant)) onComplete {
-        case Success((reservations, lastModifiedAt)) =>
-          sendAsyncReply(
-            message reply QuerySummaryConfirmed(
-              reservations,
-              lastModifiedAt.map(_.toXMLGregorianCalendar())
+      case QuerySummary(ids, ifModifiedSince) =>
+        queryConnections(ids, ifModifiedSince.map(_.toInstant)) onComplete {
+          case Success((reservations, lastModifiedAt)) =>
+            sendAsyncReply(
+              message reply QuerySummaryConfirmed(
+                reservations,
+                lastModifiedAt.map(_.toXMLGregorianCalendar())
+              )
             )
-          )
-        case Failure(_) => // nothing
-      }
-      Future.successful(GenericAck())
-    case QuerySummarySync(ids, ifModifiedSince) =>
-      queryConnections(ids, ifModifiedSince.map(_.toInstant)) map { case (states, lastModifiedAt) =>
-        QuerySummarySyncConfirmed(states, lastModifiedAt.map(_.toXMLGregorianCalendar()))
-      }
-    case QueryNotification(connectionId, start, end) =>
-      val connection = connectionManager.get(connectionId)
-      connection.map { con =>
-        queryNotifications(con, start, end) onComplete {
-          case Success(n) => sendAsyncReply(message reply QueryNotificationConfirmed(n))
           case Failure(_) => // nothing
         }
-      }
-      Future.successful(
-        connection.fold[NsiAcknowledgement](
-          ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId))
-        )(_ => GenericAck())
-      )
-    case QueryNotificationSync(connectionId, start, end) =>
-      val ack = connectionManager
-        .get(connectionId)
-        .map(queryNotifications(_, start, end).map(QueryNotificationSyncConfirmed.apply))
-
-      ack.getOrElse(
+        Future.successful(GenericAck())
+      case QuerySummarySync(ids, ifModifiedSince) =>
+        queryConnections(ids, ifModifiedSince.map(_.toInstant)) map {
+          case (states, lastModifiedAt) =>
+            QuerySummarySyncConfirmed(states, lastModifiedAt.map(_.toXMLGregorianCalendar()))
+        }
+      case QueryNotification(connectionId, start, end) =>
+        val connection = connectionManager.get(connectionId)
+        connection.map { con =>
+          queryNotifications(con, start, end) onComplete {
+            case Success(n) => sendAsyncReply(message reply QueryNotificationConfirmed(n))
+            case Failure(_) => // nothing
+          }
+        }
         Future.successful(
-          ErrorAck(
-            new GenericErrorType().withServiceException(
+          connection.fold[NsiAcknowledgement](
+            ServiceException(
               NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)
+            )
+          )(_ => GenericAck())
+        )
+      case QueryNotificationSync(connectionId, start, end) =>
+        val ack = connectionManager
+          .get(connectionId)
+          .map(queryNotifications(_, start, end).map(QueryNotificationSyncConfirmed.apply))
+
+        ack.getOrElse(
+          Future.successful(
+            ErrorAck(
+              new GenericErrorType().withServiceException(
+                NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)
+              )
             )
           )
         )
-      )
-    case QueryResult(connectionId, start, end) =>
-      val connection = connectionManager.get(connectionId)
-      connection.map { con =>
-        queryResults(con, start, end) onComplete {
-          case Success(n) => sendAsyncReply(message reply QueryResultConfirmed(n))
-          case Failure(_) => // nothing
+      case QueryResult(connectionId, start, end) =>
+        val connection = connectionManager.get(connectionId)
+        connection.map { con =>
+          queryResults(con, start, end) onComplete {
+            case Success(n) => sendAsyncReply(message reply QueryResultConfirmed(n))
+            case Failure(_) => // nothing
+          }
         }
-      }
 
-      Future.successful(
-        connection.fold[NsiAcknowledgement](
-          ServiceException(NsiError.ReservationNonExistent.toServiceException(configuration.NsaId))
-        )(_ => GenericAck())
-      )
-    case QueryResultSync(connectionId, start, end) =>
-      val ack = connectionManager
-        .get(connectionId)
-        .map(queryResults(_, start, end).map(QueryResultSyncConfirmed.apply))
-
-      ack.getOrElse(
         Future.successful(
-          ErrorAck(
-            new GenericErrorType().withServiceException(
+          connection.fold[NsiAcknowledgement](
+            ServiceException(
               NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)
+            )
+          )(_ => GenericAck())
+        )
+      case QueryResultSync(connectionId, start, end) =>
+        val ack = connectionManager
+          .get(connectionId)
+          .map(queryResults(_, start, end).map(QueryResultSyncConfirmed.apply))
+
+        ack.getOrElse(
+          Future.successful(
+            ErrorAck(
+              new GenericErrorType().withServiceException(
+                NsiError.ReservationNonExistent.toServiceException(configuration.NsaId)
+              )
             )
           )
         )
-      )
-    case q @ QueryRecursive(_, _) =>
-      handleQueryRecursive(message.copy(body = q))(sendAsyncReply)
+      case q @ QueryRecursive(_, _) =>
+        handleQueryRecursive(message.copy(body = q))(sendAsyncReply)
+    end match
+  end handleQuery
 
   private[controllers] def handleQueryRecursive(message: NsiProviderMessage[QueryRecursive])(
       sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit

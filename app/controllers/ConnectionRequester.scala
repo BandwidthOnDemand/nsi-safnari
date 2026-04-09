@@ -153,11 +153,15 @@ class ConnectionRequester @Inject() (configuration: Configuration, nsiWebService
               )
             )
           case Success(ack @ NsiProviderMessage(_, ServiceException(_))) =>
-            logger.info(s"correlationId=${headers.correlationId} direction=AckFromProvider providerNSA=${provider.nsa} url=${provider.url} result=ServiceException")
+            logger.info(
+              s"correlationId=${headers.correlationId} direction=AckFromProvider providerNSA=${provider.nsa} url=${provider.url} result=ServiceException"
+            )
             continuations.unregister(headers.correlationId)
             connection ! Connection.Command(Instant.now(), AckFromProvider(ack))
           case Success(ack) =>
-            logger.info(s"correlationId=${headers.correlationId} direction=AckFromProvider providerNSA=${provider.nsa} url=${provider.url} result=ok")
+            logger.info(
+              s"correlationId=${headers.correlationId} direction=AckFromProvider providerNSA=${provider.nsa} url=${provider.url} result=ok"
+            )
             connection ! Connection.Command(Instant.now(), AckFromProvider(ack))
         }
     }

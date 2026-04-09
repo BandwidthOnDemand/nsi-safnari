@@ -296,27 +296,47 @@ class ConnectionManager(
 
     private def logInbound(message: InboundMessage): Unit = message match
       case FromRequester(msg) =>
-        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=FromRequester operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=FromRequester operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}"
+        )
       case FromProvider(msg) =>
-        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=FromProvider operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=FromProvider operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}"
+        )
       case AckFromProvider(msg) =>
-        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=AckFromProvider operation=${msg.body.getClass.getSimpleName} providerNSA=${msg.headers.providerNSA}")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=AckFromProvider operation=${msg.body.getClass.getSimpleName} providerNSA=${msg.headers.providerNSA}"
+        )
       case FromPce(msg) =>
-        logger.info(s"connectionId=${connection.id} correlationId=${msg.correlationId} direction=FromPce operation=${msg.getClass.getSimpleName}")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${msg.correlationId} direction=FromPce operation=${msg.getClass.getSimpleName}"
+        )
       case AckFromPce(msg) =>
-        logger.info(s"connectionId=${connection.id} correlationId=${msg.correlationId} direction=AckFromPce operation=${msg.getClass.getSimpleName}")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${msg.correlationId} direction=AckFromPce operation=${msg.getClass.getSimpleName}"
+        )
       case failure: MessageDeliveryFailure =>
-        logger.info(s"connectionId=${connection.id} correlationId=${failure.correlationId} direction=MessageDeliveryFailure originalCorrelationId=${failure.originalCorrelationId} uri=${failure.uri}")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${failure.correlationId} direction=MessageDeliveryFailure originalCorrelationId=${failure.originalCorrelationId} uri=${failure.uri}"
+        )
       case passed: PassedEndTime =>
-        logger.info(s"connectionId=${connection.id} correlationId=${passed.correlationId} direction=PassedEndTime")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${passed.correlationId} direction=PassedEndTime"
+        )
 
     private def logOutbound(message: OutboundMessage): Unit = message match
       case ToProvider(msg, provider) =>
-        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=ToProvider operation=${msg.body.getClass.getSimpleName} providerNSA=${provider.nsa} url=${provider.url}")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=ToProvider operation=${msg.body.getClass.getSimpleName} providerNSA=${provider.nsa} url=${provider.url}"
+        )
       case ToRequester(msg) =>
-        logger.info(s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=ToRequester operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=ToRequester operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}"
+        )
       case ToPce(msg) =>
-        logger.info(s"connectionId=${connection.id} correlationId=${msg.correlationId} direction=ToPce operation=${msg.getClass.getSimpleName}")
+        logger.info(
+          s"connectionId=${connection.id} correlationId=${msg.correlationId} direction=ToPce operation=${msg.getClass.getSimpleName}"
+        )
 
     override def postStop(): Unit =
       endTimeCancellable.foreach(_.cancel())
