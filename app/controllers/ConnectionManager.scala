@@ -301,7 +301,7 @@ class ConnectionManager(
         )
       case FromProvider(msg) =>
         logger.info(
-          s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=FromProvider operation=${msg.body.getClass.getSimpleName} requesterNSA=${msg.headers.requesterNSA}"
+          s"connectionId=${connection.id} correlationId=${msg.headers.correlationId} direction=FromProvider operation=${msg.body.getClass.getSimpleName} providerNSA=${msg.headers.providerNSA}"
         )
       case AckFromProvider(msg) =>
         logger.info(

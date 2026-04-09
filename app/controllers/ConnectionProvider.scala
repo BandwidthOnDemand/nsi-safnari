@@ -110,9 +110,6 @@ class ConnectionProviderController @Inject() (
   private[controllers] def handleCommand(request: NsiProviderMessage[NsiProviderCommand])(
       sendAsyncReply: NsiRequesterMessage[NsiRequesterOperation] => Unit
   ): Future[NsiAcknowledgement] =
-    logger.info(
-      s"correlationId=${request.headers.correlationId} direction=FromRequester operation=${request.body.getClass.getSimpleName} requesterNSA=${request.headers.requesterNSA}"
-    )
     connectionManager.findOrCreateConnection(request) match
       case None =>
         Future.successful(
