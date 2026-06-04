@@ -25,6 +25,7 @@ package controllers
 import controllers.ActorSupport.*
 import java.net.URI
 import java.time.Instant
+import java.util.UUID
 import javax.inject.*
 import javax.xml.namespace.QName
 import nl.surfnet.nsiv2.messages.*
@@ -305,6 +306,7 @@ class ConnectionProvider @Inject() (nsiWebService: NsiWebService)(implicit
         connectionId,
         initialReserve,
         () => CorrelationId.fromUuid(correlationIdGenerator()),
+        () => CorrelationId.fromUuid(UUID.randomUUID()),
         configuration.PceAlgorithm,
         URI.create(configuration.requesterServiceUrl),
         URI.create(configuration.pceReplyUrl)

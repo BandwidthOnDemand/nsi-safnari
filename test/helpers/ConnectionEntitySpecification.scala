@@ -28,6 +28,9 @@ abstract class ConnectionEntitySpecification extends helpers.Specification:
     val mockUuidGenerator: () => ju.UUID = Uuid.mockUuidGenerator(1)
     def newCorrelationId: CorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
 
+    val mockQueryUuidGenerator: () => ju.UUID = Uuid.mockUuidGenerator(1000)
+    def newQueryCorrelationId: CorrelationId = CorrelationId.fromUuid(mockQueryUuidGenerator())
+
     val ConnectionId = "ConnectionId"
     val ReserveCorrelationId = newCorrelationId
     val CommitCorrelationId = newCorrelationId
@@ -84,6 +87,7 @@ abstract class ConnectionEntitySpecification extends helpers.Specification:
         ConnectionId,
         reserve.message.asInstanceOf[NsiProviderMessage[InitialReserve]],
         () => newCorrelationId,
+        () => newQueryCorrelationId,
         pathComputationAlgorithm,
         NsiReplyToUri,
         PceReplyToUri

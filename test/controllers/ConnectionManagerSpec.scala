@@ -44,6 +44,9 @@ class ConnectionManagerSpec extends helpers.Specification:
     lazy val mockUuidGenerator: () => UUID = Uuid.mockUuidGenerator(1)
     def newCorrelationId(): CorrelationId = CorrelationId.fromUuid(mockUuidGenerator())
 
+    lazy val mockQueryUuidGenerator: () => UUID = Uuid.mockUuidGenerator(1000)
+    def newQueryCorrelationId(): CorrelationId = CorrelationId.fromUuid(mockQueryUuidGenerator())
+
     lazy val outbound: TestActorRef[RecordingActor] = TestActorRef(new RecordingActor)
 
     lazy val connectionManager = new ConnectionManager(
@@ -55,6 +58,7 @@ class ConnectionManagerSpec extends helpers.Specification:
             id,
             reserve,
             () => newCorrelationId(),
+            () => newQueryCorrelationId(),
             PathComputationAlgorithm.CHAIN,
             URI.create("http://localhost"),
             URI.create("http://localhost")
@@ -182,6 +186,8 @@ class ConnectionManagerSpec extends helpers.Specification:
     def createConnectionManager(): ConnectionManager =
       val mockUuidGenerator = Uuid.mockUuidGenerator(1)
       def newCorrelationId() = CorrelationId.fromUuid(mockUuidGenerator())
+      val mockQueryUuidGenerator = Uuid.mockUuidGenerator(1000)
+      def newQueryCorrelationId() = CorrelationId.fromUuid(mockQueryUuidGenerator())
       new ConnectionManager(
         (id, reserve) =>
           (
@@ -191,6 +197,7 @@ class ConnectionManagerSpec extends helpers.Specification:
               id,
               reserve,
               () => newCorrelationId(),
+              () => newQueryCorrelationId(),
               PathComputationAlgorithm.CHAIN,
               URI.create("http://localhost"),
               URI.create("http://localhost")
@@ -379,6 +386,65 @@ class ConnectionManagerSpec extends helpers.Specification:
             ) :: Nil
           )
         )
+      end running
+
+    "not send a provider a correlation id already used by a non-persisted queryRecursive after restart" in new SingleConnectionActorFixture:
+      override def running() =
+        // Reserve and commit so the connection has a confirmed child segment.
+        val setup = Seq(
+          FromRequester(initialReserveMessage),
+          pce.confirm(CorrelationId(0, 1), A),
+          upa.response(CorrelationId(0, 2), ReserveConfirmed("ChildConnection", ConfirmCriteria)),
+          ura.request(CorrelationId(1, 1), ReserveCommit(connectionId)),
+          upa.response(CorrelationId(0, 4), ReserveCommitConfirmed("ChildConnection"))
+        )
+        setup.foreach(message => await(connection ? command(message)))
+
+        // queryRecursive is NOT persisted, yet it draws a correlation id from the
+        // per-connection generator and sends it to the child provider.
+        val queryCorrelationIds = output {
+          connection.actor.tell(
+            Connection.QueryRecursive(
+              ura.request(
+                helpers.Specification.newCorrelationId(),
+                QueryRecursive(Some(Left(connectionId :: Nil)), None)
+              )
+            ),
+            Actor.noSender
+          )
+          await(connection ? Connection.Query)
+        }.collect { case ToProvider(NsiProviderMessage(headers, _: QueryRecursive), _) =>
+          headers.correlationId
+        }
+
+        queryCorrelationIds aka "queryRecursive correlation ids sent to provider" must haveSize(1)
+
+        // Restart: rebuild state by replaying only the persisted messages. The queryRecursive
+        // above was never persisted, so the regenerated correlation id sequence is now shifted.
+        system.stop(connection.actor)
+        val restoredConnectionManager = createConnectionManager()
+        await(restoredConnectionManager.restore)
+        val restoredConnection = restoredConnectionManager.get(connectionId).get
+
+        // Provision after the restart draws the next correlation id from the now out-of-phase
+        // sequence and sends it to the same provider.
+        val provisionCorrelationIds = output {
+          await(
+            restoredConnection ? command(
+              ura.request(helpers.Specification.newCorrelationId(), Provision(connectionId))
+            )
+          )
+        }.collect { case ToProvider(NsiProviderMessage(headers, _: Provision), _) =>
+          headers.correlationId
+        }
+
+        provisionCorrelationIds aka "provision correlation ids sent to provider" must haveSize(1)
+
+        // The ultimate provider must never receive the same correlation id twice.
+        provisionCorrelationIds.toSet
+          .intersect(
+            queryCorrelationIds.toSet
+          ) aka "correlation ids reused across restart" must beEmpty
       end running
 
     "send PassedEndTime message after reservation end time" in new SingleConnectionActorFixture:

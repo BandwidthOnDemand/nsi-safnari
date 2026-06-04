@@ -1786,10 +1786,10 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification:
     "send query recursive confirm to requester when all child providers replied" in new ReservedConnectionWithTwoSegments:
       `given`(
         ura.request(newCorrelationId, QueryRecursive(Some(Left(ConnectionId :: Nil)), None)),
-        upa.response(CorrelationId(0, 11), QueryRecursiveConfirmed(Nil))
+        upa.response(CorrelationId(0, 1000), QueryRecursiveConfirmed(Nil))
       )
 
-      when(upa.response(CorrelationId(0, 12), QueryRecursiveConfirmed(Nil)))
+      when(upa.response(CorrelationId(0, 1001), QueryRecursiveConfirmed(Nil)))
 
       messages must haveSize(1)
       messages must contain(like[Message] {

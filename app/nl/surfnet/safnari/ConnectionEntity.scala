@@ -47,6 +47,7 @@ class ConnectionEntity(
     val id: ConnectionId,
     initialReserve: NsiProviderMessage[InitialReserve],
     newCorrelationId: () => CorrelationId,
+    newQueryCorrelationId: () => CorrelationId,
     defaultPathComputationAlgorithm: PathComputationAlgorithm,
     nsiReplyToUri: URI,
     pceReplyUri: URI
@@ -55,16 +56,30 @@ class ConnectionEntity(
   private val logger = Logger(classOf[ConnectionEntity])
 
   private def requesterNSA = initialReserve.headers.requesterNSA
-  private def newRequestHeaders(
+  private def requestHeaders(
+      correlationId: CorrelationId,
       requesterMessage: NsiProviderMessage[NsiProviderOperation],
       provider: ProviderEndPoint
   ) = requesterMessage.headers.copy(
-    correlationId = newCorrelationId(),
+    correlationId = correlationId,
     requesterNSA = aggregatorNsa,
     providerNSA = provider.nsa,
     replyTo = Some(nsiReplyToUri),
     protocolVersion = NsiHeaders.ProviderProtocolVersion
   )
+  private def newRequestHeaders(
+      requesterMessage: NsiProviderMessage[NsiProviderOperation],
+      provider: ProviderEndPoint
+  ) = requestHeaders(newCorrelationId(), requesterMessage, provider)
+
+  // Query correlation ids come from a separate generator because queries are never persisted or
+  // replayed. They must not draw from `newCorrelationId`, whose sequence is reproduced during
+  // replay to rebuild provider conversations; a non-replayed query would otherwise shift that
+  // sequence and cause a later persisted request to reuse an already-emitted correlation id.
+  private def newQueryRequestHeaders(
+      requesterMessage: NsiProviderMessage[NsiProviderOperation],
+      provider: ProviderEndPoint
+  ) = requestHeaders(newQueryCorrelationId(), requesterMessage, provider)
 
   private def newNotifyHeaders() = NsiHeaders(
     newCorrelationId(),
@@ -143,8 +158,8 @@ class ConnectionEntity(
         initialReserve,
         connectionStates,
         children.childConnections.map { case (segment, _, id) => segment.provider -> id }.toMap,
-        newCorrelationId,
-        newRequestHeaders(pm, _),
+        newQueryCorrelationId,
+        newQueryRequestHeaders(pm, _),
         ifModifiedSince
       )
 
