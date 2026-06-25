@@ -35,7 +35,7 @@ libraryDependencies ++= Seq(
   jdbc,
   evolutions,
   "org.scala-stm" %% "scala-stm" % "0.11.1",
-  "org.postgresql" % "postgresql" % "42.7.7",
+  "org.postgresql" % "postgresql" % "42.7.11",
   "org.specs2" %% "specs2-junit" % "4.20.7" % "test",
   "org.specs2" %% "specs2-matcher-extra" % "4.20.7" % "test",
   "org.specs2" %% "specs2-scalacheck" % "4.20.7" % "test",
@@ -49,12 +49,12 @@ libraryDependencies ++= Seq(
 )
 
 dependencyOverrides ++= Seq(
-  "com.fasterxml.jackson.core" % "jackson-core" % "2.18.6",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.18.6",
-  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.18.6",
-  "com.fasterxml.jackson.datatype" % "jackson-datatype-jdk8" % "2.18.6",
-  "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.18.6",
-  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.18.6",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.18.8",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.18.8",
+  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.18.8",
+  "com.fasterxml.jackson.datatype" % "jackson-datatype-jdk8" % "2.18.8",
+  "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.18.8",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.18.8",
   "commons-beanutils" % "commons-beanutils" % "1.11.0",
   "org.apache.commons" % "commons-lang3" % "3.18.0",
   "org.codehaus.plexus" % "plexus-utils" % "3.6.1",
