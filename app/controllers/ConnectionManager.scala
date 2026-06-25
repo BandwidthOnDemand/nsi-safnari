@@ -392,7 +392,7 @@ class ConnectionManager(
           case Right(outbound) =>
             scheduleExpiration(timestamp)
 
-            outbound.foreach(connection.process)
+            outbound.foreach(connection.process(_)(context))
 
             outbound.foreach(logOutbound)
             outbound.foreach(output ! _)

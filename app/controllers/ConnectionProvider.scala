@@ -240,18 +240,20 @@ class ConnectionProviderController @Inject() (
       start: Option[Long],
       end: Option[Long]
   ): Future[Seq[NotificationBaseType]] =
-    val range = start.getOrElse(1L) to end.getOrElse(Long.MaxValue)
+    val (lo, hi) = (start.getOrElse(1L), end.getOrElse(Long.MaxValue))
     val notifications = (connection ? Connection.QueryNotifications)
-    notifications.map(ns => ns.filter(n => range.contains(n.getNotificationId())))
+    notifications.map(ns =>
+      ns.filter(n => lo <= n.getNotificationId() && n.getNotificationId() <= hi)
+    )
 
   private def queryResults(
       connection: Connection,
       start: Option[Long],
       end: Option[Long]
   ): Future[Seq[QueryResultResponseType]] =
-    val range = start.getOrElse(1L) to end.getOrElse(Long.MaxValue)
+    val (lo, hi) = (start.getOrElse(1L), end.getOrElse(Long.MaxValue))
     val results = (connection ? Connection.QueryResults)
-    results.map(rs => rs.filter(r => range.contains(r.getResultId())))
+    results.map(rs => rs.filter(r => lo <= r.getResultId() && r.getResultId() <= hi))
 
   private def queryConnections(
       ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]],

@@ -64,6 +64,34 @@ class ConnectionProviderSpec extends helpers.Specification:
 
   }
 
+  "Query result sync" should {
+
+    "not fail when endResultId is omitted" in new Fixture(Application()):
+      override def running() =
+        await(connectionProvider.handleCommand(initialReserveMessage) { reply =>
+          requesterOperation.success(reply.body); ()
+        })
+
+        await(requesterOperation.future) must beLike { case op: ReserveConfirmed =>
+          // ReserveConfirmed records a result, so the filter predicate actually runs;
+          // with end=None the old code built `1L to Long.MaxValue` and threw on contains.
+          val response = await(
+            connectionProvider.handleQuery(
+              NsiProviderMessage(
+                nsiRequesterHeaders(CorrelationId(0, 4)),
+                QueryResultSync(op.connectionId, None, None)
+              )
+            )(_ => ())
+          )
+
+          response must beLike { case QueryResultSyncConfirmed(results) =>
+            results must not(beEmpty)
+          }
+        }
+      end running
+
+  }
+
   "Any operation" should {
     "check requester NSA against TLS configuration" in new Fixture(
       Application("nsi.twoway.tls" -> "yes")
