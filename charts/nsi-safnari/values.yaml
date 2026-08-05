@@ -111,6 +111,12 @@ certificate:
       create: false
       password: "secret"
 
+# Percentage of resources.limits.memory the JVM may use for the heap. The remainder has to cover
+# metaspace, code cache, thread stacks and direct buffers, so 75 is only safe once the limit is
+# several GiB; at smaller limits that fixed non-heap cost is too large a share and the container
+# gets OOMKilled instead of the JVM garbage collecting.
+maxRAMPercentage: 60.0
+
 resources:
   requests:
     memory: 0.5Gi

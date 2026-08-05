@@ -96,7 +96,7 @@ spec:
             - "-Duser.dir=/nsi-safnari"
             - {{ printf "-Dconfig.file=%s/config-overrides.conf" .Values.config.mountPath | quote }}
             - "-Dplay.evolutions.db.default.autoApply=true"
-            - "-XX:MaxRAMPercentage=75.0"
+            - {{ printf "-XX:MaxRAMPercentage=%v" .Values.maxRAMPercentage | quote }}
             - "-Xlog:gc:file=/nsi-safnari/logs/gc.log:time,level,tags:filecount=5,filesize=10M"
             - "-XshowSettings:vm"
             - "-Djavax.net.ssl.trustStoreType=jks"
