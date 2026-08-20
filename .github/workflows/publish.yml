@@ -4,8 +4,7 @@ on:
   push:
     branches-ignore:
       - 'dependabot/**'
-    tags:
-      - '**'
+    tags: ["[0-9]+.[0-9]+.[0-9]+*"]
   workflow_dispatch:
 
 env:
@@ -38,6 +37,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # type=semver normalises a leading v, so the image tag always matches
+          # the chart appVersion even if a tag is cut as v3.2.2.
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
