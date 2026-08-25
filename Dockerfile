@@ -3,12 +3,7 @@
 FROM sbtscala/scala-sbt:eclipse-temurin-jammy-21.0.2_13_1.10.2_3.5.1 AS build
 RUN apt-get update && apt-get install -y nodejs
 WORKDIR /usr/local/src/nsi-safnari
-COPY build.sbt .
-COPY .git/ .git/
-COPY app/ app/
-COPY conf/ conf/
-COPY project/ project/
-COPY public/ public/
+COPY . .
 RUN --mount=type=secret,id=github_token <<EOF
 set -e
 export GITHUB_TOKEN="$(cat /run/secrets/github_token)"
