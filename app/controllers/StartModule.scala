@@ -27,7 +27,7 @@ import anorm.SqlParser.*
 import com.google.inject.{AbstractModule, Provides}
 import javax.inject.*
 import nl.surfnet.nsiv2.soap.*
-import nl.surfnet.safnari.SafnariMessageStore
+import nl.surfnet.safnari.{BuildInfo, SafnariMessageStore}
 import org.apache.pekko.actor.*
 import play.api.Logger
 import play.api.db.Database
@@ -84,6 +84,8 @@ class GlobalSettings @Inject() (
     database: Database
 )(implicit ec: ExecutionContext):
   private val logger = Logger(classOf[GlobalSettings])
+
+  logger.info(s"Starting ${BuildInfo.name} ${BuildInfo.version} (${BuildInfo.gitHeadCommitSha})")
 
   val pceRequester: ActorRef = pathComputationEngine.createPceRequesterActor(configuration)
   private val createOutboundActor = connectionProvider.outboundActor(
