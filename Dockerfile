@@ -4,9 +4,8 @@ FROM sbtscala/scala-sbt:eclipse-temurin-jammy-21.0.2_13_1.10.2_3.5.1 AS build
 RUN apt-get update && apt-get install -y nodejs
 WORKDIR /usr/local/src/nsi-safnari
 COPY . .
-RUN --mount=type=secret,id=github_token <<EOF
+RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN,required=true <<EOF
 set -e
-export GITHUB_TOKEN="$(cat /run/secrets/github_token)"
 sbt stage
 mkdir -p target/universal/stage/logs
 EOF
