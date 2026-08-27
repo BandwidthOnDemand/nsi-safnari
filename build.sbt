@@ -11,7 +11,7 @@ githubTokenSource := (
     || TokenSource.Environment("GITHUB_TOKEN")
 )
 
-scalaVersion := "3.3.4"
+scalaVersion := "3.3.8"
 
 scalacOptions ++= Seq(
   "-deprecation",
@@ -26,8 +26,11 @@ ThisBuild / dynverVTagPrefix := false
 lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run maven")
 lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
-val playVersion = "3.0.10"
+val playVersion = "3.0.11"
 val playNsiSupportVersion = "3.1.0"
+
+// play-test's unused WithBrowser helper pulls Appium through FluentLenium.
+ThisBuild / excludeDependencies += ExclusionRule("io.appium")
 
 libraryDependencies ++= Seq(
   guice,
@@ -35,7 +38,7 @@ libraryDependencies ++= Seq(
   jdbc,
   evolutions,
   "org.scala-stm" %% "scala-stm" % "0.11.1",
-  "org.postgresql" % "postgresql" % "42.7.11",
+  "org.postgresql" % "postgresql" % "42.7.12",
   "org.specs2" %% "specs2-junit" % "4.20.7" % "test",
   "org.specs2" %% "specs2-matcher-extra" % "4.20.7" % "test",
   "org.specs2" %% "specs2-scalacheck" % "4.20.7" % "test",
@@ -49,17 +52,30 @@ libraryDependencies ++= Seq(
 )
 
 dependencyOverrides ++= Seq(
-  "com.fasterxml.jackson.core" % "jackson-core" % "2.18.8",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.18.8",
-  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.18.8",
-  "com.fasterxml.jackson.datatype" % "jackson-datatype-jdk8" % "2.18.8",
-  "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.18.8",
-  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.18.8",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.18.9",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.18.9",
+  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.18.9",
+  "com.fasterxml.jackson.datatype" % "jackson-datatype-jdk8" % "2.18.9",
+  "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.18.9",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.18.9",
   "commons-beanutils" % "commons-beanutils" % "1.11.0",
   "org.apache.commons" % "commons-lang3" % "3.18.0",
   "org.codehaus.plexus" % "plexus-utils" % "3.6.1",
-  "ch.qos.logback" % "logback-core" % "1.5.25",
-  "ch.qos.logback" % "logback-classic" % "1.5.25"
+  "ch.qos.logback" % "logback-core" % "1.5.34",
+  "ch.qos.logback" % "logback-classic" % "1.5.34",
+  "at.yawk.lz4" % "lz4-java" % "1.11.1",
+  "org.jsoup" % "jsoup" % "1.23.1",
+  // Selenium/HtmlUnit test-only deps (via play-test's WithBrowser helper, unused by this
+  // app): opentelemetry-api and jetty-http can move within their own line without
+  // disturbing the selenium-api version htmlunit-driver 4.13.0 was built against.
+  "io.opentelemetry" % "opentelemetry-api" % "1.62.0",
+  "org.eclipse.jetty" % "jetty-http" % "9.4.58.v20250814",
+  "org.eclipse.jetty" % "jetty-client" % "9.4.58.v20250814",
+  "org.eclipse.jetty" % "jetty-io" % "9.4.58.v20250814",
+  "org.eclipse.jetty" % "jetty-util" % "9.4.58.v20250814",
+  "org.eclipse.jetty.websocket" % "websocket-api" % "9.4.58.v20250814",
+  "org.eclipse.jetty.websocket" % "websocket-client" % "9.4.58.v20250814",
+  "org.eclipse.jetty.websocket" % "websocket-common" % "9.4.58.v20250814"
 )
 
 val gitHeadCommitSha = settingKey[String]("git HEAD SHA")
