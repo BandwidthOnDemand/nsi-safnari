@@ -71,6 +71,7 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification:
         when(pce.confirm(CorrelationId(0, 1), A))
 
         messages must haveSize(0)
+        connection.children.segments must beEmpty
     }
 
     "in path computation state" should {

@@ -22,6 +22,8 @@
  */
 package nl.surfnet.safnari
 
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets.UTF_8
 import java.security.SecureRandom
 import java.util.UUID
 import scala.util.Random
@@ -41,6 +43,20 @@ object Uuid:
       val leastSig = (random.nextLong() & ~0xc000000000000000L) | 0x8000000000000000L
       new UUID(mostSig, leastSig)
 
+  /** Deterministic generator seeded from the full connection id instead of its 32-bit hashCode, so
+    * two different connections never share a sequence (unlike `deterministicUuidGenerator`, whose
+    * `connectionId.##` seed can collide across connections). Each draw hashes the connection id
+    * together with a sequence number via `UUID.nameUUIDFromBytes`, so it is still reproducible
+    * during replay.
+    */
+  def nameBasedUuidGenerator(connectionId: String): () => UUID =
+    val connectionIdBytes = connectionId.getBytes(UTF_8)
+    var sequence = 0L
+    () =>
+      val sequenceBytes = ByteBuffer.allocate(java.lang.Long.BYTES).putLong(sequence).array()
+      sequence += 1
+      UUID.nameUUIDFromBytes(connectionIdBytes ++ sequenceBytes)
+
   def mockUuidGenerator(start: Long = 1): () => UUID =
     val lock = new Object
     var next = start
@@ -50,3 +66,4 @@ object Uuid:
         next += 1
         result
       }
+end Uuid

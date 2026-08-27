@@ -83,10 +83,11 @@ end Connection
 class ConnectionManager(
     connectionFactory: (
         ConnectionId,
-        NsiProviderMessage[InitialReserve]
+        NsiProviderMessage[InitialReserve],
+        Int
     ) => (ActorRef, ConnectionEntity),
     configuration: Configuration,
-    val messageStore: MessageStore[Message]
+    val messageStore: SafnariMessageStore
 ):
   private val logger = Logger(classOf[ConnectionManager])
 
@@ -192,6 +193,7 @@ class ConnectionManager(
       actorSystem: ActorSystem,
       executionContext: ExecutionContext
   ): Future[Unit] =
+    val versions = messageStore.loadCorrelationIdGeneratorVersions()
     val replayedConnections = Future
       .sequence(
         for case (
@@ -204,22 +206,34 @@ class ConnectionManager(
             ) +: _)
           ) <- messageStore.loadEverything()
         yield
-          val commands = records.map { record =>
-            Connection.Command(record.createdAt, record.message)
-          }
-          val connection =
-            createConnectionActor(connectionId, NsiProviderMessage(headers, initialReserve))
-          commands.foreach {
-            case Connection.Command(_, FromRequester(message)) =>
-              registerRequesterAndCorrelationId(
-                message.headers.requesterNSA,
-                message.headers.correlationId,
-                connectionId,
-                connection
+          val version = versions.getOrElse(connectionId, 1)
+          if version != 1 && version != 2 then
+            Future.failed(
+              new Exception(
+                s"connection $connectionId has unrecognized correlation id generator version $version"
               )
-            case _ =>
-          }
-          (connection ? Connection.Replay(commands))
+            )
+          else
+            val commands = records.map { record =>
+              Connection.Command(record.createdAt, record.message)
+            }
+            val connection = createConnectionActor(
+              connectionId,
+              NsiProviderMessage(headers, initialReserve),
+              version
+            )
+            commands.foreach {
+              case Connection.Command(_, FromRequester(message)) =>
+                registerRequesterAndCorrelationId(
+                  message.headers.requesterNSA,
+                  message.headers.correlationId,
+                  connectionId,
+                  connection
+                )
+              case _ =>
+            }
+            connection ? Connection.Replay(commands)
+          end if
       )
       .map(_.collect { case Failure(exception) =>
         exception
@@ -249,9 +263,20 @@ class ConnectionManager(
   def createConnection(connectionId: ConnectionId, request: NsiProviderMessage[InitialReserve])(
       implicit actorSystem: ActorSystem
   ): Connection =
-    val connection =
-      createConnectionActor(connectionId, NsiProviderMessage(request.headers, request.body))
-    messageStore.create(connectionId, Instant.now(), request.headers.requesterNSA)
+    val correlationIdGeneratorVersion: Int = 2
+    // Persist the generator version before the connection actor exists, so it is never
+    // discoverable/able to persist a message without a version already recorded for replay.
+    messageStore.create(
+      connectionId,
+      Instant.now(),
+      request.headers.requesterNSA,
+      correlationIdGeneratorVersion
+    )
+    val connection = createConnectionActor(
+      connectionId,
+      NsiProviderMessage(request.headers, request.body),
+      correlationIdGeneratorVersion
+    )
     registerRequesterAndCorrelationId(
       request.headers.requesterNSA,
       request.headers.correlationId,
@@ -259,12 +284,15 @@ class ConnectionManager(
       connection
     )
     connection
+  end createConnection
 
   private def createConnectionActor(
       connectionId: ConnectionId,
-      initialReserve: NsiProviderMessage[InitialReserve]
+      initialReserve: NsiProviderMessage[InitialReserve],
+      correlationIdGeneratorVersion: Int
   )(implicit actorSystem: ActorSystem): Connection =
-    val (outputActor, connectionEntity) = connectionFactory(connectionId, initialReserve)
+    val (outputActor, connectionEntity) =
+      connectionFactory(connectionId, initialReserve, correlationIdGeneratorVersion)
 
     val connection = Connection(
       actorSystem.actorOf(
@@ -278,6 +306,7 @@ class ConnectionManager(
     add(connectionId, globalReservationId, connection)
 
     connection
+  end createConnectionActor
 
   private object ConnectionActor:
     def props(connectionEntity: ConnectionEntity, outputActor: ActorRef): Props = Props(

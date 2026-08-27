@@ -296,10 +296,13 @@ class ConnectionProvider @Inject() (nsiWebService: NsiWebService)(implicit
       configuration: Configuration
   )(
       connectionId: ConnectionId,
-      initialReserve: NsiProviderMessage[InitialReserve]
+      initialReserve: NsiProviderMessage[InitialReserve],
+      correlationIdGeneratorVersion: Int
   ): (ActorRef, ConnectionEntity) =
     val outbound = createOutboundActor(initialReserve)
-    val correlationIdGenerator = Uuid.deterministicUuidGenerator(connectionId.##)
+    val correlationIdGenerator = correlationIdGeneratorVersion match
+      case 1 => Uuid.deterministicUuidGenerator(connectionId.##)
+      case 2 => Uuid.nameBasedUuidGenerator(connectionId)
 
     (
       outbound,

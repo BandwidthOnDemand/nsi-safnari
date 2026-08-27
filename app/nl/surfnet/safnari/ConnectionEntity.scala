@@ -183,28 +183,31 @@ class ConnectionEntity(
   def process(
       message: InboundMessage
   )(context: ConnectionContext): Either[ServiceExceptionType, Seq[OutboundMessage]] =
-    children = children.update(message, newCorrelationId)
-
-    message match
-      case AckFromProvider(NsiProviderMessage(_, ServiceException(exception))) =>
-        Option(exception.getConnectionId()).foreach { connectionId =>
-          mostRecentChildExceptions += connectionId -> exception;
-        }
-      case failed: MessageDeliveryFailure =>
-        failed.connectionId.foreach { connectionId =>
-          val child = children.childrenByConnectionId.get(connectionId)
-          val childNsaId = child.map(_.nsa)
-          mostRecentChildExceptions += connectionId -> NsiError.MessageDeliveryError
-            .withVariables(
-              NsiHeaders.PROVIDER_NSA -> childNsaId.getOrElse(""),
-              new QName("error") -> failed.toShortString
-            )
-            .toServiceException(childNsaId.getOrElse(""))
-        }
-      case _ =>
-
+    // Reject post-termination messages before any deterministic correlation-id draw so a late
+    // message (e.g. FromPce after Terminate) cannot advance the generator beyond what replay
+    // reproduces.
     if lsm.lifecycleState == LifecycleStateEnumType.TERMINATED then Left(messageNotApplicable)
     else
+      children = children.update(message, newCorrelationId)
+
+      message match
+        case AckFromProvider(NsiProviderMessage(_, ServiceException(exception))) =>
+          Option(exception.getConnectionId()).foreach { connectionId =>
+            mostRecentChildExceptions += connectionId -> exception;
+          }
+        case failed: MessageDeliveryFailure =>
+          failed.connectionId.foreach { connectionId =>
+            val child = children.childrenByConnectionId.get(connectionId)
+            val childNsaId = child.map(_.nsa)
+            mostRecentChildExceptions += connectionId -> NsiError.MessageDeliveryError
+              .withVariables(
+                NsiHeaders.PROVIDER_NSA -> childNsaId.getOrElse(""),
+                new QName("error") -> failed.toShortString
+              )
+              .toServiceException(childNsaId.getOrElse(""))
+          }
+        case _ =>
+
       val outputs = stateMachines(message, context).flatMap { stateMachine =>
         applyMessageToStateMachine(stateMachine, message)
       }

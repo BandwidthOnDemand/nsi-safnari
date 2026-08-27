@@ -50,7 +50,7 @@ class ConnectionManagerSpec extends helpers.Specification:
     lazy val outbound: TestActorRef[RecordingActor] = TestActorRef(new RecordingActor)
 
     lazy val connectionManager = new ConnectionManager(
-      (id, reserve) =>
+      (id, reserve, _) =>
         (
           outbound,
           new ConnectionEntity(
@@ -189,7 +189,7 @@ class ConnectionManagerSpec extends helpers.Specification:
       val mockQueryUuidGenerator = Uuid.mockUuidGenerator(1000)
       def newQueryCorrelationId() = CorrelationId.fromUuid(mockQueryUuidGenerator())
       new ConnectionManager(
-        (id, reserve) =>
+        (id, reserve, _) =>
           (
             outbound,
             new ConnectionEntity(
@@ -386,6 +386,63 @@ class ConnectionManagerSpec extends helpers.Specification:
             ) :: Nil
           )
         )
+      end running
+
+    "use distinct provider correlation ids for colliding connection hashes" in new SingleConnectionActorFixture:
+      override def running() =
+        val firstId = "eadafc81-0a10-4b4c-b4a4-1a87ab3c7c6f"
+        val secondId = "024de33b-3866-47ac-9ad3-425001a63a42"
+        val firstReserve = initialReserveMessage.copy(
+          headers = initialReserveMessage.headers.copy(correlationId = CorrelationId(9, 1))
+        )
+        val secondReserve = initialReserveMessage.copy(
+          headers = initialReserveMessage.headers.copy(correlationId = CorrelationId(9, 2))
+        )
+        val outbound = TestActorRef(new RecordingActor)
+
+        def manager = new ConnectionManager(
+          (id, reserve, version) =>
+            val generator = version match
+              case 1 => Uuid.deterministicUuidGenerator(id.##)
+              case 2 => Uuid.nameBasedUuidGenerator(id)
+            (
+              outbound,
+              new ConnectionEntity(
+                AggregatorNsa,
+                id,
+                reserve,
+                () => CorrelationId.fromUuid(generator()),
+                () => CorrelationId.fromUuid(UUID.randomUUID()),
+                PathComputationAlgorithm.CHAIN,
+                URI.create("http://localhost"),
+                URI.create("http://localhost")
+              )
+            )
+          ,
+          configuration,
+          messageStore
+        )
+        val connectionManager = manager
+        val first = connectionManager.createConnection(firstId, firstReserve)
+        val second = connectionManager.createConnection(secondId, secondReserve)
+        def providerIds = outbound.underlyingActor.messages.collect {
+          case ToProvider(NsiProviderMessage(headers, _: InitialReserve), _) =>
+            headers.correlationId
+        }
+
+        firstId.## must beEqualTo(secondId.##)
+        outbound.underlyingActor.messages = Vector.empty
+        await(first ? command(FromRequester(firstReserve)))
+        await(first ? command(pce.confirm(CorrelationId(0, 1), A)))
+        val firstIds = providerIds
+        outbound.underlyingActor.messages = Vector.empty
+        await(second ? command(FromRequester(secondReserve)))
+        await(second ? command(pce.confirm(CorrelationId(0, 1), A)))
+        val secondIds = providerIds
+
+        firstIds must haveSize(1)
+        secondIds must haveSize(1)
+        firstIds.toSet.intersect(secondIds.toSet) must beEmpty
       end running
 
     "not send a provider a correlation id already used by a non-persisted queryRecursive after restart" in new SingleConnectionActorFixture:
