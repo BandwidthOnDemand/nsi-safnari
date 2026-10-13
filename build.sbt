@@ -52,19 +52,24 @@ libraryDependencies ++= Seq(
 )
 
 dependencyOverrides ++= Seq(
-  "com.fasterxml.jackson.core" % "jackson-core" % "2.18.9",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.18.9",
-  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.18.9",
-  "com.fasterxml.jackson.datatype" % "jackson-datatype-jdk8" % "2.18.9",
-  "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.18.9",
-  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.18.9",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.18.11",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.18.11",
+  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.18.11",
+  "com.fasterxml.jackson.datatype" % "jackson-datatype-jdk8" % "2.18.11",
+  "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.18.11",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.18.11",
   "commons-beanutils" % "commons-beanutils" % "1.11.0",
   "org.apache.commons" % "commons-lang3" % "3.18.0",
   "org.codehaus.plexus" % "plexus-utils" % "3.6.1",
   "ch.qos.logback" % "logback-core" % "1.5.34",
   "ch.qos.logback" % "logback-classic" % "1.5.34",
-  "at.yawk.lz4" % "lz4-java" % "1.11.1",
-  "org.jsoup" % "jsoup" % "1.23.1",
+  "at.yawk.lz4" % "lz4-java" % "1.11.4",
+  "org.jsoup" % "jsoup" % "1.23.2",
+  // Scala 3 compiler/scaladoc toolchain only (scalaInstance), never on the app classpath.
+  "org.jline" % "jline-reader" % "3.30.15",
+  "org.jline" % "jline-terminal" % "3.30.15",
+  "org.jline" % "jline-terminal-jni" % "3.30.15",
+  "org.jline" % "jline-native" % "3.30.15",
   // Selenium/HtmlUnit test-only deps (via play-test's WithBrowser helper, unused by this
   // app): opentelemetry-api and jetty-http can move within their own line without
   // disturbing the selenium-api version htmlunit-driver 4.13.0 was built against.
