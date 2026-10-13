@@ -20,6 +20,11 @@ import helpers.NsiMessages.*
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification:
+  private val LifecycleStateVariable = javax.xml.namespace.QName(
+    QNAME_NSI_TYPES.getNamespaceURI(),
+    "lifecycleState"
+  )
+
   "A connection" >> {
     "in initial state" should {
       "send a path computation request when reserve is received" in new fixture:
@@ -1331,6 +1336,115 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification:
           )
         )
 
+      Seq[(String, () => ServiceExceptionType)](
+        "ReservationNonExistent" -> (() =>
+          NsiError.ReservationNonExistent.toServiceException(A.provider.nsa)
+        ),
+        "InvalidTransition with lifecycleState TERMINATED (SuPA)" -> (() =>
+          NsiError.InvalidTransition
+            .toServiceException(A.provider.nsa, LifecycleStateVariable -> "TERMINATED")
+        )
+      ).foreach { (refusal, exception) =>
+        s"treat a child refusing with $refusal as terminated" in new ReservedConnection:
+          val TerminateCorrelationId = newCorrelationId
+          `given`(ura.request(TerminateCorrelationId, Terminate(ConnectionId)))
+
+          when(upa.error(CorrelationId(0, 8), exception().withConnectionId("ConnectionIdA")))
+
+          lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
+          messages must contain(
+            exactly[Message](
+              ToRequester(
+                NsiRequesterMessage(
+                  nsiRequesterHeaders(TerminateCorrelationId),
+                  TerminateConfirmed(ConnectionId)
+                )
+              )
+            )
+          )
+      }
+
+      Seq[(String, () => ServiceExceptionType)](
+        "InvalidTransition with another lifecycleState" -> (() =>
+          NsiError.InvalidTransition
+            .toServiceException(A.provider.nsa, LifecycleStateVariable -> "Created")
+            .withConnectionId("ConnectionIdA")
+        ),
+        "InvalidTransition without lifecycleState" -> (() =>
+          NsiError.InvalidTransition
+            .toServiceException(A.provider.nsa)
+            .withConnectionId("ConnectionIdA")
+        ),
+        "another error" -> (() =>
+          NsiError.GenericRmError
+            .toServiceException(A.provider.nsa)
+            .withConnectionId("ConnectionIdA")
+        ),
+        "ReservationNonExistent for an unknown child" -> (() =>
+          NsiError.ReservationNonExistent
+            .toServiceException(A.provider.nsa)
+            .withConnectionId("UnknownConnectionId")
+        ),
+        "ReservationNonExistent without a connection id" -> (() =>
+          NsiError.ReservationNonExistent.toServiceException(A.provider.nsa)
+        )
+      ).foreach { (refusal, exception) =>
+        s"stay terminating when a child refuses with $refusal" in new ReservedConnection:
+          `given`(ura.request(newCorrelationId, Terminate(ConnectionId)))
+
+          when(upa.error(CorrelationId(0, 8), exception()))
+
+          lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+          childConnectionData("ConnectionIdA").lifecycleState must beEqualTo(
+            LifecycleStateEnumType.TERMINATING
+          )
+          messages must beEmpty
+      }
+
+      "resend terminate to the children still terminating when terminate is received again" in new ReservedConnectionWithTwoSegments:
+        `given`(
+          ura.request(newCorrelationId, Terminate(ConnectionId)),
+          upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA"))
+        )
+        val RetryCorrelationId = newCorrelationId
+
+        when(ura.request(RetryCorrelationId, Terminate(ConnectionId)))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATING)
+        messages must contain(
+          exactly[Message](
+            ToProvider(
+              NsiProviderMessage(
+                toProviderHeaders(B.provider, CorrelationId(0, 14)),
+                Terminate("ConnectionIdB")
+              ),
+              B.provider
+            )
+          )
+        )
+
+        when(upa.response(CorrelationId(0, 14), TerminateConfirmed("ConnectionIdB")))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
+        messages must contain(
+          exactly[Message](
+            ToRequester(
+              NsiRequesterMessage(
+                nsiRequesterHeaders(RetryCorrelationId),
+                TerminateConfirmed(ConnectionId)
+              )
+            )
+          )
+        )
+
+      "refuse terminate once terminated" in new ReservedConnection:
+        `given`(
+          ura.request(newCorrelationId, Terminate(ConnectionId)),
+          upa.response(CorrelationId(0, 8), TerminateConfirmed("ConnectionIdA"))
+        )
+
+        when(ura.request(newCorrelationId, Terminate(ConnectionId))) must beNone
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
     }
 
     "lifecycle state machine (LSM)" should {

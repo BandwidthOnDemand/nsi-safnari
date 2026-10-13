@@ -41,7 +41,7 @@ Tests run with `-Dconfig.file=conf/test.conf` which uses dummy PCE and NSI actor
 The core design is multiple **finite state machines per connection**, orchestrated by a `ConnectionEntity`:
 
 - **ReservationStateMachine** — The most complex FSM (~34KB). Handles InitialReserve, ModifyReserve, ReserveCommit, ReserveAbort. Manages PCE interaction, child reservation criteria, and timeout handling. States: InitialReservation -> Reserved -> CheckingReservation -> Held -> Committed -> Failed/Aborted/Timeout.
-- **LifecycleStateMachine** — CREATED -> TERMINATING -> TERMINATED
+- **LifecycleStateMachine** — CREATED -> TERMINATING -> TERMINATED. In TERMINATING a repeated Terminate resends to the children still terminating, and a child's refusal that it holds nothing counts as terminated (`refusedAsTerminated`).
 - **ProvisionStateMachine** — RELEASED -> PROVISIONING -> PROVISIONED
 - **DataPlaneStateMachine** — Monitors and aggregates data plane status from child connections
 - **QueryRecursiveStateMachine** — Handles recursive queries across child providers

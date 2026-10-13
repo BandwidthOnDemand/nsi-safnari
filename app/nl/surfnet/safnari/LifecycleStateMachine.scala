@@ -29,6 +29,8 @@ import org.ogf.schemas.nsi._2013._12.connection.types.LifecycleStateEnumType.*
 import org.ogf.schemas.nsi._2013._12.connection.types.*
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
 
+import scala.jdk.CollectionConverters.*
+
 case class LifecycleStateMachineData(
     childConnectionStates: Map[CorrelationId, LifecycleStateEnumType] = Map.empty,
     command: Option[NsiProviderMessage[NsiProviderOperation]] = None,
@@ -90,6 +92,16 @@ case class LifecycleStateMachineData(
       children.initialCorrelationIdFor(connectionId),
       CREATED
     ) == state
+
+  /** As `childHasState`, but false for a missing or unknown child connection id. */
+  def knownChildHasState(
+      children: ChildConnectionIds,
+      connectionId: ConnectionId,
+      state: LifecycleStateEnumType
+  ): Boolean =
+    Option(connectionId)
+      .flatMap(children.initialCorrelationIdByConnectionId.get)
+      .exists(childHasState(_, state))
 end LifecycleStateMachineData
 
 /** Implementation of the NSI v2.0 Lifecycle State Machine. The implementation is complicated by the
@@ -130,10 +142,19 @@ class LifecycleStateMachine(
   when(TERMINATING) {
     case Event(FromProvider(NsiRequesterMessage(_, message: TerminateConfirmed)), data)
         if data.childHasState(children, message.connectionId, TERMINATING) =>
-      val newData = data
-        .updateChild(children, message.connectionId, TERMINATED)
-        .copy(sendTerminateRequest = Map.empty)
-      goto(newData.aggregatedLifecycleStatus) using newData
+      childTerminated(data, message.connectionId)
+    case Event(AckFromProvider(NsiProviderMessage(_, ServiceException(exception))), data)
+        if LifecycleStateMachine.refusedAsTerminated(exception)
+          && data.knownChildHasState(children, exception.getConnectionId(), TERMINATING) =>
+      childTerminated(data, exception.getConnectionId())
+    case Event(FromRequester(message @ NsiProviderMessage(_, _: Terminate)), data) =>
+      // A repeated terminate resends to the children that have not confirmed yet.
+      stay using data.copy(
+        command = Some(message),
+        sendTerminateRequest = children.childrenByConnectionId.filter { case (childId, _) =>
+          data.childHasState(children, childId, TERMINATING)
+        }
+      )
     case Event(AckFromProvider(NsiProviderMessage(_, body: ReserveResponse)), data) =>
       stay using data
         .updateChild(children, body.connectionId, TERMINATING)
@@ -232,6 +253,12 @@ class LifecycleStateMachine(
       Seq.empty
   }
 
+  private def childTerminated(data: LifecycleStateMachineData, childId: ConnectionId): State =
+    val newData = data
+      .updateChild(children, childId, TERMINATED)
+      .copy(sendTerminateRequest = Map.empty)
+    goto(newData.aggregatedLifecycleStatus) using newData
+
   def lifecycleState = stateName
   def childConnectionState(connectionId: ConnectionId): LifecycleStateEnumType =
     stateData.childConnectionStates.getOrElse(
@@ -239,3 +266,18 @@ class LifecycleStateMachine(
       CREATED
     )
 end LifecycleStateMachine
+
+object LifecycleStateMachine:
+
+  /** A child refused terminate because it holds nothing: the connection is unknown or terminated.
+    * The lifecycleState value is matched case-insensitively; SuPA sends `TERMINATED`.
+    */
+  def refusedAsTerminated(exception: ServiceExceptionType): Boolean =
+    exception.getErrorId() match
+      case NsiError.ReservationNonExistent.id => true
+      case NsiError.InvalidTransition.id =>
+        Option(exception.getVariables()).exists(_.getVariable().asScala.exists { variable =>
+          variable.getType() == "lifecycleState"
+          && variable.getValue().asScala.exists(_.equalsIgnoreCase(TERMINATED.value()))
+        })
+      case _ => false
