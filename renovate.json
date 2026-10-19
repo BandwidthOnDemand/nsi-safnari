@@ -1,0 +1,47 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices"
+  ],
+  "minimumReleaseAge": "8 days",
+  "internalChecksFilter": "strict",
+  "rebaseWhen": "behind-base-branch",
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-minor-patch",
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["pin", "digest", "pinDigest"],
+      "minimumReleaseAge": "0 days",
+      "automerge": true
+    },
+    {
+      "matchManagers": ["helm-values"],
+      "matchPackageNames": ["ghcr.io/bandwidthondemand/nsi-safnari"],
+      "pinDigests": false
+    },
+    {
+      "description": "Stay on the Scala 3.3 LTS line",
+      "matchPackageNames": ["org.scala-lang:scala3-library_3"],
+      "allowedVersions": "<3.4"
+    },
+    {
+      "description": "The plugin and the library are one Play release; update them together",
+      "matchPackageNames": ["org.playframework:sbt-plugin", "org.playframework:play-*"],
+      "groupName": "Play"
+    },
+    {
+      "description": "pekko-testkit must match the Pekko version Play brings in",
+      "matchPackageNames": ["org.apache.pekko:pekko-testkit*"],
+      "enabled": false
+    },
+    {
+      "description": "Test-only Jetty 9.4 under htmlunit-driver; Jetty 10+ is a different API",
+      "matchPackageNames": ["org.eclipse.jetty:**", "org.eclipse.jetty.websocket:**"],
+      "allowedVersions": "<9.5"
+    }
+  ]
+}
