@@ -23,6 +23,6 @@ jobs:
           jvm: temurin:21
           apps: sbt
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: SBT dependency submission
         uses: scalacenter/sbt-dependency-submission@v3
