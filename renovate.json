@@ -42,6 +42,11 @@
       "description": "Test-only Jetty 9.4 under htmlunit-driver; Jetty 10+ is a different API",
       "matchPackageNames": ["org.eclipse.jetty:**", "org.eclipse.jetty.websocket:**"],
       "allowedVersions": "<9.5"
+    },
+    {
+      "description": "Published to GitHub Packages, which Renovate can't read; update by hand",
+      "matchPackageNames": ["nl.surfnet:**", "nl.surfnet.bod:**"],
+      "enabled": false
     }
   ]
 }
