@@ -44,6 +44,11 @@
       "allowedVersions": "<9.5"
     },
     {
+      "description": "plexus-xml 4 is built on Maven 4's xml API; maven-model 3.9 needs the 3.x line",
+      "matchPackageNames": ["org.codehaus.plexus:plexus-xml"],
+      "allowedVersions": "<4"
+    },
+    {
       "description": "Published to GitHub Packages, which Renovate can't read; update by hand",
       "matchPackageNames": ["nl.surfnet:**", "nl.surfnet.bod:**"],
       "enabled": false

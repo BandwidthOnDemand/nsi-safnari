@@ -47,6 +47,8 @@ libraryDependencies ++= Seq(
   "org.playframework" %% "play-specs2" % playVersion % "test",
   "org.glassfish.hk2" % "osgi-resource-locator" % "2.4.0" % "test",
   "com.sun.xml.ws" % "jaxws-rt" % "4.0.3" % "test",
+  // plexus-utils 4 moved its xml classes here; maven-model under play-test still needs them.
+  "org.codehaus.plexus" % "plexus-xml" % "3.1.0" % "test",
   "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion,
   "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion % "test" classifier "tests"
 )
