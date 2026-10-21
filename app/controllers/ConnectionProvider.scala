@@ -68,8 +68,7 @@ class ConnectionProviderController @Inject() (
         case message @ NsiProviderMessage(headers, command: NsiProviderCommand) =>
           handleCommand(NsiProviderMessage(headers, command))(
             connectionProvider.replyToClient(configuration, headers.replyTo)
-          ).map(message.ack)
-      )
+          ).map(message.ack))
     }
 
   private def validateRequest(
@@ -220,7 +219,7 @@ class ConnectionProviderController @Inject() (
       Future.traverse(connections)(c => (c ? Connection.QueryRecursive(FromRequester(message))))
 
     answers onComplete {
-      case Failure(e) => println(s"Answers Future failed: $e")
+      case Failure(e)    => println(s"Answers Future failed: $e")
       case Success(list) =>
         val resultTypes = list.flatMap {
           case ToRequester(NsiRequesterMessage(_, QueryRecursiveConfirmed(resultType))) =>
@@ -275,7 +274,7 @@ class ConnectionProviderController @Inject() (
   private def connectionIdsToConnections(
       ids: Option[Either[Seq[ConnectionId], Seq[GlobalReservationId]]]
   ): Seq[Connection] = ids match
-    case Some(Left(connectionIds)) => connectionManager.find(connectionIds)
+    case Some(Left(connectionIds))         => connectionManager.find(connectionIds)
     case Some(Right(globalReservationIds)) =>
       connectionManager.findByGlobalReservationIds(globalReservationIds)
     case None => connectionManager.all

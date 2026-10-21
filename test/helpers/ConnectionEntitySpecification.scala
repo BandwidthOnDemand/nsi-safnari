@@ -12,7 +12,7 @@ import nl.surfnet.nsiv2.messages.*
 import nl.surfnet.nsiv2.utils.*
 import nl.surfnet.safnari.*
 import NsiMessages.*
-import java.{util as ju}
+import java.util as ju
 
 abstract class ConnectionEntitySpecification extends helpers.Specification:
 

@@ -275,7 +275,7 @@ object LifecycleStateMachine:
   def refusedAsTerminated(exception: ServiceExceptionType): Boolean =
     exception.getErrorId() match
       case NsiError.ReservationNonExistent.id => true
-      case NsiError.InvalidTransition.id =>
+      case NsiError.InvalidTransition.id      =>
         Option(exception.getVariables()).exists(_.getVariable().asScala.exists { variable =>
           variable.getType() == "lifecycleState"
           && variable.getValue().asScala.exists(_.equalsIgnoreCase(TERMINATED.value()))

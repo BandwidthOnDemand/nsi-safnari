@@ -31,8 +31,7 @@ class PackageSpec extends helpers.Specification:
         dt.getSecond(),
         dt.get(ChronoField.MILLI_OF_SECOND),
         dt.getOffset().getTotalSeconds() / 60
-      )
-    )
+      ))
 
   "XML Gregorian Calender order" should {
     "sort a list of calendars" in {

@@ -148,12 +148,13 @@ class DiscoveryService(pceRequester: ActorRef, configuration: Configuration)(imp
       </interface>
       {
         if configuration.NetworkId.isDefined
-        then <feature type="vnd.ogf.nsi.cs.v2.role.uPA"/>
+        then
+          <feature type="vnd.ogf.nsi.cs.v2.role.uPA"/>
         else NodeSeq.Empty
       }
       <feature type="vnd.ogf.nsi.cs.v2.role.aggregator"/>
       {
-        for (peer <- configuration.PeersWith) yield peer.id match
+        for peer <- configuration.PeersWith yield peer.id match
           case Some(id) => <peersWith>{id}</peersWith>
           case _        => NodeSeq.Empty
       }

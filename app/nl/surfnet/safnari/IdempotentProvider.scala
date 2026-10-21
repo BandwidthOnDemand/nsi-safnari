@@ -45,8 +45,7 @@ private case class RequesterCommandStatus(
   def commandReplyReceived(outstandingCommand: InboundMessage): RequesterCommandStatus =
     copy(outstandingCommandsOrReply = outstandingCommandsOrReply match
       case Left(outstandingCommands) => Left(outstandingCommands - outstandingCommand.correlationId)
-      case reply @ Right(_)          => reply
-    )
+      case reply @ Right(_)          => reply)
 end RequesterCommandStatus
 
 class IdempotentProvider(
@@ -84,8 +83,7 @@ class IdempotentProvider(
                 case Left(outstandingCommands) =>
                   outstandingCommands.values.toSeq
                 case Right(reply) =>
-                  List(reply)
-              )
+                  List(reply))
       case _: FromRequester =>
         wrapped(message)(context)
       case _: FromProvider | _: FromPce | _: MessageDeliveryFailure | _: PassedEndTime |

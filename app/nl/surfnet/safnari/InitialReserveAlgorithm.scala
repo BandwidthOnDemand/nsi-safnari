@@ -88,8 +88,7 @@ object InitialReserveAlgorithm:
                 val nextService = next._2.serviceType.service.shallowCopy
                 nextService.withSourceSTP(
                   nextService.sourceStp.withLabel("vlan", vlan.toString()).toString()
-                )
-              )))
+                ))))
             }
             .getOrElse(next)
 

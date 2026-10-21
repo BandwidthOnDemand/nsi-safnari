@@ -248,7 +248,7 @@ class ConnectionEntity(
         case TerminateConfirmed(connectionId) =>
           new QueryResultResponseType().withTerminateConfirmed(genericConfirmed(connectionId))
       )
-      .withCorrelationId(headers.correlationId.toString())
+        .withCorrelationId(headers.correlationId.toString())
         .withResultId(newResultId())
         .withTimeStamp(Instant.now(context.clock).toXMLGregorianCalendar())
       nsiResults = nsiResult :: nsiResults
@@ -290,8 +290,7 @@ class ConnectionEntity(
         case Some(sm) =>
           List(sm) ++ (body match
             case _: ReserveConfirmed | _: ReserveFailed => List(lsm)
-            case _                                      => Nil
-          )
+            case _                                      => Nil)
 
     case AckFromProvider(NsiProviderMessage(headers, body)) =>
       val stateMachine = providerConversations.get(headers.correlationId)
@@ -306,8 +305,7 @@ class ConnectionEntity(
         case Some(sm) =>
           List(sm) ++ (body match
             case _: ReserveResponse => List(lsm)
-            case _                  => Nil
-          )
+            case _                  => Nil)
 
     case _: MessageDeliveryFailure =>
       Nil
@@ -337,7 +335,7 @@ class ConnectionEntity(
         case ToRequester(NsiRequesterMessage(_, _: ReserveCommitConfirmed)) =>
           val children = this.children.childConnections.map {
             case (segment, _, Present(connectionId)) => connectionId -> segment.provider
-            case (segment, _, (Pending | Never)) =>
+            case (segment, _, (Pending | Never))     =>
               throw new IllegalStateException(
                 s"reserveConfirmed with unknown child connectionId for $segment"
               )
