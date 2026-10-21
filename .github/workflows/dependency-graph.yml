@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install JVM 21 + sbt
-        uses: coursier/setup-action@v1
+        uses: coursier/setup-action@648df969f41ef15fda2baba8b37f9fa3d16390a3 # v3
         with:
           jvm: temurin:21
           apps: sbt
