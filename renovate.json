@@ -49,6 +49,21 @@
       "allowedVersions": "<4"
     },
     {
+      "description": "Overrides for the Scala 3.3 compiler's jline 3; jline 4 removed APIs it uses",
+      "matchPackageNames": ["org.jline:**"],
+      "allowedVersions": "<4"
+    },
+    {
+      "description": "play-specs2 3.0 is built on specs2 4; specs2 5 also drops must_==",
+      "matchPackageNames": ["org.specs2:**"],
+      "allowedVersions": "<5"
+    },
+    {
+      "description": "sbt-github-packages and Play's sbt plugin have no sbt 2 release",
+      "matchPackageNames": ["sbt/sbt"],
+      "allowedVersions": "<2"
+    },
+    {
       "description": "Published to GitHub Packages, which Renovate can't read; update by hand",
       "matchPackageNames": ["nl.surfnet:**", "nl.surfnet.bod:**"],
       "enabled": false
