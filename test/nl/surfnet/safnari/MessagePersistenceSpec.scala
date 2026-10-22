@@ -2,6 +2,7 @@ package nl.surfnet.safnari
 
 import java.net.URI
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import nl.surfnet.nsiv2.messages.*
 import nl.surfnet.nsiv2.persistence.MessageData
 import nl.surfnet.nsiv2.persistence.MessageStoreSpecification
@@ -9,13 +10,27 @@ import nl.surfnet.nsiv2.soap.Conversion
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
+import org.specs2.specification.BeforeAfterAll
+import play.api.db.Database
+import play.api.db.Databases
+import play.api.db.evolutions.Evolutions
 import play.api.libs.json.*
 import scala.util.Success
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class MessagePersistenceSpec extends MessageStoreSpecification:
+class MessagePersistenceSpec extends MessageStoreSpecification with BeforeAfterAll:
   import helpers.NsiMessages.*
   import Generators.given
+
+  override lazy val database: Database = Databases(
+    "org.postgresql.Driver",
+    "jdbc:postgresql://localhost/nsi-safnari-test",
+    config = Map("username" -> "nsi-safnari-user", "password" -> "password")
+  )
+
+  // The real evolutions, so a MessageStore query that drifts from the schema fails here.
+  override def beforeAll(): Unit = Evolutions.applyEvolutions(database)
+  override def afterAll(): Unit = database.shutdown()
 
   given Arbitrary[PathComputationAlgorithm] = Arbitrary(
     Gen.oneOf(PathComputationAlgorithm.values.toIndexedSeq)
@@ -23,6 +38,9 @@ class MessagePersistenceSpec extends MessageStoreSpecification:
   given Arbitrary[ServiceType] = Arbitrary(Gen.resultOf(ServiceType.apply _))
   given Arbitrary[PathComputationRequest] = Arbitrary(Gen.resultOf(PathComputationRequest.apply _))
   given Arbitrary[PceRequest] = Arbitrary(arbitrary[PathComputationRequest])
+
+  // The JSON format keeps milliseconds.
+  private def now() = Instant.now().truncatedTo(ChronoUnit.MILLIS)
 
   override type Message = nl.surfnet.safnari.Message
   override given MessageConversion: Conversion[Message, MessageData] =
@@ -61,7 +79,7 @@ class MessagePersistenceSpec extends MessageStoreSpecification:
         Some(newConnectionId()),
         CorrelationId.random(),
         URI.create("https://example.com/endpoint"),
-        Instant.now(),
+        now(),
         "message-delivery-timeout"
       )
     ),
@@ -71,7 +89,7 @@ class MessagePersistenceSpec extends MessageStoreSpecification:
         None,
         CorrelationId.random(),
         URI.create("https://example.com/endpoint"),
-        Instant.now(),
+        now(),
         "message-delivery-timeout"
       )
     ),
@@ -79,7 +97,7 @@ class MessagePersistenceSpec extends MessageStoreSpecification:
       PassedEndTime(
         CorrelationId.random(),
         newConnectionId(),
-        Instant.now()
+        now()
       )
     )
   )

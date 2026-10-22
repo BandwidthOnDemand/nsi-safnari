@@ -27,7 +27,7 @@ lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run mave
 lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
 val playVersion = "3.0.11"
-val playNsiSupportVersion = "3.1.0"
+val playNsiSupportVersion = "3.1.1"
 
 // play-test's unused WithBrowser helper pulls Appium through FluentLenium.
 ThisBuild / excludeDependencies += ExclusionRule("io.appium")
