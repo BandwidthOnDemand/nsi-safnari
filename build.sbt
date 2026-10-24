@@ -26,7 +26,7 @@ ThisBuild / dynverVTagPrefix := false
 lazy val mavenCommand = SettingKey[String]("maven-command", "Command to run maven")
 lazy val deployDist = taskKey[File]("Deploy distribution using maven")
 
-val playVersion = "3.0.11"
+val playVersion = "3.0.12"
 val playNsiSupportVersion = "3.1.1"
 
 // play-test's unused WithBrowser helper pulls Appium through FluentLenium.
