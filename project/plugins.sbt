@@ -1,7 +1,7 @@
 // Comment to get more information during initialization
 logLevel := Level.Warn
 
-addSbtPlugin("org.playframework" % "sbt-plugin" % "3.0.11")
+addSbtPlugin("org.playframework" % "sbt-plugin" % "3.0.12")
 addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.10.0")
 addSbtPlugin("com.typesafe.sbt" % "sbt-less" % "1.1.2")
 addSbtPlugin("org.playframework.twirl" % "sbt-twirl" % "2.0.7")
