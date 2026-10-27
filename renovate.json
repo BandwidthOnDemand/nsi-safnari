@@ -24,13 +24,26 @@
       "pinDigests": false
     },
     {
+      "description": "sbt-plugin probes Central at a path that 404s, so a 429 there aborts the run; read maven-metadata.xml instead",
+      "matchDatasources": ["sbt-plugin"],
+      "matchPackageNames": ["!com.codecommit:sbt-github-packages", "!com.typesafe.sbt:sbt-less"],
+      "overrideDatasource": "maven",
+      "overridePackageName": "{{packageName}}_2.12_1.0"
+    },
+    {
+      "description": "Not on Maven Central; look them up on the sbt plugin repository only",
+      "matchDatasources": ["sbt-plugin"],
+      "matchPackageNames": ["com.codecommit:sbt-github-packages", "com.typesafe.sbt:sbt-less"],
+      "registryUrls": ["https://repo.scala-sbt.org/scalasbt/sbt-plugin-releases"]
+    },
+    {
       "description": "Stay on the Scala 3.3 LTS line",
       "matchPackageNames": ["org.scala-lang:scala3-library_3"],
       "allowedVersions": "<3.4"
     },
     {
       "description": "The plugin and the library are one Play release; update them together",
-      "matchPackageNames": ["org.playframework:sbt-plugin", "org.playframework:play-*"],
+      "matchPackageNames": ["org.playframework:sbt-plugin*", "org.playframework:play-*"],
       "groupName": "Play"
     },
     {
