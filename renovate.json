@@ -42,6 +42,12 @@
       "allowedVersions": "<3.4"
     },
     {
+      "description": "Stay on the Node 24 LTS line; Node 26 also needs libatomic1 in the jammy build stage",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["node"],
+      "allowedVersions": "<25"
+    },
+    {
       "description": "The plugin and the library are one Play release; update them together",
       "matchPackageNames": ["org.playframework:sbt-plugin*", "org.playframework:play-*"],
       "groupName": "Play"
