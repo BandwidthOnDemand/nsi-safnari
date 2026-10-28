@@ -14,6 +14,9 @@ The [sbt-github-packages](https://github.com/djspiewak/sbt-github-packages)
 plugin used needs a GITHUB_TOKEN environment variable containing a GitHub
 personal access token with the package:write permission set.
 
+The theme stylesheets are compiled from LESS with Node.js, which must be on
+the PATH.
+
 ### PostgreSQL
 
 Safnari uses a PostgreSQL database to store the in en out going messages. The

@@ -32,6 +32,7 @@ Tests run with `-Dconfig.file=conf/test.conf` which uses dummy PCE and NSI actor
 
 - Java 21 (configured via `-release:21` in scalacOptions)
 - SBT 1.10.2
+- Node.js on the PATH: sbt-less compiles `app/assets/css/theme-*.less` with it
 - `GITHUB_TOKEN` environment variable for resolving `play-nsi-support` from GitHub Packages
 
 ## Architecture
