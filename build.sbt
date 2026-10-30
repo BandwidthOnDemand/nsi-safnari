@@ -11,7 +11,7 @@ githubTokenSource := (
     || TokenSource.Environment("GITHUB_TOKEN")
 )
 
-scalaVersion := "3.3.8"
+scalaVersion := "3.3.9"
 
 scalacOptions ++= Seq(
   "-deprecation",
