@@ -65,7 +65,7 @@ dependencyOverrides ++= Seq(
   "org.codehaus.plexus" % "plexus-utils" % "4.1.0",
   "ch.qos.logback" % "logback-core" % "1.6.5",
   "ch.qos.logback" % "logback-classic" % "1.6.5",
-  "at.yawk.lz4" % "lz4-java" % "1.12.0",
+  "at.yawk.lz4" % "lz4-java" % "1.12.1",
   "org.jsoup" % "jsoup" % "1.23.2",
   // Scala 3 compiler/scaladoc toolchain only (scalaInstance), never on the app classpath.
   "org.jline" % "jline-reader" % "3.30.17",
