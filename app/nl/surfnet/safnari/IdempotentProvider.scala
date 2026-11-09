@@ -25,16 +25,13 @@ package nl.surfnet.safnari
 import nl.surfnet.nsiv2.*
 import nl.surfnet.nsiv2.messages.*
 import org.ogf.schemas.nsi._2013._12.framework.types.ServiceExceptionType
+import play.api.Logger
 
 private case class RequesterCommandStatus(
     command: FromRequester,
     outstandingCommandsOrReply: Either[Map[CorrelationId, OutboundMessage], ToRequester]
 ):
   def replySent(reply: ToRequester): RequesterCommandStatus =
-    assert(
-      command.correlationId == reply.correlationId,
-      s"reply $reply correlationId did not match command $command correlationId"
-    )
     copy(outstandingCommandsOrReply = Right(reply))
 
   def commandsSent(commands: Seq[OutboundMessage]): RequesterCommandStatus =
@@ -56,6 +53,7 @@ class IdempotentProvider(
 ) extends (
         InboundMessage => ConnectionContext => Either[ServiceExceptionType, Seq[OutboundMessage]]
     ):
+  private val logger = Logger(classOf[IdempotentProvider])
   private var requesterCommands = Map.empty[CorrelationId, RequesterCommandStatus]
   private var outgoingToRequesterCommands = Map.empty[CorrelationId, CorrelationId]
 
@@ -122,14 +120,20 @@ class IdempotentProvider(
       requesterCommand.correlationId,
       RequesterCommandStatus(requesterCommand, Left(Map.empty))
     )
-
-    val updatedStatus = requesterReply match
-      case None =>
-        currentStatus.commandsSent(newOutstandingCommands)
-      case Some(reply) =>
-        currentStatus.replySent(reply)
-    requesterCommands = requesterCommands.updated(requesterCommand.correlationId, updatedStatus)
+    requesterCommands = requesterCommands.updated(
+      requesterCommand.correlationId,
+      currentStatus.commandsSent(newOutstandingCommands)
+    )
+    requesterReply.foreach(recordReply)
   end recordOutput
+
+  /** A reply belongs to the command whose correlationId it carries, e.g. a retried terminate's. */
+  private def recordReply(reply: ToRequester): Unit =
+    requesterCommands.get(reply.correlationId) match
+      case Some(status) =>
+        requesterCommands = requesterCommands.updated(reply.correlationId, status.replySent(reply))
+      case None =>
+        logger.warn(s"No requester command for reply ${reply.correlationId}, not recorded")
 
   private def sameMessage(
       a: NsiProviderMessage[NsiProviderOperation],

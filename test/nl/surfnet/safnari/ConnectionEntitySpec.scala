@@ -1437,6 +1437,24 @@ class ConnectionEntitySpec extends helpers.ConnectionEntitySpecification:
           )
         )
 
+      "confirm the retried terminate when a child answers the first terminate late" in new ReservedConnectionWithTwoSegments:
+        `given`(
+          ura.request(newCorrelationId, Terminate(ConnectionId)),
+          upa.response(CorrelationId(0, 11), TerminateConfirmed("ConnectionIdA"))
+        )
+        val RetryCorrelationId = newCorrelationId
+        `given`(ura.request(RetryCorrelationId, Terminate(ConnectionId)))
+        val confirmed = agg.response(RetryCorrelationId, TerminateConfirmed(ConnectionId))
+
+        when(upa.response(CorrelationId(0, 12), TerminateConfirmed("ConnectionIdB")))
+
+        lifecycleState must beEqualTo(LifecycleStateEnumType.TERMINATED)
+        messages must contain(exactly[Message](confirmed))
+
+        when(ura.request(RetryCorrelationId, Terminate(ConnectionId)))
+
+        messages aka "the retried terminate's retransmit" must contain(exactly[Message](confirmed))
+
       "refuse terminate once terminated" in new ReservedConnection:
         `given`(
           ura.request(newCorrelationId, Terminate(ConnectionId)),
