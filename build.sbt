@@ -66,7 +66,7 @@ dependencyOverrides ++= Seq(
   "ch.qos.logback" % "logback-core" % "1.6.6",
   "ch.qos.logback" % "logback-classic" % "1.6.6",
   "at.yawk.lz4" % "lz4-java" % "1.12.1",
-  "org.jsoup" % "jsoup" % "1.23.2",
+  "org.jsoup" % "jsoup" % "1.24.1",
   // Scala 3 compiler/scaladoc toolchain only (scalaInstance), never on the app classpath.
   "org.jline" % "jline-reader" % "3.30.17",
   "org.jline" % "jline-terminal" % "3.30.17",
