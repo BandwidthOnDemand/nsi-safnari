@@ -75,7 +75,7 @@ dependencyOverrides ++= Seq(
   // Selenium/HtmlUnit test-only deps (via play-test's WithBrowser helper, unused by this
   // app): opentelemetry-api and jetty-http can move within their own line without
   // disturbing the selenium-api version htmlunit-driver 4.13.0 was built against.
-  "io.opentelemetry" % "opentelemetry-api" % "1.67.0",
+  "io.opentelemetry" % "opentelemetry-api" % "1.68.0",
   "org.eclipse.jetty" % "jetty-http" % "9.4.58.v20250814",
   "org.eclipse.jetty" % "jetty-client" % "9.4.58.v20250814",
   "org.eclipse.jetty" % "jetty-io" % "9.4.58.v20250814",
