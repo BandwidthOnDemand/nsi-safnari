@@ -54,18 +54,18 @@ libraryDependencies ++= Seq(
 )
 
 dependencyOverrides ++= Seq(
-  "com.fasterxml.jackson.core" % "jackson-core" % "2.22.4",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.22.4",
-  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.22",
-  "com.fasterxml.jackson.datatype" % "jackson-datatype-jdk8" % "2.22.4",
-  "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.22.4",
-  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.22.4",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.23.0",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.23.0",
+  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.23",
+  "com.fasterxml.jackson.datatype" % "jackson-datatype-jdk8" % "2.23.0",
+  "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.23.0",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.23.0",
   "commons-beanutils" % "commons-beanutils" % "1.11.0",
   "org.apache.commons" % "commons-lang3" % "3.21.0",
   "org.codehaus.plexus" % "plexus-utils" % "4.1.0",
   "ch.qos.logback" % "logback-core" % "1.6.6",
   "ch.qos.logback" % "logback-classic" % "1.6.6",
-  "at.yawk.lz4" % "lz4-java" % "1.13.0",
+  "at.yawk.lz4" % "lz4-java" % "1.14.0",
   "org.jsoup" % "jsoup" % "1.24.1",
   // Scala 3 compiler/scaladoc toolchain only (scalaInstance), never on the app classpath.
   "org.jline" % "jline-reader" % "3.30.17",
