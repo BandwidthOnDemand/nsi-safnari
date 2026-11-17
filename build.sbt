@@ -61,7 +61,7 @@ dependencyOverrides ++= Seq(
   "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.23.0",
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.23.0",
   "commons-beanutils" % "commons-beanutils" % "1.11.0",
-  "org.apache.commons" % "commons-lang3" % "3.21.0",
+  "org.apache.commons" % "commons-lang3" % "3.22.0",
   "org.codehaus.plexus" % "plexus-utils" % "4.1.0",
   "ch.qos.logback" % "logback-core" % "1.6.6",
   "ch.qos.logback" % "logback-classic" % "1.6.6",
