@@ -2,7 +2,7 @@
 #
 # The staged app is pure JVM bytecode, identical on every platform, so build it once natively
 # instead of under QEMU for each target platform.
-FROM --platform=$BUILDPLATFORM node:24.22.2-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS node
+FROM --platform=$BUILDPLATFORM node:24.22.3-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS node
 
 FROM --platform=$BUILDPLATFORM sbtscala/scala-sbt:eclipse-temurin-jammy-21.0.2_13_1.10.2_3.5.1@sha256:32c8dfdcbd9220d9d392a53e20699995a386deb678773490d195f108bd6f5356 AS build
 # sbt-less compiles the stylesheets with node; jammy's apt package is Node 12
