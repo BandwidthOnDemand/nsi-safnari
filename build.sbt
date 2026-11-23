@@ -48,7 +48,7 @@ libraryDependencies ++= Seq(
   "org.glassfish.hk2" % "osgi-resource-locator" % "3.0.0" % "test",
   "com.sun.xml.ws" % "jaxws-rt" % "4.0.5" % "test",
   // plexus-utils 4 moved its xml classes here; maven-model under play-test still needs them.
-  "org.codehaus.plexus" % "plexus-xml" % "3.1.0" % "test",
+  "org.codehaus.plexus" % "plexus-xml" % "3.1.1" % "test",
   "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion,
   "nl.surfnet" %% "play-nsi-support" % playNsiSupportVersion % "test" classifier "tests"
 )
@@ -62,9 +62,9 @@ dependencyOverrides ++= Seq(
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.23.0",
   "commons-beanutils" % "commons-beanutils" % "1.11.0",
   "org.apache.commons" % "commons-lang3" % "3.22.0",
-  "org.codehaus.plexus" % "plexus-utils" % "4.1.0",
-  "ch.qos.logback" % "logback-core" % "1.6.6",
-  "ch.qos.logback" % "logback-classic" % "1.6.6",
+  "org.codehaus.plexus" % "plexus-utils" % "4.2.0",
+  "ch.qos.logback" % "logback-core" % "1.6.7",
+  "ch.qos.logback" % "logback-classic" % "1.6.7",
   "at.yawk.lz4" % "lz4-java" % "1.14.0",
   "org.jsoup" % "jsoup" % "1.24.1",
   // Scala 3 compiler/scaladoc toolchain only (scalaInstance), never on the app classpath.
