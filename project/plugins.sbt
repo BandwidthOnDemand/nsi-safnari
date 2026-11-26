@@ -2,7 +2,7 @@
 logLevel := Level.Warn
 
 addSbtPlugin("org.playframework" % "sbt-plugin" % "3.0.12")
-addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.13.2")
+addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.14.0")
 addSbtPlugin("com.typesafe.sbt" % "sbt-less" % "1.1.2")
 addSbtPlugin("org.playframework.twirl" % "sbt-twirl" % "2.0.9")
 addSbtPlugin("com.codecommit" % "sbt-github-packages" % "0.5.3")
