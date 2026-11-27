@@ -63,8 +63,8 @@ dependencyOverrides ++= Seq(
   "commons-beanutils" % "commons-beanutils" % "1.11.0",
   "org.apache.commons" % "commons-lang3" % "3.22.0",
   "org.codehaus.plexus" % "plexus-utils" % "4.2.0",
-  "ch.qos.logback" % "logback-core" % "1.6.7",
-  "ch.qos.logback" % "logback-classic" % "1.6.7",
+  "ch.qos.logback" % "logback-core" % "1.6.8",
+  "ch.qos.logback" % "logback-classic" % "1.6.8",
   "at.yawk.lz4" % "lz4-java" % "1.14.1",
   "org.jsoup" % "jsoup" % "1.24.1",
   // Scala 3 compiler/scaladoc toolchain only (scalaInstance), never on the app classpath.
